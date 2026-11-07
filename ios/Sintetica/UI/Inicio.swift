@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct Inicio: View {
     @Binding var ruta: [Ruta]
     private var vinculados = Vinculados.compartidos

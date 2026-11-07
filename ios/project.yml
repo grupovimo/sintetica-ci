@@ -8,7 +8,7 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    SWIFT_VERSION: "5.9"
+    SWIFT_VERSION: "5.0"
     CLANG_CXX_LANGUAGE_STANDARD: c++17
     GCC_ENABLE_CPP_EXCEPTIONS: NO
     GCC_ENABLE_CPP_RTTI: NO
@@ -50,6 +50,7 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+        HEADER_SEARCH_PATHS: ["$(SRCROOT)/../firmware/api", "$(SRCROOT)/../firmware/nucleo"]
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Sintetica.app/Sintetica"
         BUNDLE_LOADER: "$(TEST_HOST)"
 schemes:

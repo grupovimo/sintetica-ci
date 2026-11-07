@@ -55,7 +55,8 @@ final class NucleoTests: XCTestCase {
         var a = EditorConfig.leer(config)
         a.energia = 0.9
         try await c.mandarConfig(EditorConfig.escribir(config, a))
-        XCTAssertEqual(EditorConfig.leer(try await c.pedirConfig()).energia, 0.9, accuracy: 0.001)
+        let final = try await c.pedirConfig()
+        XCTAssertEqual(EditorConfig.leer(final).energia, 0.9, accuracy: 0.001)
     }
 
     func testVistaPreviaAlDoble() {

@@ -65,7 +65,7 @@ enum Nucleo {
         sintetica_iniciar(&h, Int32(ancho), Int32(alto))
     }
 
-    nonisolated(unsafe) static let inicioSinAislar = Date()
+    nonisolated static let inicioSinAislar = Date()
 
     static func vistaPrevia() { sintetica_vista_previa() }
     static func tick() { sintetica_tick() }

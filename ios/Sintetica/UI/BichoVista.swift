@@ -15,6 +15,8 @@ final class ModeloBicho {
     private(set) var cliente: ClienteBicho?
     @ObservationIgnored private var configTexto = "{\"version\":1}"
     @ObservationIgnored private var espejo: Task<Void, Never>?
+    /// El núcleo guarda al anfitrión con una referencia débil: el modelo lo mantiene vivo.
+    @ObservationIgnored private let anfitrionVistaPrevia = AnfitrionEnMemoria()
     var esDemo: Bool { id == ID_DEMO }
 
     init(id: String) { self.id = id }
@@ -41,7 +43,7 @@ final class ModeloBicho {
                     return
                 }
                 // La vista previa: un núcleo local con la misma config.
-                Nucleo.iniciar(identificador: id, anfitrion: AnfitrionEnMemoria())
+                Nucleo.iniciar(identificador: id, anfitrion: anfitrionVistaPrevia)
                 Nucleo.vistaPrevia()
             }
             cliente = c
@@ -125,6 +127,7 @@ private func colorDeHex(_ hex: String?) -> Color {
     return Color(hex: v)
 }
 
+@MainActor
 struct BichoVista: View {
     @Binding var ruta: [Ruta]
     @State private var modelo: ModeloBicho

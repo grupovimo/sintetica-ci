@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct Vinculando: View {
     let qr: DatosQr
     @Binding var ruta: [Ruta]

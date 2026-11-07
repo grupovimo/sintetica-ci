@@ -39,7 +39,7 @@ enum Tipos {
             if let v = ejes[tag] ?? ejes[etiqueta] { porId[id] = v }
         }
         let d = base.fontDescriptor.addingAttributes([UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String): porId])
-        return Font(UIFont(descriptor: d, size: tamano))
+        return Font(UIFont(descriptor: d, size: tamano) as CTFont)
     }
 
     private static func tag(_ n: UInt32) -> String {

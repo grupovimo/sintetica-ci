@@ -51,5 +51,5 @@ enum EditorConfig {
         return String(decoding: datos, as: UTF8.self)
     }
 
-    static func hhmmValido(_ s: String) -> Bool { s.wholeMatch(of: /([01][0-9]|2[0-3]):[0-5][0-9]/) != nil }
+    static func hhmmValido(_ s: String) -> Bool { s.wholeMatch(of: #/([01][0-9]|2[0-3]):[0-5][0-9]/#) != nil }
 }

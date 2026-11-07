@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import SwiftUI
 
+@MainActor
 struct Escanear: View {
     @Binding var ruta: [Ruta]
     @State private var aviso: String?

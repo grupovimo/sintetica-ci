@@ -169,7 +169,7 @@ struct DatosQr: Equatable, Hashable { let id: String; let codigo: String }
 /// El QR del bicho: "SINTETICA:V1/<id de 12>/<código de 6>".
 func leerQr(_ texto: String) -> DatosQr? {
     let t = texto.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard let m = t.wholeMatch(of: /SINTETICA:V1\/([0-9A-F]{12})\/([2-9A-HJKMNP-Z]{6})/) else { return nil }
+    guard let m = t.wholeMatch(of: #/SINTETICA:V1\/([0-9A-F]{12})\/([2-9A-HJKMNP-Z]{6})/#) else { return nil }
     return DatosQr(id: String(m.1), codigo: String(m.2))
 }
 

@@ -2,6 +2,7 @@ import SwiftUI
 
 /// La cara del bicho dibujada por el mismo núcleo C++ que corre en la placa,
 /// a 640 × 344 (el doble de la pantalla real, con la misma geometría).
+@MainActor
 struct VistaPrevia: View {
     let descripcion: String
     let alApretar: (Bool) -> Void
