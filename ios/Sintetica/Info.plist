@@ -36,8 +36,6 @@
 		<!-- En local, la API corre en la Mac por HTTP. En producción va por HTTPS. -->
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Para hablar con el servidor de Sintética en tu red (en desarrollo).</string>

@@ -152,5 +152,5 @@ anotado acá a propósito):
 - Guardar `claves/ota-privada.pem` fuera del servidor de la web, con copia
   segura: perderla obliga a reflashear por USB todos los bichos.
 - Sacar `DESARROLLO=1`, los bichos virtuales y, en las apps, el permiso de
-  HTTP sin cifrar (`res/xml/red.xml` en Android, `NSAllowsArbitraryLoads` en iOS).
+  HTTP sin cifrar (`res/xml/red.xml` en Android, `NSAllowsLocalNetworking` en iOS).
 - El cifrado del enlace BLE y secure boot quedan para M8.

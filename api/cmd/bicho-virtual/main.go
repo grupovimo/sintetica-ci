@@ -196,12 +196,15 @@ func (b *bicho) conectarMqtt(url, usuario, clave string) mqtt.Client {
 		SetKeepAlive(30*time.Second).SetCleanSession(true).SetWill(conexion, "0", 1, true)
 	o.SetOnConnectHandler(func(c mqtt.Client) {
 		b.log.Info("conectado a la nube", "broker", broker)
-		c.Subscribe("bicho/"+id+"/cmd", 1, func(_ mqtt.Client, m mqtt.Message) {
+		tk := c.Subscribe("bicho/"+id+"/cmd", 1, func(_ mqtt.Client, m mqtt.Message) {
 			p := m.Payload()
 			if len(p) >= 2 {
 				b.entrada <- entradaNube{car: p[0], datos: append([]byte(nil), p[1:]...)}
 			}
 		})
+		// Se anuncia recién con la suscripción confirmada: si no, lo primero
+		// que le manda la API se pierde.
+		tk.WaitTimeout(10 * time.Second)
 		c.Publish(conexion, 1, true, "1")
 		b.conectado.Store(true)
 		nucleo.Conexiones(true, true)

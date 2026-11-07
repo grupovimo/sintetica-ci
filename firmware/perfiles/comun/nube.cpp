@@ -59,6 +59,10 @@ void alEvento(void*, esp_event_base_t, int32_t id, void* datos) {
     case MQTT_EVENT_CONNECTED:
       g_rechazado = false;
       esp_mqtt_client_subscribe(g_cliente, g_topicoCmd, 1);
+      break;
+    case MQTT_EVENT_SUBSCRIBED:
+      // Se anuncia recién con la suscripción confirmada: si no, lo primero
+      // que le manda la API se pierde.
       esp_mqtt_client_publish(g_cliente, g_topicoConexion, "1", 1, 1, 1);
       g_conectado = true;
       Serial.println("[nube] conectado");

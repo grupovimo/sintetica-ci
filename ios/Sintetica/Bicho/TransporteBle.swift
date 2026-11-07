@@ -114,6 +114,8 @@ final class TransporteBle: NSObject, Transporte, CBPeripheralDelegate {
     private let periferico: CBPeripheral
     private var caracteristicas: [Car: CBCharacteristic] = [:]
     private var pendiente: CheckedContinuation<[UInt8], Error>?
+    /// Cuenta las operaciones: el plazo de una no tiene que cortar a la que vino después.
+    private var numeroOperacion = 0
 
     init(_ p: CBPeripheral) {
         periferico = p
@@ -124,10 +126,12 @@ final class TransporteBle: NSObject, Transporte, CBPeripheralDelegate {
     private func operacion(_ lanzar: () -> Void) async throws -> [UInt8] {
         try await withCheckedThrowingContinuation { c in
             pendiente = c
+            numeroOperacion += 1
+            let n = numeroOperacion
             lanzar()
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(5))
-                if let p = self.pendiente { self.pendiente = nil; p.resume(throwing: ErrorBle.tiempo) }
+                if n == self.numeroOperacion, let p = self.pendiente { self.pendiente = nil; p.resume(throwing: ErrorBle.tiempo) }
             }
         }
     }

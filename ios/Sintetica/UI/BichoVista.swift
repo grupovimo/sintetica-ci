@@ -188,8 +188,10 @@ final class ModeloBicho {
     func buscarFirmwares() async {
         let perfil = cliente?.estado?.perfil ?? ""
         guard Cuenta.compartida.activa, !perfil.isEmpty else { mensajeOta = "Entrá a tu cuenta para ver las versiones."; return }
-        do { firmwares = try await Cuenta.compartida.api.firmwares(perfil: perfil) } catch { mensajeOta = error.localizedDescription }
-        if firmwares.isEmpty { mensajeOta = "No hay versiones para \(perfil)." }
+        do {
+            firmwares = try await Cuenta.compartida.api.firmwares(perfil: perfil)
+            mensajeOta = firmwares.isEmpty ? "No hay versiones para \(perfil)." : nil
+        } catch { mensajeOta = error.localizedDescription }
     }
 
     /// Baja el firmware firmado de la API y se lo manda al bicho por BLE.

@@ -57,6 +57,7 @@ type trabajador struct {
 
 	pendiente       bool
 	esperandoAviso  bool // recién reconectado: hasta que mande su estado o su conexión, no escucha
+	avisoEn         time.Time
 	proximoIntento  time.Time
 	otaNuevaDesde   time.Time // cuándo volvió con la versión nueva de una OTA
 	estadoEn        time.Time // cuándo llegó el último estado
@@ -68,8 +69,9 @@ func nuevoTrabajador(n *Nube, id string) *trabajador {
 }
 
 func (t *trabajador) correr() {
-	reloj := time.NewTicker(15 * time.Second)
+	reloj := time.NewTicker(time.Second)
 	defer reloj.Stop()
+	vueltas := 0
 	for {
 		select {
 		case <-t.n.ctx.Done():
@@ -77,14 +79,14 @@ func (t *trabajador) correr() {
 		case e := <-t.entrada:
 			t.manejar(e)
 		case <-reloj.C:
-			if t.estado != nil {
+			if vueltas++; vueltas%15 == 0 && t.estado != nil {
 				t.revisarOta(*t.estado)
 			}
 		}
 		if t.pendiente && !t.puede() && time.Now().After(t.proximoIntento) {
 			t.n.log.Debug("no puedo sincronizar todavía", "bicho", t.id, "conectado", t.conectado, "estado", t.estado != nil)
 		}
-		if t.pendiente && t.puede() && time.Now().After(t.proximoIntento) {
+		if t.pendiente && t.puede() && time.Now().After(t.proximoIntento) && time.Since(t.avisoEn) > time.Second {
 			if err := t.sincronizar(); err != nil {
 				t.n.log.Warn("sincronización", "bicho", t.id, "error", err)
 				t.proximoIntento = time.Now().Add(20 * time.Second)
@@ -126,6 +128,9 @@ func (t *trabajador) manejar(e entrada) {
 			return
 		}
 		cambioConfig := t.estado == nil || t.estado.CrcConfig != est.CrcConfig
+		if t.esperandoAviso {
+			t.avisoEn = time.Now()
+		}
 		t.esperandoAviso = false
 		t.estado = &est
 		t.estadoEn = time.Now()
@@ -140,6 +145,9 @@ func (t *trabajador) manejar(e entrada) {
 		}
 	case entConexion:
 		if e.conectado {
+			if t.esperandoAviso {
+				t.avisoEn = time.Now()
+			}
 			t.esperandoAviso = false
 		}
 		if t.conectado == e.conectado {
