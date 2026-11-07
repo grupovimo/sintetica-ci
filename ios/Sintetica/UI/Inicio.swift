@@ -34,7 +34,10 @@ struct Inicio: View {
                 }
             }
             BotonPrimario(texto: "Vincular un bicho") { ruta.append(.escanear) }
-            BotonSecundario(texto: "Probar sin bicho") { ruta.append(.bicho(ID_DEMO)) }
+            HStack(spacing: 8) {
+                BotonSecundario(texto: "Probar sin bicho") { ruta.append(.bicho(ID_DEMO)) }
+                BotonSecundario(texto: "Probar el broche") { ruta.append(.bicho(ID_DEMO_BROCHE)) }
+            }
         }
         .padding(24)
         .background(Color.papel.ignoresSafeArea())

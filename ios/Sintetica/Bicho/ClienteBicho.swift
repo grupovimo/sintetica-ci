@@ -123,6 +123,38 @@ final class ClienteBicho {
         try await actualizarEstado()
     }
 
+    /// Manda una imagen QOI (del tamaño de la pantalla) a un espacio, avisando el progreso (0 a 1).
+    func subirImagen(_ espacio: Int, _ qoi: [UInt8], progreso: @escaping (Double) -> Void = { _ in }) async throws {
+        let flujo = transporte.difusor.escuchar()
+        let escrituras = escriturasDeImagen(espacio, qoi)
+        for (i, e) in escrituras.enumerated() {
+            try await transporte.escribir(.imagen, e)
+            progreso(Double(i + 1) / Double(escrituras.count))
+        }
+        let r: Respuesta = try await conTiempo(15) {
+            for await (c, b) in flujo where c == .imagen {
+                let r = leerRespuesta(b)
+                if r.op == Op.imgFin || (r.op != Op.imgListar && !r.ok) { return r }
+            }
+            throw ErrorBicho.tiempo
+        }
+        guard r.ok else { throw ErrorBicho.rechazo("El bicho no aceptó la imagen: \(r.mensaje)") }
+    }
+
+    func borrarImagen(_ espacio: Int) async throws { try await exigir(.imagen, ComandoImagen.borrar(espacio)) }
+
+    func listarImagenes() async throws -> [EspacioImagen] {
+        let flujo = transporte.difusor.escuchar()
+        try await transporte.escribir(.imagen, ComandoImagen.listar())
+        return try await conTiempo(5) {
+            for await (c, b) in flujo where c == .imagen && b.first == (Op.imgListar | Op.respuesta) {
+                guard b.count > 1, b[1] == 0 else { throw ErrorBicho.rechazo(leerRespuesta(b).mensaje) }
+                return leerListaImagenes(b)
+            }
+            throw ErrorBicho.tiempo
+        }
+    }
+
     func cerrar() {
         escucha?.cancel()
         transporte.cerrar()

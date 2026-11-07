@@ -10,10 +10,11 @@ enum Uuids {
     static let comando = CBUUID(string: "5157e71c-a000-4b1c-8a5e-000000000003")
     static let estado = CBUUID(string: "5157e71c-a000-4b1c-8a5e-000000000004")
     static let ota = CBUUID(string: "5157e71c-a000-4b1c-8a5e-000000000005")
+    static let imagen = CBUUID(string: "5157e71c-a000-4b1c-8a5e-000000000006")
 }
 
 enum Car: Int, CaseIterable, Sendable {
-    case config = 1, comando = 2, estado = 3, ota = 4
+    case config = 1, comando = 2, estado = 3, ota = 4, imagen = 5
 
     var uuid: CBUUID {
         switch self {
@@ -21,6 +22,7 @@ enum Car: Int, CaseIterable, Sendable {
         case .comando: Uuids.comando
         case .estado: Uuids.estado
         case .ota: Uuids.ota
+        case .imagen: Uuids.imagen
         }
     }
 
@@ -34,6 +36,7 @@ enum Op {
     static let configInicio: UInt8 = 0x01, configBloque: UInt8 = 0x02, configFin: UInt8 = 0x03, configPedir: UInt8 = 0x04
     static let expresion: UInt8 = 0x10, nombre: UInt8 = 0x11, evento: UInt8 = 0x12
     static let vincular: UInt8 = 0x13, autenticar: UInt8 = 0x14, desvincular: UInt8 = 0x15
+    static let imgInicio: UInt8 = 0x20, imgBloque: UInt8 = 0x21, imgFin: UInt8 = 0x22, imgBorrar: UInt8 = 0x23, imgListar: UInt8 = 0x24
     static let respuesta: UInt8 = 0x80, configTrozo: UInt8 = 0x84, configCierre: UInt8 = 0x85
 }
 
@@ -42,7 +45,8 @@ let MODOS = ["mascota", "reloj", "pomodoro", "clima", "notificaciones"]
 
 private let MENSAJES: [Int: String] = [
     0: "ok", 1: "muy grande", 2: "fuera de orden", 3: "CRC distinto", 4: "JSON inválido", 5: "config inválida",
-    6: "sin inicio", 7: "no existe", 8: "malformado", 9: "no autorizado", 10: "no está mostrando el QR", 255: "no implementado",
+    6: "sin inicio", 7: "no existe", 8: "malformado", 9: "no autorizado", 10: "no está mostrando el QR", 11: "imagen inválida",
+    255: "no implementado",
 ]
 
 private func u32(_ v: UInt32) -> [UInt8] { [UInt8(v & 0xFF), UInt8(v >> 8 & 0xFF), UInt8(v >> 16 & 0xFF), UInt8(v >> 24 & 0xFF)] }
@@ -68,6 +72,38 @@ enum Comando {
     static func autenticar(_ clave: [UInt8]) -> [UInt8] { [Op.autenticar] + clave }
     static func desvincular() -> [UInt8] { [Op.desvincular] }
     static func pedirConfig() -> [UInt8] { [Op.configPedir] }
+}
+
+/// Una imagen QOI (del tamaño de la pantalla) en las escrituras de la característica Imagen.
+func escriturasDeImagen(_ espacio: Int, _ qoi: [UInt8], tamanoBloque: Int = 180) -> [[UInt8]] {
+    let porBloque = tamanoBloque - 5
+    var salida: [[UInt8]] = [[Op.imgInicio, UInt8(espacio)] + u32(UInt32(qoi.count)) + u32(crc32(qoi))]
+    var off = 0
+    while off < qoi.count {
+        let fin = min(qoi.count, off + porBloque)
+        salida.append([Op.imgBloque] + u32(UInt32(off)) + Array(qoi[off ..< fin]))
+        off = fin
+    }
+    salida.append([Op.imgFin])
+    return salida
+}
+
+enum ComandoImagen {
+    static func borrar(_ espacio: Int) -> [UInt8] { [Op.imgBorrar, UInt8(espacio)] }
+    static func listar() -> [UInt8] { [Op.imgListar] }
+}
+
+struct EspacioImagen: Equatable, Sendable { let espacio: Int; let largo: UInt32; let crc: UInt32 }
+
+/// La respuesta a ComandoImagen.listar(): los espacios ocupados.
+func leerListaImagenes(_ b: [UInt8]) -> [EspacioImagen] {
+    var l: [EspacioImagen] = []
+    var i = 3
+    while i + 9 <= b.count {
+        l.append(EspacioImagen(espacio: Int(b[i]), largo: leerU32(b, i + 1), crc: leerU32(b, i + 5)))
+        i += 9
+    }
+    return l
 }
 
 /// Parte la config (texto JSON) en las escrituras de la característica Config.
@@ -135,7 +171,13 @@ struct ArmadorDeConfig {
     }
 }
 
+struct Pantalla: Equatable, Sendable {
+    var ancho = 320, alto = 172
+    var redonda = false
+}
+
 struct Estado: Equatable, Sendable {
+    var pantalla = Pantalla()
     var bateria: Int?
     var humor: Float
     var modo: String
@@ -144,7 +186,7 @@ struct Estado: Equatable, Sendable {
 }
 
 func leerEstado(_ b: [UInt8]) throws -> Estado {
-    guard b.first == 1 || b.first == 2 else { throw ErrorProtocolo.estadoDesconocido(b.first ?? 0) }
+    guard let v = b.first, (1 ... 3).contains(v) else { throw ErrorProtocolo.estadoDesconocido(b.first ?? 0) }
     var i = 5
     func campo() -> String {
         let n = Int(b[i])
@@ -156,7 +198,11 @@ func leerEstado(_ b: [UInt8]) throws -> Estado {
     let serie = b[0] >= 2 ? campo() : ""
     let id = b[0] >= 2 ? campo() : ""
     let flags = b[4]
+    let pantalla = b[0] >= 3
+        ? Pantalla(ancho: Int(b[i]) | Int(b[i + 1]) << 8, alto: Int(b[i + 2]) | Int(b[i + 3]) << 8, redonda: b[i + 4] == 1)
+        : Pantalla()
     return Estado(
+        pantalla: pantalla,
         bateria: b[1] == 255 ? nil : Int(b[1]), humor: Float(Int8(bitPattern: b[2])) / 100,
         modo: Int(b[3]) < MODOS.count ? MODOS[Int(b[3])] : "?",
         dormido: flags & 1 != 0, fija: flags & 2 != 0, emparejando: flags & 4 != 0, autenticado: flags & 8 != 0,

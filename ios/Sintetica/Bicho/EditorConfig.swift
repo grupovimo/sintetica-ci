@@ -9,6 +9,8 @@ struct Ajustes: Equatable {
     var timidez: Double = 0.3      // 0 a 1
     var suenoDesde: String? = nil  // "HH:MM"
     var suenoHasta: String? = nil
+    var lista: [String] = []        // "cara:<nombre>" o "imagen:<0-7>"
+    var rotar = 0                   // minutos; 0 = no rota
 }
 
 /// Lee y escribe los ajustes sobre el JSON completo de la config, sin tocar lo
@@ -29,7 +31,9 @@ enum EditorConfig {
             tamano: (cara["tamano"] as? NSNumber)?.doubleValue ?? 1,
             energia: (per["energia"] as? NSNumber)?.doubleValue ?? 0.5,
             timidez: (per["timidez"] as? NSNumber)?.doubleValue ?? 0.3,
-            suenoDesde: sueno?.first, suenoHasta: sueno?.dropFirst().first
+            suenoDesde: sueno?.first, suenoHasta: sueno?.dropFirst().first,
+            lista: raiz["lista"] as? [String] ?? [],
+            rotar: (raiz["rotar"] as? NSNumber)?.intValue ?? 0
         )
     }
 
@@ -47,6 +51,8 @@ enum EditorConfig {
         per["timidez"] = redondo(a.timidez)
         if let d = a.suenoDesde, let h = a.suenoHasta { per["sueno"] = "\(d)-\(h)" } else { per.removeValue(forKey: "sueno") }
         raiz["personalidad"] = per
+        raiz["lista"] = a.lista
+        raiz["rotar"] = a.rotar
         let datos = (try? JSONSerialization.data(withJSONObject: raiz, options: [.sortedKeys, .withoutEscapingSlashes])) ?? Data("{\"version\":1}".utf8)
         return String(decoding: datos, as: UTF8.self)
     }

@@ -60,7 +60,7 @@ expresiones con curvas de easing.
 | M1 | Motor de vida y las 16 expresiones desde el JSON embebido | Mira a los costados, respira, cambia de expresión con transición; sacudirlo lo marea (IMU) | Listo en simulador; falta probar en la placa |
 | M2 | BLE: servicio GATT y configuración guardada en flash | Desde nRF Connect se cambia la expresión y el nombre, y sobrevive a un reinicio | Listo en simulador; falta probar en la placa |
 | M3 | Apps iOS y Android mínimas | Escanear el QR, vincular, elegir expresión con vista previa idéntica a la del bicho | Android compila y pasa sus tests; iOS escrita, falta compilarla en una Mac; falta probar las dos con la placa |
-| M4 | Broche: perfil `broche-c3`, pulsador y sueño profundo | Un toque cambia la animación, mantenerlo lo duerme, otro toque lo despierta; dormido gasta menos de 0,3 mA | — |
+| M4 | Broche: perfil `broche-c3`, pulsador y sueño profundo | Un toque cambia la animación, mantenerlo lo duerme, otro toque lo despierta; dormido gasta menos de 0,3 mA | Listo en el simulador y compila; falta armarlo y medir el consumo dormido |
 | M5 | Backend en el VPS: cuentas, configuraciones, MQTT y OTA firmada | Un bicho con WiFi recibe un cambio hecho desde otro celu y se actualiza solo | — |
 | M6 | Web: editor de caras, animaciones y reglas | Una cara creada en la web se ve igual en la app y en el bicho | — |
 | M7 | Cubito: voz, IA con clave propia y servidor MCP | Le hablás, responde con voz y cara; el Claude del usuario le cambia la cara por MCP | — |
@@ -70,7 +70,7 @@ expresiones con curvas de easing.
 
 ```
 sintetica/
-  firmware/        núcleo + perfiles (dev-147b; después broche-c3, cubito-154)
+  firmware/        núcleo + perfiles (dev-147b, broche-c3; después cubito-154)
   shared/formato/  JSON Schema de la configuración + caras base
   sim/             el simulador: el núcleo compilado a WebAssembly
   docs/            esta especificación
@@ -112,6 +112,19 @@ Tomadas el 7/11/2026 con Nahuel:
 - Apps `com.sinteticalabs.app`, iOS 17+ y Android 10+. Pantallas: escanear,
   vincular, el bicho (vista previa, estado, caras, nombre, ojos, personalidad,
   sueño) y "probar sin bicho".
+
+### Decisiones de la etapa 3 (M4)
+
+- **Pulsador del broche:** toque = lo siguiente de la lista; mantener 2 s =
+  dormir (pantalla apagada y sueño profundo); un toque lo despierta; mantener
+  8 s = QR.
+- **Pantalla redonda:** las mismas caras con los ojos 1,5× y los indicadores
+  acercados al centro; el emparejamiento lleva el QR centrado.
+- **Imágenes** para todos los perfiles: hasta 8, en QOI del tamaño de la
+  pantalla, mezcladas con las caras en la lista (`"lista"`, `"rotar"` en la
+  config). Mientras se ve una imagen, cada 1 a 3 min vuelve la cara 2,5 s.
+- **Render por franjas** para placas sin PSRAM (el C3 dibuja de a 40 filas).
+- **Batería del broche:** divisor de 2 × 100 kΩ de B+ a GND, al GPIO0.
 
 ### Diferencias con el ejemplo del doc
 

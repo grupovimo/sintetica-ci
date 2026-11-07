@@ -31,10 +31,18 @@ protocol Transporte: AnyObject {
 final class TransporteVirtual: Transporte {
     let difusor = Difusor()
     private let anfitrion = AnfitrionEnMemoria()
+    private let broche: Bool
+
+    init(broche: Bool = false) { self.broche = broche }
 
     func conectar() async throws {
         anfitrion.alNotificar = { [difusor] c, d in if let car = Car(rawValue: c) { difusor.emitir(car, Array(d)) } }
-        Nucleo.iniciar(identificador: "000000000000", anfitrion: anfitrion)
+        // Al doble de la pantalla, para que se vea nítido; las imágenes se recortan a este tamaño.
+        if broche {
+            Nucleo.iniciar(ancho: 480, alto: 480, identificador: "000000000000", anfitrion: anfitrion, redonda: true, broche: true)
+        } else {
+            Nucleo.iniciar(identificador: "000000000000", anfitrion: anfitrion)
+        }
         Nucleo.vistaPrevia()
         Nucleo.bleConexion(true)
     }

@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 struct VistaPrevia: View {
     let descripcion: String
+    var redonda = false
     let alApretar: (Bool) -> Void
     @State private var apretado = false
 
@@ -14,11 +15,11 @@ struct VistaPrevia: View {
             Group {
                 if let imagen { Image(decorative: imagen, scale: 1).resizable().interpolation(.high) } else { Color.pantalla }
             }
-            .aspectRatio(640.0 / 344.0, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .aspectRatio(CGFloat(Nucleo.ancho) / CGFloat(max(1, Nucleo.alto)), contentMode: .fit)
+            .clipShape(redonda ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 10)))
         }
-        .padding(14)
-        .background(Color.carcasa, in: RoundedRectangle(cornerRadius: 24))
+        .padding(redonda ? 22 : 14)
+        .background(Color.carcasa, in: redonda ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 24)))
         .accessibilityLabel(descripcion)
         .gesture(DragGesture(minimumDistance: 0)
             .onChanged { _ in if !apretado { apretado = true; alApretar(true) } }

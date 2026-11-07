@@ -1,4 +1,5 @@
 import Observation
+import PhotosUI
 import SwiftUI
 
 @MainActor
@@ -12,12 +13,17 @@ final class ModeloBicho {
     var guardando = false
     var aviso: String?
     var expresiones: [String] = []
+    var espacios: [EspacioImagen] = []
+    var miniaturas: [Int: UIImage] = [:]
+    var progreso: Double?
+    /// La pantalla del bicho (la del estado v3); la vista previa va al doble.
+    private(set) var pantalla = Pantalla()
     private(set) var cliente: ClienteBicho?
     @ObservationIgnored private var configTexto = "{\"version\":1}"
     @ObservationIgnored private var espejo: Task<Void, Never>?
     /// El núcleo guarda al anfitrión con una referencia débil: el modelo lo mantiene vivo.
     @ObservationIgnored private let anfitrionVistaPrevia = AnfitrionEnMemoria()
-    var esDemo: Bool { id == ID_DEMO }
+    var esDemo: Bool { id.hasPrefix(ID_DEMO) }
 
     init(id: String) { self.id = id }
 
@@ -28,8 +34,9 @@ final class ModeloBicho {
         do {
             let c: ClienteBicho
             if esDemo {
-                c = ClienteBicho(TransporteVirtual())
+                c = ClienteBicho(TransporteVirtual(broche: id == ID_DEMO_BROCHE))
                 try await c.conectar()
+                pantalla = c.estado?.pantalla ?? pantalla
             } else {
                 guard let v = Vinculados.compartidos.buscar(id) else { throw ErrorBicho.rechazo("Este bicho no está vinculado.") }
                 let p = try await Central.compartida.buscar(id: id)
@@ -42,8 +49,10 @@ final class ModeloBicho {
                     conexion = .error("Este bicho ya no reconoce a este celu. Vinculalo de nuevo.", revincular: true)
                     return
                 }
-                // La vista previa: un núcleo local con la misma config.
-                Nucleo.iniciar(identificador: id, anfitrion: anfitrionVistaPrevia)
+                // La vista previa: un núcleo local con la misma config, al doble de la pantalla.
+                pantalla = c.estado?.pantalla ?? pantalla
+                Nucleo.iniciar(ancho: pantalla.ancho * 2, alto: pantalla.alto * 2, identificador: id,
+                               anfitrion: anfitrionVistaPrevia, redonda: pantalla.redonda)
                 Nucleo.vistaPrevia()
             }
             cliente = c
@@ -51,6 +60,7 @@ final class ModeloBicho {
             ajustes = EditorConfig.leer(configTexto)
             if !esDemo { aplicarEnVistaPrevia(configTexto) }
             expresiones = Nucleo.expresiones
+            await refrescarImagenes()
             conexion = .lista
             // Copiar en la vista previa la expresión que muestra el bicho.
             if !esDemo {
@@ -68,6 +78,47 @@ final class ModeloBicho {
         } catch {
             conexion = .error(error.localizedDescription, revincular: false)
         }
+    }
+
+    /// Los espacios ocupados; la vista previa recibe las que este celu tiene guardadas.
+    func refrescarImagenes() async {
+        guard let c = cliente else { return }
+        espacios = (try? await c.listarImagenes()) ?? []
+        var minis: [Int: UIImage] = [:]
+        for e in espacios {
+            guard let mandada = CacheImagenes.mandada(id, e.espacio), crc32(mandada) == e.crc else { continue }  // otro celu la cambió
+            if !esDemo, let vista = CacheImagenes.vistaPrevia(id, e.espacio) {
+                for w in escriturasDeImagen(e.espacio, vista, tamanoBloque: 512) { Nucleo.bleEscribir(Car.imagen.rawValue, Data(w)) }
+            }
+            minis[e.espacio] = CacheImagenes.miniatura(id, e.espacio)
+        }
+        miniaturas = minis
+    }
+
+    func subirImagen(_ espacio: Int, _ fuente: UIImage) async {
+        guard let c = cliente else { return }
+        progreso = 0
+        defer { progreso = nil }
+        let p = pantalla
+        let recortada = PrepararImagen.recortar(fuente, ancho: p.ancho, alto: p.alto, redonda: p.redonda)
+        let qoi = PrepararImagen.qoi(recortada)
+        // En el modo demo el núcleo ya está al doble: la misma imagen sirve para las dos.
+        let vista = esDemo ? qoi : PrepararImagen.qoi(PrepararImagen.recortar(fuente, ancho: p.ancho * 2, alto: p.alto * 2, redonda: p.redonda))
+        do {
+            try await c.subirImagen(espacio, qoi) { [weak self] v in self?.progreso = v }
+            CacheImagenes.guardar(id, espacio, mandada: qoi, vistaPrevia: vista, miniatura: recortada)
+            await refrescarImagenes()
+            aviso = "Imagen guardada en el espacio \(espacio)."
+        } catch {
+            aviso = error.localizedDescription
+        }
+    }
+
+    func borrarImagen(_ espacio: Int) async {
+        do { try await cliente?.borrarImagen(espacio) } catch { aviso = error.localizedDescription }
+        CacheImagenes.borrar(id, espacio)
+        if !esDemo { Nucleo.bleEscribir(Car.imagen.rawValue, Data(ComandoImagen.borrar(espacio))) }
+        await refrescarImagenes()
     }
 
     private func aplicarEnVistaPrevia(_ json: String) {
@@ -193,7 +244,7 @@ struct BichoVista: View {
                     Text("UNIDAD #\((e?.serie ?? "").isEmpty ? "—" : e!.serie)").font(Tipos.serie).foregroundStyle(Color.naranjaProfundo)
                     Text(e?.nombre ?? modelo.ajustes.nombre).font(Tipos.display).foregroundStyle(Color.tinta)
                 }
-                VistaPrevia(descripcion: "Cara de \(e?.nombre ?? "el bicho"): \(e?.expresion ?? "")") { modelo.tocar($0) }
+                VistaPrevia(descripcion: "Cara de \(e?.nombre ?? "el bicho"): \(e?.expresion ?? "")", redonda: modelo.pantalla.redonda) { modelo.tocar($0) }
 
                 VStack(spacing: 0) {
                     FilaDato(etiqueta: "Expresión", valor: (e?.expresion ?? "—") + ((e?.fija ?? false) ? " (fija)" : ""))
@@ -210,6 +261,9 @@ struct BichoVista: View {
                         }
                     }
                 }
+
+                SeccionImagenes(modelo: modelo)
+                SeccionLista(modelo: modelo)
 
                 Seccion(titulo: "Nombre") {
                     TextField("Nombre", text: Binding(
@@ -288,13 +342,14 @@ private struct Deslizador: View {
     let etiqueta: String
     let valor: Double
     let rango: ClosedRange<Double>
+    var texto: ((Double) -> String)? = nil
     let alCambiar: (Double) -> Void
     var body: some View {
         VStack(spacing: 4) {
             HStack {
                 Etiqueta(etiqueta)
                 Spacer()
-                Text("\(Int((valor * 100).rounded()))%").font(Tipos.dato).foregroundStyle(Color.tinta)
+                Text(texto?(valor) ?? "\(Int((valor * 100).rounded()))%").font(Tipos.dato).foregroundStyle(Color.tinta)
             }
             Slider(value: Binding(get: { valor }, set: alCambiar), in: rango).tint(Color.naranja)
         }
@@ -315,5 +370,98 @@ private struct CampoHora: View {
                 .onChange(of: texto) { _, t in if EditorConfig.hhmmValido(t) { alCambiar(t) } }
         }
         .onAppear { texto = valor }
+    }
+}
+
+private struct SeccionImagenes: View {
+    let modelo: ModeloBicho
+    @State private var elegido = 0
+    @State private var foto: PhotosPickerItem?
+
+    var body: some View {
+        let ocupados = Set(modelo.espacios.map(\.espacio))
+        let forma = modelo.pantalla.redonda ? AnyShape(Circle()) : AnyShape(RoundedRectangle(cornerRadius: 10))
+        Seccion(titulo: "Imágenes") {
+            Text("Hasta 8. Se recortan a la forma de la pantalla del bicho.").font(Tipos.chico).foregroundStyle(Color.tintaSuave)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+                ForEach(0 ..< 8, id: \.self) { i in
+                    Button { elegido = i } label: {
+                        ZStack {
+                            Color.pantalla
+                            if let mini = modelo.miniaturas[i] {
+                                Image(uiImage: mini).resizable().scaledToFill()
+                            } else {
+                                Text(ocupados.contains(i) ? "\(i) ·" : "\(i)").font(Tipos.dato).foregroundStyle(Color.tintaSuave)
+                            }
+                        }
+                        .aspectRatio(1, contentMode: .fit)
+                        .clipShape(forma)
+                        .overlay(forma.stroke(elegido == i ? Color.naranja : Color.linea, lineWidth: elegido == i ? 3 : 1))
+                    }
+                    .accessibilityLabel("Espacio \(i)")
+                }
+            }
+            if let p = modelo.progreso { ProgressView(value: p).tint(Color.naranja) }
+            HStack(spacing: 8) {
+                PhotosPicker(selection: $foto, matching: .images) {
+                    Text("ELEGIR DE LA GALERÍA").font(Tipos.boton).frame(maxWidth: .infinity).frame(height: 48)
+                        .foregroundStyle(Color.tinta).overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.linea, lineWidth: 1))
+                }
+                .disabled(modelo.progreso != nil)
+                if ocupados.contains(elegido) {
+                    BotonSecundario(texto: "Borrar") { Task { await modelo.borrarImagen(elegido) } }
+                }
+            }
+        }
+        .onChange(of: foto) { _, item in
+            guard let item else { return }
+            Task {
+                if let datos = try? await item.loadTransferable(type: Data.self), let imagen = UIImage(data: datos) {
+                    await modelo.subirImagen(elegido, imagen)
+                }
+                foto = nil
+            }
+        }
+    }
+}
+
+private struct SeccionLista: View {
+    let modelo: ModeloBicho
+    @State private var agregando = false
+
+    var body: some View {
+        let a = modelo.ajustes
+        Seccion(titulo: "Lista") {
+            Text(modelo.pantalla.redonda ? "Un toque en el broche pasa a lo siguiente." : "Lo que muestra, en orden; puede rotar solo.")
+                .font(Tipos.chico).foregroundStyle(Color.tintaSuave)
+            ForEach(Array(a.lista.enumerated()), id: \.offset) { i, item in
+                HStack {
+                    Text("\(i + 1). " + item.replacingOccurrences(of: "cara:", with: "").replacingOccurrences(of: "imagen:", with: "imagen "))
+                        .font(Tipos.dato).foregroundStyle(Color.tinta)
+                    Spacer()
+                    Button("↑") { var b = a; b.lista.swapAt(i, i - 1); modelo.editar(b) }.disabled(i == 0)
+                    Button("↓") { var b = a; b.lista.swapAt(i, i + 1); modelo.editar(b) }.disabled(i == a.lista.count - 1)
+                    Button("QUITAR") { var b = a; b.lista.remove(at: i); modelo.editar(b) }.font(Tipos.boton).foregroundStyle(Color.naranjaProfundo)
+                }
+                .font(Tipos.boton)
+            }
+            if a.lista.isEmpty {
+                Text(modelo.pantalla.redonda ? "Vacía: recorre las 16 caras." : "Vacía: se maneja solo.").font(Tipos.dato).foregroundStyle(Color.tintaSuave)
+            }
+            if agregando {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], alignment: .leading, spacing: 8) {
+                    ForEach(modelo.espacios, id: \.espacio) { e in
+                        Chip(texto: "imagen \(e.espacio)", elegido: false) { var b = a; b.lista.append("imagen:\(e.espacio)"); modelo.editar(b); agregando = false }
+                    }
+                    ForEach(modelo.expresiones, id: \.self) { x in
+                        Chip(texto: x, elegido: false) { var b = a; b.lista.append("cara:\(x)"); modelo.editar(b); agregando = false }
+                    }
+                }
+            } else if a.lista.count < 16 {
+                BotonSecundario(texto: "Agregar") { agregando = true }
+            }
+            Deslizador(etiqueta: "Rotar sola", valor: Double(a.rotar), rango: 0 ... 60,
+                       texto: { $0 < 0.5 ? "no" : "cada \(Int($0.rounded())) min" }) { var b = a; b.rotar = Int($0.rounded()); modelo.editar(b) }
+        }
     }
 }

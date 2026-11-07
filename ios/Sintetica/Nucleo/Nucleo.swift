@@ -28,7 +28,9 @@ enum Nucleo {
     private static weak var anfitrion: Anfitrion?
     private static var identificador: UnsafeMutablePointer<CChar>?
 
-    static func iniciar(ancho: Int = 640, alto: Int = 344, identificador id: String, anfitrion: Anfitrion?) {
+    /// redonda: el broche; broche: con el pulsador del broche (toque = siguiente).
+    static func iniciar(ancho: Int = 640, alto: Int = 344, identificador id: String, anfitrion: Anfitrion?,
+                        redonda: Bool = false, broche: Bool = false) {
         Self.anfitrion = anfitrion
         free(identificador)
         identificador = strdup(id)
@@ -62,7 +64,7 @@ enum Nucleo {
             MainActor.assumeIsolated { Nucleo.anfitrion?.registrar(s) }
         }
         h.identificador = UnsafePointer(identificador)
-        sintetica_iniciar(&h, Int32(ancho), Int32(alto))
+        sintetica_iniciar_perfil(&h, Int32(ancho), Int32(alto), redonda ? 1 : 0, broche ? 1 : 0)
     }
 
     nonisolated static let inicioSinAislar = Date()
@@ -92,6 +94,7 @@ enum Nucleo {
     }
     static var expresionVisible: String { String(cString: sintetica_expresion_visible()) }
     static var version: String { String(cString: sintetica_version()) }
+    static var imagenVisible: Int { Int(sintetica_imagen_visible()) }
 
     /// El último cuadro como imagen (RGBA de 8 bits).
     static func imagen() -> CGImage? {

@@ -24,6 +24,8 @@ final class ProtocoloTests: XCTestCase {
         XCTAssertEqual(hex(Comando.autenticar(deHex(c["autenticar"]!["clave"] as! String))), esperado("autenticar"))
         XCTAssertEqual(hex(Comando.desvincular()), esperado("desvincular"))
         XCTAssertEqual(hex(Comando.pedirConfig()), esperado("pedir config"))
+        XCTAssertEqual(hex(ComandoImagen.borrar(3)), esperado("imagen borrar 3"))
+        XCTAssertEqual(hex(ComandoImagen.listar()), esperado("imagen listar"))
     }
 
     func testConfigEnBloques() {
@@ -47,6 +49,9 @@ final class ProtocoloTests: XCTestCase {
             XCTAssertEqual(est.nombre, c["nombre"] as? String)
             XCTAssertEqual(est.serie, c["serie"] as? String)
             XCTAssertEqual(est.id, c["id"] as? String)
+            XCTAssertEqual(est.pantalla.ancho, c["ancho"] as? Int)
+            XCTAssertEqual(est.pantalla.alto, c["alto"] as? Int)
+            XCTAssertEqual(est.pantalla.redonda, c["redonda"] as? Bool)
         }
     }
 
@@ -69,6 +74,14 @@ final class ProtocoloTests: XCTestCase {
             } else { XCTAssertNil(l) }
         }
         for a in lista("anuncios") { XCTAssertEqual(idDeAnuncio(deHex(a["hex"] as! String)), a["id"] as? String) }
+    }
+
+    func testQoiIgualAlDeReferencia() {
+        let q = v["qoi"] as! [String: Any]
+        let qoi = Qoi.codificar(deHex(q["rgb"] as! String), ancho: q["ancho"] as! Int, alto: q["alto"] as! Int)
+        XCTAssertEqual(hex(qoi), q["hex"] as? String)
+        let escrituras = escriturasDeImagen(q["espacio"] as! Int, qoi, tamanoBloque: q["tamanoBloque"] as! Int).map(hex)
+        XCTAssertEqual(escrituras, q["escrituras"] as? [String])
     }
 
     func testCrc() {

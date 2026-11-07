@@ -1,4 +1,4 @@
-# Protocolo BLE de SintéticaOS (v1.1)
+# Protocolo BLE de SintéticaOS (v1.2)
 
 Un servicio GATT propio. Todos los enteros van en little-endian. La
 implementación de referencia es `firmware/nucleo/protocolo.*` y
@@ -14,6 +14,7 @@ mismos bytes.
 | Comando | `5157e71c-a000-4b1c-8a5e-000000000003` | write, notify |
 | Estado | `5157e71c-a000-4b1c-8a5e-000000000004` | read, notify |
 | OTA | `5157e71c-a000-4b1c-8a5e-000000000005` | write, notify (reservada, todavía no implementada) |
+| Imagen | `5157e71c-a000-4b1c-8a5e-000000000006` | write, write without response, notify (v1.2) |
 
 El nombre BLE del bicho es el que eligió el dueño. El anuncio lleva, además del
 UUID del servicio, **datos de fabricante** `FF FF` + los 6 bytes de la MAC: es
@@ -58,7 +59,8 @@ característica: `[op | 0x80][código][detalle opcional en UTF-8]`.
 | `0x07` | No existe (una expresión desconocida) |
 | `0x08` | Malformado |
 | `0x09` | No autorizado (falta vincular o autenticar, o el código o la clave no coinciden) |
-| `0x0A` | No está mostrando el QR (mantené el botón 5 s) |
+| `0x0A` | No está mostrando el QR (mantené el botón 5 s; en el broche, 8 s) |
+| `0x0B` | Imagen inválida (no es un QOI del tamaño de la pantalla) |
 | `0xFF` | No implementado |
 
 ## Config
@@ -79,6 +81,26 @@ entera, partida en bloques que entren en el MTU.
 Si la config no es válida, el bicho sigue con la anterior. Una config nueva
 borra el nombre puesto por comando (gana el de la config).
 
+## Imagen (v1.2)
+
+El bicho guarda hasta 8 imágenes (espacios 0 a 7), en
+[QOI](https://qoiformat.org) con 3 canales y **exactamente del tamaño de su
+pantalla** (lo dice el estado v3). Pesan hasta 240 KB. La app recorta la imagen
+a la forma de la pantalla (en el broche, redonda: lo de afuera del círculo en
+`#0B0A09`). Las imágenes se muestran desde la lista de la config
+(`"lista": ["imagen:0", …]`).
+
+| Op | Datos | Qué hace |
+| --- | --- | --- |
+| `0x20` Inicio | u8 espacio, u32 largo, u32 CRC-32 | Empieza a recibir; borra lo que había en ese espacio. Responde. |
+| `0x21` Bloque | u32 desplazamiento, bytes | Se escribe directo a la flash. Solo responde si hay error (y entonces la transferencia se aborta). |
+| `0x22` Fin | — | Verifica largo, CRC y la cabecera QOI (tamaño de la pantalla). Responde. |
+| `0x23` Borrar | u8 espacio | Responde. |
+| `0x24` Listar | — | Responde `[0xA4][0x00][máscara de ocupados]` + por cada espacio ocupado `[espacio][u32 largo][u32 CRC-32]`. |
+
+Los bloques conviene mandarlos sin respuesta (write without response): es varias
+veces más rápido.
+
 ## Comando
 
 | Op | Datos | Qué hace |
@@ -98,12 +120,14 @@ Eventos: `0` tacto, `1` doble toque, `2` levantado, `3` sacudida, `4` boca abajo
 Lectura o notificación (se notifica cuando cambia algo que no sea el humor):
 
 ```
-[versión = 2][batería u8, 255 = no se sabe][humor i8, -100..100][modo u8]
+[versión = 3][batería u8, 255 = no se sabe][humor i8, -100..100][modo u8]
 [flags u8: bit 0 dormido, 1 expresión fija, 2 mostrando el QR, 3 esta conexión autenticada]
 [n u8][expresión visible][n u8][nombre][n u8][número de unidad][n u8][id]
+[u16 ancho][u16 alto][forma u8: 0 rectangular, 1 redonda]
 ```
 
-(Textos en UTF-8. La versión 1 no tenía los dos últimos campos ni los bits 2 y 3.)
+(Textos en UTF-8. La versión 2 no tenía la pantalla; la 1 tampoco el número
+de unidad, el id ni los bits 2 y 3.)
 
 Modos: `0` mascota, `1` reloj, `2` pomodoro, `3` clima, `4` notificaciones.
 

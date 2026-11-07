@@ -31,6 +31,15 @@ final class EditorConfigTests: XCTestCase {
         XCTAssertNil(b.suenoDesde)
     }
 
+    func testListaYRotar() throws {
+        var a = EditorConfig.leer(try ejemplo())
+        a.lista = ["imagen:0", "cara:guino"]
+        a.rotar = 15
+        let b = EditorConfig.leer(EditorConfig.escribir(try ejemplo(), a))
+        XCTAssertEqual(b.lista, ["imagen:0", "cara:guino"])
+        XCTAssertEqual(b.rotar, 15)
+    }
+
     func testHoras() {
         XCTAssertTrue(EditorConfig.hhmmValido("23:30"))
         XCTAssertFalse(EditorConfig.hhmmValido("24:00"))
@@ -57,6 +66,16 @@ final class NucleoTests: XCTestCase {
         try await c.mandarConfig(EditorConfig.escribir(config, a))
         let final = try await c.pedirConfig()
         XCTAssertEqual(EditorConfig.leer(final).energia, 0.9, accuracy: 0.001)
+    }
+
+    func testBrocheVirtualConImagen() async throws {
+        let c = ClienteBicho(TransporteVirtual(broche: true))
+        try await c.conectar()
+        XCTAssertEqual(c.estado?.pantalla, Pantalla(ancho: 480, alto: 480, redonda: true))
+        let rgb = [UInt8](repeating: 120, count: 480 * 480 * 3)
+        try await c.subirImagen(1, Qoi.codificar(rgb, ancho: 480, alto: 480))
+        let espacios = try await c.listarImagenes()
+        XCTAssertEqual(espacios.map(\.espacio), [1])
     }
 
     func testVistaPreviaAlDoble() {

@@ -13,6 +13,8 @@ previa, editar nombre, ojos, personalidad y sueño).
 | `shared/formato/` | JSON Schema de la configuración, las 16 caras base y las referencias del manual |
 | `firmware/nucleo/` | El núcleo en C++17 autocontenido: render, motor de vida, gestos, reglas, protocolo BLE |
 | `firmware/perfiles/dev-147b/` | El perfil para la Waveshare ESP32-S3-LCD-1.47B (PlatformIO + LovyanGFX + NimBLE) |
+| `firmware/perfiles/broche-c3/` | El broche: ESP32-C3 SuperMini + GC9A01 redonda; ver su README |
+| `firmware/perfiles/comun/` | Lo que comparten las placas ESP32 (BLE, almacenamiento, taller) |
 | `firmware/perfiles/sim/` | El perfil del simulador (WebAssembly) |
 | `firmware/api/` | El núcleo detrás de una API en C, para las apps |
 | `shared/protocolo/` | Vectores de prueba del protocolo BLE, compartidos por todas las implementaciones |
@@ -43,6 +45,7 @@ npm run empaquetar     # sim/dist/simulador.html: un solo archivo, con el wasm a
 npm run caras          # regenerar las caras desde las medidas del manual
 cd firmware && pio run -e dev-147b                 # compilar el firmware
 cd firmware && pio run -e dev-147b -t upload -t monitor   # grabarlo en la placa
+cd firmware && pio run -e broche-c3 -t upload -t monitor  # el broche
 cd android && ./gradlew testDebugUnitTest assembleDebug   # app de Android (APK en app/build/outputs)
 cd ios && xcodegen && open Sintetica.xcodeproj            # app de iOS
 ```
