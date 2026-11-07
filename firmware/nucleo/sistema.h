@@ -214,6 +214,7 @@ class Sistema {
   uint32_t otaTamano_ = 0, otaRecibido_ = 0;
   uint8_t otaPorcentaje_ = 0;
   uint32_t crcConfig_ = 0;
+  uint32_t arranque_ = 0;
 
   // Animaciones: la pedida (por comando o regla) gana sobre la de la lista.
   int animPedida_ = -1;

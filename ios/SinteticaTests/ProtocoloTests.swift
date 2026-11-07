@@ -79,6 +79,7 @@ final class ProtocoloTests: XCTestCase {
             XCTAssertEqual(est.version, c["version"] as? String)
             XCTAssertEqual(est.perfil, c["perfil"] as? String)
             XCTAssertEqual(est.crcConfig, UInt32(c["crcConfigHex"] as! String, radix: 16))
+            XCTAssertEqual(est.encendido, UInt32(c["encendido"] as! Int))
         }
     }
 

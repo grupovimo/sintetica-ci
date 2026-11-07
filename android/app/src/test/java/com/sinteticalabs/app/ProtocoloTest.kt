@@ -108,6 +108,7 @@ class ProtocoloTest {
             assertEquals(s(c, "version"), est.version)
             assertEquals(s(c, "perfil"), est.perfil)
             assertEquals(s(c, "crcConfigHex").toLong(16), est.crcConfig)
+            assertEquals(c["encendido"]!!.jsonPrimitive.int.toLong(), est.encendido)
         }
     }
 

@@ -234,6 +234,7 @@ export function leerEstado(b) {
   const version = b[0] >= 4 ? campo() : '';
   const perfil = b[0] >= 4 ? campo() : '';
   const crcConfig = b[0] >= 4 ? leerU32(b, i) : 0;
+  const encendido = b[0] >= 4 ? leerU32(b, i + 4) : 0;
   return {
     bateria: b[1] === 255 ? null : b[1],
     humor: (b[2] << 24 >> 24) / 100,
@@ -249,6 +250,7 @@ export function leerEstado(b) {
     version,
     perfil,
     crcConfig,
+    encendido,
     expresion,
     nombre,
     serie,

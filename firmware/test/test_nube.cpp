@@ -304,7 +304,17 @@ PRUEBA("nube: autorizada por el broker, responde por la nube") {
   VERIFICAR(!g_nube.empty() && g_nube.back().first == CarEstado && (g_nube.back().second[4] & 48) == 48);
   VERIFICAR(!g_ble.empty() && g_ble.back().first == CarEstado);
   const auto& e = g_nube.back().second;
-  VERIFICAR(leer32(e.data() + e.size() - 4) == g_s.crcConfig());
+  VERIFICAR(leer32(e.data() + e.size() - 8) == g_s.crcConfig());
+  // Los segundos encendido no disparan notificaciones (con una expresión fija,
+  // para que el motor de vida no cambie nada).
+  nube(CarComando, conTexto(CmdExpresion, "neutral"));
+  correr(500);
+  g_nube.clear();
+  correr(3000);
+  VERIFICAR(g_nube.empty());
+  uint8_t est[160];
+  size_t n = g_s.estadoBle(est, sizeof est);
+  VERIFICAR(leer32(est + n - 4) >= 6);
 }
 
 PRUEBA("red: WiFi y nube por BLE, avisan al perfil") {
@@ -506,9 +516,12 @@ PRUEBA("config: si la nueva es mala, vuelve la anterior (leída de la flash, sin
   for (auto& n : g_ble)
     if (n.second[0] == ConfigTrozo) armada.append(n.second.begin() + 5, n.second.end());
   VERIFICAR(armada == CONFIG_ANIMADA);
-  // Pedirla en medio de una transferencia: ocupado.
+  // Pedirla en medio de una transferencia la aborta y la manda igual.
   std::vector<uint8_t> ini{ConfigInicio, 10, 0, 0, 0, 0, 0, 0, 0};
   ble(CarConfig, ini);
+  g_ble.clear();
   ble(CarConfig, v({ConfigPedir}));
-  VERIFICAR(g_ble.back().second[1] == Ocupado);
+  VERIFICAR(g_ble.back().second[0] == ConfigCierre);
+  ble(CarConfig, v({ConfigFin}));
+  VERIFICAR(g_ble.back().second[1] == SinInicio);
 }

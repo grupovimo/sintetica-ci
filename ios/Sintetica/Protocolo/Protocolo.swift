@@ -251,6 +251,7 @@ struct Estado: Equatable, Sendable {
     var wifi = false, nube = false, redConfigurada = false, actualizando = false
     var version = "", perfil = ""
     var crcConfig: UInt32 = 0
+    var encendido: UInt32 = 0
 }
 
 func leerEstado(_ b: [UInt8]) throws -> Estado {
@@ -273,6 +274,7 @@ func leerEstado(_ b: [UInt8]) throws -> Estado {
     let firmware = b[0] >= 4 ? campo() : ""
     let perfil = b[0] >= 4 ? campo() : ""
     let crcConfig = b[0] >= 4 ? leerU32(b, i) : 0
+    let encendido = b[0] >= 4 ? leerU32(b, i + 4) : 0
     return Estado(
         pantalla: pantalla,
         bateria: b[1] == 255 ? nil : Int(b[1]), humor: Float(Int8(bitPattern: b[2])) / 100,
@@ -280,7 +282,7 @@ func leerEstado(_ b: [UInt8]) throws -> Estado {
         dormido: flags & 1 != 0, fija: flags & 2 != 0, emparejando: flags & 4 != 0, autenticado: flags & 8 != 0,
         expresion: expresion, nombre: nombre, serie: serie, id: id,
         wifi: flags & 16 != 0, nube: flags & 32 != 0, redConfigurada: flags & 64 != 0, actualizando: flags & 128 != 0,
-        version: firmware, perfil: perfil, crcConfig: crcConfig
+        version: firmware, perfil: perfil, crcConfig: crcConfig, encendido: encendido
     )
 }
 

@@ -1,0 +1,11 @@
+**/node_modules
+**/.pio
+**/build
+android
+ios
+sim/dist
+web/.svelte-kit
+web/build
+claves
+.git
+*.log

@@ -53,6 +53,10 @@ typedef struct sintetica_hal {
   void (*ota_cancelar)(void* contexto);
   const char* perfil;  /* "dev-147b", "broche-c3", "virtual"…; NULL = "sim" */
   const char* version; /* del firmware; NULL = la del núcleo */
+  /* Archivos grandes (imágenes) por partes; NULL = en memoria, dentro de la API. */
+  int (*escribir_trozo)(void* contexto, const char* clave, uint32_t desplazamiento, const uint8_t* datos, size_t n);
+  int (*leer_trozo)(void* contexto, const char* clave, uint32_t desplazamiento, uint8_t* datos, size_t n);
+  int (*borrar)(void* contexto, const char* clave);
 } sintetica_hal;
 
 /* Arranca el núcleo. ancho ≤ 640, alto ≤ 640. Cualquier función de la tabla puede ser NULL.
@@ -87,6 +91,9 @@ void sintetica_ota_progreso(int codigo, int porcentaje, const char* detalle);
 uint32_t sintetica_crc_config(void);
 /* El texto que se firma para una OTA. Devuelve el largo (0 si no entra). */
 size_t sintetica_mensaje_ota(const sintetica_manifiesto* m, char* salida, size_t cap);
+
+/* Lo que se ve en el broche dormido: 1 = la pantalla apagada (quiere dormir). */
+int sintetica_quiere_dormir(void);
 
 /* Valida una config de usuario (sin tocar la instancia). 0 = válida; si no,
  * el código de error y el detalle en `detalle`. No hace falta haber llamado a

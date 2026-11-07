@@ -264,5 +264,5 @@ PRUEBA("imagen: el estado trae el tamaño y la forma de la pantalla") {
   // Después de la pantalla: [n][versión][n][perfil][u32 crc].
   size_t i = 5;
   for (int k = 0; k < 4; k++) i += 1 + b[i];
-  VERIFICAR(i + 5 < n && b[i] == 240 && b[i + 1] == 0 && b[i + 2] == 240 && b[i + 3] == 0 && b[i + 4] == 1);
+  VERIFICAR(i + 9 < n && b[i] == 240 && b[i + 1] == 0 && b[i + 2] == 240 && b[i + 3] == 0 && b[i + 4] == 1);
 }

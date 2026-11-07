@@ -154,10 +154,12 @@ struct EstadoPublico {
   const char* version = "";   // del firmware
   const char* perfil = "";
   uint32_t crcConfig = 0;     // CRC-32 de la config guardada (0 = la de fábrica)
+  uint32_t encendido = 0;     // segundos desde que arrancó (no dispara notificaciones)
 };
 constexpr uint8_t VERSION_ESTADO = 4;
 // [versión=4][batería][humor][modo][flags][n][expresión][n][nombre][n][serie][n][id]
 // [u16 ancho][u16 alto][forma: 0 rectangular, 1 redonda][n][versión][n][perfil][u32 crc config]
+// [u32 segundos encendido]
 // flags: bit 0 dormido, 1 expresión fija, 2 mostrando el QR, 3 esta conexión autenticada,
 // 4 WiFi conectado, 5 nube conectada, 6 WiFi configurado, 7 actualizando
 constexpr size_t MAX_ESTADO = 160;

@@ -145,6 +145,7 @@ PRUEBA("vectores: el estado se codifica igual") {
     std::string ve = texto(g_j.buscar(c, "version")), pe = texto(g_j.buscar(c, "perfil"));
     p.version = ve.c_str(), p.perfil = pe.c_str();
     p.crcConfig = static_cast<uint32_t>(std::stoul(texto(g_j.buscar(c, "crcConfigHex")), nullptr, 16));
+    p.encendido = static_cast<uint32_t>(g_j.numero(g_j.buscar(c, "encendido"), 0));
     uint8_t b[160];
     size_t n = protocolo::codificarEstado(p, b, sizeof b);
     VERIFICAR(aHex(b, n) == texto(g_j.buscar(e, "hex")));

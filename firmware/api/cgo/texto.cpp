@@ -1,0 +1,1 @@
+../../nucleo/texto.cpp

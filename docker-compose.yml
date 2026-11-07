@@ -1,0 +1,142 @@
+# SintéticaOS en local: la API, la web, EMQX, Postgres, Mailpit y dos bichos
+# virtuales (una 1.47B y un broche). Ver docs/local.md.
+#
+#   cp .env.example .env    (y poné tu IP en IP_LOCAL para usar placas reales)
+#   docker compose up --build
+#
+# Web: http://localhost:5173 · Mails: http://localhost:8025 · EMQX: http://localhost:18083
+# Bichos virtuales: http://localhost:8090 y http://localhost:8091
+name: sintetica
+
+x-api-entorno: &api-entorno
+  DATABASE_URL: postgres://sintetica:${POSTGRES_CLAVE:-sintetica}@postgres:5432/sintetica?sslmode=disable
+  MQTT_URL: tcp://emqx:1883
+  MQTT_USUARIO: api
+  MQTT_CLAVE: ${MQTT_CLAVE_API:-cambiame-api}
+  MQTT_URL_PUBLICA: mqtt://${IP_LOCAL:-localhost}:1883
+  MQTT_URL_INTERNA: mqtt://emqx:1883
+  API_URL_PUBLICA: http://${IP_LOCAL:-localhost}:8080
+  API_URL_INTERNA: http://api:8080
+  WEB_URL: http://${IP_WEB:-localhost}:5173
+  SMTP_SERVIDOR: mailpit:1025
+  SMTP_DE: Sintética Labs <hola@sinteticalabs.com>
+  CLAVE_FIRMA: /claves/ota-privada.pem
+  SECRETO: ${SECRETO:-un-secreto-local-de-al-menos-16-bytes}
+  ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+  DESARROLLO: "1"
+  BICHOS_VIRTUALES: http://bicho-virtual:8090,http://bicho-broche:8090
+  EMQX_API_URL: http://emqx:18083
+  EMQX_API_CLAVE: sintetica:clave-local-de-la-api-de-emqx
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sintetica
+      POSTGRES_PASSWORD: ${POSTGRES_CLAVE:-sintetica}
+      POSTGRES_DB: sintetica
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "sintetica"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  emqx:
+    image: emqx/emqx:5.8.6
+    environment:
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_CLAVE_PANEL:-sintetica}
+    volumes:
+      - ./emqx/emqx.conf:/opt/emqx/etc/emqx.conf:ro
+      - ./emqx/api-claves.txt:/opt/emqx/etc/api-claves.txt:ro
+      - emqx:/opt/emqx/data
+    ports:
+      - "1883:1883"
+      - "8083:8083"
+      - "127.0.0.1:18083:18083"
+    healthcheck:
+      test: ["CMD", "/opt/emqx/bin/emqx", "ctl", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    ports:
+      - "127.0.0.1:8025:8025"
+    restart: unless-stopped
+
+  # Genera las claves de firma de las OTA en ./claves si no están (una vez).
+  claves:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+      target: api
+    image: sintetica-api
+    user: root
+    command: ["claves", "/claves", "/claves-api"]
+    volumes:
+      - ./claves:/claves
+      - claves-api:/claves-api
+
+  api:
+    image: sintetica-api
+    depends_on:
+      claves:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    environment: *api-entorno
+    volumes:
+      - claves-api:/claves:ro
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  bicho-virtual:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+      target: bicho-virtual
+    image: sintetica-bicho-virtual
+    depends_on:
+      claves:
+        condition: service_completed_successfully
+    environment:
+      BICHO_FORMA: 147b
+      CLAVE_PUBLICA: /claves/ota-publica.pem
+    volumes:
+      - bicho-virtual:/datos
+      - ./claves:/claves:ro
+    ports:
+      - "8090:8090"
+    restart: unless-stopped
+
+  bicho-broche:
+    image: sintetica-bicho-virtual
+    depends_on:
+      bicho-virtual:
+        condition: service_started
+    environment:
+      BICHO_FORMA: broche
+      CLAVE_PUBLICA: /claves/ota-publica.pem
+    volumes:
+      - bicho-broche:/datos
+      - ./claves:/claves:ro
+    ports:
+      - "8091:8090"
+    restart: unless-stopped
+
+volumes:
+  claves-api:
+  postgres:
+  emqx:
+  bicho-virtual:
+  bicho-broche:

@@ -141,7 +141,10 @@ Lectura o notificación (se notifica cuando cambia algo que no sea el humor):
 [n u8][expresión visible][n u8][nombre][n u8][número de unidad][n u8][id]
 [u16 ancho][u16 alto][forma u8: 0 rectangular, 1 redonda]
 [n u8][versión del firmware][n u8][perfil][u32 CRC-32 de la config guardada, 0 = la de fábrica]
+[u32 segundos encendido]
 ```
+
+(Ni el humor ni los segundos encendido disparan notificaciones solos.)
 
 (Textos en UTF-8. Mientras se ve una animación, la expresión visible es
 `animacion:<nombre>`. La versión 3 no tenía la red, el firmware ni el CRC; la

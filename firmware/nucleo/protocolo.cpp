@@ -44,7 +44,7 @@ Codigo Receptor::fin() {
 size_t codificarEstado(const EstadoPublico& e, uint8_t* s, size_t cap) {
   const size_t ne = largo(e.expresion), nn = largo(e.nombre), ns = largo(e.serie), ni = largo(e.id);
   const size_t nv = largo(e.version), np = largo(e.perfil);
-  const size_t total = 5 + 1 + ne + 1 + nn + 1 + ns + 1 + ni + 5 + 1 + nv + 1 + np + 4;
+  const size_t total = 5 + 1 + ne + 1 + nn + 1 + ns + 1 + ni + 5 + 1 + nv + 1 + np + 8;
   if (cap < total || ne > 255 || nn > 255 || ns > 255 || ni > 255 || nv > 255 || np > 255) return 0;
   size_t i = 0;
   s[i++] = VERSION_ESTADO;
@@ -76,7 +76,8 @@ size_t codificarEstado(const EstadoPublico& e, uint8_t* s, size_t cap) {
   copiarBytes(s + i, e.perfil, np);
   i += np;
   escribir32(s + i, e.crcConfig);
-  return i + 4;
+  escribir32(s + i + 4, e.encendido);
+  return i + 8;
 }
 
 size_t leerTextoCorto(const uint8_t* d, size_t n, char* destino, size_t cap) {

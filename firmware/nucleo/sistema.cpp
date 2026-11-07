@@ -67,6 +67,7 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
   leerRed();
 
   const uint32_t ahora = hal_.ahoraMs();
+  arranque_ = ahora;
   motor_.iniciar(&config_, hal_.semilla ? hal_.semilla() : ahora, ahora);
   leerAjustes();
   leerImagenes();
@@ -605,6 +606,7 @@ size_t Sistema::estadoBle(uint8_t* salida, size_t cap) const {
   p.version = perfil_.version ? perfil_.version : "";
   p.perfil = perfil_.nombre ? perfil_.nombre : "";
   p.crcConfig = crcConfig_;
+  p.encendido = (hal_.ahoraMs() - arranque_) / 1000u;
   return protocolo::codificarEstado(p, salida, cap);
 }
 
@@ -612,9 +614,10 @@ void Sistema::notificarEstadoSiCambio() {
   if (!hal_.notificar && !hal_.notificarNube) return;
   uint8_t b[protocolo::MAX_ESTADO];
   size_t n = estadoBle(b, sizeof b);
-  // El humor cambia de a poco: no notificar por eso solo.
+  // El humor cambia de a poco y el tiempo encendido, siempre (los últimos 4
+  // bytes): no notificar por eso solo.
   bool igual = n == largoUltimoEstado_;
-  for (size_t i = 0; igual && i < n; i++) igual = i == 2 || b[i] == ultimoEstado_[i];
+  for (size_t i = 0; igual && i + 4 < n; i++) igual = i == 2 || b[i] == ultimoEstado_[i];
   if (igual) return;
   copiarBytes(ultimoEstado_, b, n);
   largoUltimoEstado_ = n;
@@ -649,8 +652,10 @@ void Sistema::responder(uint8_t car, uint8_t op, protocolo::Codigo c, const char
 }
 
 void Sistema::enviarConfig() {
+  // Pedirla en medio de una transferencia la aborta (0x84 es el código de los
+  // trozos: no hay forma de responder "ocupado" sin confundir).
+  receptor_.reiniciar();
   char* texto = receptor_.prestar();
-  if (!texto) return responder(protocolo::CarConfig, protocolo::ConfigPedir, protocolo::Ocupado, "hay una config llegando");
   size_t total = leerGuardada(texto);
   if (total == 0) total = copiarTexto(texto, MAX_CONFIG_BYTES + 1, CONFIG_VACIA);
   uint8_t* b = g_trozo;

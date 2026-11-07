@@ -261,6 +261,7 @@ data class Estado(
     val version: String = "",
     val perfil: String = "",
     val crcConfig: Long = 0,
+    val encendido: Long = 0,
 )
 
 fun leerEstado(b: ByteArray): Estado {
@@ -287,6 +288,7 @@ fun leerEstado(b: ByteArray): Estado {
     val firmware = if (version >= 4) campo() else ""
     val perfil = if (version >= 4) campo() else ""
     val crcConfig = if (version >= 4) leerU32(b, i) else 0L
+    val encendido = if (version >= 4) leerU32(b, i + 4) else 0L
     return Estado(
         pantalla = pantalla,
         bateria = (b[1].toInt() and 0xFF).takeIf { it != 255 },
@@ -301,7 +303,7 @@ fun leerEstado(b: ByteArray): Estado {
         nube = flags and 32 != 0,
         redConfigurada = flags and 64 != 0,
         actualizando = flags and 128 != 0,
-        version = firmware, perfil = perfil, crcConfig = crcConfig,
+        version = firmware, perfil = perfil, crcConfig = crcConfig, encendido = encendido,
     )
 }
 

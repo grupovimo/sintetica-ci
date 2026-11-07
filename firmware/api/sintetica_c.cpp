@@ -115,6 +115,7 @@ void sintetica_iniciar_perfil(const sintetica_hal* hal, int ancho, int alto, int
     if (g_hal.ota_cancelar) g_hal.ota_cancelar(g_hal.contexto);
   };
   h.escribirTrozo = [](const char* c, uint32_t off, const uint8_t* d, size_t n) {
+    if (g_hal.escribir_trozo) return g_hal.escribir_trozo(g_hal.contexto, c, off, d, n) != 0;
     const int e = espacioDe(c);
     if (e < 0 || (off != 0 && off != g_largos[e])) return false;
     if (off + n > g_capacidad[e]) {
@@ -129,6 +130,7 @@ void sintetica_iniciar_perfil(const sintetica_hal* hal, int ancho, int alto, int
     return true;
   };
   h.leerTrozo = [](const char* c, uint32_t off, uint8_t* d, size_t n) {
+    if (g_hal.leer_trozo) return g_hal.leer_trozo(g_hal.contexto, c, off, d, n);
     const int e = espacioDe(c);
     if (e < 0 || !g_largos[e]) return -1;
     if (off >= g_largos[e]) return 0;
@@ -137,6 +139,7 @@ void sintetica_iniciar_perfil(const sintetica_hal* hal, int ancho, int alto, int
     return static_cast<int>(m);
   };
   h.borrar = [](const char* c) {
+    if (g_hal.borrar) return g_hal.borrar(g_hal.contexto, c) != 0;
     const int e = espacioDe(c);
     if (e >= 0) g_largos[e] = 0;
     return true;
@@ -199,6 +202,7 @@ void sintetica_ota_progreso(int codigo, int pct, const char* detalle) {
   g_sistema.otaProgreso(static_cast<uint8_t>(codigo), static_cast<uint8_t>(limitar(static_cast<float>(pct), 0, 100)), detalle);
 }
 uint32_t sintetica_crc_config(void) { return g_sistema.crcConfig(); }
+int sintetica_quiere_dormir(void) { return g_sistema.quiereDormir() ? 1 : 0; }
 size_t sintetica_mensaje_ota(const sintetica_manifiesto* m, char* s, size_t cap) {
   return m ? protocolo::mensajeOta(*reinterpret_cast<const ManifiestoOta*>(m), s, cap) : 0;
 }

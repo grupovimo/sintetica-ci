@@ -29,7 +29,8 @@ function estado(c) {
   return hex([4, c.bateria ?? 255, Math.round(c.humor * 100) & 0xff, c.modo, flags,
     ...campo(c.expresion), ...campo(c.nombre), ...campo(c.serie), ...campo(c.id),
     c.ancho & 255, c.ancho >> 8, c.alto & 255, c.alto >> 8, c.redonda ? 1 : 0,
-    ...campo(c.version), ...campo(c.perfil), ...[0, 8, 16, 24].map((k) => (c.crcConfig >>> k) & 255)]);
+    ...campo(c.version), ...campo(c.perfil), ...[0, 8, 16, 24].map((k) => (c.crcConfig >>> k) & 255),
+    ...[0, 8, 16, 24].map((k) => (c.encendido >>> k) & 255)]);
 }
 
 // Una imagen chica que usa todas las operaciones de QOI: rachas, índice,
@@ -133,10 +134,10 @@ const vectores = {
   },
   estados: [
     {
-      campos: { bateria: null, humor: 0.2, modo: 'mascota', dormido: false, fija: false, emparejando: true, autenticado: false, wifi: false, nube: false, redConfigurada: false, actualizando: false, expresion: 'neutral', nombre: 'bicho', serie: '', id: 'A1B2C3D4E5F6', ancho: 320, alto: 172, redonda: false, version: '0.2.0', perfil: 'dev-147b', crcConfig: 0 },
+      campos: { bateria: null, humor: 0.2, modo: 'mascota', dormido: false, fija: false, emparejando: true, autenticado: false, wifi: false, nube: false, redConfigurada: false, actualizando: false, expresion: 'neutral', nombre: 'bicho', serie: '', id: 'A1B2C3D4E5F6', ancho: 320, alto: 172, redonda: false, version: '0.2.0', perfil: 'dev-147b', crcConfig: 0, encendido: 5 },
     },
     {
-      campos: { bateria: 87, humor: -0.35, modo: 'reloj', dormido: true, fija: true, emparejando: false, autenticado: true, wifi: true, nube: true, redConfigurada: true, actualizando: true, expresion: 'animacion:saludo', nombre: 'Ñandú', serie: '001', id: '00AABBCCDDEE', ancho: 240, alto: 240, redonda: true, version: '0.2.0', perfil: 'broche-c3', crcConfig: 0xcbf43926 },
+      campos: { bateria: 87, humor: -0.35, modo: 'reloj', dormido: true, fija: true, emparejando: false, autenticado: true, wifi: true, nube: true, redConfigurada: true, actualizando: true, expresion: 'animacion:saludo', nombre: 'Ñandú', serie: '001', id: '00AABBCCDDEE', ancho: 240, alto: 240, redonda: true, version: '0.2.0', perfil: 'broche-c3', crcConfig: 0xcbf43926, encendido: 86400 },
     },
   ].map((e) => ({ campos: { ...e.campos, crcConfigHex: e.campos.crcConfig.toString(16).padStart(8, '0') }, hex: estado({ ...e.campos, modo: ['mascota', 'reloj', 'pomodoro', 'clima', 'notificaciones'].indexOf(e.campos.modo) }) })),
   respuestas: [
