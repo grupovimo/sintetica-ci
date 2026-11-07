@@ -1,0 +1,194 @@
+<title>Simulador SintéticaOS</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..800,0..100&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: el bicho arriba a la izquierda como héroe; a la derecha, el banco de pruebas (sensores, caras, BLE). En el celu, todo en una columna. */
+:root {
+  --papel: #FBFAF7;
+  --papel-alto: #FFFFFF;
+  --linea: #E6E2DA;
+  --tinta: #141210;
+  --tinta-suave: #6B6660;
+  --naranja: #F5501A;
+  --naranja-profundo: #B83C0C;
+  --naranja-claro: #FFE3D6;
+  --sobre-naranja: #141210;
+  --carcasa: #1A1816;
+  --pantalla: #0B0A09;
+  --display: "Fraunces", Georgia, serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --radio: 12px;
+  --radio-lg: 24px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --papel: #0E0D0C; --papel-alto: #1A1816; --linea: #2C2925; --tinta: #F5F2EC; --tinta-suave: #A39E96;
+    --naranja: #FF6A33; --naranja-profundo: #FF8A5C; --naranja-claro: #4A2416; --carcasa: #26231F;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --papel: #0E0D0C; --papel-alto: #1A1816; --linea: #2C2925; --tinta: #F5F2EC; --tinta-suave: #A39E96;
+  --naranja: #FF6A33; --naranja-profundo: #FF8A5C; --naranja-claro: #4A2416; --carcasa: #26231F;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--papel); color: var(--tinta);
+  font-family: var(--display); font-variation-settings: "SOFT" 100; font-size: 16px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 48px;
+}
+.marco { max-width: 1120px; margin: 0 auto; display: grid; gap: 32px; }
+.etiqueta {
+  font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--tinta-suave);
+}
+header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 24px; }
+h1 {
+  margin: 4px 0 0; font-size: clamp(32px, 6vw, 56px); line-height: .98; font-weight: 800;
+  font-variation-settings: "SOFT" 100, "opsz" 144; letter-spacing: -.025em; text-wrap: balance;
+}
+h1 span { display: block; color: var(--naranja); }
+h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+p { margin: 0; max-width: 62ch; }
+.bajada { color: var(--tinta-suave); font-size: 15px; }
+
+.grilla { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 860px) { .grilla { grid-template-columns: minmax(0, 1fr); } }
+.columna { display: grid; gap: 24px; min-width: 0; }
+
+/* El bicho: carcasa redondeada con la pantalla adentro. */
+.bicho { background: var(--carcasa); border-radius: var(--radio-lg); padding: 18px; display: grid; gap: 14px; }
+.pantalla { background: var(--pantalla); border-radius: 10px; overflow: hidden; line-height: 0; touch-action: none; cursor: pointer; }
+.pantalla canvas { width: 100%; height: auto; aspect-ratio: 320 / 172; display: block; }
+.placa { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.placa .etiqueta { color: #A39E96; }
+.corazon-led { width: 12px; height: 12px; border-radius: 999px; background: #2C2925; box-shadow: 0 0 0 3px #0B0A09; transition: background .2s; }
+
+/* Ficha técnica en mono, como la etiqueta de serie. */
+.ficha { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1px; background: var(--linea); border: 1px solid var(--linea); border-radius: var(--radio); overflow: hidden; }
+.ficha div { background: var(--papel-alto); padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+.ficha b { font-family: var(--mono); font-size: 14px; font-weight: 400; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+section { display: grid; gap: 12px; }
+.fila { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select, input, textarea { font: inherit; color: inherit; }
+button {
+  font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  background: var(--papel-alto); border: 1px solid var(--linea); border-radius: var(--radio);
+  padding: 10px 14px; cursor: pointer; transition: border-color .15s, background .15s;
+}
+button:hover { border-color: var(--tinta-suave); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--naranja); outline-offset: 2px; }
+button.primario { background: var(--naranja); border-color: var(--naranja); color: var(--sobre-naranja); }
+button[aria-pressed="true"] { background: var(--naranja-claro); border-color: var(--naranja); }
+.caras { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; }
+.caras button { text-transform: none; letter-spacing: 0; font-weight: 400; text-align: left; padding: 8px 10px; }
+.caras button.visible { border-color: var(--naranja); box-shadow: inset 3px 0 0 var(--naranja); }
+label { display: grid; gap: 6px; }
+input[type="text"], select, textarea {
+  background: var(--papel-alto); border: 1px solid var(--linea); border-radius: var(--radio); padding: 9px 12px; min-width: 0;
+}
+input[type="range"] { accent-color: var(--naranja); width: 100%; }
+textarea { font-family: var(--mono); font-size: 12px; line-height: 1.5; width: 100%; min-height: 220px; resize: vertical; }
+.panel { background: var(--papel-alto); border: 1px solid var(--linea); border-radius: var(--radio-lg); padding: 20px; display: grid; gap: 20px; min-width: 0; }
+.registro {
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.55; background: var(--papel); border: 1px solid var(--linea);
+  border-radius: var(--radio); padding: 10px 12px; height: 210px; overflow: auto; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.registro .ida { color: var(--naranja-profundo); }
+.registro .mal { color: var(--naranja-profundo); font-weight: 700; }
+.nota { font-size: 13px; color: var(--tinta-suave); }
+kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--linea); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
+.dos { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="marco">
+  <header>
+    <div>
+      <div class="etiqueta">Sintética Labs · Banco de pruebas · Etapa 1</div>
+      <h1>El bicho, <span>sin la placa.</span></h1>
+    </div>
+    <p class="bajada">Es el mismo firmware de SintéticaOS compilado a WebAssembly: lo que ves acá es lo que va a hacer la pantalla de la 1.47B. Tocalo, sacudilo o mandale una config por BLE.</p>
+  </header>
+
+  <div class="grilla">
+    <div class="columna">
+      <div class="bicho">
+        <div class="pantalla" id="pantalla" title="Tocar (mantener = caricia)">
+          <canvas id="lienzo" width="320" height="172" aria-label="Pantalla del bicho"></canvas>
+        </div>
+        <div class="placa">
+          <span class="etiqueta" id="placa-serie">Unidad #000 · SintéticaOS</span>
+          <span class="corazon-led" id="led" title="LED de corazón"></span>
+        </div>
+      </div>
+
+      <div class="ficha" aria-live="polite">
+        <div><span class="etiqueta">Nombre</span><b id="f-nombre">—</b></div>
+        <div><span class="etiqueta">Expresión</span><b id="f-expresion">—</b></div>
+        <div><span class="etiqueta">Humor</span><b id="f-humor">—</b></div>
+        <div><span class="etiqueta">Estado</span><b id="f-estado">—</b></div>
+      </div>
+
+      <section aria-labelledby="t-sensores">
+        <h2 id="t-sensores">Sensores</h2>
+        <div class="fila">
+          <button id="b-tocar" class="primario">Tocar</button>
+          <button id="b-doble">Doble toque</button>
+          <button id="b-levantar">Levantar</button>
+          <button id="b-sacudir">Sacudir</button>
+          <button id="b-abajo" aria-pressed="false">Boca abajo</button>
+        </div>
+        <p class="nota">También se puede tocar la pantalla: un toque, dos seguidos, o mantener apretado para acariciarlo. Con el teclado: <kbd>Espacio</kbd> toca, <kbd>S</kbd> sacude.</p>
+        <div class="dos">
+          <label for="r-bateria"><span class="etiqueta">Batería: <span id="v-bateria">sin batería</span></span>
+            <input type="range" id="r-bateria" min="-1" max="100" value="-1">
+          </label>
+          <button id="b-noche" aria-pressed="false">Es de noche</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="panel">
+      <section aria-labelledby="t-caras">
+        <div class="fila" style="justify-content: space-between">
+          <h2 id="t-caras">Las 16 caras</h2>
+          <button id="b-auto" aria-pressed="true">Automático</button>
+        </div>
+        <div class="caras" id="caras"></div>
+        <p class="nota">Elegir una la deja fija por BLE (comando 0x10), y se guarda: sobrevive a reiniciar el bicho.</p>
+      </section>
+
+      <section aria-labelledby="t-ble">
+        <h2 id="t-ble">BLE</h2>
+        <div class="dos">
+          <label for="i-nombre"><span class="etiqueta">Nombre (comando 0x11)</span>
+            <input type="text" id="i-nombre" maxlength="24" value="Toto" autocomplete="off">
+          </label>
+          <button id="b-nombre">Cambiar</button>
+        </div>
+        <label for="t-config"><span class="etiqueta">Configuración (se manda por bloques de 180 bytes)</span>
+          <textarea id="t-config" spellcheck="false"></textarea>
+        </label>
+        <div class="fila">
+          <button id="b-mandar" class="primario">Mandar config</button>
+          <button id="b-pedir">Pedir config</button>
+          <button id="b-reiniciar">Reiniciar bicho</button>
+          <button id="b-borrar">Borrar memoria</button>
+        </div>
+        <div>
+          <div class="etiqueta" style="margin-bottom:6px">Registro: → escrituras, ← notificaciones</div>
+          <pre class="registro" id="registro" aria-live="polite"></pre>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
