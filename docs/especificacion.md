@@ -59,7 +59,7 @@ expresiones con curvas de easing.
 | M0 | Firmware base en la 1.47B: PlatformIO, LovyanGFX, perfil `dev-147b` | La cara neutral parpadea al azar cada 3 a 7 s, fluida y sin parpadeos de pantalla | Listo en simulador; falta probar en la placa |
 | M1 | Motor de vida y las 16 expresiones desde el JSON embebido | Mira a los costados, respira, cambia de expresión con transición; sacudirlo lo marea (IMU) | Listo en simulador; falta probar en la placa |
 | M2 | BLE: servicio GATT y configuración guardada en flash | Desde nRF Connect se cambia la expresión y el nombre, y sobrevive a un reinicio | Listo en simulador; falta probar en la placa |
-| M3 | Apps iOS y Android mínimas | Escanear el QR, vincular, elegir expresión con vista previa idéntica a la del bicho | — |
+| M3 | Apps iOS y Android mínimas | Escanear el QR, vincular, elegir expresión con vista previa idéntica a la del bicho | Android compila y pasa sus tests; iOS escrita, falta compilarla en una Mac; falta probar las dos con la placa |
 | M4 | Broche: perfil `broche-c3`, pulsador y sueño profundo | Un toque cambia la animación, mantenerlo lo duerme, otro toque lo despierta; dormido gasta menos de 0,3 mA | — |
 | M5 | Backend en el VPS: cuentas, configuraciones, MQTT y OTA firmada | Un bicho con WiFi recibe un cambio hecho desde otro celu y se actualiza solo | — |
 | M6 | Web: editor de caras, animaciones y reglas | Una cara creada en la web se ve igual en la app y en el bicho | — |
@@ -98,6 +98,20 @@ Tomadas el 7/11/2026 con Nahuel:
 - Apps nativas: Swift + SwiftUI en iOS y Kotlin + Jetpack Compose en Android.
 - Web: el frontend en Svelte + TypeScript; el backend en Go.
 - Todo se despliega en el VPS de Grupo Vimo.
+
+### Decisiones de la etapa 2 (M3)
+
+- La vista previa de las apps la dibuja **el mismo núcleo C++** (Android por
+  JNI, iOS por la API en C de `firmware/api`): no hay renderers paralelos.
+- **Emparejamiento**: la pantalla del manual (QR, "UNIDAD #001", "Escaneame /
+  con la app."). Aparece mientras ningún celu está vinculado y 2 min después de
+  mantener el botón 5 s.
+- **Sin el código no se escribe**: vincular da una clave por celu; cada conexión
+  se autentica. Detalle en `docs/protocolo-ble.md` (v1.1).
+- Número de unidad grabado en el taller por USB (`serie 001`).
+- Apps `com.sinteticalabs.app`, iOS 17+ y Android 10+. Pantallas: escanear,
+  vincular, el bicho (vista previa, estado, caras, nombre, ojos, personalidad,
+  sueño) y "probar sin bicho".
 
 ### Diferencias con el ejemplo del doc
 
