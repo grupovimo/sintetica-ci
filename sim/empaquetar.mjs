@@ -12,14 +12,22 @@ const modulo = (texto) => texto
   .replace(/^import[\s\S]*?from '\.\/[^']+';\n/gm, '')
   .replace(/^export (async function|function|const|class)/gm, '$1');
 
+// Los módulos van a un solo ámbito: dos nombres iguales al primer nivel romperían la página.
+const modulos = ['web/protocolo.js', 'web/qoi.js', 'web/sim.js', 'web/app.js'];
+const vistos = new Map();
+for (const m of modulos) {
+  for (const [, nombre] of leer(m).matchAll(/^(?:export )?(?:async )?(?:const|let|var|function|class) ([A-Za-z_$][\w$]*)/gm)) {
+    if (vistos.has(nombre)) throw new Error(`"${nombre}" está en ${vistos.get(nombre)} y en ${m}: renombrá uno`);
+    vistos.set(nombre, m);
+  }
+}
+
 const wasm = fs.readFileSync(path.join(aqui, 'dist/sinteticaos.wasm')).toString('base64');
 const ejemplo = fs.readFileSync(path.join(aqui, '../shared/formato/config-ejemplo.json'), 'utf8');
 const codigo = [
   `globalThis.SINTETICA_WASM_B64 = ${JSON.stringify(wasm)};`,
   `globalThis.SINTETICA_EJEMPLO = ${JSON.stringify(ejemplo)};`,
-  modulo(leer('web/protocolo.js')),
-  modulo(leer('web/sim.js')),
-  modulo(leer('web/app.js')),
+  ...modulos.map((m) => modulo(leer(m))),
 ].join('\n');
 
 const html = leer('web/index.html').replace(

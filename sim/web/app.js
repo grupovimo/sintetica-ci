@@ -2,32 +2,43 @@
 // botones de sensores y el panel BLE, que manda los mismos bytes que la app.
 import { almacenLocal, crearSimulador } from './sim.js';
 import {
-  ArmadorDeConfig, Car, comando, escriturasDeConfig, Eventos, leerEstado, leerQr, leerRespuesta, pedirConfig,
+  ArmadorDeConfig, Car, comando, escriturasDeConfig, escriturasDeImagen, Eventos, imagen, leerEstado,
+  leerListaImagenes, leerQr, leerRespuesta, pedirConfig,
 } from './protocolo.js';
+import { codificarQoi } from './qoi.js';
 
 const $ = (id) => document.getElementById(id);
 const lienzo = $('lienzo');
 const ctx = lienzo.getContext('2d');
-const imagen = ctx.createImageData(320, 172);
+let datosPantalla = ctx.createImageData(320, 172);
 const registro = $('registro');
-const almacen = almacenLocal();
 
-const NOMBRES_CAR = { 1: 'config', 2: 'comando', 3: 'estado', 4: 'ota' };
+// La placa que se simula: la 1.47B (mascota) o el broche. Cada una con su memoria.
+let perfil = 'mascota';
+try { perfil = localStorage.getItem('sinteticaos-perfil') === 'broche' ? 'broche' : 'mascota'; } catch { /* sin almacenamiento */ }
+const almacenes = { mascota: almacenLocal('sinteticaos:'), broche: almacenLocal('sinteticaos:broche:') };
+let almacen = almacenes[perfil];
+const PANTALLA = { mascota: [320, 172], broche: [240, 240] };
+let espacio = 0;            // el espacio de imagen elegido
+let ocupados = 0;           // máscara de espacios con imagen
+
+const NOMBRES_CAR = { 1: 'config', 2: 'comando', 3: 'estado', 4: 'ota', 5: 'imagen' };
 const NOMBRES_OP = {
   0x10: 'expresión', 0x11: 'nombre', 0x12: 'evento', 0x13: 'vincular', 0x14: 'autenticar', 0x15: 'desvincular',
   0x01: 'inicio', 0x02: 'bloque', 0x03: 'fin', 0x04: 'pedir',
+  0x20: 'inicio', 0x21: 'bloque', 0x22: 'fin', 0x23: 'borrar', 0x24: 'listar',
 };
 
 // La clave que el bicho le dio a "este celu" al vincular (como la guardaría la app).
-const CLAVE_CELU = 'sinteticaos-celu:clave';
+const claveCelu = () => `sinteticaos-celu:clave:${perfil}`;
 let claveEnMemoria = null;  // por si el navegador no deja usar localStorage
 function claveGuardada() {
-  try { const s = localStorage.getItem(CLAVE_CELU); if (s) return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)); } catch { /* sin almacenamiento */ }
+  try { const s = localStorage.getItem(claveCelu()); if (s) return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)); } catch { /* sin almacenamiento */ }
   return claveEnMemoria;
 }
 function guardarClave(clave) {
   claveEnMemoria = clave;
-  try { if (clave) localStorage.setItem(CLAVE_CELU, btoa(String.fromCharCode(...clave))); else localStorage.removeItem(CLAVE_CELU); } catch { /* sin almacenamiento */ }
+  try { if (clave) localStorage.setItem(claveCelu(), btoa(String.fromCharCode(...clave))); else localStorage.removeItem(claveCelu()); } catch { /* sin almacenamiento */ }
 }
 
 let sim = null;
@@ -57,6 +68,13 @@ function escribir(car, bytes, comentario = '') {
 
 function alNotificar(car, b) {
   if (car === Car.estado) { mostrarEstado(leerEstado(b)); return; }
+  if (car === Car.imagen && b[0] === 0xa4 && b[1] === 0) {
+    const l = leerListaImagenes(b);
+    ocupados = l.mascara;
+    armarEspacios();
+    anotar(`← imagen listar  ${l.espacios.length ? l.espacios.map((e) => `${e.espacio}: ${(e.largo / 1024).toFixed(1)} KB`).join(', ') : 'sin imágenes'}`);
+    return;
+  }
   const r = leerRespuesta(b);
   if (r.tipo === 'trozo') { armador.agregar(r); return; }
   if (r.tipo === 'cierre') {
@@ -83,6 +101,73 @@ function mostrarEstado(e) {
   $('b-vincular').disabled = !e.emparejando;
   $('b-auto').setAttribute('aria-pressed', String(!e.fija));
   for (const b of $('caras').children) b.setAttribute('aria-pressed', String(e.fija && b.dataset.nombre === e.expresion));
+}
+
+function armarEspacios() {
+  const caja = $('espacios');
+  caja.replaceChildren();
+  for (let i = 0; i < 8; i++) {
+    const b = document.createElement('button');
+    b.textContent = String(i);
+    b.className = ocupados & (1 << i) ? 'ocupado' : '';
+    b.setAttribute('aria-pressed', String(i === espacio));
+    b.title = ocupados & (1 << i) ? `Espacio ${i}: con imagen` : `Espacio ${i}: vacío`;
+    b.addEventListener('click', () => { espacio = i; armarEspacios(); });
+    caja.append(b);
+  }
+}
+
+// Recorta la imagen a la pantalla (cubriendo, centrada; redonda si es el broche) y la codifica en QOI.
+function prepararImagen(fuente) {
+  const [w, h] = PANTALLA[perfil];
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.fillStyle = '#0B0A09';
+  g.fillRect(0, 0, w, h);
+  const fw = fuente.width, fh = fuente.height;
+  const k = Math.max(w / fw, h / fh);
+  g.save();
+  if (perfil === 'broche') { g.beginPath(); g.arc(w / 2, h / 2, w / 2, 0, Math.PI * 2); g.clip(); }
+  g.drawImage(fuente, (w - fw * k) / 2, (h - fh * k) / 2, fw * k, fh * k);
+  g.restore();
+  return codificarQoi(g.getImageData(0, 0, w, h).data, w, h);
+}
+
+// Una imagen de ejemplo hecha acá mismo: un campo naranja con la cara del isotipo.
+function imagenDeEjemplo() {
+  const [w, h] = PANTALLA[perfil];
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  const fondo = g.createLinearGradient(0, 0, w, h);
+  fondo.addColorStop(0, '#FF6A33');
+  fondo.addColorStop(1, '#B83C0C');
+  g.fillStyle = fondo;
+  g.fillRect(0, 0, w, h);
+  const s = Math.min(w, h) / 172;
+  g.fillStyle = '#0B0A09';
+  const pildora = (x, y, ww, hh) => { g.beginPath(); g.roundRect(x, y, ww, hh, ww / 2); g.fill(); };
+  pildora(w / 2 - 60 * s, h / 2 - 36 * s, 36 * s, 72 * s);
+  g.beginPath();  // el ojo con el corte 1:2
+  g.moveTo(w / 2 + 24 * s, h / 2 - 36 * s); g.lineTo(w / 2 + 60 * s, h / 2 - 18 * s);
+  g.lineTo(w / 2 + 60 * s, h / 2 + 18 * s); g.arc(w / 2 + 42 * s, h / 2 + 18 * s, 18 * s, 0, Math.PI); g.closePath(); g.fill();
+  return c;
+}
+
+async function subirImagen(qoi) {
+  const escrituras = escriturasDeImagen(espacio, qoi, 180);
+  const barra = $('progreso');
+  barra.hidden = false;
+  anotar(`· imagen QOI de ${(qoi.length / 1024).toFixed(1)} KB al espacio ${espacio}, en ${escrituras.length - 2} bloques`);
+  for (let i = 0; i < escrituras.length; i++) {
+    const e = escrituras[i];
+    if (i === 0 || i === escrituras.length - 1) escribir(Car.imagen, e); else sim.bleEscribir(Car.imagen, e);
+    barra.value = (i + 1) / escrituras.length;
+    if (i % 40 === 0) await new Promise((r) => setTimeout(r, 0));  // que se vea el progreso
+  }
+  barra.hidden = true;
+  escribir(Car.imagen, imagen.listar());
 }
 
 function armarCaras() {
@@ -113,12 +198,22 @@ async function cargarEjemplo() {
 let wasm = null;
 async function arrancar() {
   armador = new ArmadorDeConfig();
+  const [w, h] = PANTALLA[perfil];
+  lienzo.width = w; lienzo.height = h;
+  datosPantalla = ctx.createImageData(w, h);
+  document.querySelector('.bicho').dataset.forma = perfil === 'broche' ? 'redonda' : 'rectangular';
+  for (const el of document.querySelectorAll('.solo-mascota')) el.hidden = perfil === 'broche';
+  for (const el of document.querySelectorAll('.solo-broche')) el.hidden = perfil !== 'broche';
+  $('p-mascota').setAttribute('aria-pressed', String(perfil === 'mascota'));
+  $('p-broche').setAttribute('aria-pressed', String(perfil === 'broche'));
+  $('pantalla').title = perfil === 'broche' ? 'Toque: siguiente · 2 s: dormir · 8 s: QR' : 'Tocar (mantener = caricia)';
   sim = await crearSimulador({
     wasm,
     almacen,
+    perfil,
     bateria: () => bateria,
     minutoDelDia: () => (noche ? 2 * 60 : (() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); })()),
-    alPresentar: (rgba) => { imagen.data.set(rgba); ctx.putImageData(imagen, 0, 0); },
+    alPresentar: (rgba) => { datosPantalla.data.set(rgba); ctx.putImageData(datosPantalla, 0, 0); },
     alNotificar,
     alRegistrar: (m) => anotar(`· ${m}`),
     alSonido: (s) => anotar(`♪ sonido: ${s}`),
@@ -130,6 +225,9 @@ async function arrancar() {
   if (clave && !sim.emparejando()) escribir(Car.comando, comando.autenticar(clave), '(clave guardada de este celu)');
   sim.tick();
   mostrarEstado(leerEstado(sim.bleLeerEstado()));
+  ocupados = 0;
+  armarEspacios();
+  if (!sim.emparejando()) escribir(Car.imagen, imagen.listar());
 }
 
 // El IMU de mentira: 50 lecturas por segundo, quieto salvo que se aprieten botones.
@@ -192,6 +290,33 @@ function enlazar() {
     escrituras.forEach((b, i) => escribir(Car.config, b, i === 0 ? `(${json.length} bytes en ${escrituras.length - 2} bloques)` : ''));
   });
   $('b-pedir').addEventListener('click', () => escribir(Car.config, pedirConfig()));
+  for (const p of ['mascota', 'broche']) {
+    $(`p-${p}`).addEventListener('click', async () => {
+      if (perfil === p) return;
+      perfil = p;
+      almacen = almacenes[p];
+      try { localStorage.setItem('sinteticaos-perfil', p); } catch { /* sin almacenamiento */ }
+      anotar(`· ahora simulo ${p === 'broche' ? 'el broche (redondo, 240 × 240)' : 'la 1.47B (320 × 172)'}`);
+      await arrancar();
+    });
+  }
+  $('i-archivo').addEventListener('change', async (e) => {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    try { await subirImagen(prepararImagen(await createImageBitmap(archivo))); } catch (err) { anotar(`No pude leer la imagen: ${err.message}`, 'mal'); }
+    e.target.value = '';
+  });
+  $('b-ejemplo').addEventListener('click', () => subirImagen(prepararImagen(imagenDeEjemplo())));
+  $('b-borrar-imagen').addEventListener('click', () => { escribir(Car.imagen, imagen.borrar(espacio)); escribir(Car.imagen, imagen.listar()); });
+  $('b-lista').addEventListener('click', () => {
+    let config;
+    try { config = JSON.parse($('t-config').value); } catch (e) { anotar(`El editor no tiene JSON válido: ${e.message}`, 'mal'); return; }
+    config.lista = $('i-lista').value.split(',').map((x) => x.trim()).filter(Boolean);
+    config.rotar = Math.max(0, Math.min(1440, parseInt($('i-rotar').value, 10) || 0));
+    $('t-config').value = JSON.stringify(config, null, 2);
+    const json = JSON.stringify(config);
+    escriturasDeConfig(json, 180).forEach((b, i) => escribir(Car.config, b, i === 0 ? `(lista: ${config.lista.join(', ')})` : ''));
+  });
   $('b-vincular').addEventListener('click', () => {
     const qr = leerQr(sim.qr());
     anotar(`· escaneé el QR: ${sim.qr()}`);

@@ -65,6 +65,21 @@ p { margin: 0; max-width: 62ch; }
 .bicho { background: var(--carcasa); border-radius: var(--radio-lg); padding: 18px; display: grid; gap: 14px; }
 .pantalla { background: var(--pantalla); border-radius: 10px; overflow: hidden; line-height: 0; touch-action: none; cursor: pointer; }
 .pantalla canvas { width: 100%; height: auto; aspect-ratio: 320 / 172; display: block; }
+/* El broche: pantalla redonda de 240 × 240 en una carcasa redonda. */
+.bicho[data-forma="redonda"] { border-radius: 999px; padding: 22px; width: min(100%, 380px); justify-self: center; }
+.bicho[data-forma="redonda"] .pantalla { border-radius: 999px; }
+.bicho[data-forma="redonda"] .pantalla canvas { aspect-ratio: 1; }
+.bicho[data-forma="redonda"] .placa { display: none; }
+.selector { display: inline-flex; border: 1px solid var(--linea); border-radius: var(--radio); overflow: hidden; }
+.selector button { border: 0; border-radius: 0; }
+.selector button + button { border-left: 1px solid var(--linea); }
+input[type="file"] { max-width: 100%; min-width: 0; font-family: var(--mono); font-size: 12px; }
+.dos > label { min-width: 0; }
+.dos input[type="text"] { width: 100%; }
+progress { width: 100%; accent-color: var(--naranja); height: 8px; }
+.espacios { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
+.espacios button { padding: 8px 0; text-align: center; }
+.espacios button.ocupado { background: var(--naranja-claro); }
 .placa { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .placa .etiqueta { color: #A39E96; }
 .corazon-led { width: 12px; height: 12px; border-radius: 999px; background: #2C2925; box-shadow: 0 0 0 3px #0B0A09; transition: background .2s; }
@@ -111,10 +126,14 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--linea);
 <div class="marco">
   <header>
     <div>
-      <div class="etiqueta">Sintética Labs · Banco de pruebas · Etapa 1</div>
+      <div class="etiqueta">Sintética Labs · Banco de pruebas</div>
       <h1>El bicho, <span>sin la placa.</span></h1>
     </div>
-    <p class="bajada">Es el mismo firmware de SintéticaOS compilado a WebAssembly: lo que ves acá es lo que va a hacer la pantalla de la 1.47B. Tocalo, sacudilo o mandale una config por BLE.</p>
+    <div class="selector" role="group" aria-label="Placa">
+      <button id="p-mascota" aria-pressed="true">1.47B</button>
+      <button id="p-broche" aria-pressed="false">Broche</button>
+    </div>
+    <p class="bajada">Es el mismo firmware de SintéticaOS compilado a WebAssembly: lo que ves acá es lo que va a hacer la pantalla de la placa. Tocalo, sacudilo, mandale una config o una imagen por BLE.</p>
   </header>
 
   <div class="grilla">
@@ -140,12 +159,13 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--linea);
         <h2 id="t-sensores">Sensores</h2>
         <div class="fila">
           <button id="b-tocar" class="primario">Tocar</button>
-          <button id="b-doble">Doble toque</button>
-          <button id="b-levantar">Levantar</button>
-          <button id="b-sacudir">Sacudir</button>
-          <button id="b-abajo" aria-pressed="false">Boca abajo</button>
+          <button id="b-doble" class="solo-mascota">Doble toque</button>
+          <button id="b-levantar" class="solo-mascota">Levantar</button>
+          <button id="b-sacudir" class="solo-mascota">Sacudir</button>
+          <button id="b-abajo" class="solo-mascota" aria-pressed="false">Boca abajo</button>
         </div>
-        <p class="nota">También se puede tocar la pantalla: un toque, dos seguidos, o mantener apretado para acariciarlo. Con el teclado: <kbd>Espacio</kbd> toca, <kbd>S</kbd> sacude.</p>
+        <p class="nota solo-mascota">También se puede tocar la pantalla: un toque, dos seguidos, o mantener apretado para acariciarlo. Con el teclado: <kbd>Espacio</kbd> toca, <kbd>S</kbd> sacude.</p>
+        <p class="nota solo-broche" hidden>El broche tiene un solo pulsador. Un toque pasa a lo siguiente de la lista; mantenerlo 2 s lo duerme (pantalla negra) y un toque lo despierta; mantenerlo 8 s muestra el QR. Probalo con Tocar, la pantalla o <kbd>Espacio</kbd>.</p>
         <div class="dos">
           <label for="i-serie"><span class="etiqueta">Número de unidad (taller, por USB)</span>
             <input type="text" id="i-serie" maxlength="12" value="001" autocomplete="off">
@@ -169,6 +189,27 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--linea);
         </div>
         <div class="caras" id="caras"></div>
         <p class="nota">Elegir una la deja fija por BLE (comando 0x10), y se guarda: sobrevive a reiniciar el bicho.</p>
+      </section>
+
+      <section aria-labelledby="t-imagenes">
+        <h2 id="t-imagenes">Imágenes</h2>
+        <p class="nota">Hasta 8. La página recorta la imagen a la forma de la pantalla, la codifica en QOI y la manda por la característica Imagen.</p>
+        <div class="espacios" id="espacios" role="group" aria-label="Espacio"></div>
+        <div class="fila">
+          <label for="i-archivo" class="boton-archivo"><input type="file" id="i-archivo" accept="image/*"></label>
+          <button id="b-ejemplo">Imagen de ejemplo</button>
+          <button id="b-borrar-imagen">Borrar este espacio</button>
+        </div>
+        <progress id="progreso" max="1" value="0" hidden></progress>
+        <div class="dos">
+          <label for="i-lista"><span class="etiqueta">Lista (cara:&lt;nombre&gt; o imagen:&lt;0-7&gt;, separadas por coma)</span>
+            <input type="text" id="i-lista" value="cara:neutral, imagen:0, cara:enamorado" autocomplete="off">
+          </label>
+          <label for="i-rotar"><span class="etiqueta">Rotar (min)</span>
+            <input type="text" id="i-rotar" value="0" inputmode="numeric" autocomplete="off" style="width: 6em">
+          </label>
+        </div>
+        <div class="fila"><button id="b-lista">Guardar la lista en el bicho</button></div>
       </section>
 
       <section aria-labelledby="t-ble">

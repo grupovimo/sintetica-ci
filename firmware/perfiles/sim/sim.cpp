@@ -11,7 +11,10 @@ extern "C" {
 IMPORTAR(js_ahora) uint32_t js_ahora();
 IMPORTAR(js_identificador) const char* js_identificador();
 IMPORTAR(js_semilla) uint32_t js_semilla();
-IMPORTAR(js_presentar) void js_presentar(const uint16_t* pixeles, int ancho, int alto);
+IMPORTAR(js_presentar_franja) void js_presentar_franja(const uint16_t* pixeles, int ancho, int y0, int filas);
+IMPORTAR(js_escribir_trozo) int js_escribir_trozo(const char* clave, uint32_t desplazamiento, const uint8_t* datos, size_t n);
+IMPORTAR(js_leer_trozo) int js_leer_trozo(const char* clave, uint32_t desplazamiento, uint8_t* datos, size_t n);
+IMPORTAR(js_borrar) int js_borrar(const char* clave);
 IMPORTAR(js_minuto) int js_minuto();
 IMPORTAR(js_bateria) int js_bateria();
 IMPORTAR(js_guardar) int js_guardar(const char* clave, const uint8_t* datos, size_t n);
@@ -48,20 +51,24 @@ void __cxa_pure_virtual() { __builtin_trap(); }
 }
 
 namespace {
-constexpr int ANCHO = 320, ALTO = 172;  // la pantalla de la 1.47B, apaisada
-uint16_t g_pixeles[ANCHO * ALTO];
+// 1.47B: 320 × 172 de una vez. Broche: 240 × 240 en franjas de 40 filas, como en la placa.
+uint16_t g_pixeles[320 * 240];
 uint8_t g_intercambio[MAX_CONFIG_BYTES + 64];
 Sistema g_sistema;
 }  // namespace
 
 extern "C" {
 
-__attribute__((export_name("sim_iniciar"))) void sim_iniciar() {
+// perfil: 0 = la 1.47B (mascota), 1 = el broche.
+__attribute__((export_name("sim_iniciar"))) void sim_iniciar(int perfil) {
   Hal h;
   h.ahoraMs = js_ahora;
   h.identificador = js_identificador;
   h.semilla = js_semilla;
-  h.presentar = js_presentar;
+  h.presentarFranja = js_presentar_franja;
+  h.escribirTrozo = [](const char* c, uint32_t off, const uint8_t* d, size_t n) { return js_escribir_trozo(c, off, d, n) != 0; };
+  h.leerTrozo = js_leer_trozo;
+  h.borrar = [](const char* c) { return js_borrar(c) != 0; };
   h.minutoDelDia = js_minuto;
   h.bateria = js_bateria;
   h.guardar = [](const char* c, const uint8_t* d, size_t n) { return js_guardar(c, d, n) != 0; };
@@ -70,7 +77,11 @@ __attribute__((export_name("sim_iniciar"))) void sim_iniciar() {
   h.sonido = js_sonido;
   h.led = js_led;
   h.registrar = js_registrar;
-  g_sistema.iniciar(h, g_pixeles, ANCHO, ALTO);
+  Perfil p;
+  if (perfil == 1) {
+    p.ancho = 240, p.alto = 240, p.filasFranja = 40, p.redonda = true, p.boton = Perfil::Boton::Broche;
+  }
+  g_sistema.iniciar(h, g_pixeles, p);
 }
 
 __attribute__((export_name("sim_tick"))) void sim_tick() { g_sistema.tick(); }
@@ -106,5 +117,8 @@ __attribute__((export_name("sim_conexion"))) void sim_conexion(int conectado) { 
 __attribute__((export_name("sim_qr"))) const char* sim_qr() { return g_sistema.contenidoQr(); }
 __attribute__((export_name("sim_emparejando"))) int sim_emparejando() { return g_sistema.emparejando() ? 1 : 0; }
 __attribute__((export_name("sim_fijar_serie"))) void sim_fijar_serie(const char* s) { g_sistema.fijarSerie(s); }
+__attribute__((export_name("sim_quiere_dormir"))) int sim_quiere_dormir() { return g_sistema.quiereDormir() ? 1 : 0; }
+__attribute__((export_name("sim_imagen_visible"))) int sim_imagen_visible() { return g_sistema.imagenVisible(); }
+__attribute__((export_name("sim_posicion_lista"))) int sim_posicion_lista() { return g_sistema.posicionLista(); }
 __attribute__((export_name("sim_version"))) const char* sim_version() { return VERSION_SINTETICAOS; }
 }

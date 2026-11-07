@@ -8,20 +8,22 @@ import { fileURLToPath } from 'node:url';
 
 import { crearSimulador, memoriaVolatil } from '../web/sim.js';
 import {
-  ArmadorDeConfig, Car, comando, escriturasDeConfig, idDeAnuncio, leerEstado, leerQr, leerRespuesta, pedirConfig,
+  ArmadorDeConfig, Car, comando, escriturasDeConfig, escriturasDeImagen, idDeAnuncio, imagen, leerEstado, leerListaImagenes,
+  leerQr, leerRespuesta, pedirConfig,
 } from '../web/protocolo.js';
+import { codificarQoi, decodificarQoi } from '../web/qoi.js';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
 const wasm = fs.readFileSync(path.join(aqui, '../dist/sinteticaos.wasm'));
 
 // Como la app: se conecta y, si el bicho muestra el QR, vincula; si no, se autentica.
 let claveCelu = null;
-async function nuevo(almacen = memoriaVolatil(), { vincular = true } = {}) {
+async function nuevo(almacen = memoriaVolatil(), { vincular = true, perfil = 'mascota' } = {}) {
   const reloj = { t: 0 };
   const notis = [];
   let cuadros = 0;
   const sim = await crearSimulador({
-    wasm, almacen, ahora: () => reloj.t, semilla: () => 1234, minutoDelDia: () => 12 * 60,
+    wasm, almacen, perfil, ahora: () => reloj.t, semilla: () => 1234, minutoDelDia: () => 12 * 60,
     alNotificar: (c, b) => notis.push({ c, b }), alPresentar: () => cuadros++,
   });
   const correr = (ms) => { for (let i = 0; i < ms; i += 20) { reloj.t += 20; sim.tick(); } };
@@ -159,4 +161,63 @@ test('M3: el id del anuncio BLE y el número de serie', async () => {
   const { sim } = await nuevo();
   sim.fijarSerie('001');
   assert.equal(leerEstado(sim.bleLeerEstado()).serie, '001');
+});
+
+test('QOI: codificar y decodificar da lo mismo; el vector compartido coincide', () => {
+  const w = 37, h = 23, rgba = new Uint8Array(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    rgba[i * 4] = (i * 7) & 255; rgba[i * 4 + 1] = i % 5 === 0 ? 80 : 81; rgba[i * 4 + 2] = (i >> 3) & 255; rgba[i * 4 + 3] = 255;
+  }
+  const d = decodificarQoi(codificarQoi(rgba, w, h));
+  assert.equal(d.ancho, w);
+  assert.deepEqual(d.rgba, rgba);
+  const v = JSON.parse(fs.readFileSync(path.join(aqui, '../../shared/protocolo/vectores.json'), 'utf8')).qoi;
+  const q = decodificarQoi(Uint8Array.from(v.hex.split(' ').map((x) => parseInt(x, 16))));
+  const rgb565 = Array.from({ length: v.ancho * v.alto }, (_, i) => ((q.rgba[i * 4] & 0xf8) << 8) | ((q.rgba[i * 4 + 1] & 0xfc) << 3) | (q.rgba[i * 4 + 2] >> 3));
+  assert.deepEqual(rgb565, v.rgb565);
+});
+
+test('M4: el broche es redondo; un toque pasa a la cara siguiente', async () => {
+  const { sim, correr } = await nuevo(memoriaVolatil(), { perfil: 'broche' });
+  const e = leerEstado(sim.bleLeerEstado());
+  assert.deepEqual(e.pantalla, { ancho: 240, alto: 240, redonda: true });
+  correr(200);
+  assert.equal(sim.expresionVisible(), 'neutral');
+  sim.tacto(true); correr(100); sim.tacto(false); correr(300);
+  assert.equal(sim.expresionVisible(), 'contento');
+});
+
+test('M4: mantener 2 s lo duerme y un toque lo despierta', async () => {
+  const { sim, correr } = await nuevo(memoriaVolatil(), { perfil: 'broche' });
+  correr(100);
+  sim.tacto(true); correr(2200); sim.tacto(false); correr(40);
+  assert.equal(sim.quiereDormir(), true);
+  sim.tacto(true); correr(80); sim.tacto(false); correr(200);
+  assert.equal(sim.quiereDormir(), false);
+  assert.equal(sim.expresionVisible(), 'neutral');
+});
+
+test('M4: subir una imagen, ponerla en la lista y verla', async () => {
+  const { sim, notis, correr } = await nuevo(memoriaVolatil(), { perfil: 'broche' });
+  const rgba = new Uint8Array(240 * 240 * 4);
+  for (let i = 0; i < 240 * 240; i++) { rgba[i * 4] = 245; rgba[i * 4 + 1] = 80; rgba[i * 4 + 2] = (i % 240) & 255; rgba[i * 4 + 3] = 255; }
+  const qoi = codificarQoi(rgba, 240, 240);
+  for (const e of escriturasDeImagen(4, qoi)) sim.bleEscribir(Car.imagen, e);
+  const fin = notis.filter((n) => n.c === Car.imagen).map((n) => leerRespuesta(n.b)).at(-1);
+  assert.equal(fin.ok, true, fin.detalle);
+  notis.length = 0;
+  sim.bleEscribir(Car.imagen, imagen.listar());
+  const lista = leerListaImagenes(notis.at(-1).b);
+  assert.deepEqual(lista.espacios.map((x) => x.espacio), [4]);
+  for (const e of escriturasDeConfig({ version: 1, lista: ['imagen:4', 'cara:guino'] })) sim.bleEscribir(Car.config, e);
+  correr(100);
+  assert.equal(sim.imagenVisible(), 4);
+  sim.tacto(true); correr(100); sim.tacto(false); correr(300);
+  assert.equal(sim.imagenVisible(), -1);
+  assert.equal(sim.expresionVisible(), 'guino');
+  // Una imagen de otro tamaño se rechaza.
+  for (const e of escriturasDeImagen(5, codificarQoi(new Uint8Array(100 * 100 * 4), 100, 100))) sim.bleEscribir(Car.imagen, e);
+  const rechazo = leerRespuesta(notis.filter((n) => n.c === Car.imagen).at(-1).b);
+  assert.equal(rechazo.mensaje, 'imagen inválida');
+  assert.equal(rechazo.detalle, 'tiene que ser un QOI del tamaño de la pantalla');
 });

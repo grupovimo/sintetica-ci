@@ -17,6 +17,7 @@ export async function crearSimulador(opciones) {
     minutoDelDia = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); },
     semilla = () => (Math.random() * 0xffffffff) >>> 0,
     identificador = 'A1B2C3D4E5F6',
+    perfil = 'mascota',        // 'mascota' (la 1.47B, 320 × 172) o 'broche' (redondo, 240 × 240)
   } = opciones;
 
   let memoria;
@@ -38,10 +39,11 @@ export async function crearSimulador(opciones) {
     },
     js_ahora: () => (Math.floor(ahora() - inicio) >>> 0),
     js_semilla: () => semilla() >>> 0,
-    js_presentar: (p, w, h) => {
-      const px = new Uint16Array(memoria.buffer, p, w * h);
-      if (!rgba || rgba.length !== w * h * 4) rgba = new Uint8ClampedArray(w * h * 4);
-      for (let i = 0, j = 0; i < px.length; i++, j += 4) {
+    js_presentar_franja: (p, w, y0, filas) => {
+      const px = new Uint16Array(memoria.buffer, p, w * filas);
+      const alto = perfil === 'broche' ? 240 : 172;
+      if (!rgba || rgba.length !== w * alto * 4) rgba = new Uint8ClampedArray(w * alto * 4);
+      for (let i = 0, j = y0 * w * 4; i < px.length; i++, j += 4) {
         const c = px[i];
         const r = (c >> 11) & 0x1f, g = (c >> 5) & 0x3f, b = c & 0x1f;
         rgba[j] = (r << 3) | (r >> 2);
@@ -49,8 +51,16 @@ export async function crearSimulador(opciones) {
         rgba[j + 2] = (b << 3) | (b >> 2);
         rgba[j + 3] = 255;
       }
-      alPresentar(rgba, w, h);
+      if (y0 + filas >= alto) alPresentar(rgba, w, alto);
     },
+    js_escribir_trozo: (pc, off, pd, n) => (almacen.escribirTrozo(cadena(pc), off, bytes(pd, n).slice()) ? 1 : 0),
+    js_leer_trozo: (pc, off, pd, n) => {
+      const v = almacen.leerTrozo(cadena(pc), off, n);
+      if (v == null) return -1;
+      bytes(pd, v.length).set(v);
+      return v.length;
+    },
+    js_borrar: (pc) => (almacen.borrarArchivo(cadena(pc)), 1),
     js_minuto: () => minutoDelDia(),
     js_bateria: () => bateria(),
     js_guardar: (pc, pd, n) => (almacen.guardar(cadena(pc), bytes(pd, n).slice()) ? 1 : 0),
@@ -71,7 +81,7 @@ export async function crearSimulador(opciones) {
   var x = instance.exports;
   memoria = x.memory;
   x.__wasm_call_ctors();
-  x.sim_iniciar();
+  x.sim_iniciar(perfil === 'broche' ? 1 : 0);
 
   return {
     tick: () => x.sim_tick(),
@@ -99,21 +109,75 @@ export async function crearSimulador(opciones) {
     nombre: () => cadena(x.sim_nombre()),
     cierre: () => x.sim_cierre(),
     version: () => cadena(x.sim_version()),
+    perfil,
+    quiereDormir: () => x.sim_quiere_dormir() === 1,
+    imagenVisible: () => x.sim_imagen_visible(),
+    posicionLista: () => x.sim_posicion_lista(),
     // Reiniciar es volver a llamar a crearSimulador con el mismo almacén.
+  };
+}
+
+// Archivos grandes (imágenes) en memoria, escritos por partes.
+function archivos() {
+  const a = new Map();
+  return {
+    escribirTrozo(k, off, datos) {
+      const viejo = off === 0 ? new Uint8Array(0) : a.get(k);
+      if (!viejo || viejo.length !== off) return false;
+      const nuevo = new Uint8Array(off + datos.length);
+      nuevo.set(viejo);
+      nuevo.set(datos, off);
+      a.set(k, nuevo);
+      return true;
+    },
+    leerTrozo(k, off, n) {
+      const v = a.get(k);
+      if (!v) return null;
+      return v.subarray(Math.min(off, v.length), Math.min(off + n, v.length));
+    },
+    borrarArchivo: (k) => a.delete(k),
+    todos: a,
   };
 }
 
 // Almacén en memoria (Node, tests).
 export function memoriaVolatil() {
   const m = new Map();
-  return { guardar: (k, v) => (m.set(k, v), true), leer: (k) => m.get(k) ?? null, borrar: () => m.clear() };
+  const f = archivos();
+  return {
+    guardar: (k, v) => (m.set(k, v), true), leer: (k) => m.get(k) ?? null,
+    borrar: () => { m.clear(); f.todos.clear(); },
+    escribirTrozo: f.escribirTrozo, leerTrozo: f.leerTrozo, borrarArchivo: f.borrarArchivo,
+  };
 }
+
+const b64 = (u8) => { let s = ''; for (let i = 0; i < u8.length; i += 8192) s += String.fromCharCode(...u8.subarray(i, i + 8192)); return btoa(s); };
+const deB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
 // Almacén en localStorage (navegador). Si no hay (modo privado), en memoria.
 export function almacenLocal(prefijo = 'sinteticaos:') {
   const respaldo = memoriaVolatil();
-  const b64 = (u8) => btoa(String.fromCharCode(...u8));
-  const deB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  // Las imágenes viven en memoria y se copian a localStorage un rato después de
+  // la última escritura (si entran: localStorage tiene unos 5 MB).
+  const f = archivos();
+  const pendientes = new Set();
+  let reloj = null;
+  const persistir = () => {
+    reloj = null;
+    for (const k of pendientes) {
+      try {
+        const v = f.todos.get(k);
+        if (v) localStorage.setItem(prefijo + 'archivo:' + k, b64(v)); else localStorage.removeItem(prefijo + 'archivo:' + k);
+      } catch { /* sin lugar: queda en memoria */ }
+    }
+    pendientes.clear();
+  };
+  const tocar = (k) => { pendientes.add(k); if (!reloj) reloj = setTimeout(persistir, 300); };
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith(prefijo + 'archivo:')) f.todos.set(k.slice((prefijo + 'archivo:').length), deB64(localStorage.getItem(k)));
+    }
+  } catch { /* sin almacenamiento */ }
   return {
     guardar(k, v) {
       try { localStorage.setItem(prefijo + k, b64(v)); return true; } catch { return respaldo.guardar(k, v); }
@@ -124,6 +188,10 @@ export function almacenLocal(prefijo = 'sinteticaos:') {
     borrar() {
       try { for (const k of Object.keys(localStorage)) if (k.startsWith(prefijo)) localStorage.removeItem(k); } catch { /* nada */ }
       respaldo.borrar();
+      f.todos.clear();
     },
+    escribirTrozo: (k, off, d) => { const ok = f.escribirTrozo(k, off, d); if (ok) tocar(k); return ok; },
+    leerTrozo: f.leerTrozo,
+    borrarArchivo: (k) => { f.borrarArchivo(k); tocar(k); },
   };
 }
