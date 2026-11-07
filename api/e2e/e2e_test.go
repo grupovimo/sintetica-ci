@@ -401,3 +401,70 @@ func TestDePuntaAPunta(t *testing.T) {
 	esperar(t, "que se desconecte", 20*time.Second, func() bool { return !leerVirtual(t).Nube })
 	_ = base64.StdEncoding
 }
+
+// El motor de vida en la nube: la memoria llega a la API (el diario) y se muda
+// de un bicho a otro (cambio de placa).
+func TestMemoriaYMudanza(t *testing.T) {
+	web := entrar(t, "web")
+	var virtuales struct {
+		Virtuales []struct{ ID string }
+	}
+	web.pedir("GET", "/v1/bichos/virtuales", nil, &virtuales)
+	if len(virtuales.Virtuales) < 2 {
+		t.Skip("hacen falta los dos bichos virtuales")
+	}
+	viejo, nuevo := virtuales.Virtuales[0].ID, virtuales.Virtuales[1].ID
+	for _, id := range []string{viejo, nuevo} {
+		if s := web.pedir("POST", "/v1/bichos/reclamar-virtual", map[string]string{"id": id}, nil); s != 200 {
+			t.Fatalf("sumar %s: %d", id, s)
+		}
+		defer web.pedir("DELETE", "/v1/bichos/"+id, nil, nil)
+	}
+	conectado := func(id string) bool {
+		var v struct{ Conectado bool }
+		web.pedir("GET", "/v1/bichos/"+id, nil, &v)
+		return v.Conectado
+	}
+	esperar(t, "que se conecten los dos", 30*time.Second, func() bool { return conectado(viejo) && conectado(nuevo) })
+
+	// Tres caricias al viejo (por la nube, como desde la web).
+	time.Sleep(2 * time.Second)
+	for i := 0; i < 3; i++ {
+		if s := web.pedir("POST", "/v1/bichos/"+viejo+"/comando", map[string]string{"evento": "caricia"}, nil); s != 202 {
+			t.Fatalf("caricia: %d", s)
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	type memoria struct {
+		Memoria *struct {
+			Caricias int
+			Dias     int
+		}
+		MudanzaPendiente bool
+	}
+	// Pedirle la memoria ya (si no, la API la pide cada 5 minutos).
+	web.pedir("POST", "/v1/bichos/"+viejo+"/marcos", map[string]any{"car": protocolo.CarComando, "datos": protocolo.PedirMemoria()}, nil)
+	esperar(t, "que la memoria del viejo llegue a la API", 20*time.Second, func() bool {
+		var m memoria
+		web.pedir("GET", "/v1/bichos/"+viejo+"/memoria", nil, &m)
+		return m.Memoria != nil && m.Memoria.Caricias >= 3 && m.Memoria.Dias >= 1
+	})
+
+	// La mudanza: la memoria del viejo pasa al nuevo.
+	if s := web.pedir("POST", "/v1/bichos/"+nuevo+"/mudar", map[string]string{"desde": viejo}, nil); s != 202 {
+		t.Fatalf("mudar: %d", s)
+	}
+	esperar(t, "que el nuevo confirme la mudanza", 90*time.Second, func() bool {
+		var m memoria
+		web.pedir("GET", "/v1/bichos/"+nuevo+"/memoria", nil, &m)
+		return !m.MudanzaPendiente && m.Memoria != nil && m.Memoria.Caricias >= 3
+	})
+	// Y de verdad la tiene: se la pido al bicho.
+	web.pedir("POST", "/v1/bichos/"+nuevo+"/marcos", map[string]any{"car": protocolo.CarComando, "datos": protocolo.PedirMemoria()}, nil)
+	time.Sleep(2 * time.Second)
+	var m memoria
+	web.pedir("GET", "/v1/bichos/"+nuevo+"/memoria", nil, &m)
+	if m.Memoria == nil || m.Memoria.Caricias < 3 {
+		t.Fatalf("el bicho nuevo no tiene la memoria del viejo: %+v", m.Memoria)
+	}
+}

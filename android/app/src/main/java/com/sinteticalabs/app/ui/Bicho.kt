@@ -456,18 +456,31 @@ private fun Contenido(vm: BichoViewModel, alVolver: () -> Unit) {
         }
 
         Seccion("Personalidad") {
-            Deslizador("Energía", a.energia, 0f..1f, "%.0f%%".format(a.energia * 100)) { vm.editar(a.copy(energia = it)) }
-            Deslizador("Timidez", a.timidez, 0f..1f, "%.0f%%".format(a.timidez * 100)) { vm.editar(a.copy(timidez = it)) }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                NOMBRES_PRESET.forEach { (clave, nombrePreset) ->
+                    val elegido = a.preset == clave
+                    Text(nombrePreset, style = Tipos.cuerpo, color = if (elegido) p.pantalla else p.tinta,
+                        modifier = Modifier.background(if (elegido) p.naranja else p.linea, RoundedCornerShape(16.dp))
+                            .clickable { vm.editar(EditorConfig.conPreset(a, clave)) }.padding(horizontal = 12.dp, vertical = 6.dp))
+                }
+            }
+            val pct = { f: Float -> "%.0f%%".format(f * 100) }
+            Deslizador("Energía", a.energia, 0f..1f, pct(a.energia)) { vm.editar(a.copy(energia = it)) }
+            Deslizador("Sociabilidad", a.sociabilidad, 0f..1f, pct(a.sociabilidad)) { vm.editar(a.copy(sociabilidad = it)) }
+            Deslizador("Picardía", a.picardia, 0f..1f, pct(a.picardia)) { vm.editar(a.copy(picardia = it)) }
+            Deslizador("Timidez", a.timidez, 0f..1f, pct(a.timidez)) { vm.editar(a.copy(timidez = it)) }
+            Deslizador("Curiosidad", a.curiosidad, 0f..1f, pct(a.curiosidad)) { vm.editar(a.copy(curiosidad = it)) }
+            Deslizador("Mal genio", a.malGenio, 0f..1f, pct(a.malGenio)) { vm.editar(a.copy(malGenio = it)) }
             val conSueno = a.suenoDesde != null
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text("Duerme de noche", style = Tipos.cuerpo, color = p.tinta, modifier = Modifier.weight(1f))
+                Text("Mi horario (si no, de 8:00 a 23:30)", style = Tipos.cuerpo, color = p.tinta, modifier = Modifier.weight(1f))
                 Switch(checked = conSueno, onCheckedChange = { si ->
                     vm.editar(if (si) a.copy(suenoDesde = "23:30", suenoHasta = "08:00") else a.copy(suenoDesde = null, suenoHasta = null))
                 }, colors = SwitchDefaults.colors(checkedTrackColor = p.naranja))
             }
             if (conSueno) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CampoHora("Desde", a.suenoDesde!!, Modifier.weight(1f)) { vm.editar(a.copy(suenoDesde = it)) }
-                CampoHora("Hasta", a.suenoHasta!!, Modifier.weight(1f)) { vm.editar(a.copy(suenoHasta = it)) }
+                CampoHora("Se duerme", a.suenoDesde!!, Modifier.weight(1f)) { vm.editar(a.copy(suenoDesde = it)) }
+                CampoHora("Se despierta", a.suenoHasta!!, Modifier.weight(1f)) { vm.editar(a.copy(suenoHasta = it)) }
             }
         }
 
@@ -495,6 +508,11 @@ private fun Chip(texto: String, seleccionado: Boolean, alTocar: () -> Unit) {
         border = BorderStroke(1.dp, if (seleccionado) p.naranja else p.linea), modifier = Modifier.clickable(onClick = alTocar),
     ) { Text(texto, style = Tipos.dato, color = p.tinta, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) }
 }
+
+private val NOMBRES_PRESET = listOf(
+    "equilibrado" to "Equilibrado", "timido" to "Tímido", "picaro" to "Pícaro", "dormilon" to "Dormilón",
+    "carinoso" to "Cariñoso", "curioso" to "Curioso", "grunon" to "Gruñón", "electrico" to "Eléctrico",
+)
 
 @Composable
 private fun Deslizador(etiqueta: String, valor: Float, rango: ClosedFloatingPointRange<Float>, texto: String, alCambiar: (Float) -> Unit) {

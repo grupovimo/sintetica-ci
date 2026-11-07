@@ -78,6 +78,7 @@ final class ClienteBicho {
     /// Vincula con el código del QR y devuelve la clave que hay que guardar.
     func vincular(_ codigo: String) async throws -> [UInt8] {
         let r = try await exigir(.comando, Comando.vincular(codigo))
+        await mandarHora()
         try await actualizarEstado()
         guard case let .resultado(_, _, _, clave?) = r else { throw ErrorBicho.rechazo("El bicho no mandó la clave.") }
         return clave
@@ -85,8 +86,19 @@ final class ClienteBicho {
 
     func autenticar(_ clave: [UInt8]) async throws {
         try await exigir(.comando, Comando.autenticar(clave))
+        await mandarHora()
         try await actualizarEstado()
     }
+
+    /// Le pasa la hora del celu (el broche no tiene WiFi: es la única forma de saberla).
+    /// Un firmware anterior a la v1.4 no lo entiende: no pasa nada.
+    private func mandarHora() async {
+        let ahora = Date()
+        let zona = TimeZone.current.secondsFromGMT(for: ahora) / 60
+        _ = try? await exigir(.comando, Comando.hora(epochUtc: UInt32(ahora.timeIntervalSince1970), zonaMinutos: zona))
+    }
+
+    func probarComportamiento(_ nombre: String) async throws { try await exigir(.comando, Comando.comportamiento(nombre)) }
 
     func fijarExpresion(_ nombre: String?) async throws { try await exigir(.comando, Comando.expresion(nombre ?? "")); try await actualizarEstado() }
     func cambiarNombre(_ nombre: String) async throws { try await exigir(.comando, Comando.nombre(nombre)); try await actualizarEstado() }

@@ -35,6 +35,14 @@ final class ProtocoloTests: XCTestCase {
         XCTAssertEqual(hex(Comando.reproducir("saludo")), esperado("reproducir saludo"))
         XCTAssertEqual(hex(Comando.reproducir()), esperado("reproducir parar"))
         XCTAssertEqual(hex(ComandoOta.cancelar()), esperado("ota cancelar"))
+        // v1.4
+        XCTAssertEqual(hex(Comando.hora(epochUtc: 1_793_000_000, zonaMinutos: -180)), esperado("hora"))
+        XCTAssertEqual(hex(Comando.vida()), esperado("vida"))
+        XCTAssertEqual(hex(Comando.vida(superposicion: true)), esperado("vida superposicion"))
+        XCTAssertEqual(hex(Comando.memoria()), esperado("memoria"))
+        XCTAssertEqual(hex(Comando.registro()), esperado("registro"))
+        XCTAssertEqual(hex(Comando.evento("sacudida-fuerte")), esperado("evento sacudida-fuerte"))
+        XCTAssertEqual(hex(Comando.comportamiento("practicar-caras")), esperado("comportamiento practicar-caras"))
     }
 
     func testOta() {

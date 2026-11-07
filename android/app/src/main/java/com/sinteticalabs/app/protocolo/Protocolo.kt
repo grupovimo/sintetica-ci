@@ -41,6 +41,12 @@ object Op {
     const val NUBE = 0x17
     const val OLVIDAR_RED = 0x18
     const val REPRODUCIR = 0x19
+    const val HORA = 0x1A           // v1.4
+    const val VIDA = 0x1B
+    const val MEMORIA = 0x1C
+    const val RESTAURAR = 0x1D
+    const val REGISTRO = 0x1E
+    const val COMPORTAMIENTO = 0x1F
     const val IMG_INICIO = 0x20
     const val IMG_BLOQUE = 0x21
     const val IMG_FIN = 0x22
@@ -60,7 +66,13 @@ object Op {
     const val IMG_CIERRE = 0xA8
 }
 
-val EVENTOS = listOf("tacto", "doble-toque", "levantado", "sacudida", "boca-abajo", "vinculado", "app-abierta", "despertado")
+/** En el orden del protocolo (el índice viaja en el comando Evento). Los primeros 8 son de la v1. */
+val EVENTOS = listOf(
+    "tacto", "doble-toque", "levantado", "sacudida", "boca-abajo", "vinculado", "app-abierta", "despertado",
+    "caricia", "muchos-toques", "sacudida-suave", "sacudida-fuerte", "inclinado", "caida", "voz", "nombre",
+    "ruido", "musica", "silencio", "notificacion", "llamada", "bateria-baja", "bateria-critica", "enchufado",
+    "desenchufado", "cargado", "sin-wifi", "cambio-de-cara", "bicho-cerca", "volvio", "hito",
+)
 val MODOS = listOf("mascota", "reloj", "pomodoro", "clima", "notificaciones")
 
 private val MENSAJES = mapOf(
@@ -111,6 +123,14 @@ object Comando {
     fun olvidarRed() = byteArrayOf(Op.OLVIDAR_RED.toByte())
     fun reproducir(animacion: String = "") = byteArrayOf(Op.REPRODUCIR.toByte()) + animacion.toByteArray()
     fun pedirConfig() = byteArrayOf(Op.CONFIG_PEDIR.toByte())
+    /** La hora (v1.4): epoch UTC en segundos y la zona en minutos (Argentina: -180). */
+    fun hora(epochUtc: Long, zonaMinutos: Int) = byteArrayOf(Op.HORA.toByte()) + u32(epochUtc) + u16(zonaMinutos and 0xFFFF)
+    fun vida(superposicion: Boolean? = null) =
+        if (superposicion == null) byteArrayOf(Op.VIDA.toByte()) else byteArrayOf(Op.VIDA.toByte(), if (superposicion) 1 else 0)
+    fun memoria() = byteArrayOf(Op.MEMORIA.toByte())
+    fun restaurar(memoria: ByteArray) = byteArrayOf(Op.RESTAURAR.toByte()) + memoria
+    fun registro() = byteArrayOf(Op.REGISTRO.toByte())
+    fun comportamiento(nombre: String) = byteArrayOf(Op.COMPORTAMIENTO.toByte()) + nombre.toByteArray()
 }
 
 /** Una imagen QOI (del tamaño de la pantalla) en las escrituras de la característica Imagen. */

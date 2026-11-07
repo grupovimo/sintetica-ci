@@ -57,9 +57,9 @@ func (s *Servidor) mudar(w http.ResponseWriter, r *http.Request) {
 		s.interno(w, err)
 		return
 	}
-	// La config también se muda.
+	// La config también se muda (autor "api": la copia la API).
 	if c, err := s.alm.UltimaConfig(r.Context(), desde); err == nil {
-		if _, err := s.nube.GuardarConfig(r.Context(), b.ID, c.Texto, "mudanza", usuarioDe(r).Usuario.ID); err != nil {
+		if _, err := s.nube.GuardarConfig(r.Context(), b.ID, c.Texto, "api", usuarioDe(r).Usuario.ID); err != nil {
 			s.interno(w, err)
 			return
 		}

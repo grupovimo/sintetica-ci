@@ -380,17 +380,34 @@ struct BichoVista: View {
                 }
 
                 Seccion(titulo: "Personalidad") {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(EditorConfig.presets, id: \.clave) { p in
+                                let elegido = modelo.ajustes.preset == p.clave
+                                Text(p.nombre).font(Tipos.cuerpo)
+                                    .foregroundStyle(elegido ? Color.pantalla : Color.tinta)
+                                    .padding(.horizontal, 12).padding(.vertical, 6)
+                                    .background(elegido ? Color.naranja : Color.linea, in: Capsule())
+                                    .onTapGesture { modelo.editar(EditorConfig.conPreset(modelo.ajustes, p.clave)) }
+                                    .accessibilityAddTraits(.isButton)
+                            }
+                        }
+                    }
                     Deslizador(etiqueta: "Energía", valor: modelo.ajustes.energia, rango: 0 ... 1) { var a = modelo.ajustes; a.energia = $0; modelo.editar(a) }
+                    Deslizador(etiqueta: "Sociabilidad", valor: modelo.ajustes.sociabilidad, rango: 0 ... 1) { var a = modelo.ajustes; a.sociabilidad = $0; modelo.editar(a) }
+                    Deslizador(etiqueta: "Picardía", valor: modelo.ajustes.picardia, rango: 0 ... 1) { var a = modelo.ajustes; a.picardia = $0; modelo.editar(a) }
                     Deslizador(etiqueta: "Timidez", valor: modelo.ajustes.timidez, rango: 0 ... 1) { var a = modelo.ajustes; a.timidez = $0; modelo.editar(a) }
+                    Deslizador(etiqueta: "Curiosidad", valor: modelo.ajustes.curiosidad, rango: 0 ... 1) { var a = modelo.ajustes; a.curiosidad = $0; modelo.editar(a) }
+                    Deslizador(etiqueta: "Mal genio", valor: modelo.ajustes.malGenio, rango: 0 ... 1) { var a = modelo.ajustes; a.malGenio = $0; modelo.editar(a) }
                     Toggle(isOn: Binding(
                         get: { modelo.ajustes.suenoDesde != nil },
                         set: { si in var a = modelo.ajustes; a.suenoDesde = si ? "23:30" : nil; a.suenoHasta = si ? "08:00" : nil; modelo.editar(a) }
-                    )) { Text("Duerme de noche").font(Tipos.cuerpo).foregroundStyle(Color.tinta) }
+                    )) { Text("Mi horario (si no, de 8:00 a 23:30)").font(Tipos.cuerpo).foregroundStyle(Color.tinta) }
                         .tint(Color.naranja)
                     if let desde = modelo.ajustes.suenoDesde, let hasta = modelo.ajustes.suenoHasta {
                         HStack(spacing: 12) {
-                            CampoHora(etiqueta: "Desde", valor: desde) { var a = modelo.ajustes; a.suenoDesde = $0; modelo.editar(a) }
-                            CampoHora(etiqueta: "Hasta", valor: hasta) { var a = modelo.ajustes; a.suenoHasta = $0; modelo.editar(a) }
+                            CampoHora(etiqueta: "Se duerme", valor: desde) { var a = modelo.ajustes; a.suenoDesde = $0; modelo.editar(a) }
+                            CampoHora(etiqueta: "Se despierta", valor: hasta) { var a = modelo.ajustes; a.suenoHasta = $0; modelo.editar(a) }
                         }
                     }
                 }

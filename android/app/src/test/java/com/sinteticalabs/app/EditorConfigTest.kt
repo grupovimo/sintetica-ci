@@ -69,4 +69,21 @@ class EditorConfigTest {
         assertArrayEquals(v.clave, l[0].clave)
         assertEquals(emptyList<Vinculado>(), Vinculados.leer("basura"))
     }
+
+    @Test fun personalidadYHorarioV2() {
+        val nueva = EditorConfig.escribir("{\"version\":1,\"personalidad\":{\"sueno\":\"23:00-07:00\"}}",
+            EditorConfig.conPreset(Ajustes(suenoDesde = "22:30", suenoHasta = "07:15"), "picaro"))
+        val o = Json.parseToJsonElement(nueva).jsonObject
+        assertEquals("2", o["version"].toString())
+        assertFalse("el sueño de la v1 se va", o["personalidad"]!!.jsonObject.containsKey("sueno"))
+        assertEquals("\"07:15\"", o["horario"]!!.jsonObject["despierta"].toString())
+        val a = EditorConfig.leer(nueva)
+        assertEquals("picaro", a.preset)
+        assertEquals(0.95f, a.picardia, 0.001f)
+        assertEquals("22:30", a.suenoDesde)
+        // Una config v2 del ejemplo se lee.
+        val v2 = EditorConfig.leer(File("../../shared/formato/config-ejemplo-v2.json").readText())
+        assertEquals(0.8f, v2.sociabilidad, 0.001f)
+        assertEquals("23:30", v2.suenoDesde)
+    }
 }

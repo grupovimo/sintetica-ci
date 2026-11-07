@@ -65,14 +65,26 @@ class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) 
     /** Vincula con el código del QR y devuelve la clave que hay que guardar. */
     suspend fun vincular(codigo: String): ByteArray {
         val r = exigir(Car.COMANDO, Comando.vincular(codigo))
+        mandarHora()
         actualizarEstado()
         return r.clave ?: throw ErrorBicho("El bicho no mandó la clave.")
     }
 
     suspend fun autenticar(clave: ByteArray) {
         exigir(Car.COMANDO, Comando.autenticar(clave))
+        mandarHora()
         actualizarEstado()
     }
+
+    /** Le pasa la hora del celu (el broche no tiene WiFi: es la única forma de saberla). */
+    private suspend fun mandarHora() {
+        val ahora = System.currentTimeMillis()
+        val zona = java.util.TimeZone.getDefault().getOffset(ahora) / 60_000
+        // Un firmware anterior a la v1.4 no lo entiende: no pasa nada.
+        runCatching { pedir(Car.COMANDO, Comando.hora(ahora / 1000, zona)) }
+    }
+
+    suspend fun probarComportamiento(nombre: String) { exigir(Car.COMANDO, Comando.comportamiento(nombre)) }
 
     suspend fun fijarExpresion(nombre: String?) { exigir(Car.COMANDO, Comando.expresion(nombre ?: "")); actualizarEstado() }
     suspend fun cambiarNombre(nombre: String) { exigir(Car.COMANDO, Comando.nombre(nombre)); actualizarEstado() }

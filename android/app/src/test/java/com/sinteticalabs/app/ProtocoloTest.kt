@@ -61,6 +61,14 @@ class ProtocoloTest {
         assertEquals(s(porNombre["reproducir saludo"]!!, "hex"), hex(Comando.reproducir("saludo")))
         assertEquals(s(porNombre["reproducir parar"]!!, "hex"), hex(Comando.reproducir()))
         assertEquals(s(porNombre["ota cancelar"]!!, "hex"), hex(Ota.cancelar()))
+        // v1.4
+        assertEquals(s(porNombre["hora"]!!, "hex"), hex(Comando.hora(1793000000, -180)))
+        assertEquals(s(porNombre["vida"]!!, "hex"), hex(Comando.vida()))
+        assertEquals(s(porNombre["vida superposicion"]!!, "hex"), hex(Comando.vida(true)))
+        assertEquals(s(porNombre["memoria"]!!, "hex"), hex(Comando.memoria()))
+        assertEquals(s(porNombre["registro"]!!, "hex"), hex(Comando.registro()))
+        assertEquals(s(porNombre["evento sacudida-fuerte"]!!, "hex"), hex(Comando.evento("sacudida-fuerte")))
+        assertEquals(s(porNombre["comportamiento practicar-caras"]!!, "hex"), hex(Comando.comportamiento("practicar-caras")))
     }
 
     @Test fun ota() {

@@ -37,6 +37,9 @@ enum Op {
     static let expresion: UInt8 = 0x10, nombre: UInt8 = 0x11, evento: UInt8 = 0x12
     static let vincular: UInt8 = 0x13, autenticar: UInt8 = 0x14, desvincular: UInt8 = 0x15
     static let red: UInt8 = 0x16, nube: UInt8 = 0x17, olvidarRed: UInt8 = 0x18, reproducir: UInt8 = 0x19
+    // v1.4: el motor de vida.
+    static let hora: UInt8 = 0x1A, vida: UInt8 = 0x1B, memoria: UInt8 = 0x1C, restaurar: UInt8 = 0x1D, registro: UInt8 = 0x1E
+    static let comportamiento: UInt8 = 0x1F
     static let imgInicio: UInt8 = 0x20, imgBloque: UInt8 = 0x21, imgFin: UInt8 = 0x22, imgBorrar: UInt8 = 0x23, imgListar: UInt8 = 0x24
     static let imgPedir: UInt8 = 0x25
     static let otaInicio: UInt8 = 0x30, otaBloque: UInt8 = 0x31, otaFin: UInt8 = 0x32, otaDescargar: UInt8 = 0x33
@@ -45,7 +48,13 @@ enum Op {
     static let imgTrozo: UInt8 = 0xA7, imgCierre: UInt8 = 0xA8
 }
 
-let EVENTOS = ["tacto", "doble-toque", "levantado", "sacudida", "boca-abajo", "vinculado", "app-abierta", "despertado"]
+/// En el orden del protocolo (el índice viaja en el comando Evento). Los primeros 8 son de la v1.
+let EVENTOS = [
+    "tacto", "doble-toque", "levantado", "sacudida", "boca-abajo", "vinculado", "app-abierta", "despertado",
+    "caricia", "muchos-toques", "sacudida-suave", "sacudida-fuerte", "inclinado", "caida", "voz", "nombre",
+    "ruido", "musica", "silencio", "notificacion", "llamada", "bateria-baja", "bateria-critica", "enchufado",
+    "desenchufado", "cargado", "sin-wifi", "cambio-de-cara", "bicho-cerca", "volvio", "hito",
+]
 let MODOS = ["mascota", "reloj", "pomodoro", "clima", "notificaciones"]
 
 private let MENSAJES: [Int: String] = [
@@ -93,6 +102,16 @@ enum Comando {
     static func olvidarRed() -> [UInt8] { [Op.olvidarRed] }
     static func reproducir(_ animacion: String = "") -> [UInt8] { [Op.reproducir] + Array(animacion.utf8) }
     static func pedirConfig() -> [UInt8] { [Op.configPedir] }
+    /// La hora (v1.4): epoch UTC en segundos y la zona en minutos (Argentina: -180).
+    static func hora(epochUtc: UInt32, zonaMinutos: Int) -> [UInt8] { [Op.hora] + u32(epochUtc) + u16(zonaMinutos & 0xFFFF) }
+    static func vida(superposicion: Bool? = nil) -> [UInt8] {
+        guard let s = superposicion else { return [Op.vida] }
+        return [Op.vida, s ? 1 : 0]
+    }
+    static func memoria() -> [UInt8] { [Op.memoria] }
+    static func restaurar(_ memoria: [UInt8]) -> [UInt8] { [Op.restaurar] + memoria }
+    static func registro() -> [UInt8] { [Op.registro] }
+    static func comportamiento(_ nombre: String) -> [UInt8] { [Op.comportamiento] + Array(nombre.utf8) }
 }
 
 /// Una imagen QOI (del tamaño de la pantalla) en las escrituras de la característica Imagen.
