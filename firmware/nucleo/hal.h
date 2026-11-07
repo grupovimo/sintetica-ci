@@ -40,6 +40,10 @@ struct Hal {
   // Segundos desde 1970 en hora local (con la zona ya sumada), o 0 si no se
   // sabe (en ese caso vale la que mande la app con el comando Hora).
   uint32_t (*epoch)() = nullptr;
+  // La app mandó la hora (comando Hora): el perfil pone en hora su reloj (en
+  // el ESP32 sigue andando durante el sueño profundo). nullptr = la guarda
+  // el núcleo (se pierde al reiniciar).
+  void (*fijarHora)(uint32_t epochUtc, int zonaMinutos) = nullptr;
   // Almacenamiento persistente por clave (NVS, localStorage, memoria).
   bool (*guardar)(const char* clave, const uint8_t* datos, size_t n) = nullptr;
   int (*leer)(const char* clave, uint8_t* datos, size_t cap) = nullptr;  // -1 si no está

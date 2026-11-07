@@ -1,5 +1,8 @@
 #include "comun.h"
 
+#include <sys/time.h>
+#include <time.h>
+
 #include <LittleFS.h>
 #include <NimBLEDevice.h>
 #include <Preferences.h>
@@ -115,7 +118,41 @@ int leerTrozo(const char* clave, uint32_t off, uint8_t* d, size_t n) {
 
 bool borrar(const char* clave) { return !g_hayLittleFs || !LittleFS.exists(ruta(clave)) || LittleFS.remove(ruta(clave)); }
 
+namespace {
+// La zona que mandó la app (sobrevive al sueño profundo, como el reloj).
+RTC_DATA_ATTR int32_t g_zonaMinutos = -100000;
+
+// Días desde 1970 de una fecha civil (Howard Hinnant).
+int32_t diasDesde1970(int32_t y, int32_t m, int32_t d) {
+  y -= m <= 2;
+  const int32_t era = (y >= 0 ? y : y - 399) / 400;
+  const int32_t yoe = y - era * 400;
+  const int32_t doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+  const int32_t doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+  return era * 146097 + doe - 719468;
+}
+
+uint32_t epochLocal() {
+  const time_t t = time(nullptr);
+  if (t < 1700000000) return 0;  // todavía no sabe la hora
+  if (g_zonaMinutos != -100000) return static_cast<uint32_t>(t + g_zonaMinutos * 60);
+  // Sin zona de la app: la de NTP (TZ).
+  struct tm l;
+  localtime_r(&t, &l);
+  return static_cast<uint32_t>(diasDesde1970(l.tm_year + 1900, l.tm_mon + 1, l.tm_mday)) * 86400u +
+         static_cast<uint32_t>(l.tm_hour * 3600 + l.tm_min * 60 + l.tm_sec);
+}
+
+void fijarHora(uint32_t utc, int zona) {
+  timeval tv{static_cast<time_t>(utc), 0};
+  settimeofday(&tv, nullptr);
+  g_zonaMinutos = zona;
+}
+}  // namespace
+
 void completarHal(Hal& h) {
+  h.epoch = epochLocal;
+  h.fijarHora = fijarHora;
   h.identificador = identificador;
   h.semilla = [] { return static_cast<uint32_t>(esp_random()); };
   h.guardar = guardar;

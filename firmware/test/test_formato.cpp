@@ -112,3 +112,14 @@ PRUEBA("formato: expresión propia nueva") {
   VERIFICAR(g_c.expresiones[i].formas[1].color == paleta::TINTA);
   VERIFICAR(!g_c.expresiones[i].formas[1].acento);
 }
+
+PRUEBA("formato: el ejemplo v2 del doc (motor de vida) se aplica") {
+  std::string t = leerArchivo(std::string(RAIZ_REPO) + "/shared/formato/config-ejemplo-v2.json");
+  VERIFICAR(!t.empty());
+  ResultadoConfig r = cargarConfig(g_c, t.c_str(), t.size());
+  if (!r.ok()) std::printf("    detalle: %s\n", r.detalle);
+  VERIFICAR(r.ok());
+  VERIFICAR(g_c.version == 2 && g_c.vida.semilla == 48213);
+  VERIFICAR(g_c.vida.indiceCara("picaro") >= 0);
+  VERIFICAR(g_c.vida.indiceComportamiento("saludar-picaro") >= 0);
+}

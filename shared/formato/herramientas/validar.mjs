@@ -10,7 +10,7 @@ const formato = path.resolve(aqui, '..');
 const schema = JSON.parse(fs.readFileSync(path.join(formato, 'config.schema.json'), 'utf8'));
 const ajv = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true });
 const validarConfig = ajv.compile(schema);
-const validarExpresion = ajv.compile({ $ref: 'https://sinteticalabs.com/schema/config/v1.json#/$defs/expresion' });
+const validarExpresion = ajv.compile({ $ref: 'https://sinteticalabs.com/schema/config/v2.json#/$defs/expresion' });
 
 let errores = 0;
 function revisar(nombre, validar, datos) {
@@ -27,7 +27,7 @@ revisar('config-ejemplo.json', validarConfig, JSON.parse(fs.readFileSync(path.jo
 for (const f of fs.readdirSync(path.join(formato, 'caras')).filter((f) => f.endsWith('.json')).sort()) {
   revisar(`caras/${f}`, validarExpresion, JSON.parse(fs.readFileSync(path.join(formato, 'caras', f), 'utf8')));
 }
-const validarAnimacion = ajv.compile({ $ref: 'https://sinteticalabs.com/schema/config/v1.json#/$defs/animacion' });
+const validarAnimacion = ajv.compile({ $ref: 'https://sinteticalabs.com/schema/config/v2.json#/$defs/animacion' });
 const animaciones = {};
 for (const f of fs.readdirSync(path.join(formato, 'animaciones')).filter((f) => f.endsWith('.json')).sort()) {
   const { nombre, ...a } = JSON.parse(fs.readFileSync(path.join(formato, 'animaciones', f), 'utf8'));
@@ -42,4 +42,17 @@ for (const f of fs.readdirSync(path.join(formato, 'caras')).filter((f) => f.ends
   todas.expresiones[c.nombre] = c;
 }
 revisar('config con las 16 caras', validarConfig, todas);
+
+// El motor de vida: las expresiones, los comportamientos y las reglas base
+// tienen que ser una config v2 válida (así el usuario puede copiarlos y editarlos).
+const vida = (f) => JSON.parse(fs.readFileSync(path.join(formato, 'vida', f), 'utf8'));
+const validarVida = ajv.compile({ $ref: 'https://sinteticalabs.com/schema/config/v2.json#/$defs/expresionVida' });
+for (const [n, e] of Object.entries(vida('expresiones.json'))) revisar(`vida/expresiones: ${n}`, validarVida, e);
+const validarComp = ajv.compile({ $ref: 'https://sinteticalabs.com/schema/config/v2.json#/$defs/comportamiento' });
+for (const [n, c] of Object.entries(vida('comportamientos.json'))) revisar(`vida/comportamientos: ${n}`, validarComp, c);
+revisar('vida/reglas.json (de a 24)', validarConfig, { version: 2, reglas: vida('reglas.json').slice(0, 24) });
+revisar('vida/reglas.json (el resto)', validarConfig, { version: 2, reglas: vida('reglas.json').slice(24) });
+const per = vida('personalidades.json');
+for (const [n, p] of Object.entries(per)) revisar(`vida/personalidades: ${n}`, validarConfig, { version: 2, personalidad: { preset: n, ...p } });
+revisar('config-ejemplo-v2.json', validarConfig, JSON.parse(fs.readFileSync(path.join(formato, 'config-ejemplo-v2.json'), 'utf8')));
 process.exit(errores ? 1 : 0);

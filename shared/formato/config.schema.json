@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sinteticalabs.com/schema/config/v1.json",
+  "$id": "https://sinteticalabs.com/schema/config/v2.json",
   "title": "Configuración de un bicho (SintéticaOS)",
-  "description": "El único documento que guarda un bicho. La app y la web lo editan y se lo mandan entero o por partes. Caras, animaciones y reglas son datos, nunca código.",
+  "description": "El único documento que guarda un bicho. La app y la web lo editan y se lo mandan entero o por partes. Caras, animaciones y reglas son datos, nunca código. La v2 suma el motor de vida: expresiones paramétricas, comportamientos, personalidad de 6 rasgos, horario, dueño y límites de la marca (docs/motor-de-vida.md). Una config v1 sigue siendo válida.",
   "type": "object",
   "required": [
     "version"
@@ -10,7 +10,10 @@
   "additionalProperties": false,
   "properties": {
     "version": {
-      "const": 1
+      "enum": [
+        1,
+        2
+      ]
     },
     "nombre": {
       "type": "string",
@@ -40,17 +43,54 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "preset": {
+          "enum": [
+            "equilibrado",
+            "timido",
+            "picaro",
+            "dormilon",
+            "carinoso",
+            "curioso",
+            "grunon",
+            "electrico"
+          ],
+          "description": "Arranca de un preset; los rasgos que vengan lo ajustan."
+        },
         "energia": {
           "type": "number",
           "minimum": 0,
           "maximum": 1,
-          "description": "Cuánto se mueve: frecuencia de la mirada y de las sorpresas."
+          "description": "Alto: se mueve mucho, resortes rápidos, duerme poco. Bajo: tranquilo, siestero."
+        },
+        "sociabilidad": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Alto: busca atención y se aburre rápido solo. Bajo: independiente."
+        },
+        "picardia": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Alto: guiños, bromas, finge dormir. Bajo: serio."
         },
         "timidez": {
           "type": "number",
           "minimum": 0,
           "maximum": 1,
-          "description": "Cuánto esquiva la mirada y cuánto tarda en ponerse contento."
+          "description": "Alto: se asusta y se avergüenza fácil. Bajo: valiente."
+        },
+        "curiosidad": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Alto: investiga todo. Bajo: se concentra."
+        },
+        "malGenio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Alto: se enoja rápido y se le pasa lento. Bajo: paciente."
         },
         "sueno": {
           "type": "string",
@@ -61,13 +101,20 @@
     },
     "expresiones": {
       "type": "object",
-      "description": "Expresiones propias o que reemplazan a las base, por nombre.",
-      "maxProperties": 24,
+      "description": "Expresiones propias o que reemplazan a las base, por nombre. Con \"formas\" es un dibujo (v1); si no, una expresión paramétrica del motor de vida.",
+      "maxProperties": 48,
       "propertyNames": {
         "$ref": "#/$defs/nombreExpresion"
       },
       "additionalProperties": {
-        "$ref": "#/$defs/expresion"
+        "oneOf": [
+          {
+            "$ref": "#/$defs/expresion"
+          },
+          {
+            "$ref": "#/$defs/expresionVida"
+          }
+        ]
       }
     },
     "animaciones": {
@@ -94,17 +141,22 @@
         "properties": {
           "si": {
             "type": "string",
-            "description": "Un evento (tacto, doble-toque, levantado, sacudida, boca-abajo, vinculado, app-abierta, despertado) o una condición sobre una variable (bateria<15, humor>0.5).",
-            "pattern": "^([a-z-]+|(bateria|humor)[<>]-?[0-9]+(\\.[0-9]+)?)$"
+            "description": "Un evento (tacto, toque, doble-toque, levantado, sacudida, boca-abajo, vinculado, app-abierta, despertado, caricia, muchos-toques, sacudida-suave, sacudida-fuerte, inclinado, caida, voz, nombre, ruido, musica, silencio, notificacion, llamada, bateria-baja, bateria-critica, enchufado, desenchufado, cargado, sin-wifi, cambio-de-cara, bicho-cerca, volvio, hito; también con _ o . en vez de -, como \"sacudida.fuerte\") o una condición de estado (bateria<15, humor>0.5).",
+            "pattern": "^([a-z][a-z._-]*|(bateria|humor)[<>]-?[0-9]+(\\.[0-9]+)?)$"
           },
           "entonces": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 4,
+            "maxItems": 6,
             "items": {
               "type": "string",
-              "pattern": "^(expresion|sonido|led|animacion):[a-z0-9#-]+$"
+              "pattern": "^((expresion|sonido|led|animacion|reflejo|comportamiento|particula):[a-z0-9#-]+|estado\\.(energia|animo|afecto|aburrimiento|curiosidad|sueno|estres)[+-](0(\\.[0-9]+)?|1(\\.0+)?))$"
             }
+          },
+          "y": {
+            "type": "string",
+            "description": "Condiciones extra separadas por coma: \"afecto>0.6\", \"rasgo.timidez>0.5\", \"dormido\", \"noche\".",
+            "pattern": "^[a-zA-Z._]+([<>]-?[0-9]+(\\.[0-9]+)?)?(,[a-zA-Z._]+([<>]-?[0-9]+(\\.[0-9]+)?)?)?$"
           }
         }
       }
@@ -132,6 +184,72 @@
       "minimum": 0,
       "maximum": 1440,
       "description": "Cada cuántos minutos la lista pasa sola al siguiente; 0 = no rota."
+    },
+    "semilla": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295,
+      "description": "Semilla del azar del motor de vida (0 = la del hardware). Con la misma semilla, el mismo bicho hace exactamente lo mismo."
+    },
+    "horario": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "El horario del dueño: fuera de él, el bicho duerme (por defecto 08:00 a 23:30).",
+      "properties": {
+        "despierta": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        },
+        "duerme": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+        }
+      }
+    },
+    "dueno": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nombre": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "cumple": {
+          "type": "string",
+          "pattern": "^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+        }
+      }
+    },
+    "cumple": {
+      "type": "string",
+      "pattern": "^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
+      "description": "El cumpleaños del bicho (la fecha de armado), MM-DD."
+    },
+    "limites_marca": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/colorHex"
+        },
+        "brillo_max": {
+          "type": "number",
+          "minimum": 0.2,
+          "maximum": 1
+        }
+      }
+    },
+    "comportamientos": {
+      "type": "object",
+      "maxProperties": 64,
+      "description": "Comportamientos propios o que reemplazan a los base (shared/formato/vida/comportamientos.json).",
+      "propertyNames": {
+        "$ref": "#/$defs/nombreExpresion"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/comportamiento"
+      }
     }
   },
   "$defs": {
@@ -635,6 +753,490 @@
             "paso"
           ],
           "default": "suave"
+        }
+      }
+    },
+    "ojo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "w": {
+          "type": "number",
+          "minimum": 0.03,
+          "maximum": 0.2,
+          "description": "Medio ancho"
+        },
+        "h": {
+          "type": "number",
+          "minimum": 0.03,
+          "maximum": 0.32,
+          "description": "Medio alto"
+        },
+        "r": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Redondez (1 = píldora)"
+        },
+        "tilt": {
+          "type": "number",
+          "minimum": -0.6,
+          "maximum": 0.6,
+          "description": "Inclinación (rad)"
+        },
+        "lt": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.5,
+          "description": "Párpado de arriba: cuánto tapa"
+        },
+        "lta": {
+          "type": "number",
+          "minimum": -0.8,
+          "maximum": 0.8,
+          "description": "Ángulo del párpado de arriba (positivo = enojo)"
+        },
+        "lb": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.5,
+          "description": "Párpado de abajo"
+        },
+        "lba": {
+          "type": "number",
+          "minimum": -0.8,
+          "maximum": 0.8
+        },
+        "smile": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Arco feliz"
+        },
+        "heart": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Corazón"
+        },
+        "star": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Estrella"
+        },
+        "cross": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Cruz (KO)"
+        },
+        "ring": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Anillo (cargando)"
+        },
+        "pupil": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Pupila"
+        },
+        "squash": {
+          "type": "number",
+          "minimum": 0.7,
+          "maximum": 1.3,
+          "description": "Aplastamiento"
+        }
+      }
+    },
+    "expresionVida": {
+      "type": "object",
+      "description": "Una expresión paramétrica: lo que cambia respecto de la neutral (o de la que extiende). \"ojo\" va a los dos; \"izq\" y \"der\", a uno.",
+      "additionalProperties": false,
+      "properties": {
+        "nombre": {
+          "$ref": "#/$defs/nombreExpresion"
+        },
+        "numero": {
+          "type": "integer"
+        },
+        "disparador": {
+          "type": "string"
+        },
+        "extiende": {
+          "$ref": "#/$defs/nombreExpresion"
+        },
+        "ojo": {
+          "$ref": "#/$defs/ojo"
+        },
+        "izq": {
+          "$ref": "#/$defs/ojo"
+        },
+        "der": {
+          "$ref": "#/$defs/ojo"
+        },
+        "movimiento": {
+          "enum": [
+            "ninguno",
+            "rebote",
+            "saltitos",
+            "risa",
+            "mirada-lado",
+            "salto",
+            "encogerse",
+            "dormir",
+            "temblor",
+            "resoplido",
+            "lagrima",
+            "achicarse",
+            "picaro",
+            "latido",
+            "bamboleo",
+            "escuchar",
+            "hablar",
+            "pensar",
+            "duda",
+            "acercarse",
+            "suspiro",
+            "quieto",
+            "cabeceo",
+            "carga",
+            "orbita",
+            "buscar",
+            "caer",
+            "glitch",
+            "estirarse"
+          ]
+        },
+        "particula": {
+          "enum": [
+            "zzz",
+            "corazon",
+            "lagrima",
+            "gota",
+            "chispa",
+            "pregunta",
+            "exclamacion",
+            "nota",
+            "estrella",
+            "burbuja",
+            "ninguna"
+          ]
+        },
+        "parpadeo": {
+          "enum": [
+            "normal",
+            "menos",
+            "mas",
+            "no",
+            "lento",
+            "rapido",
+            "doble"
+          ]
+        },
+        "gx": {
+          "type": "number",
+          "minimum": -0.3,
+          "maximum": 0.3,
+          "description": "Mirada horizontal"
+        },
+        "gy": {
+          "type": "number",
+          "minimum": -0.25,
+          "maximum": 0.25,
+          "description": "Mirada vertical"
+        },
+        "ey": {
+          "type": "number",
+          "minimum": -0.25,
+          "maximum": 0.25,
+          "description": "Altura de la cara"
+        },
+        "sep": {
+          "type": "number",
+          "minimum": 0.15,
+          "maximum": 0.45,
+          "description": "Separación de los ojos"
+        },
+        "ftilt": {
+          "type": "number",
+          "minimum": -0.6,
+          "maximum": 0.6,
+          "description": "Inclinación de la cara"
+        },
+        "fscale": {
+          "type": "number",
+          "minimum": 0.7,
+          "maximum": 1.3,
+          "description": "Escala de la cara"
+        },
+        "spin": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Remolino (mareo)"
+        },
+        "orbit": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Los ojos giran"
+        },
+        "pulse": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Laten con el sonido"
+        },
+        "beat": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Latido doble"
+        },
+        "glitch": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "dim": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Cuánto se apaga"
+        },
+        "hue": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "De naranja a rojo"
+        },
+        "mo": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.2,
+          "description": "Boca: apertura"
+        },
+        "mw": {
+          "type": "number",
+          "minimum": 0.02,
+          "maximum": 0.2,
+          "description": "Boca: ancho"
+        },
+        "mcurve": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1,
+          "description": "Boca: sonrisa (+) o puchero (-)"
+        },
+        "blush": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Cachetes"
+        },
+        "shake": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Temblor"
+        }
+      }
+    },
+    "paso": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cara": {
+          "$ref": "#/$defs/nombreExpresion"
+        },
+        "dura": {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0.05,
+              "maximum": 60
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0.05,
+                "maximum": 60
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          ],
+          "description": "Segundos (o [mínimo, máximo])"
+        },
+        "veces": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 20
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          ]
+        },
+        "mirada": {
+          "enum": [
+            "libre",
+            "frente",
+            "arriba",
+            "abajo",
+            "izquierda",
+            "derecha",
+            "lado",
+            "alrededor",
+            "perdida",
+            "reojo",
+            "estimulo",
+            "rem",
+            "ovejas"
+          ]
+        },
+        "parpadeo": {
+          "enum": [
+            "normal",
+            "menos",
+            "mas",
+            "no",
+            "lento",
+            "rapido",
+            "doble"
+          ]
+        },
+        "particula": {
+          "enum": [
+            "zzz",
+            "corazon",
+            "lagrima",
+            "gota",
+            "chispa",
+            "pregunta",
+            "exclamacion",
+            "nota",
+            "estrella",
+            "burbuja"
+          ]
+        },
+        "cuantas": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "peso": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "sonido": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8
+        },
+        "estado": {
+          "type": "string",
+          "pattern": "^(estado\\.)?(energia|animo|afecto|aburrimiento|curiosidad|sueno|estres)[+-](0(\\.[0-9]+)?|1(\\.0+)?)$"
+        }
+      }
+    },
+    "comportamiento": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pasos"
+      ],
+      "properties": {
+        "tipo": {
+          "enum": [
+            "ocioso",
+            "reaccion",
+            "rutina"
+          ],
+          "description": "ocioso: lo elige el selector solo; reaccion: lo dispara una regla; rutina: el ritmo diario."
+        },
+        "cuando": {
+          "type": "string",
+          "description": "Condiciones separadas por coma (\"sueno>0.5\", \"rasgo.picardia>0.5\", \"ignorado>240\", \"noche\")."
+        },
+        "necesidad": {
+          "type": "string"
+        },
+        "base": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "probabilidad": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "enfriamiento": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 86400
+        },
+        "interrumpible": {
+          "type": "boolean"
+        },
+        "afinidad": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "energia": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "sociabilidad": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "picardia": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "timidez": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "curiosidad": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            },
+            "malGenio": {
+              "type": "number",
+              "minimum": -1,
+              "maximum": 1
+            }
+          }
+        },
+        "pasos": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/paso"
+          }
         }
       }
     }

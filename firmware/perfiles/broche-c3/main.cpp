@@ -82,8 +82,12 @@ void dormir() {
   g_lcd.setBrightness(0);
   g_lcd.sleep();  // la pantalla también se duerme (unos µA)
   comun::bleApagar();
-  // Despertar con el pulsador (va a GND: nivel bajo).
+  // Despertar con el pulsador (va a GND: nivel bajo) y, si se durmió de
+  // noche, solo a la hora de despertarse (el reloj sigue andando).
   esp_deep_sleep_enable_gpio_wakeup(1ULL << pines::BOTON, ESP_GPIO_WAKEUP_GPIO_LOW);
+  const int segundos = g_sistema.segundosHastaDespertar();
+  if (segundos > 0 && g_sistema.motor().dormido())
+    esp_sleep_enable_timer_wakeup(static_cast<uint64_t>(segundos) * 1000000ULL);
   esp_deep_sleep_start();
 }
 
@@ -122,7 +126,8 @@ void loop() {
   }
 
   const uint32_t ahora = millis();
-  if (ahora - g_ultimoCuadro >= 33) {
+  // Los modos de energía: 30 cuadros por segundo despierto, 5 dormido.
+  if (ahora - g_ultimoCuadro >= 1000u / static_cast<uint32_t>(g_sistema.fpsSugerido())) {
     g_ultimoCuadro = ahora;
     g_sistema.tick();
     if (g_sistema.quiereDormir()) dormir();

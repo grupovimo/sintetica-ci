@@ -15,7 +15,7 @@ IMPORTAR(js_presentar_franja) void js_presentar_franja(const uint16_t* pixeles, 
 IMPORTAR(js_escribir_trozo) int js_escribir_trozo(const char* clave, uint32_t desplazamiento, const uint8_t* datos, size_t n);
 IMPORTAR(js_leer_trozo) int js_leer_trozo(const char* clave, uint32_t desplazamiento, uint8_t* datos, size_t n);
 IMPORTAR(js_borrar) int js_borrar(const char* clave);
-IMPORTAR(js_minuto) int js_minuto();
+IMPORTAR(js_epoch) uint32_t js_epoch();
 IMPORTAR(js_bateria) int js_bateria();
 IMPORTAR(js_guardar) int js_guardar(const char* clave, const uint8_t* datos, size_t n);
 IMPORTAR(js_leer) int js_leer(const char* clave, uint8_t* datos, size_t cap);
@@ -78,7 +78,7 @@ __attribute__((export_name("sim_iniciar"))) void sim_iniciar(int perfil) {
   h.escribirTrozo = [](const char* c, uint32_t off, const uint8_t* d, size_t n) { return js_escribir_trozo(c, off, d, n) != 0; };
   h.leerTrozo = js_leer_trozo;
   h.borrar = [](const char* c) { return js_borrar(c) != 0; };
-  h.minutoDelDia = js_minuto;
+  h.epoch = js_epoch;  // la hora local (el simulador la puede acelerar)
   h.bateria = js_bateria;
   h.guardar = [](const char* c, const uint8_t* d, size_t n) { return js_guardar(c, d, n) != 0; };
   h.leer = js_leer;
@@ -141,7 +141,7 @@ __attribute__((export_name("sim_nombre_animacion"))) const char* sim_nombre_anim
 // Lo que se ve: el nombre de la expresión o "animacion:<nombre>".
 __attribute__((export_name("sim_visible"))) const char* sim_visible() {
   const int a = g_sistema.animacionVisible();
-  if (a < 0) return g_sistema.config().expresiones[g_sistema.motor().expresionVisible()].nombre;
+  if (a < 0) return g_sistema.motor().nombreVisible();
   const size_t k = copiarTexto(g_visible, sizeof g_visible, "animacion:");
   copiarTexto(g_visible + k, sizeof g_visible - k, g_sistema.config().animaciones[a].nombre);
   return g_visible;
@@ -217,4 +217,112 @@ __attribute__((export_name("sim_editor_animacion"))) void sim_editor_animacion(i
   dibujarAnimacion(g_editorLienzo, g_editorVista, a, t < 0 ? 0u : static_cast<uint32_t>(t), e);
 }
 __attribute__((export_name("sim_editor_pixeles"))) const uint16_t* sim_editor_pixeles() { return g_editorPx; }
+
+// --- Motor de vida ---
+// Los parámetros del rostro (para armar los controles del editor).
+__attribute__((export_name("sim_cantidad_parametros"))) int sim_cantidad_parametros() { return N_PARAMETROS; }
+__attribute__((export_name("sim_parametro_nombre"))) const char* sim_parametro_nombre(int i) {
+  return i >= 0 && i < N_PARAMETROS ? infoParametro(i).nombre : "";
+}
+__attribute__((export_name("sim_parametro_min"))) float sim_parametro_min(int i) { return i >= 0 && i < N_PARAMETROS ? infoParametro(i).minimo : 0; }
+__attribute__((export_name("sim_parametro_max"))) float sim_parametro_max(int i) { return i >= 0 && i < N_PARAMETROS ? infoParametro(i).maximo : 0; }
+__attribute__((export_name("sim_parametro_defecto"))) float sim_parametro_defecto(int i) {
+  return i >= 0 && i < N_PARAMETROS ? infoParametro(i).defecto : 0;
+}
+// Las expresiones paramétricas del editor.
+__attribute__((export_name("sim_editor_cantidad_caras"))) int sim_editor_cantidad_caras() { return g_editorConfig.vida.nCaras; }
+__attribute__((export_name("sim_editor_nombre_cara"))) const char* sim_editor_nombre_cara(int i) {
+  return i >= 0 && i < g_editorConfig.vida.nCaras ? g_editorConfig.vida.caras[i].nombre : "";
+}
+__attribute__((export_name("sim_editor_indice_cara"))) int sim_editor_indice_cara() {
+  return g_editorConfig.vida.indiceCara(reinterpret_cast<const char*>(g_intercambio));
+}
+// Los parámetros completos de la cara i (neutral + sus ajustes) al intercambio, como float32.
+__attribute__((export_name("sim_editor_parametros_cara"))) int sim_editor_parametros_cara(int i) {
+  Rostro r;
+  const int n = g_editorConfig.vida.indiceCara("neutral");
+  if (n >= 0) g_editorConfig.vida.caras[n].aplicar(r);
+  if (i >= 0 && i < g_editorConfig.vida.nCaras) g_editorConfig.vida.caras[i].aplicar(r);
+  copiarBytes(g_intercambio, r.v, sizeof r.v);
+  return N_PARAMETROS;
+}
+// Dibuja un rostro con los parámetros del intercambio (N_PARAMETROS float32),
+// con un parpadeo y una mirada, y las partículas de muestra que se pidan.
+__attribute__((export_name("sim_editor_rostro"))) void sim_editor_rostro(float parpadeo, float t, int particula) {
+  CuadroRostro c;
+  copiarBytes(c.r.v, g_intercambio, sizeof c.r.v);
+  c.r.limitar();
+  const float bl = limitar(parpadeo, 0, 1);
+  for (int lado = 0; lado < 2; lado++) {
+    const int b = lado * param::POR_OJO;
+    c.r[b + param::LT] += (0.5f - c.r[b + param::LT]) * bl;
+    c.r[b + param::LB] += (0.5f - c.r[b + param::LB]) * bl;
+  }
+  c.tiempo = t;
+  c.faseSpin = t * 3.2f * c.r[param::SPIN];
+  c.faseOrbita = t * 4.5f * c.r[param::ORBIT];
+  const float ph = t * 1.15f - piso(t * 1.15f);
+  auto g = [](float x) { return exponencial(-x * x); };
+  c.latido = g((ph - 0.1f) * 22) + 0.65f * g((ph - 0.3f) * 22);
+  c.pulso = 1 + c.r[param::PULSE] * (0.09f + 0.09f * seno(t * 9) * seno(t * 2.3f));
+  c.glitch = c.r[param::GLITCH] * (seno(t * 23) > 0.6f ? 1.0f : 0.35f);
+  c.semillaGlitch = piso(t * 8);
+  c.progreso = t * 0.15f - piso(t * 0.15f);
+  c.colorOjos = g_editorConfig.hayColorOjos ? g_editorConfig.colorOjos : paleta::NARANJA;
+  c.brillo = g_editorConfig.vida.brilloMax;
+  if (particula >= 0 && particula < static_cast<int>(TipoParticula::Cantidad)) {
+    Particula& p = c.particulas[0];
+    p.viva = true;
+    p.tipo = static_cast<TipoParticula>(particula);
+    p.x = 0.33f, p.y = 0.3f, p.vida = 2, p.edad = 0.6f, p.tamano = 0.06f;
+  }
+  const VistaRostro v = VistaRostro::para(g_editorLienzo.ancho(), g_editorLienzo.alto(), g_editorVista.redonda);
+  dibujarRostro(g_editorLienzo, v, c);
+}
+
+// El estado del motor del simulador (las barras del panel).
+__attribute__((export_name("sim_vida_estado"))) float sim_vida_estado(int i) {
+  return i >= 0 && i < N_ESTADO ? g_sistema.motor().estadoInterno()[i] : 0;
+}
+__attribute__((export_name("sim_vida_rasgo"))) float sim_vida_rasgo(int i) {
+  return i >= 0 && i < N_RASGOS ? g_sistema.motor().rasgos()[i] : 0;
+}
+__attribute__((export_name("sim_vida_comportamiento"))) const char* sim_vida_comportamiento() {
+  return g_sistema.motor().nombreComportamiento();
+}
+__attribute__((export_name("sim_vida_dormido"))) int sim_vida_dormido() {
+  return (g_sistema.motor().dormido() ? 1 : 0) | (g_sistema.motor().sonando() ? 2 : 0);
+}
+__attribute__((export_name("sim_vida_candidato"))) const char* sim_vida_candidato(int i) {
+  const char* n[3];
+  float p[3];
+  const int k = g_sistema.motor().candidatos(n, p, 3);
+  return i >= 0 && i < k ? n[i] : "";
+}
+__attribute__((export_name("sim_vida_puntaje"))) float sim_vida_puntaje(int i) {
+  const char* n[3];
+  float p[3];
+  const int k = g_sistema.motor().candidatos(n, p, 3);
+  return i >= 0 && i < k ? p[i] : 0;
+}
+__attribute__((export_name("sim_vida_comportamientos_hechos"))) int sim_vida_comportamientos_hechos() {
+  return static_cast<int>(g_sistema.motor().comportamientosEmpezados());
+}
+__attribute__((export_name("sim_vida_parpadeos"))) int sim_vida_parpadeos() { return static_cast<int>(g_sistema.motor().parpadeos()); }
+// Las expresiones paramétricas de la config del bicho.
+__attribute__((export_name("sim_cantidad_caras"))) int sim_cantidad_caras() { return g_sistema.config().vida.nCaras; }
+__attribute__((export_name("sim_nombre_cara"))) const char* sim_nombre_cara(int i) {
+  return i >= 0 && i < g_sistema.config().vida.nCaras ? g_sistema.config().vida.caras[i].nombre : "";
+}
+__attribute__((export_name("sim_cantidad_eventos"))) int sim_cantidad_eventos() { return static_cast<int>(Evento::Cantidad); }
+__attribute__((export_name("sim_nombre_evento"))) const char* sim_nombre_evento(int i) {
+  return i >= 0 && i < static_cast<int>(Evento::Cantidad) ? nombreEvento(static_cast<Evento>(i)) : "";
+}
+// Empieza un comportamiento por nombre (el nombre en el intercambio).
+__attribute__((export_name("sim_vida_comportamiento_forzar"))) int sim_vida_comportamiento_forzar() {
+  const int i = g_sistema.config().vida.indiceComportamiento(reinterpret_cast<const char*>(g_intercambio));
+  return g_sistema.motor().comportamiento(i, 0) ? 1 : 0;
+}
+__attribute__((export_name("sim_seguir"))) void sim_seguir(float x, float y) { g_sistema.seguir(x, y); }
+__attribute__((export_name("sim_depurar"))) void sim_depurar(int si) { g_sistema.depurar(si != 0); }
 }

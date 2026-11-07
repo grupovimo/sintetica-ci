@@ -11,6 +11,7 @@ uint32_t ahora(void*) { return goAhoraMs(); }
 uint32_t semilla(void*) { return goSemilla(); }
 int minuto(void*) { return goMinuto(); }
 int bateria(void*) { return goBateria(); }
+uint32_t epoch(void*) { return goEpoch(); }
 int guardar(void*, const char* c, const uint8_t* d, size_t n) {
   return goGuardar(const_cast<char*>(c), const_cast<uint8_t*>(d), n);
 }
@@ -37,6 +38,7 @@ extern "C" void sintetica_go_iniciar(const char* id, const char* perfil, const c
   h.semilla = semilla;
   h.minuto_del_dia = minuto;
   h.bateria = bateria;
+  h.epoch = epoch;
   h.guardar = guardar;
   h.leer = leer;
   h.notificar = notificar;

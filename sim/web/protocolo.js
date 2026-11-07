@@ -18,6 +18,7 @@ export const Op = {
   cmdExpresion: 0x10, cmdNombre: 0x11, cmdEvento: 0x12,
   cmdVincular: 0x13, cmdAutenticar: 0x14, cmdDesvincular: 0x15,
   cmdRed: 0x16, cmdNube: 0x17, cmdOlvidarRed: 0x18, cmdReproducir: 0x19,
+  cmdHora: 0x1a, cmdVida: 0x1b, cmdMemoria: 0x1c, cmdRestaurar: 0x1d, cmdRegistro: 0x1e,
   imgInicio: 0x20, imgBloque: 0x21, imgFin: 0x22, imgBorrar: 0x23, imgListar: 0x24, imgPedir: 0x25,
   otaInicio: 0x30, otaBloque: 0x31, otaFin: 0x32, otaDescargar: 0x33, otaProgreso: 0x34, otaCancelar: 0x35,
   respuesta: 0x80, configTrozo: 0x84, configCierre: 0x85, imgTrozo: 0xa7, imgCierre: 0xa8,
@@ -31,7 +32,17 @@ export const Codigo = {
   255: 'no implementado',
 };
 
-export const Eventos = ['tacto', 'doble-toque', 'levantado', 'sacudida', 'boca-abajo', 'vinculado', 'app-abierta', 'despertado'];
+// En el orden del núcleo (el índice viaja en el comando Evento). Los primeros 8 son de la v1.
+export const Eventos = [
+  'tacto', 'doble-toque', 'levantado', 'sacudida', 'boca-abajo', 'vinculado', 'app-abierta', 'despertado',
+  'caricia', 'muchos-toques', 'sacudida-suave', 'sacudida-fuerte', 'inclinado', 'caida', 'voz', 'nombre',
+  'ruido', 'musica', 'silencio', 'notificacion', 'llamada', 'bateria-baja', 'bateria-critica', 'enchufado',
+  'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito',
+];
+// El estado interno y los rasgos, en el orden del protocolo (comando Vida).
+export const VariablesEstado = ['energia', 'animo', 'afecto', 'aburrimiento', 'curiosidad', 'sueno', 'estres'];
+export const Rasgos = ['energia', 'sociabilidad', 'picardia', 'timidez', 'curiosidad', 'malGenio'];
+export const LARGO_MEMORIA = 112;
 export const Modos = ['mascota', 'reloj', 'pomodoro', 'clima', 'notificaciones'];
 
 const texto = new TextEncoder();
@@ -83,6 +94,19 @@ export const comando = {
   nube: (url, usuario, clave) => Uint8Array.from([Op.cmdNube, ...corto(url, 160), ...corto(usuario, 64), ...corto(clave, 128)]),
   olvidarRed: () => Uint8Array.from([Op.cmdOlvidarRed]),
   reproducir: (animacion = '') => Uint8Array.from([Op.cmdReproducir, ...texto.encode(animacion)]),
+  // La hora (v1.4): epoch UTC en segundos y la zona en minutos (Argentina: -180).
+  hora: (epochUtc = Math.floor(Date.now() / 1000), zonaMinutos = -new Date().getTimezoneOffset()) => {
+    const b = new Uint8Array(7);
+    b[0] = Op.cmdHora;
+    new DataView(b.buffer).setUint32(1, epochUtc >>> 0, true);
+    new DataView(b.buffer).setInt16(5, zonaMinutos, true);
+    return b;
+  },
+  // El estado del motor de vida; con superposicion (true/false) prende o apaga la de depuración.
+  vida: (superposicion) => (superposicion === undefined ? Uint8Array.from([Op.cmdVida]) : Uint8Array.from([Op.cmdVida, superposicion ? 1 : 0])),
+  memoria: () => Uint8Array.from([Op.cmdMemoria]),
+  restaurar: (memoria) => Uint8Array.from([Op.cmdRestaurar, ...memoria]),
+  registro: () => Uint8Array.from([Op.cmdRegistro]),
   evento: (nombreOIndice) => {
     const i = typeof nombreOIndice === 'number' ? nombreOIndice : Eventos.indexOf(nombreOIndice);
     if (i < 0) throw new Error(`evento desconocido: ${nombreOIndice}`);
@@ -257,4 +281,52 @@ export function leerEstado(b) {
     id,
     pantalla,
   };
+}
+
+// La respuesta al comando Vida: [0x9B][0][7 estado][6 rasgos][flags][n][comportamiento][n][visible][n cand]...[fps]
+export function leerVida(b) {
+  if ((b[0] & 0x7f) !== Op.cmdVida || b[1] !== 0) throw new Error('no es una respuesta de Vida');
+  let i = 2;
+  const estado = {}, rasgos = {};
+  for (const v of VariablesEstado) estado[v] = b[i++] / 255;
+  for (const r of Rasgos) rasgos[r] = b[i++] / 255;
+  const flags = b[i++];
+  const campo = () => { const n = b[i]; const s = lector.decode(b.subarray(i + 1, i + 1 + n)); i += 1 + n; return s; };
+  const comportamiento = campo();
+  const visible = campo();
+  const candidatos = [];
+  const nc = b[i++];
+  for (let k = 0; k < nc; k++) candidatos.push({ nombre: campo(), puntaje: b[i++] / 100 });
+  return { estado, rasgos, dormido: !!(flags & 1), sonando: !!(flags & 2), superposicion: !!(flags & 4), comportamiento, visible, candidatos, fps: b[i] };
+}
+
+// La memoria (112 bytes, la del comando Memoria sin los 2 de la respuesta).
+export function leerMemoria(m) {
+  if (m.length !== LARGO_MEMORIA || m[0] !== 1) throw new Error('memoria inválida');
+  if (leerU32(m, LARGO_MEMORIA - 4) !== crc32(m.subarray(0, LARGO_MEMORIA - 4))) throw new Error('memoria con otro CRC');
+  const u16 = (k) => m[k] | (m[k + 1] << 8);
+  const i8 = (k) => (m[k] << 24) >> 24;
+  const estado = {};
+  VariablesEstado.forEach((v, k) => { estado[v] = m[79 + k] / 255; });
+  const deriva = {};
+  Rasgos.forEach((r, k) => { deriva[r] = i8(73 + k) / 100; });
+  return {
+    nacimiento: leerU32(m, 1), ultimaInteraccion: leerU32(m, 5), rencorHasta: leerU32(m, 9), ultimoDia: leerU32(m, 13),
+    dias: u16(17), racha: u16(19), rachaMax: u16(21),
+    caricias: leerU32(m, 23), toques: leerU32(m, 27), sacudidas: leerU32(m, 31),
+    horas: Array.from(m.subarray(35, 59)),
+    gustos: Object.fromEntries(['caricia', 'tacto', 'voz', 'musica', 'nombre', 'levantado', 'sacudida-suave', 'app-abierta'].map((g, k) => [g, i8(59 + k)])),
+    hitos: u16(67), anioCumpleBicho: u16(69), anioCumpleDueno: u16(71),
+    deriva, estado, epochEstado: leerU32(m, 86), ausenciaMaxima: u16(90), afectoHoy: m[92],
+  };
+}
+
+// El registro: [0x9E][0][n][n × (u32 segundos, u8 tipo, u8 dato)].
+export function leerRegistro(b) {
+  const n = b[2];
+  const tipos = ['evento', 'comportamiento', 'sueño', 'hito'];
+  return Array.from({ length: n }, (_, k) => {
+    const i = 3 + k * 6;
+    return { segundos: leerU32(b, i), tipo: tipos[b[i + 4]] ?? String(b[i + 4]), dato: b[i + 5] };
+  });
 }

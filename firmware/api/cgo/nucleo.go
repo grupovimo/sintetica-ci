@@ -131,6 +131,8 @@ type Hal interface {
 	AhoraMs() uint32
 	Semilla() uint32
 	MinutoDelDia() int
+	// Segundos desde 1970 en hora local (0 = no se sabe).
+	Epoch() uint32
 	Bateria() int
 	Guardar(clave string, datos []byte) bool
 	Leer(clave string) ([]byte, bool)
@@ -294,6 +296,9 @@ func goSemilla() C.uint32_t { return C.uint32_t(hal.Semilla()) }
 
 //export goMinuto
 func goMinuto() C.int { return C.int(hal.MinutoDelDia()) }
+
+//export goEpoch
+func goEpoch() C.uint32_t { return C.uint32_t(hal.Epoch()) }
 
 //export goBateria
 func goBateria() C.int { return C.int(hal.Bateria()) }

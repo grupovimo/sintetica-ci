@@ -49,6 +49,11 @@ func (h *hal) MinutoDelDia() int {
 	t := time.Now().In(zonaArgentina)
 	return t.Hour()*60 + t.Minute()
 }
+func (h *hal) Epoch() uint32 {
+	t := time.Now().In(zonaArgentina)
+	_, offset := t.Zone()
+	return uint32(t.Unix() + int64(offset))
+}
 func (h *hal) Bateria() int { return -1 }
 
 func (h *hal) Guardar(clave string, d []byte) bool {

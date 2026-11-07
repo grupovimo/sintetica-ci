@@ -14,7 +14,9 @@ export async function crearSimulador(opciones) {
     alSonido = () => {},
     alLed = () => {},
     bateria = () => -1,
-    minutoDelDia = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); },
+    // La hora local. Si se pasa minutoDelDia (los tests), el día es uno fijo y
+    // la hora arranca en ese minuto; si no, la del reloj de la compu.
+    minutoDelDia = null,
     semilla = () => (Math.random() * 0xffffffff) >>> 0,
     identificador = 'A1B2C3D4E5F6',
     perfil = 'mascota',        // 'mascota' (la 1.47B, 320 × 172) o 'broche' (redondo, 240 × 240)
@@ -22,6 +24,13 @@ export async function crearSimulador(opciones) {
 
   let memoria;
   const inicio = ahora();
+  // El reloj del bicho puede ir más rápido (un día en 2 minutos = ×720): se
+  // lleva aparte del reloj real, sin saltos al cambiar la velocidad.
+  let velocidad = 1, baseReal = inicio, baseVirtual = 0;
+  const virtualMs = () => baseVirtual + (ahora() - baseReal) * velocidad;
+  const epochInicio = minutoDelDia
+    ? 20764 * 86400 + minutoDelDia() * 60
+    : Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60;
   const bytes = (p, n) => new Uint8Array(memoria.buffer, p, n);
   const cadena = (p) => {
     const m = new Uint8Array(memoria.buffer);
@@ -37,7 +46,8 @@ export async function crearSimulador(opciones) {
       if (!pId) { pId = x.sim_intercambio() + x.sim_intercambio_cap() - 16; bytes(pId, 13).set([...new TextEncoder().encode(identificador.slice(0, 12)), 0]); }
       return pId;
     },
-    js_ahora: () => (Math.floor(ahora() - inicio) >>> 0),
+    js_ahora: () => (Math.floor(virtualMs()) >>> 0),
+    js_epoch: () => (epochInicio + Math.floor(virtualMs() / 1000)) >>> 0,
     js_semilla: () => semilla() >>> 0,
     js_presentar_franja: (p, w, y0, filas) => {
       const px = new Uint16Array(memoria.buffer, p, w * filas);
@@ -61,7 +71,6 @@ export async function crearSimulador(opciones) {
       return v.length;
     },
     js_borrar: (pc) => (almacen.borrarArchivo(cadena(pc)), 1),
-    js_minuto: () => minutoDelDia(),
     js_bateria: () => bateria(),
     js_guardar: (pc, pd, n) => (almacen.guardar(cadena(pc), bytes(pd, n).slice()) ? 1 : 0),
     js_leer: (pc, pd, cap) => {
@@ -85,6 +94,44 @@ export async function crearSimulador(opciones) {
 
   return {
     tick: () => x.sim_tick(),
+    // El tiempo: velocidad (1 = real; 720 = un día en 2 min) y la hora local.
+    velocidad: (v) => {
+      if (v === undefined) return velocidad;
+      baseVirtual = virtualMs();
+      baseReal = ahora();
+      velocidad = Math.max(0, v);
+      return velocidad;
+    },
+    adelantar: (ms) => { baseVirtual += ms; },
+    hora: () => {
+      const e = epochInicio + Math.floor(virtualMs() / 1000);
+      return { epoch: e, minuto: Math.floor((e % 86400) / 60) };
+    },
+    // El motor de vida, para el panel y las herramientas.
+    vida: () => ({
+      estado: Array.from({ length: 7 }, (_, i) => x.sim_vida_estado(i)),
+      rasgos: Array.from({ length: 6 }, (_, i) => x.sim_vida_rasgo(i)),
+      comportamiento: cadena(x.sim_vida_comportamiento()),
+      dormido: (x.sim_vida_dormido() & 1) === 1,
+      sonando: (x.sim_vida_dormido() & 2) === 2,
+      candidatos: [0, 1, 2].map((i) => ({ nombre: cadena(x.sim_vida_candidato(i)), puntaje: x.sim_vida_puntaje(i) })).filter((c) => c.nombre),
+      comportamientos: x.sim_vida_comportamientos_hechos(),
+      parpadeos: x.sim_vida_parpadeos(),
+    }),
+    caras: () => Array.from({ length: x.sim_cantidad_caras() }, (_, i) => cadena(x.sim_nombre_cara(i))),
+    eventos: () => Array.from({ length: x.sim_cantidad_eventos() }, (_, i) => cadena(x.sim_nombre_evento(i))),
+    forzarComportamiento: (nombre) => {
+      const b = new TextEncoder().encode(nombre);
+      bytes(x.sim_intercambio(), b.length + 1).set([...b, 0]);
+      return x.sim_vida_comportamiento_forzar() === 1;
+    },
+    seguir: (mx, my) => x.sim_seguir(mx, my),
+    depurar: (si) => x.sim_depurar(si ? 1 : 0),
+    // Los parámetros del rostro: [{ nombre, min, max, defecto }] (los del ojo
+    // van dos veces: izquierdo y derecho).
+    parametros: () => Array.from({ length: x.sim_cantidad_parametros() }, (_, i) => ({
+      nombre: cadena(x.sim_parametro_nombre(i)), min: x.sim_parametro_min(i), max: x.sim_parametro_max(i), defecto: x.sim_parametro_defecto(i),
+    })),
     tacto: (apretado) => x.sim_tacto(apretado ? 1 : 0),
     imu: (ax, ay, az) => x.sim_imu(ax, ay, az),
     evento: (i) => x.sim_evento(i),
@@ -160,6 +207,20 @@ export async function crearSimulador(opciones) {
         indiceAnimacion: (n) => (nombreAlIntercambio(n), x.sim_editor_indice_animacion()),
         duracion: (i) => x.sim_editor_duracion(i),
         expresion: (i, cierre = 0, mx = 0, my = 0) => (x.sim_editor_expresion(i, cierre, mx, my), leer()),
+        // Expresiones paramétricas.
+        caras: () => Array.from({ length: x.sim_editor_cantidad_caras() }, (_, i) => cadena(x.sim_editor_nombre_cara(i))),
+        indiceCara: (n) => (nombreAlIntercambio(n), x.sim_editor_indice_cara()),
+        // Los parámetros completos de una cara (Float32Array).
+        parametrosCara: (i) => {
+          const n = x.sim_editor_parametros_cara(i);
+          return new Float32Array(memoria.buffer, x.sim_intercambio(), n).slice();
+        },
+        // Dibuja un rostro con estos parámetros (Float32Array) en el instante t (s).
+        rostro: (params, t = 0, parpadeo = 0, particula = -1) => {
+          new Float32Array(memoria.buffer, x.sim_intercambio(), params.length).set(params);
+          x.sim_editor_rostro(parpadeo, t, particula);
+          return leer();
+        },
         animacion: (i, t) => (x.sim_editor_animacion(i, t), leer()),
       };
     })(),

@@ -101,7 +101,7 @@ ResultadoConfig leerParametros(const Json& j, int obj, int lado, CaraVida* c) {
         if (c->nAjustes >= MAX_AJUSTES) return falla("expresion: demasiados parámetros", ErrorConfig::Demasiadas);
         c->nAjustes++;
       }
-      c->ajustes[a] = {static_cast<uint8_t>(idx), v};
+      c->ajustes[a] = Ajuste::de(idx, v);
       if (lado < 0) break;
     }
   }
@@ -189,12 +189,14 @@ ResultadoConfig leerPaso(const Json& j, int obj, const Config& c, Paso* p) {
   const int pe = j.buscar(obj, "peso");
   if (pe >= 0) {
     if (j.tipo(pe) != TipoJson::Numero || j.numero(pe, 1) < 0 || j.numero(pe, 1) > 1) return falla("paso: peso de 0 a 1");
-    p->peso = j.numero(pe, 1);
+    p->pesoQ = static_cast<uint8_t>(j.numero(pe, 1) * 255 + 0.5f);
   }
-  if ((r = leerTextoEn(j, obj, "sonido", p->sonido, sizeof p->sonido)) < 0) return falla("paso: sonido de hasta 10 letras");
+  if ((r = leerTextoEn(j, obj, "sonido", p->sonido, sizeof p->sonido)) < 0) return falla("paso: sonido de hasta 8 letras");
   char e[32];
   if ((r = leerTextoEn(j, obj, "estado", e, sizeof e)) != 0) {
-    if (r < 0 || !leerEmpujon(e, &p->estadoVar, &p->estadoDelta)) return falla("paso: estado es \"animo+0.1\"");
+    float delta = 0;
+    if (r < 0 || !leerEmpujon(e, &p->estadoVar, &delta)) return falla("paso: estado es \"animo+0.1\"");
+    p->estadoCent = static_cast<int8_t>(delta * 100 + (delta < 0 ? -0.5f : 0.5f));
   }
   return {};
 }
@@ -249,7 +251,7 @@ ResultadoConfig leerComportamiento(const Json& j, int obj, const Config& c, Comp
   }
   const int ps = j.buscar(obj, "pasos");
   if (!j.valido(ps) || j.tipo(ps) != TipoJson::Arreglo || j.cantidad(ps) < 1 || j.cantidad(ps) > MAX_PASOS)
-    return falla("comportamiento: de 1 a 8 pasos");
+    return falla("comportamiento: de 1 a 6 pasos");
   b->nPasos = 0;
   for (int i = 0; i < j.cantidad(ps); i++) {
     b->pasos[i] = Paso();
@@ -280,7 +282,7 @@ ResultadoConfig guardarCara(DatosVida& v, const CaraVida& c) {
   return {};
 }
 
-TokenJson g_tok[600];
+TokenJson g_tok[260];  // los presets y cada dato base (el de la config del usuario usa otros)
 
 bool leerPersonalidadObj(const Json& j, int obj, Personalidad* p) {
   for (int i = 0; i < N_RASGOS; i++) {
@@ -343,7 +345,7 @@ const char* nombreRasgo(int i) { return i >= 0 && i < N_RASGOS ? NOMBRES_RASGO[i
 
 bool presetPersonalidad(const char* nombre, Personalidad* p) {
   Json j;
-  if (j.parsear(PERSONALIDADES_BASE, largo(PERSONALIDADES_BASE), g_tok, 600) <= 0) return false;
+  if (j.parsear(PERSONALIDADES_BASE, largo(PERSONALIDADES_BASE), g_tok, 260) <= 0) return false;
   const int o = j.buscar(0, nombre);
   if (o < 0 || j.tipo(o) != TipoJson::Objeto) return false;
   Personalidad q;
@@ -384,7 +386,7 @@ bool miradaPorNombre(const char* n, Mirada* m) {
 }
 
 void CaraVida::aplicar(Rostro& r) const {
-  for (int i = 0; i < nAjustes; i++) r[ajustes[i].param] = ajustes[i].valor;
+  for (int i = 0; i < nAjustes; i++) r[ajustes[i].param] = ajustes[i].valor();
 }
 
 int DatosVida::indiceCara(const char* n) const {
@@ -536,13 +538,13 @@ ResultadoConfig cargarVidaBase(Config& c) {
   c.vida = DatosVida();
   Json j;
   for (const DatoVidaBase& d : CARAS_VIDA_BASE) {
-    if (j.parsear(d.json, largo(d.json), g_tok, 600) <= 0) return falla("vida base: expresión inválida");
+    if (j.parsear(d.json, largo(d.json), g_tok, 260) <= 0) return falla("vida base: expresión inválida");
     ResultadoConfig r = leerCaraVida(j, 0, c, d.nombre, false);
     if (!r.ok()) return r;
   }
   static Comportamiento b;
   for (const DatoVidaBase& d : COMPORTAMIENTOS_BASE) {
-    if (j.parsear(d.json, largo(d.json), g_tok, 600) <= 0) return falla("vida base: comportamiento inválido");
+    if (j.parsear(d.json, largo(d.json), g_tok, 260) <= 0) return falla("vida base: comportamiento inválido");
     b = Comportamiento();
     copiarTexto(b.nombre, sizeof b.nombre, d.nombre);
     ResultadoConfig r = leerComportamiento(j, 0, c, &b);

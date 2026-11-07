@@ -12,8 +12,8 @@ struct Rostro;
 
 constexpr int MAX_CARAS_VIDA = 48;
 constexpr int MAX_AJUSTES = 28;
-constexpr int MAX_COMPORTAMIENTOS = 72;
-constexpr int MAX_PASOS = 8;
+constexpr int MAX_COMPORTAMIENTOS = 64;
+constexpr int MAX_PASOS = 6;
 constexpr int MAX_CUANDO = 3;
 constexpr int LARGO_VIDA = 25;  // nombres: 24 bytes + terminador
 
@@ -74,9 +74,14 @@ bool parpadeoPorNombre(const char* n, Parpadeo* p);
 
 // Una expresión paramétrica: lo que cambia respecto de la neutral (o de la
 // que extiende), una capa de movimiento y, opcional, una partícula.
+// (En diezmilésimos: todos los rangos entran en ±3,2 y así ocupa 4 bytes.)
 struct Ajuste {
   uint8_t param;
-  float valor;
+  int16_t diezmil;
+  float valor() const { return diezmil / 10000.0f; }
+  static Ajuste de(int p, float v) {
+    return {static_cast<uint8_t>(p), static_cast<int16_t>(v * 10000.0f + (v < 0 ? -0.5f : 0.5f))};
+  }
 };
 struct CaraVida {
   char nombre[LARGO_VIDA] = {};
@@ -105,10 +110,12 @@ struct Paso {
   Parpadeo parpadeo = Parpadeo::Normal;
   int8_t particula = -1;
   uint8_t cuantas = 1;            // cuántas partículas suelta al empezar
-  float peso = 1;                 // cuánto de la cara (0 a 1)
-  char sonido[11] = {};
+  uint8_t pesoQ = 255;            // cuánto de la cara (0 a 255 = 0 a 1)
+  char sonido[9] = {};
   int8_t estadoVar = -1;          // empujón al estado al empezar
-  float estadoDelta = 0;
+  int8_t estadoCent = 0;          // en centésimos
+  float peso() const { return pesoQ / 255.0f; }
+  float estadoDelta() const { return estadoCent / 100.0f; }
 };
 
 enum class TipoComportamiento : uint8_t { Ocioso, Reaccion, Rutina };

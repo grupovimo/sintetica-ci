@@ -44,7 +44,6 @@ function guardarClave(clave) {
 
 let sim = null;
 let bateria = -1;
-let noche = false;
 let bocaAbajo = false;
 let sacudiendo = 0;
 let levantando = 0;
@@ -176,7 +175,7 @@ async function subirImagen(qoi) {
 function armarCaras() {
   const caja = $('caras');
   caja.replaceChildren();
-  for (const nombre of sim.expresiones()) {
+  for (const nombre of sim.caras()) {
     const b = document.createElement('button');
     b.textContent = nombre;
     b.dataset.nombre = nombre;
@@ -229,7 +228,6 @@ async function arrancar() {
     almacen,
     perfil,
     bateria: () => bateria,
-    minutoDelDia: () => (noche ? 2 * 60 : (() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); })()),
     alPresentar: (rgba) => { datosPantalla.data.set(rgba); ctx.putImageData(datosPantalla, 0, 0); },
     alNotificar,
     alRegistrar: (m) => anotar(`· ${m}`),
@@ -238,6 +236,7 @@ async function arrancar() {
   });
   armarCaras();
   armarAnimaciones();
+  armarVida();
   sim.bleConexion(true);
   const clave = claveGuardada();
   if (clave && !sim.emparejando()) escribir(Car.comando, comando.autenticar(clave), '(clave guardada de este celu)');
@@ -263,8 +262,53 @@ function leerImu() {
   }
 }
 
-function cuadro() {
-  if (sim) sim.tick();
+const NOMBRES_ESTADO = ['energía', 'ánimo', 'afecto', 'aburrimiento', 'curiosidad', 'sueño', 'estrés'];
+const NOMBRES_RASGOS = ['energía', 'sociabilidad', 'picardía', 'timidez', 'curiosidad', 'mal genio'];
+function barras(caja, nombres, valores) {
+  if (caja.childElementCount !== nombres.length) {
+    caja.replaceChildren(...nombres.map((n) => {
+      const d = document.createElement('div');
+      d.className = 'barra';
+      d.innerHTML = `<span>${n}</span><i><b></b></i><span></span>`;
+      return d;
+    }));
+  }
+  valores.forEach((v, i) => {
+    const fila = caja.children[i];
+    fila.querySelector('b').style.width = `${Math.round(v * 100)}%`;
+    fila.lastChild.textContent = v.toFixed(2);
+  });
+}
+
+function armarVida() {
+  $('eventos').replaceChildren(...sim.eventos().map((n, i) => {
+    const b = document.createElement('button');
+    b.textContent = n;
+    b.addEventListener('click', () => escribir(Car.comando, comando.evento(i), `(${n})`));
+    return b;
+  }));
+  fetch('../../shared/formato/vida/comportamientos.json').then((r) => r.json()).then((c) => {
+    $('s-comportamiento').replaceChildren(...Object.keys(c).map((n) => Object.assign(document.createElement('option'), { value: n, textContent: n })));
+  }).catch(() => {});
+}
+
+let ultimoPanel = 0;
+function cuadro(t) {
+  if (sim) {
+    sim.tick();
+    if (t - ultimoPanel > 200) {
+      ultimoPanel = t;
+      const v = sim.vida();
+      barras($('barras-estado'), NOMBRES_ESTADO, v.estado);
+      barras($('barras-rasgos'), NOMBRES_RASGOS, v.rasgos);
+      $('v-comportamiento').textContent = v.dormido ? (v.sonando ? 'soñando' : 'durmiendo') : (v.comportamiento || 'nada en especial');
+      $('v-candidatos').textContent = v.candidatos.length
+        ? '· el último sorteo: ' + v.candidatos.map((c) => `${c.nombre} ${c.puntaje.toFixed(2)}`).join(', ') : '';
+      const { minuto } = sim.hora();
+      $('v-hora').textContent = `${String(Math.floor(minuto / 60)).padStart(2, '0')}:${String(minuto % 60).padStart(2, '0')}` +
+        (sim.velocidad() !== 1 ? ` · × ${sim.velocidad()}` : '');
+    }
+  }
   requestAnimationFrame(cuadro);
 }
 
@@ -284,10 +328,34 @@ function enlazar() {
     bocaAbajo = !bocaAbajo;
     e.currentTarget.setAttribute('aria-pressed', String(bocaAbajo));
   });
-  $('b-noche').addEventListener('click', (e) => {
-    noche = !noche;
-    e.currentTarget.setAttribute('aria-pressed', String(noche));
-    anotar(noche ? '· son las 2:00 (dentro del horario de sueño si la config lo define)' : '· vuelve la hora real');
+  // Saltar en el tiempo: el bicho vive lo que pasó en el medio (de golpe).
+  const irA = (minuto) => {
+    const { minuto: ahora } = sim.hora();
+    const falta = ((minuto - ahora) % 1440 + 1440) % 1440;
+    sim.adelantar(falta * 60000);
+    anotar(`· adelanto ${Math.floor(falta / 60)} h ${falta % 60} min`);
+  };
+  $('b-noche').addEventListener('click', () => irA(23 * 60 + 25));
+  $('b-manana').addEventListener('click', () => irA(7 * 60 + 58));
+  for (const b of document.querySelectorAll('[data-velocidad]')) {
+    b.addEventListener('click', () => {
+      sim.velocidad(Number(b.dataset.velocidad));
+      for (const o of document.querySelectorAll('[data-velocidad]')) o.setAttribute('aria-pressed', String(o === b));
+    });
+  }
+  $('b-depurar').addEventListener('click', (e) => {
+    const si = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+    e.currentTarget.setAttribute('aria-pressed', String(si));
+    escribir(Car.comando, comando.vida(si));
+  });
+  $('b-comportamiento').addEventListener('click', () => {
+    const n = $('s-comportamiento').value;
+    if (n && !sim.forzarComportamiento(n)) anotar(`· no pude empezar ${n}`, 'mal');
+  });
+  // La mirada sigue al mouse sobre la pantalla.
+  $('pantalla').addEventListener('pointermove', (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    sim?.seguir(((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1));
   });
   $('r-bateria').addEventListener('input', (e) => {
     bateria = Number(e.target.value);

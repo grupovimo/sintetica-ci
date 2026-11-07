@@ -68,6 +68,7 @@ void sintetica_iniciar_perfil(const sintetica_hal* hal, int ancho, int alto, int
   h.semilla = [] { return g_hal.semilla ? g_hal.semilla(g_hal.contexto) : 0x5157E71Cu; };
   h.minutoDelDia = [] { return g_hal.minuto_del_dia ? g_hal.minuto_del_dia(g_hal.contexto) : -1; };
   h.bateria = [] { return g_hal.bateria ? g_hal.bateria(g_hal.contexto) : -1; };
+  if (g_hal.epoch) h.epoch = [] { return g_hal.epoch(g_hal.contexto); };
   h.guardar = [](const char* c, const uint8_t* d, size_t n) {
     if (g_hal.guardar) return g_hal.guardar(g_hal.contexto, c, d, n) != 0;
     Guardado* g = buscarGuardado(c, true);

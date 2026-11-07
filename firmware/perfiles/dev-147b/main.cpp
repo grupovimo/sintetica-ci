@@ -2,6 +2,7 @@
 // Este archivo solo traduce el hardware al HAL del núcleo; todo el
 // comportamiento vive en nucleo/ (el mismo código que el simulador).
 #include <Arduino.h>
+#include <new>
 #include <LovyanGFX.hpp>
 #include <Wire.h>
 
@@ -61,7 +62,10 @@ class Pantalla : public lgfx::LGFX_Device {
 Pantalla g_lcd;
 constexpr int ANCHO = 320, ALTO = 172;  // apaisada
 uint16_t* g_pixeles = nullptr;  // en la PSRAM: no entra en la RAM interna junto con BLE
-Sistema g_sistema;
+// El sistema (con la config, unos 140 KB) va en la PSRAM: en la RAM interna
+// quedan el BLE, el WiFi y TLS.
+Sistema* g_sistemaPtr = nullptr;
+#define g_sistema (*g_sistemaPtr)
 
 // --- IMU QMI8658 (registros mínimos para leer el acelerómetro) ------------------
 
@@ -109,7 +113,8 @@ Hal armarHal() {
   h.presentar = [](const uint16_t* px, int w, int alto) {
     g_lcd.pushImage(0, 0, w, alto, reinterpret_cast<const lgfx::rgb565_t*>(px));
   };
-  h.minutoDelDia = comun::nubeMinutoDelDia;  // por NTP, cuando hay WiFi
+  // La hora: la de NTP (con WiFi) o la que manda la app; el núcleo saca el
+  // minuto del día de h.epoch (comun::completarHal).
   h.notificarNube = comun::nubeNotificar;
   h.redCambio = comun::nubeReconfigurar;
   comun::otaCompletarHal(h, true);
@@ -142,6 +147,10 @@ void setup() {
   g_pixeles = static_cast<uint16_t*>(heap_caps_malloc(ANCHO * ALTO * 2, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
   if (!g_pixeles) g_pixeles = static_cast<uint16_t*>(heap_caps_malloc(ANCHO * ALTO * 2, MALLOC_CAP_8BIT));
 
+  void* lugar = heap_caps_malloc(sizeof(Sistema), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  if (!lugar) lugar = heap_caps_malloc(sizeof(Sistema), MALLOC_CAP_8BIT);
+  g_sistemaPtr = new (lugar) Sistema();
+
   g_hayImu = imuIniciar();
   Perfil p;
   p.ancho = ANCHO, p.alto = ALTO;
@@ -169,7 +178,8 @@ void loop() {
     float ax, ay, az;
     if (imuLeer(&ax, &ay, &az)) g_sistema.imu(ax, ay, az);
   }
-  if (ahora - g_ultimoCuadro >= 33) {  // ~30 cuadros por segundo
+  // ~30 cuadros por segundo despierto; dormido, 5 (los modos de energía).
+  if (ahora - g_ultimoCuadro >= 1000u / static_cast<uint32_t>(g_sistema.fpsSugerido())) {
     g_ultimoCuadro = ahora;
     g_sistema.tick();
   }

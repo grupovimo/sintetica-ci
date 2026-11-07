@@ -561,7 +561,7 @@ void MotorVida::calcularObjetivos(float dt) {
     for (int k = 0; k < 6; k++) {
       if (animoCaras_[k] < 0 || animoPesos_[k] <= 0.001f) continue;
       const CaraVida& c = v.caras[animoCaras_[k]];
-      for (int a = 0; a < c.nAjustes; a++) T[c.ajustes[a].param] += animoPesos_[k] * (c.ajustes[a].valor - N[c.ajustes[a].param]);
+      for (int a = 0; a < c.nAjustes; a++) T[c.ajustes[a].param] += animoPesos_[k] * (c.ajustes[a].valor() - N[c.ajustes[a].param]);
     }
   }
 
@@ -1198,7 +1198,7 @@ void MotorVida::empezarPaso(int i, bool primera) {
   pasoDesde_ = t;
   pasoHasta_ = t + azar_.entre(p.duraMin, p.duraMax) / 1000.0f;
   pasoCara_ = p.cara >= 0 ? p.cara : config_->vida.indiceCara("neutral");
-  pasoPeso_ = p.cara >= 0 ? p.peso : 0;
+  pasoPeso_ = p.cara >= 0 ? p.peso() : 0;
   if (actual_ == -2) pasoDibujo_ = sinteticoDibujo_;
   mirada_ = p.mirada;
   parpadeoPaso_ = p.parpadeo;
@@ -1217,7 +1217,7 @@ void MotorVida::empezarPaso(int i, bool primera) {
   }
   if (p.particula >= 0) soltar(static_cast<TipoParticula>(p.particula), p.cuantas);
   if (p.sonido[0] && salidas_.sonido) salidas_.sonido(salidas_.ctx, p.sonido);
-  if (p.estadoVar >= 0) empujar(p.estadoVar, p.estadoDelta);
+  if (p.estadoVar >= 0) empujar(p.estadoVar, p.estadoDelta());
 }
 
 void MotorVida::avanzarComportamiento() {

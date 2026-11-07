@@ -57,6 +57,9 @@ typedef struct sintetica_hal {
   int (*escribir_trozo)(void* contexto, const char* clave, uint32_t desplazamiento, const uint8_t* datos, size_t n);
   int (*leer_trozo)(void* contexto, const char* clave, uint32_t desplazamiento, uint8_t* datos, size_t n);
   int (*borrar)(void* contexto, const char* clave);
+  /* Segundos desde 1970 en hora local (0 = no se sabe): la memoria del motor de vida
+   * (ausencias, días juntos, cumpleaños). NULL = solo el minuto del día. */
+  uint32_t (*epoch)(void* contexto);
 } sintetica_hal;
 
 /* Arranca el núcleo. ancho ≤ 640, alto ≤ 640. Cualquier función de la tabla puede ser NULL.

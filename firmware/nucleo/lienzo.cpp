@@ -9,7 +9,11 @@ float g_fila[MAX_ANCHO + 1];
 // Máscara para combinar los segmentos de un trazo (cobertura máxima, sin
 // dibujar dos veces las uniones). Alcanza para trazos de hasta 160 × 160 px;
 // uno más grande se dibuja segmento por segmento.
+#ifdef ARDUINO
+constexpr int LADO_MASCARA = 112;  // en la placa la RAM es poca: un trazo más grande va de a segmentos
+#else
 constexpr int LADO_MASCARA = 160;
+#endif
 uint8_t g_mascara[LADO_MASCARA * LADO_MASCARA];
 
 // Distancia con signo a un rectángulo redondeado centrado en el origen.

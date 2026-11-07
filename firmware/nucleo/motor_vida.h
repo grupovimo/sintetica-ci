@@ -200,7 +200,6 @@ class MotorVida {
   Resorte parpadeo_, aplastar_, sacX_, sacY_;
   float parpadeoObj_ = 0;
   float rigidez_ = 1;          // multiplica k (personalidad, energía, reflejos)
-  float rigidezReflejo_ = 0;
 
   // Capas.
   Config::Cara fija_, base_;

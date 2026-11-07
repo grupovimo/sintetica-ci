@@ -121,6 +121,12 @@ textarea { font-family: var(--mono); font-size: 12px; line-height: 1.5; width: 1
 kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--linea); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; }
 .dos { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  .vida { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .barras { display: grid; gap: 4px; }
+  .barra { display: grid; grid-template-columns: 7.5em 1fr 3em; align-items: center; gap: 8px; font-size: 12px; }
+  .barra i { display: block; height: 6px; border-radius: 3px; background: var(--linea, #2c2925); overflow: hidden; }
+  .barra i b { display: block; height: 100%; background: #ff6a33; }
+  @media (max-width: 640px) { .vida { grid-template-columns: 1fr; } }
 </style>
 
 <div class="marco">
@@ -176,15 +182,43 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--linea);
           <label for="r-bateria"><span class="etiqueta">Batería: <span id="v-bateria">sin batería</span></span>
             <input type="range" id="r-bateria" min="-1" max="100" value="-1">
           </label>
-          <button id="b-noche" aria-pressed="false">Es de noche</button>
+          <button id="b-noche">Ir a la noche (23:25)</button>
+          <button id="b-manana">Ir a la mañana (7:58)</button>
         </div>
       </section>
     </div>
 
     <div class="panel">
+      <section aria-labelledby="t-vida">
+        <div class="fila">
+          <h2 id="t-vida">Motor de vida</h2>
+          <span class="etiqueta" id="v-hora">—</span>
+        </div>
+        <div class="fila" role="group" aria-label="Velocidad del tiempo">
+          <button data-velocidad="1" aria-pressed="true">Tiempo real</button>
+          <button data-velocidad="60" aria-pressed="false">× 60</button>
+          <button data-velocidad="720" aria-pressed="false">Un día en 2 min</button>
+          <button id="b-depurar" aria-pressed="false">Superposición</button>
+        </div>
+        <div class="vida">
+          <div class="barras" id="barras-estado" aria-label="Estado interno"></div>
+          <div class="barras" id="barras-rasgos" aria-label="Personalidad"></div>
+        </div>
+        <p class="nota"><b id="v-comportamiento">—</b> <span id="v-candidatos"></span></p>
+        <details>
+          <summary class="etiqueta">Todos los eventos</summary>
+          <div class="caras" id="eventos"></div>
+        </details>
+        <div class="fila">
+          <label for="s-comportamiento"><span class="etiqueta">Hacer</span>
+            <select id="s-comportamiento"></select></label>
+          <button id="b-comportamiento">Ya</button>
+        </div>
+      </section>
+
       <section aria-labelledby="t-caras">
         <div class="fila" style="justify-content: space-between">
-          <h2 id="t-caras">Las 16 caras</h2>
+          <h2 id="t-caras">Las caras</h2>
           <button id="b-auto" aria-pressed="true">Automático</button>
         </div>
         <div class="caras" id="caras"></div>

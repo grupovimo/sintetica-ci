@@ -240,6 +240,7 @@ void Sistema::leerMemoria() {
 void Sistema::evento(Evento e) { motor_.evento(e, hal_.ahoraMs()); }
 
 void Sistema::hora(uint32_t epochUtc, int zonaMinutos) {
+  if (hal_.fijarHora) hal_.fijarHora(epochUtc, zonaMinutos);
   horaRef_ = static_cast<uint32_t>(static_cast<int64_t>(epochUtc) + static_cast<int64_t>(zonaMinutos) * 60);
   horaRefMs_ = hal_.ahoraMs();
 }

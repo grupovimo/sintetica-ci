@@ -49,34 +49,34 @@ test('arranca con las 16 caras y en neutral', async () => {
   assert.equal(sim.expresionVisible(), 'neutral');
   assert.equal(cuadros(), 10);
   assert.equal(sim.emparejando(), true);
-  assert.equal(sim.version(), '0.2.0');
+  assert.equal(sim.version(), '0.3.0');
 });
 
-test('M0: parpadea al azar cada 3 a 7 s', async () => {
-  const { sim, reloj, correr } = await nuevo();
-  const inicios = [];
-  let antes = false;
-  for (let i = 0; i < 3000; i++) {
-    correr(10);
-    const cerrando = sim.cierre() > 0;
-    if (cerrando && !antes) inicios.push(reloj.t);
+test('M0 (v2): parpadea de 10 a 20 veces por minuto', async () => {
+  const { sim, correr } = await nuevo();
+  let antes = false, inicios = 0;
+  for (let i = 0; i < 6000; i++) {  // 2 min
+    correr(20);
+    const cerrando = sim.cierre() > 0.5;
+    if (cerrando && !antes) inicios++;
     antes = cerrando;
   }
-  assert.ok(inicios.length >= 4, `parpadeos: ${inicios.length}`);
-  for (let i = 1; i < inicios.length; i++) {
-    const d = inicios[i] - inicios[i - 1];
-    assert.ok((d >= 3000 && d <= 7020) || d === 260, `intervalo ${d}`);
-  }
+  const porMinuto = inicios / 2;
+  assert.ok(porMinuto >= 10 && porMinuto <= 26, `parpadeos por minuto: ${porMinuto}`);
+  assert.ok(sim.vida().parpadeos >= 20);
 });
 
 test('M1: sacudirlo lo marea', async () => {
   const { sim, correr } = await nuevo();
   correr(100);
-  for (let i = 0; i < 6; i++) { sim.imu(i % 2 ? 2.5 : -2.5, 0, 1); correr(100); }
+  // Una sacudida fuerte (picos de más de 2 g): reflejo de mareo, después gruñón.
+  for (let i = 0; i < 6; i++) { sim.imu(i % 2 ? 3.5 : -3.5, 0, 1); correr(100); }
   correr(100);
   assert.equal(sim.expresionVisible(), 'mareado');
-  correr(3500);
-  assert.equal(sim.expresionVisible(), 'neutral');
+  assert.equal(sim.vida().comportamiento, 'mareo');
+  assert.ok(sim.vida().estado[6] > 0.3, 'el estrés sube');
+  correr(8000);
+  assert.notEqual(sim.expresionVisible(), 'mareado');
 });
 
 test('M2: expresión y nombre por BLE sobreviven a un reinicio', async () => {
@@ -214,6 +214,7 @@ test('M4: subir una imagen, ponerla en la lista y verla', async () => {
   assert.equal(sim.imagenVisible(), 4);
   sim.tacto(true); correr(100); sim.tacto(false); correr(300);
   assert.equal(sim.imagenVisible(), -1);
+  correr(3000);  // (al cambiar de config se mira en el espejo)
   assert.equal(sim.expresionVisible(), 'guino');
   // Una imagen de otro tamaño se rechaza.
   for (const e of escriturasDeImagen(5, codificarQoi(new Uint8Array(100 * 100 * 4), 100, 100))) sim.bleEscribir(Car.imagen, e);
@@ -257,4 +258,37 @@ test('E4: el modo editor dibuja caras y animaciones y valida', async () => {
   const a = sim.editor.indiceAnimacion('saludo');
   assert.equal(sim.editor.duracion(a), 1400);
   assert.ok(pintados(sim.editor.animacion(a, 500)) > pintados(sim.editor.animacion(a, 0)) - 1);
+});
+
+test('E5: el motor de vida, con el tiempo acelerado', async () => {
+  const { sim, correr } = await nuevo();
+  assert.ok(sim.eventos().includes('sacudida-fuerte'));
+  assert.ok(sim.parametros().length >= 40);
+  // Un día en 2 minutos: 720 veces más rápido.
+  sim.velocidad(720);
+  const h0 = sim.hora().minuto;
+  correr(1000);  // 12 min del bicho
+  assert.ok(sim.hora().minuto - h0 >= 11, `${sim.hora().minuto} ${h0}`);
+  sim.velocidad(1);
+  const v = sim.vida();
+  assert.equal(v.estado.length, 7);
+  assert.equal(v.rasgos.length, 6);
+  assert.ok(v.comportamientos >= 1);
+  assert.ok(sim.forzarComportamiento('practicar-caras'));
+  correr(50);
+  assert.equal(sim.vida().comportamiento, 'practicar-caras');
+});
+
+test('E5: el editor dibuja un rostro paramétrico', async () => {
+  const sim = await crearSimulador({ wasm });
+  sim.editor.iniciar(320, 172);
+  assert.ok(sim.editor.config({ version: 2 }).ok);
+  const i = sim.editor.indiceCara('enamorado');
+  assert.ok(i >= 0);
+  const p = sim.editor.parametrosCara(i);
+  assert.equal(p.length, sim.parametros().length);
+  const { rgba } = sim.editor.rostro(p, 0.5);
+  let naranjas = 0;
+  for (let k = 0; k < rgba.length; k += 4) if (rgba[k] > 200 && rgba[k + 1] > 80) naranjas++;
+  assert.ok(naranjas > 500, `píxeles naranjas: ${naranjas}`);
 });
