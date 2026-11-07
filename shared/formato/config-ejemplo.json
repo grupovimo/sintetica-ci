@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "nombre": "Toto",
+  "cara": { "ojos": "pastilla", "color": "#FF6A33", "tamano": 1.0 },
+  "personalidad": { "energia": 0.6, "timidez": 0.3, "sueno": "23:30-08:00" },
+  "expresiones": {
+    "contento": {
+      "formas": [
+        { "forma": "arco", "puntos": [[-0.4, 0.1125], [-0.3125, -0.175], [-0.2125, 0.1125]], "trazo": 0.1 },
+        { "forma": "arco", "puntos": [[0.2125, 0.1125], [0.3125, -0.175], [0.4, 0.1125]], "trazo": 0.1 }
+      ]
+    }
+  },
+  "reglas": [
+    { "si": "sacudida", "entonces": ["expresion:mareado", "sonido:boing"] },
+    { "si": "bateria<15", "entonces": ["expresion:bateria-baja"] }
+  ],
+  "modo": "mascota"
+}

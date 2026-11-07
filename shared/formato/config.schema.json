@@ -1,0 +1,497 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sinteticalabs.com/schema/config/v1.json",
+  "title": "Configuración de un bicho (SintéticaOS)",
+  "description": "El único documento que guarda un bicho. La app y la web lo editan y se lo mandan entero o por partes. Caras, animaciones y reglas son datos, nunca código.",
+  "type": "object",
+  "required": [
+    "version"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "nombre": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 24
+    },
+    "cara": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ojos": {
+          "type": "string",
+          "description": "Preset de ojos. Por ahora solo \"pastilla\"."
+        },
+        "color": {
+          "$ref": "#/$defs/colorHex",
+          "description": "Reemplaza al naranja de pantalla en los ojos."
+        },
+        "tamano": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 1.5
+        }
+      }
+    },
+    "personalidad": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "energia": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Cuánto se mueve: frecuencia de la mirada y de las sorpresas."
+        },
+        "timidez": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Cuánto esquiva la mirada y cuánto tarda en ponerse contento."
+        },
+        "sueno": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]-([01][0-9]|2[0-3]):[0-5][0-9]$",
+          "description": "Horario en que duerme, HH:MM-HH:MM (puede cruzar la medianoche)."
+        }
+      }
+    },
+    "expresiones": {
+      "type": "object",
+      "description": "Expresiones propias o que reemplazan a las base, por nombre.",
+      "maxProperties": 24,
+      "propertyNames": {
+        "$ref": "#/$defs/nombreExpresion"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/expresion"
+      }
+    },
+    "reglas": {
+      "type": "array",
+      "maxItems": 24,
+      "items": {
+        "type": "object",
+        "required": [
+          "si",
+          "entonces"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "si": {
+            "type": "string",
+            "description": "Un evento (tacto, doble-toque, levantado, sacudida, boca-abajo, vinculado, app-abierta, despertado) o una condición sobre una variable (bateria<15, humor>0.5).",
+            "pattern": "^([a-z-]+|(bateria|humor)[<>]-?[0-9]+(\\.[0-9]+)?)$"
+          },
+          "entonces": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+              "type": "string",
+              "pattern": "^(expresion|sonido|led):[a-z0-9#-]+$"
+            }
+          }
+        }
+      }
+    },
+    "modo": {
+      "enum": [
+        "mascota",
+        "reloj",
+        "pomodoro",
+        "clima",
+        "notificaciones"
+      ]
+    }
+  },
+  "$defs": {
+    "colorHex": {
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}$"
+    },
+    "color": {
+      "description": "Un token de la marca (tema Pantalla) o un hex.",
+      "anyOf": [
+        {
+          "enum": [
+            "naranja",
+            "naranja-profundo",
+            "pantalla",
+            "tinta",
+            "tinta-suave",
+            "linea"
+          ]
+        },
+        {
+          "$ref": "#/$defs/colorHex"
+        }
+      ]
+    },
+    "nombreExpresion": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,23}$"
+    },
+    "num": {
+      "type": "number",
+      "minimum": -2,
+      "maximum": 2
+    },
+    "medida": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2
+    },
+    "punto": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/num"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "comun": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/color"
+        },
+        "fijo": {
+          "type": "boolean",
+          "description": "No sigue la mirada, la respiración ni el parpadeo (indicadores: zZ, batería, puntos)."
+        },
+        "audio": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7,
+          "description": "Barra de audio: su alto sigue el nivel de la voz."
+        },
+        "progreso": {
+          "type": "boolean",
+          "description": "Su ancho sigue el progreso de la tarea en curso (OTA)."
+        }
+      }
+    },
+    "expresion": {
+      "type": "object",
+      "required": [
+        "formas"
+      ],
+      "properties": {
+        "nombre": {
+          "$ref": "#/$defs/nombreExpresion"
+        },
+        "numero": {
+          "type": "integer"
+        },
+        "disparador": {
+          "type": "string"
+        },
+        "parpadea": {
+          "type": "boolean",
+          "default": true
+        },
+        "formas": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "$ref": "#/$defs/forma"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "forma": {
+      "description": "Primitivas vectoriales en coordenadas normalizadas: centro de la pantalla en (0, 0), el ancho de -1 a 1, escala uniforme (1 = media pantalla de ancho).",
+      "oneOf": [
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "$ref": "#/$defs/comun"
+            }
+          ],
+          "properties": {
+            "forma": {
+              "const": "pildora"
+            },
+            "x": {
+              "$ref": "#/$defs/num"
+            },
+            "y": {
+              "$ref": "#/$defs/num"
+            },
+            "w": {
+              "$ref": "#/$defs/medida"
+            },
+            "h": {
+              "$ref": "#/$defs/medida"
+            },
+            "r": {
+              "$ref": "#/$defs/medida",
+              "description": "Radio de las esquinas. Por defecto, la mitad del lado corto."
+            },
+            "relleno": {
+              "type": "boolean",
+              "default": true
+            },
+            "trazo": {
+              "$ref": "#/$defs/medida",
+              "description": "Grosor del contorno cuando relleno es false."
+            }
+          },
+          "required": [
+            "forma",
+            "x",
+            "y",
+            "w",
+            "h"
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "$ref": "#/$defs/comun"
+            }
+          ],
+          "properties": {
+            "forma": {
+              "const": "corte"
+            },
+            "x": {
+              "$ref": "#/$defs/num"
+            },
+            "y": {
+              "$ref": "#/$defs/num"
+            },
+            "w": {
+              "$ref": "#/$defs/medida"
+            },
+            "h": {
+              "$ref": "#/$defs/medida"
+            },
+            "izq": {
+              "$ref": "#/$defs/medida",
+              "description": "Cuánto baja el borde de arriba en el lado izquierdo."
+            },
+            "der": {
+              "$ref": "#/$defs/medida",
+              "description": "Cuánto baja el borde de arriba en el lado derecho."
+            }
+          },
+          "required": [
+            "forma",
+            "x",
+            "y",
+            "w",
+            "h"
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "$ref": "#/$defs/comun"
+            }
+          ],
+          "properties": {
+            "forma": {
+              "const": "circulo"
+            },
+            "x": {
+              "$ref": "#/$defs/num"
+            },
+            "y": {
+              "$ref": "#/$defs/num"
+            },
+            "r": {
+              "$ref": "#/$defs/medida"
+            }
+          },
+          "required": [
+            "forma",
+            "x",
+            "y",
+            "r"
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "$ref": "#/$defs/comun"
+            }
+          ],
+          "properties": {
+            "forma": {
+              "const": "arco"
+            },
+            "puntos": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/punto"
+              },
+              "minItems": 3,
+              "maxItems": 3,
+              "description": "Inicio, control y fin de una curva cuadrática."
+            },
+            "trazo": {
+              "$ref": "#/$defs/medida"
+            }
+          },
+          "required": [
+            "forma",
+            "puntos",
+            "trazo"
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "$ref": "#/$defs/comun"
+            }
+          ],
+          "properties": {
+            "forma": {
+              "const": "corazon"
+            },
+            "x": {
+              "$ref": "#/$defs/num"
+            },
+            "y": {
+              "$ref": "#/$defs/num"
+            },
+            "tamano": {
+              "$ref": "#/$defs/medida"
+            }
+          },
+          "required": [
+            "forma",
+            "x",
+            "y"
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "$ref": "#/$defs/comun"
+            }
+          ],
+          "properties": {
+            "forma": {
+              "const": "espiral"
+            },
+            "x": {
+              "$ref": "#/$defs/num"
+            },
+            "y": {
+              "$ref": "#/$defs/num"
+            },
+            "r0": {
+              "$ref": "#/$defs/medida"
+            },
+            "paso": {
+              "$ref": "#/$defs/medida",
+              "description": "Cuánto crece el radio por radián."
+            },
+            "giro": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 40,
+              "description": "Ángulo total en radianes."
+            },
+            "trazo": {
+              "$ref": "#/$defs/medida"
+            }
+          },
+          "required": [
+            "forma",
+            "x",
+            "y",
+            "r0",
+            "paso",
+            "giro",
+            "trazo"
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "$ref": "#/$defs/comun"
+            }
+          ],
+          "properties": {
+            "forma": {
+              "const": "poligono"
+            },
+            "puntos": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/punto"
+              },
+              "minItems": 3,
+              "maxItems": 16
+            }
+          },
+          "required": [
+            "forma",
+            "puntos"
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "forma": {
+              "const": "franjas"
+            },
+            "bandas": {
+              "type": "array",
+              "maxItems": 6,
+              "items": {
+                "type": "object",
+                "required": [
+                  "y",
+                  "h",
+                  "dx"
+                ],
+                "properties": {
+                  "y": {
+                    "$ref": "#/$defs/num"
+                  },
+                  "h": {
+                    "$ref": "#/$defs/medida"
+                  },
+                  "dx": {
+                    "$ref": "#/$defs/num"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "forma",
+            "bandas"
+          ],
+          "description": "Corre en horizontal las franjas de lo ya dibujado (glitch). y es el borde de arriba de cada franja.",
+          "unevaluatedProperties": false
+        }
+      ]
+    }
+  }
+}

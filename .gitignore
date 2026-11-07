@@ -1,0 +1,7 @@
+node_modules/
+build/
+firmware/.pio/
+sim/dist/
+*.ppm
+.DS_Store
+__pycache__/
