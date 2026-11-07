@@ -23,8 +23,8 @@ regla de oro: caras, animaciones y reglas son **datos**, nunca código.
 | Firmware producción | ESP-IDF | OTA con rollback, secure boot y flash encryption |
 | App iOS | Swift + SwiftUI + CoreBluetooth | Nativa, nada de Expo |
 | App Android | Kotlin + Jetpack Compose | Nativa |
-| Web | Next.js + TypeScript | Editor de caras y animaciones en pantalla grande |
-| Backend | API en TypeScript + Postgres + MQTT (Mosquitto o EMQX), en el VPS | Cuentas, configuraciones, OTA firmada |
+| Web | Svelte + TypeScript | Editor de caras y animaciones en pantalla grande |
+| Backend | API en Go + Postgres + MQTT (Mosquitto o EMQX), en el VPS de Grupo Vimo | Cuentas, configuraciones, OTA firmada |
 | IA | Clave de API del usuario + servidor MCP | Nosotros no pagamos el uso |
 
 ## Perfiles de hardware
@@ -92,6 +92,12 @@ Tomadas el 7/11/2026 con Nahuel:
 - **Las 16 caras salen del manual de marca** (`expresiones-set.svg`): las
   medidas en píxeles están en `shared/formato/herramientas/generar_caras.py` y
   las referencias SVG en `shared/formato/referencia/`.
+
+### Stack de las próximas etapas (decidido el 7/11/2026)
+
+- Apps nativas: Swift + SwiftUI en iOS y Kotlin + Jetpack Compose en Android.
+- Web: el frontend en Svelte + TypeScript; el backend en Go.
+- Todo se despliega en el VPS de Grupo Vimo.
 
 ### Diferencias con el ejemplo del doc
 
