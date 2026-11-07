@@ -5,3 +5,8 @@ sim/dist/
 *.ppm
 .DS_Store
 __pycache__/
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/local.properties
