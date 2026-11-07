@@ -85,7 +85,8 @@ borra el nombre puesto por comando (gana el de la config).
 
 El bicho guarda hasta 8 imágenes (espacios 0 a 7), en
 [QOI](https://qoiformat.org) con 3 canales y **exactamente del tamaño de su
-pantalla** (lo dice el estado v3). Pesan hasta 240 KB. La app recorta la imagen
+pantalla** (lo dice el estado v3). Pesan como mucho ancho × alto × 4 + 22
+bytes, el peor caso de QOI (en el broche, 230 KB; una foto común, 80 a 130 KB). La app recorta la imagen
 a la forma de la pantalla (en el broche, redonda: lo de afuera del círculo en
 `#0B0A09`). Las imágenes se muestran desde la lista de la config
 (`"lista": ["imagen:0", …]`).

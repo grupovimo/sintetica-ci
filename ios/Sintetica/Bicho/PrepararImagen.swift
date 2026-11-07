@@ -22,9 +22,11 @@ enum PrepararImagen {
         guard let cg = imagen.cgImage else { return [] }
         let w = cg.width, h = cg.height
         var rgba = [UInt8](repeating: 0, count: w * h * 4)
-        let ctx = CGContext(data: &rgba, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
-                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
-        ctx?.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        rgba.withUnsafeMutableBytes { p in
+            let ctx = CGContext(data: p.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
+            ctx?.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        }
         var rgb = [UInt8](repeating: 0, count: w * h * 3)
         for i in 0 ..< w * h {
             rgb[i * 3] = rgba[i * 4]

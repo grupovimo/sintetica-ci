@@ -1,5 +1,7 @@
 #include "sintetica_c.h"
 
+#include <stdlib.h>
+
 #include "sistema.h"
 
 using namespace sintetica;
@@ -10,8 +12,10 @@ Sistema g_sistema;
 uint16_t g_pixeles[640 * 640];
 int g_ancho = 0, g_alto = 0;
 
-// Las imágenes de la vista previa, en memoria ("img0" a "img7").
-uint8_t g_imagenes[MAX_IMAGENES][protocolo::MAX_IMAGEN_BYTES];
+// Las imágenes de la vista previa, en memoria ("img0" a "img7"). Con malloc:
+// al doble de la pantalla una foto puede pasar el megabyte (las apps tienen lugar).
+uint8_t* g_imagenes[MAX_IMAGENES];
+uint32_t g_capacidad[MAX_IMAGENES];
 uint32_t g_largos[MAX_IMAGENES];
 
 int espacioDe(const char* clave) {
@@ -49,7 +53,14 @@ void sintetica_iniciar_perfil(const sintetica_hal* hal, int ancho, int alto, int
   };
   h.escribirTrozo = [](const char* c, uint32_t off, const uint8_t* d, size_t n) {
     const int e = espacioDe(c);
-    if (e < 0 || (off != 0 && off != g_largos[e]) || off + n > protocolo::MAX_IMAGEN_BYTES) return false;
+    if (e < 0 || (off != 0 && off != g_largos[e])) return false;
+    if (off + n > g_capacidad[e]) {
+      const uint32_t nueva = static_cast<uint32_t>(off + n) * 2 + 4096;
+      auto* p = static_cast<uint8_t*>(realloc(g_imagenes[e], nueva));
+      if (!p) return false;
+      g_imagenes[e] = p;
+      g_capacidad[e] = nueva;
+    }
     copiarBytes(g_imagenes[e] + off, d, n);
     g_largos[e] = off + static_cast<uint32_t>(n);
     return true;

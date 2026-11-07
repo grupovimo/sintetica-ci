@@ -302,7 +302,7 @@ void Sistema::bleImagen(uint8_t op, const uint8_t* d, size_t n) {
     case ImgInicio: {
       if (n != 10 || d[1] >= MAX_IMAGENES) return responder(car, op, Malformado);
       const uint32_t largo = leer32(d + 2);
-      if (largo < 22 || largo > MAX_IMAGEN_BYTES) return responder(car, op, MuyGrande);
+      if (largo < 22 || largo > limiteImagen(perfil_.ancho, perfil_.alto)) return responder(car, op, MuyGrande);
       subiendo_ = d[1];
       subidaLargo_ = largo;
       subidaCrc_ = leer32(d + 6);

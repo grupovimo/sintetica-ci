@@ -386,16 +386,16 @@ private struct SeccionImagenes: View {
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
                 ForEach(0 ..< 8, id: \.self) { i in
                     Button { elegido = i } label: {
-                        ZStack {
-                            Color.pantalla
-                            if let mini = modelo.miniaturas[i] {
-                                Image(uiImage: mini).resizable().scaledToFill()
-                            } else {
-                                Text(ocupados.contains(i) ? "\(i) ·" : "\(i)").font(Tipos.dato).foregroundStyle(Color.tintaSuave)
+                        Color.pantalla
+                            .aspectRatio(1, contentMode: .fit)
+                            .overlay {
+                                if let mini = modelo.miniaturas[i] {
+                                    Image(uiImage: mini).resizable().scaledToFill()
+                                } else {
+                                    Text(ocupados.contains(i) ? "\(i) ·" : "\(i)").font(Tipos.dato).foregroundStyle(Color.tintaSuave)
+                                }
                             }
-                        }
-                        .aspectRatio(1, contentMode: .fit)
-                        .clipShape(forma)
+                            .clipShape(forma)
                         .overlay(forma.stroke(elegido == i ? Color.naranja : Color.linea, lineWidth: elegido == i ? 3 : 1))
                     }
                     .accessibilityLabel("Espacio \(i)")

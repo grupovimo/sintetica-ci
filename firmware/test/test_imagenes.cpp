@@ -237,6 +237,15 @@ PRUEBA("imagen: errores (sin autenticar, CRC, tamaño, orden, espacio)") {
   VERIFICAR(g_notis.back()[1] == Malformado);
   escribir({ImgInicio, 1, 0, 0, 0x10, 0, 0, 0, 0, 0});  // 1 MB
   VERIFICAR(g_notis.back()[1] == MuyGrande);
+  // El límite es el peor caso de QOI para esta pantalla: 240 × 240 × 4 + 22.
+  std::vector<uint8_t> justo = {ImgInicio, 1};
+  for (uint8_t x : u32(limiteImagen(240, 240))) justo.push_back(x);
+  for (int i = 0; i < 4; i++) justo.push_back(0);
+  escribir(justo);
+  VERIFICAR(g_notis.back()[1] == Ok);
+  justo[2] += 1;
+  escribir(justo);
+  VERIFICAR(g_notis.back()[1] == MuyGrande);
   // Sin autenticar.
   Perfil p;
   p.ancho = 240, p.alto = 240, p.filasFranja = 40, p.redonda = true;

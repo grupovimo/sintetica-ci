@@ -18,8 +18,11 @@ constexpr const char* UUID_IMAGEN = "5157e71c-a000-4b1c-8a5e-000000000006";
 
 enum Caracteristica : uint8_t { CarConfig = 1, CarComando = 2, CarEstado = 3, CarOta = 4, CarImagen = 5 };
 
-// Una foto de 240 × 240 en QOI ocupa entre 80 y 130 KB; el peor caso (ruido) llega a 230 KB.
-constexpr uint32_t MAX_IMAGEN_BYTES = 240 * 1024;
+// El peor caso de QOI (3 canales, ruido) es ancho × alto × 4 + 22 bytes: el
+// límite de cada bicho depende de su pantalla (en el broche, 230 KB; una foto
+// común ocupa entre 80 y 130 KB). Este es el de la pantalla más grande en placa.
+constexpr uint32_t MAX_IMAGEN_BYTES = 320 * 240 * 4 + 22;
+inline uint32_t limiteImagen(int ancho, int alto) { return static_cast<uint32_t>(ancho) * static_cast<uint32_t>(alto) * 4u + 22u; }
 
 // Operaciones (primer byte de cada escritura).
 enum Op : uint8_t {
