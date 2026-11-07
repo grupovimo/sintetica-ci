@@ -1,0 +1,26 @@
+{
+  "name": "sintetica-web",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "license": "UNLICENSED",
+  "scripts": {
+    "preparar": "node herramientas/preparar.mjs",
+    "dev": "npm run preparar && vite dev --port 5173 --host",
+    "build": "npm run preparar && vite build",
+    "preview": "vite preview --port 5173",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-node": "5.2.12",
+    "@sveltejs/kit": "2.20.7",
+    "@sveltejs/vite-plugin-svelte": "5.0.3",
+    "@types/node": "^22.15.3",
+    "svelte": "5.28.2",
+    "svelte-check": "4.1.6",
+    "typescript": "5.8.3",
+    "vite": "6.3.3",
+    "vitest": "3.1.2"
+  }
+}

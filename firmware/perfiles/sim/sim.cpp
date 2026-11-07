@@ -150,6 +150,8 @@ __attribute__((export_name("sim_visible"))) const char* sim_visible() {
 __attribute__((export_name("sim_nube_escribir"))) void sim_nube_escribir(int car, int n) {
   if (n > 0 && n <= static_cast<int>(sizeof g_intercambio)) g_sistema.nubeEscribir(static_cast<uint8_t>(car), g_intercambio, n);
 }
+// Vista previa (la web y las apps): nunca muestra el QR y confía en quien escribe.
+__attribute__((export_name("sim_vista_previa"))) void sim_vista_previa() { g_sistema.modoVistaPrevia(); }
 __attribute__((export_name("sim_crc_config"))) uint32_t sim_crc_config() { return g_sistema.crcConfig(); }
 
 // --- Editor ---

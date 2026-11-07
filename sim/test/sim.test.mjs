@@ -237,3 +237,24 @@ test('E4: animaciones con claves desde la config de ejemplo', async () => {
   correr(1400);  // no repite: vuelve sola
   assert.notEqual(sim.expresionVisible(), 'animacion:saludo');
 });
+
+test('E4: el modo editor dibuja caras y animaciones y valida', async () => {
+  const { sim } = await nuevo();
+  assert.equal(sim.validar({ version: 1 }).ok, true);
+  const mala = sim.validar({ version: 1, lista: ['animacion:nada'] });
+  assert.equal(mala.ok, false);
+  assert.match(mala.detalle, /animación/);
+  sim.editor.iniciar(640, 344);
+  const ejemplo = fs.readFileSync(path.join(aqui, '../../shared/formato/config-ejemplo.json'), 'utf8');
+  assert.equal(sim.editor.config(ejemplo).ok, true);
+  const i = sim.editor.indiceExpresion('enamorado');
+  assert.ok(i >= 0);
+  const cuadro = sim.editor.expresion(i);
+  assert.equal(cuadro.rgba.length, 640 * 344 * 4);
+  const pintados = (c) => { let n = 0; for (let k = 0; k < c.rgba.length; k += 4) if (c.rgba[k] > 100) n++; return n; };
+  assert.ok(pintados(cuadro) > 2000);
+  assert.ok(pintados(sim.editor.expresion(i, 1)) < pintados(cuadro));  // cerrado: menos píxeles
+  const a = sim.editor.indiceAnimacion('saludo');
+  assert.equal(sim.editor.duracion(a), 1400);
+  assert.ok(pintados(sim.editor.animacion(a, 500)) > pintados(sim.editor.animacion(a, 0)) - 1);
+});

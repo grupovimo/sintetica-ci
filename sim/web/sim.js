@@ -114,6 +114,55 @@ export async function crearSimulador(opciones) {
     quiereDormir: () => x.sim_quiere_dormir() === 1,
     imagenVisible: () => x.sim_imagen_visible(),
     posicionLista: () => x.sim_posicion_lista(),
+    crcConfig: () => x.sim_crc_config() >>> 0,
+    vistaPrevia: () => x.sim_vista_previa(),
+    // Lo mismo que llega por la nube (MQTT).
+    nubeEscribir: (caracteristica, datos) => {
+      bytes(x.sim_intercambio(), datos.length).set(datos);
+      x.sim_nube_escribir(caracteristica, datos.length);
+    },
+    // ¿El bicho aceptaría esta config? { ok, codigo, detalle }
+    validar: (json) => {
+      const b = new TextEncoder().encode(typeof json === 'string' ? json : JSON.stringify(json));
+      if (b.length > x.sim_intercambio_cap()) return { ok: false, codigo: 5, detalle: 'config: más de 16 KB' };
+      bytes(x.sim_intercambio(), b.length).set(b);
+      const codigo = x.sim_validar(b.length);
+      return { ok: codigo === 0, codigo, detalle: codigo ? cadena(x.sim_detalle()) : '' };
+    },
+    // Editor: dibuja una expresión o un cuadro de una animación sin el sistema
+    // (con una config propia), al tamaño que se pida.
+    editor: (() => {
+      let ancho = 640, alto = 344;
+      const nombreAlIntercambio = (n) => {
+        const b = new TextEncoder().encode(n);
+        bytes(x.sim_intercambio(), b.length + 1).set([...b, 0]);
+      };
+      const leer = () => {
+        const px = new Uint16Array(memoria.buffer, x.sim_editor_pixeles(), ancho * alto);
+        const out = new Uint8ClampedArray(ancho * alto * 4);
+        for (let i = 0, j = 0; i < px.length; i++, j += 4) {
+          const c = px[i];
+          const r = (c >> 11) & 0x1f, g = (c >> 5) & 0x3f, b = c & 0x1f;
+          out[j] = (r << 3) | (r >> 2); out[j + 1] = (g << 2) | (g >> 4); out[j + 2] = (b << 3) | (b >> 2); out[j + 3] = 255;
+        }
+        return { rgba: out, ancho, alto };
+      };
+      return {
+        iniciar: (w, h, redonda = false) => { ancho = w; alto = h; x.sim_editor_iniciar(w, h, redonda ? 1 : 0); },
+        config: (json) => {
+          const b = new TextEncoder().encode(typeof json === 'string' ? json : JSON.stringify(json));
+          if (b.length > x.sim_intercambio_cap()) return { ok: false, codigo: 5, detalle: 'config: más de 16 KB' };
+          bytes(x.sim_intercambio(), b.length).set(b);
+          const codigo = x.sim_editor_config(b.length);
+          return { ok: codigo === 0, codigo, detalle: codigo ? cadena(x.sim_detalle()) : '' };
+        },
+        indiceExpresion: (n) => (nombreAlIntercambio(n), x.sim_editor_indice_expresion()),
+        indiceAnimacion: (n) => (nombreAlIntercambio(n), x.sim_editor_indice_animacion()),
+        duracion: (i) => x.sim_editor_duracion(i),
+        expresion: (i, cierre = 0, mx = 0, my = 0) => (x.sim_editor_expresion(i, cierre, mx, my), leer()),
+        animacion: (i, t) => (x.sim_editor_animacion(i, t), leer()),
+      };
+    })(),
     // Reiniciar es volver a llamar a crearSimulador con el mismo almacén.
   };
 }

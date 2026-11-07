@@ -100,6 +100,20 @@ services:
       - "8080:8080"
     restart: unless-stopped
 
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    image: sintetica-web
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      API_INTERNA: http://api:8080
+    ports:
+      - "5173:3000"
+    restart: unless-stopped
+
   bicho-virtual:
     build:
       context: .
