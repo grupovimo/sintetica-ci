@@ -62,6 +62,73 @@ type trabajador struct {
 	otaNuevaDesde   time.Time // cuándo volvió con la versión nueva de una OTA
 	estadoEn        time.Time // cuándo llegó el último estado
 	configRechazada uint32    // una config que el bicho rechazó: no se reintenta
+	horaEn          time.Time // cuándo se le mandó la hora (en cada conexión, y cada 6 h)
+	memoriaEn       time.Time // cuándo se le pidió la memoria (cada 5 min)
+	mudanzaEn       time.Time // cuándo se le mandó una memoria de otra placa
+}
+
+// La zona horaria de los bichos (por ahora, la de Argentina; la hora la
+// cuenta el bicho en hora local).
+var zonaBichos = func() *time.Location {
+	if l, err := time.LoadLocation("America/Argentina/Buenos_Aires"); err == nil {
+		return l
+	}
+	return time.FixedZone("ART", -3*3600)
+}()
+
+// vida: la hora, la memoria (el diario) y las mudanzas.
+func (t *trabajador) vida() {
+	if !t.puede() || time.Since(t.avisoEn) < time.Second {
+		return
+	}
+	ahora := time.Now()
+	if t.horaEn.IsZero() || ahora.Sub(t.horaEn) > 6*time.Hour {
+		_, off := ahora.In(zonaBichos).Zone()
+		if t.n.enviar(t.id, protocolo.CarComando, protocolo.Hora(uint32(ahora.Unix()), int16(off/60))) == nil {
+			t.horaEn = ahora
+		}
+	}
+	if ahora.Sub(t.mudanzaEn) > time.Minute {
+		if m, err := t.n.alm.LeerMemoria(t.n.ctx, t.id); err == nil && m.Deseada != nil {
+			if r, err := protocolo.Restaurar(m.Deseada); err == nil && t.n.enviar(t.id, protocolo.CarComando, r) == nil {
+				t.mudanzaEn = ahora
+				t.n.log.Info("mudanza: le mando la memoria", "bicho", t.id, "desde", m.DeseadaDesde)
+			}
+		}
+	}
+	if ahora.Sub(t.memoriaEn) > 5*time.Minute {
+		if t.n.enviar(t.id, protocolo.CarComando, protocolo.PedirMemoria()) == nil {
+			t.memoriaEn = ahora
+		}
+	}
+}
+
+// respuestaVida guarda la memoria que llega y confirma las mudanzas.
+func (t *trabajador) respuestaVida(d []byte) {
+	ctx := t.n.ctx
+	switch {
+	case len(d) == 2+protocolo.LargoMemoria && d[0] == protocolo.CmdMemoria|protocolo.Respuesta && d[1] == protocolo.Ok:
+		m, err := protocolo.LeerMemoria(d[2:])
+		if err != nil {
+			t.n.log.Warn("memoria inválida", "bicho", t.id, "error", err)
+			return
+		}
+		if err := t.n.alm.GuardarMemoria(ctx, t.id, d[2:]); err != nil {
+			t.n.log.Warn("no pude guardar la memoria", "bicho", t.id, "error", err)
+			return
+		}
+		t.n.publicar(t.id, eventos.Evento{Tipo: "memoria", Datos: m})
+	case len(d) >= 2 && d[0] == protocolo.CmdRestaurar|protocolo.Respuesta:
+		if d[1] != protocolo.Ok {
+			t.n.log.Warn("el bicho rechazó la mudanza", "bicho", t.id, "codigo", d[1])
+			return
+		}
+		if err := t.n.alm.MemoriaRecibida(ctx, t.id); err != nil {
+			t.n.log.Warn("mudanza", "bicho", t.id, "error", err)
+		}
+		t.memoriaEn = time.Time{} // que la pida de nuevo
+		t.n.log.Info("mudanza confirmada", "bicho", t.id)
+	}
 }
 
 func nuevoTrabajador(n *Nube, id string) *trabajador {
@@ -81,6 +148,9 @@ func (t *trabajador) correr() {
 		case <-reloj.C:
 			if vueltas++; vueltas%15 == 0 && t.estado != nil {
 				t.revisarOta(*t.estado)
+			}
+			if !t.pendiente {
+				t.vida()
 			}
 		}
 		if t.pendiente && !t.puede() && time.Now().After(t.proximoIntento) {
@@ -154,6 +224,7 @@ func (t *trabajador) manejar(e entrada) {
 			return
 		}
 		t.conectado = e.conectado
+		t.horaEn, t.memoriaEn, t.mudanzaEn = time.Time{}, time.Time{}, time.Time{} // conexión nueva: todo de nuevo
 		t.conectadoAhora.Store(e.conectado)
 		if err := t.n.alm.GuardarConexion(ctx, t.id, e.conectado); err != nil {
 			t.n.log.Warn("no pude guardar la conexión", "bicho", t.id, "error", err)
@@ -182,6 +253,9 @@ func (t *trabajador) manejar(e entrada) {
 		}
 		if e.car == protocolo.CarOta && len(e.datos) >= 2 {
 			t.progresoOta(e.datos)
+		}
+		if e.car == protocolo.CarComando && len(e.datos) >= 2 {
+			t.respuestaVida(e.datos)
 		}
 	}
 }

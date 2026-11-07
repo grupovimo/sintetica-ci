@@ -4,7 +4,8 @@ import { getContext, setContext } from 'svelte';
 import { api, ErrorApi } from './api';
 import { escuchar } from './eventos.svelte';
 import type { Bicho, Actualizacion } from './tipos';
-import type { Config } from './formato';
+import { EXPRESIONES_BASE, type Config } from './formato';
+import { Car, comando, leerVida } from '$compartido/protocolo.js';
 import { nucleoEditor } from './nucleo';
 import { foto } from './foto.svelte';
 
@@ -16,6 +17,9 @@ export class BichoAbierto {
   error = $state('');
   ota = $state<Actualizacion | null>(null);
   respuestas = $state<{ texto: string; ok: boolean; cuando: number }[]>([]);
+  // El motor de vida en vivo (respuesta al comando Vida, que se pide desde la pestaña Vida).
+  vida = $state<ReturnType<typeof leerVida> | null>(null);
+  vidaEn = $state(0);
   private dejar: (() => void) | null = null;
 
   constructor(public id: string) {}
@@ -48,6 +52,12 @@ export class BichoAbierto {
         case 'ota': this.ota = e.datos; break;
         case 'marco': {
           const b = Uint8Array.from(atob(e.datos.datos), (c) => c.charCodeAt(0));
+          if (e.datos.car === 2 && b[0] === 0x9b && b[1] === 0) {
+            try { this.vida = leerVida(b); this.vidaEn = Date.now(); } catch { /* una respuesta rara */ }
+            break;
+          }
+          // Las respuestas de Memoria y Registro no son para mostrar.
+          if (e.datos.car === 2 && (b[0] === 0x9c || b[0] === 0x9e || b[0] === 0x9a)) break;
           if (e.datos.car === 2 && b.length >= 2) {
             const ok = b[1] === 0;
             const detalle = b.length > 2 ? new TextDecoder().decode(b.subarray(2)) : '';
@@ -77,6 +87,23 @@ export class BichoAbierto {
     }
   }
 
+  // Un marco crudo del protocolo (como por BLE): la respuesta llega por los eventos.
+  async marco(car: number, datos: Uint8Array): Promise<string | null> {
+    try {
+      let s = '';
+      for (const x of datos) s += String.fromCharCode(x);
+      await api(`/v1/bichos/${this.id}/marcos`, { cuerpo: { car, datos: btoa(s) } });
+      return null;
+    } catch (e) {
+      return e instanceof ErrorApi ? e.message : 'No pude mandarlo.';
+    }
+  }
+
+  // Pide el estado del motor de vida (y prende o apaga la superposición de depuración).
+  pedirVida(superposicion?: boolean) {
+    return this.marco(Car.comando, comando.vida(superposicion));
+  }
+
   async comando(c: { expresion?: string; nombre?: string; evento?: string; reproducir?: string }): Promise<string | null> {
     try {
       await api(`/v1/bichos/${this.id}/comando`, { cuerpo: c });
@@ -86,9 +113,9 @@ export class BichoAbierto {
     }
   }
 
-  // Los nombres de las caras: las 16 base más las propias.
+  // Los nombres de las caras: las del motor de vida (paramétricas), las 16 del manual y las propias.
   get nombresCaras(): string[] {
-    return [...new Set([...BASE, ...Object.keys(this.config.expresiones ?? {})])];
+    return [...new Set([...Object.keys(EXPRESIONES_BASE), ...BASE, ...Object.keys(this.config.expresiones ?? {})])];
   }
   get nombresAnimaciones(): string[] {
     return Object.keys(this.config.animaciones ?? {});

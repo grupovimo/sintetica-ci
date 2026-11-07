@@ -48,6 +48,7 @@ enum Op : uint8_t {
   CmdMemoria = 0x1C,     // → [0x9C][0][memoria, 112 bytes] (v1.4)
   CmdRestaurar = 0x1D,   // [memoria, 112 bytes]: la mudanza (v1.4)
   CmdRegistro = 0x1E,    // → [0x9E][0][n][n × (u32 segundos, u8 tipo, u8 dato)] (v1.4)
+  CmdComportamiento = 0x1F,  // nombre de un comportamiento: lo empieza ya (para probarlo) (v1.4)
   // Imagen
   ImgInicio = 0x20,      // u8 espacio (0-7), u32 largo, u32 crc32
   ImgBloque = 0x21,      // u32 desplazamiento, datos

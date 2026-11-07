@@ -1,16 +1,88 @@
 // El formato de la config (shared/formato/config.schema.json) para los editores.
 
-export const EVENTOS = ['tacto', 'doble-toque', 'levantado', 'sacudida', 'boca-abajo', 'vinculado', 'app-abierta', 'despertado'] as const;
+import expresionesBase from '$formato/vida/expresiones.json';
+import comportamientosBase from '$formato/vida/comportamientos.json';
+import reglasBase from '$formato/vida/reglas.json';
+import personalidades from '$formato/vida/personalidades.json';
+
+// En el orden del protocolo (el índice viaja en el comando Evento).
+export const EVENTOS = [
+  'tacto', 'doble-toque', 'levantado', 'sacudida', 'boca-abajo', 'vinculado', 'app-abierta', 'despertado',
+  'caricia', 'muchos-toques', 'sacudida-suave', 'sacudida-fuerte', 'inclinado', 'caida', 'voz', 'nombre',
+  'ruido', 'musica', 'silencio', 'notificacion', 'llamada', 'bateria-baja', 'bateria-critica', 'enchufado',
+  'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito',
+] as const;
 export const NOMBRES_EVENTO: Record<string, string> = {
-  tacto: 'Lo tocan',
-  'doble-toque': 'Doble toque',
-  levantado: 'Lo levantan',
-  sacudida: 'Lo sacuden',
-  'boca-abajo': 'Boca abajo',
-  vinculado: 'Se vincula un celu',
-  'app-abierta': 'Abren la app',
-  despertado: 'Lo despiertan',
+  tacto: 'Lo tocan', 'doble-toque': 'Doble toque', levantado: 'Lo levantan', sacudida: 'Lo sacuden (cualquiera)',
+  'boca-abajo': 'Boca abajo', vinculado: 'Se vincula un celu', 'app-abierta': 'Abren la app', despertado: 'Lo despiertan',
+  caricia: 'Una caricia', 'muchos-toques': 'Muchos toques seguidos', 'sacudida-suave': 'Sacudida suave',
+  'sacudida-fuerte': 'Sacudida fuerte', inclinado: 'Lo inclinan', caida: 'Se cae', voz: 'Le hablan', nombre: 'Dicen su nombre',
+  ruido: 'Un ruido fuerte', musica: 'Música', silencio: 'Silencio largo', notificacion: 'Una notificación',
+  llamada: 'Una llamada', 'bateria-baja': 'Batería baja (20 %)', 'bateria-critica': 'Batería crítica (5 %)',
+  enchufado: 'Lo enchufan', desenchufado: 'Lo desenchufan', cargado: 'Carga completa', 'sin-wifi': 'Se queda sin WiFi',
+  'cambio-de-cara': 'Le cambian la cara', 'bicho-cerca': 'Otro bicho cerca', volvio: 'Volvés después de un rato',
+  hito: 'Un hito (días juntos, caricias, cumpleaños)',
 };
+
+// --- Motor de vida (config v2) ---
+export const RASGOS = ['energia', 'sociabilidad', 'picardia', 'timidez', 'curiosidad', 'malGenio'] as const;
+export const NOMBRES_RASGO: Record<string, [string, string, string]> = {
+  energia: ['Energía', 'Se mueve mucho, duerme poco', 'Tranquilo, siestero'],
+  sociabilidad: ['Sociabilidad', 'Busca atención, se aburre solo', 'Independiente'],
+  picardia: ['Picardía', 'Guiños, bromas, finge dormir', 'Serio'],
+  timidez: ['Timidez', 'Se asusta y se avergüenza fácil', 'Valiente'],
+  curiosidad: ['Curiosidad', 'Investiga todo', 'Se concentra'],
+  malGenio: ['Mal genio', 'Se enoja rápido, se le pasa lento', 'Paciente'],
+};
+export const ESTADO = ['energia', 'animo', 'afecto', 'aburrimiento', 'curiosidad', 'sueno', 'estres'] as const;
+export const NOMBRES_ESTADO: Record<string, string> = {
+  energia: 'Energía', animo: 'Ánimo', afecto: 'Afecto', aburrimiento: 'Aburrimiento', curiosidad: 'Curiosidad', sueno: 'Sueño', estres: 'Estrés',
+};
+export const PRESETS = personalidades as unknown as Record<string, Personalidad>;
+export const NOMBRES_PRESET: Record<string, string> = {
+  equilibrado: 'Equilibrado', timido: 'Tímido', picaro: 'Pícaro', dormilon: 'Dormilón', carinoso: 'Cariñoso',
+  curioso: 'Curioso', grunon: 'Gruñón', electrico: 'Eléctrico',
+};
+export const MOVIMIENTOS = ['ninguno', 'rebote', 'saltitos', 'risa', 'mirada-lado', 'salto', 'encogerse', 'dormir', 'temblor', 'resoplido',
+  'lagrima', 'achicarse', 'picaro', 'latido', 'bamboleo', 'escuchar', 'hablar', 'pensar', 'duda', 'acercarse', 'suspiro', 'quieto',
+  'cabeceo', 'carga', 'orbita', 'buscar', 'caer', 'glitch', 'estirarse'] as const;
+export const PARTICULAS = ['zzz', 'corazon', 'lagrima', 'gota', 'chispa', 'pregunta', 'exclamacion', 'nota', 'estrella', 'burbuja'] as const;
+export const PARPADEOS = ['normal', 'menos', 'mas', 'no', 'lento', 'rapido', 'doble'] as const;
+export const MIRADAS = ['libre', 'frente', 'arriba', 'abajo', 'izquierda', 'derecha', 'lado', 'alrededor', 'perdida', 'reojo', 'estimulo', 'rem', 'ovejas'] as const;
+// Los parámetros del ojo y los globales, con sus límites (los de la marca: config.schema.json).
+export const PARAMS_OJO: [string, number, number, string][] = [
+  ['w', 0.03, 0.2, 'Ancho'], ['h', 0.03, 0.32, 'Alto'], ['r', 0, 1, 'Redondez'], ['tilt', -0.6, 0.6, 'Inclinación'],
+  ['lt', 0, 0.5, 'Párpado de arriba'], ['lta', -0.8, 0.8, 'Su ángulo'], ['lb', 0, 0.5, 'Párpado de abajo'], ['lba', -0.8, 0.8, 'Su ángulo'],
+  ['smile', 0, 1, 'Arco feliz'], ['heart', 0, 1, 'Corazón'], ['star', 0, 1, 'Estrella'], ['cross', 0, 1, 'Cruz'],
+  ['ring', 0, 1, 'Anillo'], ['pupil', 0, 1, 'Pupila'], ['squash', 0.7, 1.3, 'Aplastado'],
+];
+export const PARAMS_CARA: [string, number, number, string][] = [
+  ['gx', -0.3, 0.3, 'Mirada →'], ['gy', -0.25, 0.25, 'Mirada ↑'], ['ey', -0.25, 0.25, 'Altura'], ['sep', 0.15, 0.45, 'Separación'],
+  ['ftilt', -0.6, 0.6, 'Inclinación'], ['fscale', 0.7, 1.3, 'Escala'], ['spin', 0, 1, 'Remolino'], ['orbit', 0, 1, 'Órbita'],
+  ['pulse', 0, 1, 'Pulso'], ['beat', 0, 1, 'Latido'], ['glitch', 0, 1, 'Glitch'], ['dim', 0, 1, 'Apagado'], ['hue', 0, 1, 'Rojo'],
+  ['mo', 0, 0.2, 'Boca abierta'], ['mw', 0.02, 0.2, 'Boca ancha'], ['mcurve', -1, 1, 'Sonrisa / puchero'], ['blush', 0, 1, 'Cachetes'],
+  ['shake', 0, 1, 'Temblor'],
+];
+
+export type Personalidad = Partial<Record<(typeof RASGOS)[number], number>> & { preset?: string; sueno?: string };
+export type OjoVida = Partial<Record<string, number>>;
+export type ExpresionVida = {
+  extiende?: string; ojo?: OjoVida; izq?: OjoVida; der?: OjoVida;
+  movimiento?: string; particula?: string; parpadeo?: string;
+  [param: string]: unknown;
+};
+export type Paso = {
+  cara?: string; dura?: number | [number, number]; veces?: number | [number, number]; mirada?: string; parpadeo?: string;
+  particula?: string; cuantas?: number; peso?: number; sonido?: string; estado?: string;
+};
+export type Comportamiento = {
+  tipo?: 'ocioso' | 'reaccion' | 'rutina'; cuando?: string; necesidad?: string; base?: number; probabilidad?: number;
+  enfriamiento?: number; interrumpible?: boolean; afinidad?: Partial<Record<string, number>>; pasos: Paso[];
+};
+export const EXPRESIONES_BASE = expresionesBase as unknown as Record<string, ExpresionVida>;
+export const COMPORTAMIENTOS_BASE = comportamientosBase as unknown as Record<string, Comportamiento>;
+export const REGLAS_BASE = reglasBase as unknown as Regla[];
+export const esDibujo = (e: Expresion | ExpresionVida): e is Expresion => Array.isArray((e as Expresion).formas);
 export const MODOS = ['mascota', 'reloj', 'pomodoro', 'clima', 'notificaciones'] as const;
 export const CURVAS = ['suave', 'lineal', 'entrada', 'salida', 'rebote', 'paso'] as const;
 export const NOMBRES_CURVA: Record<string, string> = {
@@ -37,13 +109,19 @@ export type Expresion = { parpadea?: boolean; formas: Forma[] };
 export type Clave = { t: number; x?: number; y?: number; escala?: number; rotacion?: number; opacidad?: number; color?: string; curva?: string };
 export type Pista = { forma: Forma; centro?: Punto; claves: Clave[] };
 export type Animacion = { duracion: number; repetir?: boolean; sobre?: string; pistas: Pista[] };
-export type Regla = { si: string; entonces: string[] };
+export type Regla = { si: string; y?: string; entonces: string[] };
 export type Config = {
-  version: 1;
+  version: 1 | 2;
   nombre?: string;
+  semilla?: number;
   cara?: { color?: string; tamano?: number; ojos?: string };
-  personalidad?: { energia?: number; timidez?: number; sueno?: string };
-  expresiones?: Record<string, Expresion>;
+  personalidad?: Personalidad;
+  horario?: { despierta?: string; duerme?: string };
+  dueno?: { nombre?: string; cumple?: string };
+  cumple?: string;
+  limites_marca?: { color?: string; brillo_max?: number };
+  expresiones?: Record<string, Expresion | ExpresionVida>;
+  comportamientos?: Record<string, Comportamiento>;
   animaciones?: Record<string, Animacion>;
   reglas?: Regla[];
   modo?: string;
@@ -66,7 +144,7 @@ export const nombreValido = (n: string) => /^[a-z][a-z0-9-]{0,23}$/.test(n);
 
 // Una config "vacía" pero completa: lo que muestran los editores si el bicho no tiene nada.
 export function configBase(): Config {
-  return { version: 1 };
+  return { version: 2 };
 }
 
 // Copia profunda (los documentos son JSON; sirve también con los proxies de $state).

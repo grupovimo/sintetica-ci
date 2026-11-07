@@ -9,6 +9,7 @@ COPY firmware/nucleo firmware/nucleo
 COPY firmware/perfiles/sim firmware/perfiles/sim
 COPY firmware/herramientas/fuentes firmware/herramientas/fuentes
 COPY sim sim
+COPY shared/formato shared/formato
 COPY web web
 RUN cd web && npm run build
 

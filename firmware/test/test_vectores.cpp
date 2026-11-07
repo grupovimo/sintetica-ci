@@ -1,5 +1,6 @@
 // Los vectores compartidos (shared/protocolo/vectores.json) contra el núcleo:
 // lo que codifican la app y el simulador es lo que entiende el bicho.
+#include <cstring>
 #include <fstream>
 #include <map>
 #include <sstream>
@@ -9,6 +10,7 @@
 #include "../api/sintetica_c.h"
 #include "json.h"
 #include "lienzo.h"
+#include "motor_vida.h"
 #include "protocolo.h"
 #include "prueba.h"
 
@@ -234,4 +236,23 @@ PRUEBA("api C: vista previa al doble, sin QR") {
   sintetica_pixeles_rgba(rgba.data());
   VERIFICAR(rgba[(172 * 640 + 220) * 4] == 0xFF && rgba[3] == 255);
   VERIFICAR(sintetica_cantidad_expresiones() == 16);
+}
+
+PRUEBA("vectores: la memoria del motor de vida se decodifica igual") {
+  VERIFICAR(cargar());
+  const int m = g_j.buscar(0, "memoria");
+  auto b = deHex(texto(g_j.buscar(m, "hex")));
+  Memoria mem;
+  VERIFICAR(b.size() == LARGO_MEMORIA && decodificarMemoria(b.data(), b.size(), &mem));
+  const int c = g_j.buscar(m, "campos");
+  VERIFICAR(mem.dias == g_j.numero(g_j.buscar(c, "dias"), -1));
+  VERIFICAR(mem.caricias == g_j.numero(g_j.buscar(c, "caricias"), -1));
+  VERIFICAR(mem.toques == g_j.numero(g_j.buscar(c, "toques"), -1));
+  VERIFICAR(mem.hitos == g_j.numero(g_j.buscar(c, "hitos"), -1));
+  VERIFICAR(mem.horas[9] == g_j.numero(g_j.buscar(c, "hora9"), -1));
+  VERIFICAR(mem.estado[2] == g_j.numero(g_j.buscar(c, "afecto"), -1));
+  // Y vuelve a dar los mismos bytes.
+  uint8_t otra[LARGO_MEMORIA];
+  codificarMemoria(mem, otra, sizeof otra);
+  VERIFICAR(std::memcmp(otra, b.data(), LARGO_MEMORIA) == 0);
 }

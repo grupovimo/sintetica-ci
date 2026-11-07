@@ -1243,6 +1243,15 @@ void Sistema::procesar(uint8_t car, const uint8_t* d, size_t n) {
       }
       case CmdRegistro:
         return enviarRegistro();
+      case CmdComportamiento: {
+        char nombre[LARGO_VIDA];
+        if (n < 2 || n - 1 >= LARGO_VIDA) return responder(car, op, Malformado);
+        copiarTexto(nombre, sizeof nombre, reinterpret_cast<const char*>(d + 1), n - 1);
+        const int i = config_.vida.indiceComportamiento(nombre);
+        if (i < 0) return responder(car, op, NoExiste);
+        if (motor_.dormido()) motor_.despertar(ahora, true);
+        return responder(car, op, motor_.comportamiento(i, ahora) ? Ok : Ocupado);
+      }
       case CmdReproducir: {
         if (n == 1) {
           reproducir(-1, false);

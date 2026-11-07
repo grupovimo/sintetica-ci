@@ -23,37 +23,43 @@ const (
 
 // Operaciones.
 const (
-	ConfigInicio   = 0x01
-	ConfigBloque   = 0x02
-	ConfigFin      = 0x03
-	ConfigPedir    = 0x04
-	CmdExpresion   = 0x10
-	CmdNombre      = 0x11
-	CmdEvento      = 0x12
-	CmdVincular    = 0x13
-	CmdAutenticar  = 0x14
-	CmdDesvincular = 0x15
-	CmdRed         = 0x16
-	CmdNube        = 0x17
-	CmdOlvidarRed  = 0x18
-	CmdReproducir  = 0x19
-	ImgInicio      = 0x20
-	ImgBloque      = 0x21
-	ImgFin         = 0x22
-	ImgBorrar      = 0x23
-	ImgListar      = 0x24
-	ImgPedir       = 0x25
-	OtaInicio      = 0x30
-	OtaBloque      = 0x31
-	OtaFin         = 0x32
-	OtaDescargar   = 0x33
-	OtaProgreso    = 0x34
-	OtaCancelar    = 0x35
-	Respuesta      = 0x80
-	ConfigTrozo    = 0x84
-	ConfigCierre   = 0x85
-	ImgTrozo       = 0xA7
-	ImgCierre      = 0xA8
+	ConfigInicio      = 0x01
+	ConfigBloque      = 0x02
+	ConfigFin         = 0x03
+	ConfigPedir       = 0x04
+	CmdExpresion      = 0x10
+	CmdNombre         = 0x11
+	CmdEvento         = 0x12
+	CmdVincular       = 0x13
+	CmdAutenticar     = 0x14
+	CmdDesvincular    = 0x15
+	CmdRed            = 0x16
+	CmdNube           = 0x17
+	CmdOlvidarRed     = 0x18
+	CmdReproducir     = 0x19
+	CmdHora           = 0x1A // v1.4: la hora
+	CmdVida           = 0x1B // v1.4: el estado del motor de vida
+	CmdMemoria        = 0x1C // v1.4: pedir la memoria
+	CmdRestaurar      = 0x1D // v1.4: restaurarla (mudanza)
+	CmdRegistro       = 0x1E // v1.4: el registro de eventos
+	CmdComportamiento = 0x1F // v1.4: empezar un comportamiento (para probarlo)
+	ImgInicio         = 0x20
+	ImgBloque         = 0x21
+	ImgFin            = 0x22
+	ImgBorrar         = 0x23
+	ImgListar         = 0x24
+	ImgPedir          = 0x25
+	OtaInicio         = 0x30
+	OtaBloque         = 0x31
+	OtaFin            = 0x32
+	OtaDescargar      = 0x33
+	OtaProgreso       = 0x34
+	OtaCancelar       = 0x35
+	Respuesta         = 0x80
+	ConfigTrozo       = 0x84
+	ConfigCierre      = 0x85
+	ImgTrozo          = 0xA7
+	ImgCierre         = 0xA8
 )
 
 // Códigos de respuesta.
@@ -95,7 +101,20 @@ func Mensaje(codigo int) string {
 }
 
 // Eventos, en el orden del protocolo.
-var Eventos = []string{"tacto", "doble-toque", "levantado", "sacudida", "boca-abajo", "vinculado", "app-abierta", "despertado"}
+// Los primeros 8 son de la v1; el resto, del motor de vida (v1.4).
+var Eventos = []string{
+	"tacto", "doble-toque", "levantado", "sacudida", "boca-abajo", "vinculado", "app-abierta", "despertado",
+	"caricia", "muchos-toques", "sacudida-suave", "sacudida-fuerte", "inclinado", "caida", "voz", "nombre",
+	"ruido", "musica", "silencio", "notificacion", "llamada", "bateria-baja", "bateria-critica", "enchufado",
+	"desenchufado", "cargado", "sin-wifi", "cambio-de-cara", "bicho-cerca", "volvio", "hito",
+}
+
+// VariablesEstado y Rasgos: el estado interno y la personalidad, en el orden del protocolo.
+var VariablesEstado = []string{"energia", "animo", "afecto", "aburrimiento", "curiosidad", "sueno", "estres"}
+var Rasgos = []string{"energia", "sociabilidad", "picardia", "timidez", "curiosidad", "malGenio"}
+
+// LargoMemoria es el largo de la memoria del motor de vida (con su CRC).
+const LargoMemoria = 112
 
 // Modos, en el orden del protocolo.
 var Modos = []string{"mascota", "reloj", "pomodoro", "clima", "notificaciones"}
@@ -113,14 +132,175 @@ func corto(s string, max int) ([]byte, error) {
 }
 
 // Comandos.
-func Expresion(nombre string) []byte  { return append([]byte{CmdExpresion}, nombre...) }
-func Nombre(nombre string) []byte     { return append([]byte{CmdNombre}, nombre...) }
-func Reproducir(nombre string) []byte { return append([]byte{CmdReproducir}, nombre...) }
-func Vincular(codigo string) []byte   { return append([]byte{CmdVincular}, codigo...) }
-func Autenticar(clave []byte) []byte  { return append([]byte{CmdAutenticar}, clave...) }
-func Desvincular() []byte             { return []byte{CmdDesvincular} }
-func OlvidarRed() []byte              { return []byte{CmdOlvidarRed} }
-func PedirConfig() []byte             { return []byte{ConfigPedir} }
+func Expresion(nombre string) []byte      { return append([]byte{CmdExpresion}, nombre...) }
+func Nombre(nombre string) []byte         { return append([]byte{CmdNombre}, nombre...) }
+func Reproducir(nombre string) []byte     { return append([]byte{CmdReproducir}, nombre...) }
+func Vincular(codigo string) []byte       { return append([]byte{CmdVincular}, codigo...) }
+func Autenticar(clave []byte) []byte      { return append([]byte{CmdAutenticar}, clave...) }
+func Desvincular() []byte                 { return []byte{CmdDesvincular} }
+func OlvidarRed() []byte                  { return []byte{CmdOlvidarRed} }
+func PedirConfig() []byte                 { return []byte{ConfigPedir} }
+func PedirMemoria() []byte                { return []byte{CmdMemoria} }
+func PedirRegistro() []byte               { return []byte{CmdRegistro} }
+func Comportamiento(nombre string) []byte { return append([]byte{CmdComportamiento}, nombre...) }
+
+// Hora arma el comando Hora: epoch UTC y la zona en minutos (Argentina: -180).
+func Hora(epochUtc uint32, zonaMinutos int16) []byte {
+	b := append([]byte{CmdHora}, u32(epochUtc)...)
+	return binary.LittleEndian.AppendUint16(b, uint16(zonaMinutos))
+}
+
+// Vida pide el estado del motor de vida; con superposicion != nil la prende o la apaga.
+func Vida(superposicion *bool) []byte {
+	if superposicion == nil {
+		return []byte{CmdVida}
+	}
+	if *superposicion {
+		return []byte{CmdVida, 1}
+	}
+	return []byte{CmdVida, 0}
+}
+
+// Restaurar manda una memoria (la mudanza de una placa a otra).
+func Restaurar(memoria []byte) ([]byte, error) {
+	if _, err := LeerMemoria(memoria); err != nil {
+		return nil, err
+	}
+	return append([]byte{CmdRestaurar}, memoria...), nil
+}
+
+// Memoria es lo que el bicho recuerda (el diario de la app y la web).
+type Memoria struct {
+	Nacimiento        uint32             `json:"nacimiento"`
+	UltimaInteraccion uint32             `json:"ultimaInteraccion"`
+	RencorHasta       uint32             `json:"rencorHasta"`
+	UltimoDia         uint32             `json:"ultimoDia"`
+	Dias              uint16             `json:"dias"`
+	Racha             uint16             `json:"racha"`
+	RachaMax          uint16             `json:"rachaMax"`
+	Caricias          uint32             `json:"caricias"`
+	Toques            uint32             `json:"toques"`
+	Sacudidas         uint32             `json:"sacudidas"`
+	Horas             []int              `json:"horas"`
+	Gustos            map[string]int     `json:"gustos"`
+	Hitos             []string           `json:"hitos"`
+	AnioCumpleBicho   uint16             `json:"anioCumpleBicho"`
+	AnioCumpleDueno   uint16             `json:"anioCumpleDueno"`
+	Deriva            map[string]float64 `json:"deriva"`
+	Estado            map[string]float64 `json:"estado"`
+	EpochEstado       uint32             `json:"epochEstado"`
+	AusenciaMaxima    uint16             `json:"ausenciaMaxima"`
+	AfectoHoy         uint8              `json:"afectoHoy"`
+}
+
+// Los gustos y los hitos, en el orden del núcleo (motor_vida.cpp).
+var Gustos = []string{"caricia", "tacto", "voz", "musica", "nombre", "levantado", "sacudida-suave", "app-abierta"}
+var Hitos = []string{"primer-dia", "siete-dias", "treinta-dias", "cien-caricias", "cien-dias", "mil-caricias"}
+
+// LeerMemoria decodifica los 112 bytes de la memoria (y verifica su CRC).
+func LeerMemoria(m []byte) (*Memoria, error) {
+	if len(m) != LargoMemoria || m[0] != 1 {
+		return nil, fmt.Errorf("memoria inválida")
+	}
+	if binary.LittleEndian.Uint32(m[LargoMemoria-4:]) != Crc32(m[:LargoMemoria-4]) {
+		return nil, fmt.Errorf("memoria con otro CRC")
+	}
+	le := binary.LittleEndian
+	r := &Memoria{
+		Nacimiento: le.Uint32(m[1:]), UltimaInteraccion: le.Uint32(m[5:]), RencorHasta: le.Uint32(m[9:]), UltimoDia: le.Uint32(m[13:]),
+		Dias: le.Uint16(m[17:]), Racha: le.Uint16(m[19:]), RachaMax: le.Uint16(m[21:]),
+		Caricias: le.Uint32(m[23:]), Toques: le.Uint32(m[27:]), Sacudidas: le.Uint32(m[31:]),
+		Gustos: map[string]int{}, Deriva: map[string]float64{}, Estado: map[string]float64{}, Hitos: []string{},
+		AnioCumpleBicho: le.Uint16(m[69:]), AnioCumpleDueno: le.Uint16(m[71:]),
+		EpochEstado: le.Uint32(m[86:]), AusenciaMaxima: le.Uint16(m[90:]), AfectoHoy: m[92],
+	}
+	for h := 0; h < 24; h++ {
+		r.Horas = append(r.Horas, int(m[35+h]))
+	}
+	for k, g := range Gustos {
+		r.Gustos[g] = int(int8(m[59+k]))
+	}
+	bits := le.Uint16(m[67:])
+	for k, h := range Hitos {
+		if bits&(1<<k) != 0 {
+			r.Hitos = append(r.Hitos, h)
+		}
+	}
+	for k, n := range Rasgos {
+		r.Deriva[n] = float64(int8(m[73+k])) / 100
+	}
+	for k, n := range VariablesEstado {
+		r.Estado[n] = float64(m[79+k]) / 255
+	}
+	return r, nil
+}
+
+// EstadoVida es la respuesta al comando Vida.
+type EstadoVida struct {
+	Estado         map[string]float64 `json:"estado"`
+	Rasgos         map[string]float64 `json:"rasgos"`
+	Dormido        bool               `json:"dormido"`
+	Sonando        bool               `json:"sonando"`
+	Superposicion  bool               `json:"superposicion"`
+	Comportamiento string             `json:"comportamiento"`
+	Visible        string             `json:"visible"`
+	Candidatos     []Candidato        `json:"candidatos"`
+	Fps            int                `json:"fps"`
+}
+
+type Candidato struct {
+	Nombre  string  `json:"nombre"`
+	Puntaje float64 `json:"puntaje"`
+}
+
+// LeerVida decodifica [0x9B][0][7 estado][6 rasgos][flags][n][comportamiento][n][visible][n]{[n][nombre][puntaje]}[fps].
+func LeerVida(b []byte) (*EstadoVida, error) {
+	if len(b) < 2+7+6+1+3 || b[0] != CmdVida|Respuesta || b[1] != Ok {
+		return nil, fmt.Errorf("no es una respuesta de Vida")
+	}
+	v := &EstadoVida{Estado: map[string]float64{}, Rasgos: map[string]float64{}, Candidatos: []Candidato{}}
+	i := 2
+	for _, n := range VariablesEstado {
+		v.Estado[n] = float64(b[i]) / 255
+		i++
+	}
+	for _, n := range Rasgos {
+		v.Rasgos[n] = float64(b[i]) / 255
+		i++
+	}
+	f := b[i]
+	i++
+	v.Dormido, v.Sonando, v.Superposicion = f&1 != 0, f&2 != 0, f&4 != 0
+	campo := func() (string, bool) {
+		if i >= len(b) || i+1+int(b[i]) > len(b) {
+			return "", false
+		}
+		s := string(b[i+1 : i+1+int(b[i])])
+		i += 1 + int(b[i])
+		return s, true
+	}
+	var ok bool
+	if v.Comportamiento, ok = campo(); !ok {
+		return nil, fmt.Errorf("vida: corta")
+	}
+	if v.Visible, ok = campo(); !ok || i >= len(b) {
+		return nil, fmt.Errorf("vida: corta")
+	}
+	n := int(b[i])
+	i++
+	for k := 0; k < n; k++ {
+		nombre, ok := campo()
+		if !ok || i >= len(b) {
+			return nil, fmt.Errorf("vida: corta")
+		}
+		v.Candidatos = append(v.Candidatos, Candidato{nombre, float64(b[i]) / 100})
+		i++
+	}
+	if i < len(b) {
+		v.Fps = int(b[i])
+	}
+	return v, nil
+}
 
 // Evento arma el comando de un evento por nombre.
 func Evento(nombre string) ([]byte, error) {

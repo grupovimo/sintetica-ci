@@ -18,7 +18,7 @@ export const Op = {
   cmdExpresion: 0x10, cmdNombre: 0x11, cmdEvento: 0x12,
   cmdVincular: 0x13, cmdAutenticar: 0x14, cmdDesvincular: 0x15,
   cmdRed: 0x16, cmdNube: 0x17, cmdOlvidarRed: 0x18, cmdReproducir: 0x19,
-  cmdHora: 0x1a, cmdVida: 0x1b, cmdMemoria: 0x1c, cmdRestaurar: 0x1d, cmdRegistro: 0x1e,
+  cmdHora: 0x1a, cmdVida: 0x1b, cmdMemoria: 0x1c, cmdRestaurar: 0x1d, cmdRegistro: 0x1e, cmdComportamiento: 0x1f,
   imgInicio: 0x20, imgBloque: 0x21, imgFin: 0x22, imgBorrar: 0x23, imgListar: 0x24, imgPedir: 0x25,
   otaInicio: 0x30, otaBloque: 0x31, otaFin: 0x32, otaDescargar: 0x33, otaProgreso: 0x34, otaCancelar: 0x35,
   respuesta: 0x80, configTrozo: 0x84, configCierre: 0x85, imgTrozo: 0xa7, imgCierre: 0xa8,
@@ -107,6 +107,8 @@ export const comando = {
   memoria: () => Uint8Array.from([Op.cmdMemoria]),
   restaurar: (memoria) => Uint8Array.from([Op.cmdRestaurar, ...memoria]),
   registro: () => Uint8Array.from([Op.cmdRegistro]),
+  // Empieza un comportamiento ya (para probarlo).
+  comportamiento: (nombre) => Uint8Array.from([Op.cmdComportamiento, ...texto.encode(nombre)]),
   evento: (nombreOIndice) => {
     const i = typeof nombreOIndice === 'number' ? nombreOIndice : Eventos.indexOf(nombreOIndice);
     if (i < 0) throw new Error(`evento desconocido: ${nombreOIndice}`);
@@ -329,4 +331,23 @@ export function leerRegistro(b) {
     const i = 3 + k * 6;
     return { segundos: leerU32(b, i), tipo: tipos[b[i + 4]] ?? String(b[i + 4]), dato: b[i + 5] };
   });
+}
+
+// La memoria al revés (para los tests y las herramientas; el bicho la arma solo).
+export function codificarMemoria(m) {
+  const b = new Uint8Array(LARGO_MEMORIA);
+  const v = new DataView(b.buffer);
+  b[0] = 1;
+  v.setUint32(1, m.nacimiento ?? 0, true); v.setUint32(5, m.ultimaInteraccion ?? 0, true);
+  v.setUint32(9, m.rencorHasta ?? 0, true); v.setUint32(13, m.ultimoDia ?? 0, true);
+  v.setUint16(17, m.dias ?? 0, true); v.setUint16(19, m.racha ?? 0, true); v.setUint16(21, m.rachaMax ?? 0, true);
+  v.setUint32(23, m.caricias ?? 0, true); v.setUint32(27, m.toques ?? 0, true); v.setUint32(31, m.sacudidas ?? 0, true);
+  (m.horas ?? []).forEach((h, k) => { b[35 + k] = h; });
+  ['caricia', 'tacto', 'voz', 'musica', 'nombre', 'levantado', 'sacudida-suave', 'app-abierta'].forEach((g, k) => v.setInt8(59 + k, m.gustos?.[g] ?? 0));
+  v.setUint16(67, m.hitos ?? 0, true); v.setUint16(69, m.anioCumpleBicho ?? 0, true); v.setUint16(71, m.anioCumpleDueno ?? 0, true);
+  Rasgos.forEach((r, k) => v.setInt8(73 + k, Math.round((m.deriva?.[r] ?? 0) * 100)));
+  VariablesEstado.forEach((e, k) => { b[79 + k] = Math.round((m.estado?.[e] ?? 0) * 255); });
+  v.setUint32(86, m.epochEstado ?? 0, true); v.setUint16(90, m.ausenciaMaxima ?? 0, true); b[92] = m.afectoHoy ?? 0;
+  v.setUint32(LARGO_MEMORIA - 4, crc32(b.subarray(0, LARGO_MEMORIA - 4)), true);
+  return b;
 }

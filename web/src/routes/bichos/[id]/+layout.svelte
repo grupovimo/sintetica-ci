@@ -16,8 +16,11 @@
   const base = $derived(`/bichos/${b.id}`);
   const pestanas = [
     { ruta: '', nombre: 'Resumen' },
+    { ruta: '/vida', nombre: 'Vida' },
     { ruta: '/config', nombre: 'Config' },
-    { ruta: '/caras', nombre: 'Caras' },
+    { ruta: '/expresiones', nombre: 'Expresiones' },
+    { ruta: '/comportamientos', nombre: 'Comportamientos' },
+    { ruta: '/caras', nombre: 'Dibujos' },
     { ruta: '/animaciones', nombre: 'Animaciones' },
     { ruta: '/reglas', nombre: 'Reglas' },
     { ruta: '/imagenes', nombre: 'Imágenes' },

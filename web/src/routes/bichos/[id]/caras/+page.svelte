@@ -4,7 +4,7 @@
   import { api, ErrorApi } from '$lib/api';
   import { BASE, usarBicho } from '$lib/bicho.svelte';
   import { formatoBase } from '$lib/base';
-  import { clonar, nombreValido, type Config, type Expresion } from '$lib/formato';
+  import { clonar, esDibujo, nombreValido, type Config, type Expresion } from '$lib/formato';
   import type { Pieza } from '$lib/tipos';
   import EditorCara from '$lib/componentes/EditorCara.svelte';
   import Miniatura from '$lib/componentes/Miniatura.svelte';
@@ -23,7 +23,9 @@
     biblioteca = (await api<{ piezas: Pieza[] }>('/v1/biblioteca?tipo=cara')).piezas;
   });
 
-  const propias = $derived(b.config.expresiones ?? {});
+  // Solo los dibujos (expresiones con formas); las paramétricas van en Expresiones.
+  const propias = $derived(Object.fromEntries(Object.entries(b.config.expresiones ?? {}).filter(([, e]) => esDibujo(e))) as Record<string, Expresion>);
+  const nombresDibujos = $derived([...new Set([...BASE, ...Object.keys(propias)])]);
   const docDe = (n: string): Expresion | null => propias[n] ?? base[n] ?? null;
 
   function editar(n: string) {
@@ -32,7 +34,7 @@
   }
   function nueva(desde?: Expresion) {
     let n = 'mi-cara', k = 2;
-    while (b.nombresCaras.includes(n)) n = `mi-cara-${k++}`;
+    while (b.nombresCaras.includes(n) || nombresDibujos.includes(n)) n = `mi-cara-${k++}`;
     editando = { nombre: n, expresion: clonar(desde ?? base['neutral'] ?? { formas: [{ forma: 'pildora', x: -0.3125, y: 0, w: 0.15, h: 0.4 }] }), nueva: true };
   }
 
@@ -94,11 +96,11 @@
   <div class="grilla">
     <div class="fila" style="justify-content: space-between">
       <p class="nota" style="margin: 0">Las 16 del manual y las propias. Tocá una para editarla.</p>
-      <button class="primario" onclick={() => nueva()} disabled={b.nombresCaras.length >= 24}>Cara nueva</button>
+      <button class="primario" onclick={() => nueva()} disabled={Object.keys(propias).length >= 24}>Cara nueva</button>
     </div>
     {#if aviso}<p class="aviso-caja ok">{aviso}</p>{/if}
     <div class="caras">
-      {#each b.nombresCaras as n}
+      {#each nombresDibujos as n}
         {@const doc = docDe(n)}
         <div class="cara tarjeta">
           <button class="mini" onclick={() => editar(n)} aria-label="Editar {n}">

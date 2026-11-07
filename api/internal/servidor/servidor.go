@@ -93,6 +93,8 @@ func (s *Servidor) Rutas() http.Handler {
 	m.HandleFunc("GET /v1/bichos/{id}/eventos", s.conBicho(s.eventosBicho))
 	m.HandleFunc("POST /v1/bichos/{id}/actualizar", s.conBicho(s.actualizar))
 	m.HandleFunc("GET /v1/bichos/{id}/actualizaciones", s.conBicho(s.listarActualizaciones))
+	m.HandleFunc("GET /v1/bichos/{id}/memoria", s.conBicho(s.verMemoria))
+	m.HandleFunc("POST /v1/bichos/{id}/mudar", s.conBicho(s.mudar))
 
 	m.HandleFunc("GET /v1/biblioteca", s.conSesion(s.listarBiblioteca))
 	m.HandleFunc("POST /v1/biblioteca", s.conSesion(s.guardarPieza))

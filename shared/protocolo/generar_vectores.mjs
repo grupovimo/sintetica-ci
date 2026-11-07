@@ -1,5 +1,5 @@
 // Genera shared/protocolo/vectores.json: los bytes de cada operación del
-// protocolo v1.3. Los arma el codificador de referencia en JS
+// protocolo v1.4. Los arma el codificador de referencia en JS
 // (sim/web/protocolo.js); el núcleo C++ los reproduce en sus tests
 // (firmware/test/test_vectores.cpp) y las apps de Kotlin y Swift los usan para
 // comprobar sus propios codificadores. Así las cuatro implementaciones no se
@@ -12,13 +12,23 @@ import { fileURLToPath } from 'node:url';
 
 import crypto from 'node:crypto';
 
-import { comando, crc32, escriturasDeConfig, escriturasDeImagen, imagen, manifiestoOta, mensajeOta, ota, pedirConfig } from '../../sim/web/protocolo.js';
+import { codificarMemoria, comando, crc32, escriturasDeConfig, escriturasDeImagen, imagen, manifiestoOta, mensajeOta, ota, pedirConfig } from '../../sim/web/protocolo.js';
 import { codificarQoi } from '../../sim/web/qoi.js';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
 const hex = (b) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join(' ');
 const utf8 = (s) => new TextEncoder().encode(s);
 const clave = Uint8Array.from({ length: 16 }, (_, i) => i * 17);
+
+// Una memoria de ejemplo (la del comando Restaurar y la de "memoria" abajo).
+const MEMORIA_PRUEBA = {
+  nacimiento: 1790000000, ultimaInteraccion: 1793000000, rencorHasta: 0, ultimoDia: 20752, dias: 42, racha: 5, rachaMax: 9,
+  caricias: 321, toques: 1234, sacudidas: 7, horas: Array.from({ length: 24 }, (_, h) => (h === 9 ? 30 : h === 21 ? 12 : 0)),
+  gustos: { caricia: 40, tacto: 10, voz: 0, musica: -3, nombre: 5, levantado: 0, 'sacudida-suave': 2, 'app-abierta': 1 },
+  hitos: 0x0b, anioCumpleBicho: 2026, anioCumpleDueno: 0, deriva: { sociabilidad: 0.04, malGenio: -0.02 },
+  estado: { energia: 0.6, animo: 0.7, afecto: 0.55, aburrimiento: 0.1, curiosidad: 0.5, sueno: 0.2, estres: 0 },
+  epochEstado: 1793000000, ausenciaMaxima: 30, afectoHoy: 6,
+};
 
 const ejemplo = JSON.stringify(JSON.parse(fs.readFileSync(path.join(aqui, '../formato/config-ejemplo.json'), 'utf8')));
 
@@ -75,7 +85,7 @@ const desdeHex = (h) => Uint8Array.from(h.split(' ').map((x) => parseInt(x, 16))
 const manifiestoPrueba = { tamano: binarioPrueba.length, sha256: shaPrueba, firma: desdeHex(firmaPrueba.firma), version: '0.2.1', perfil: 'dev-147b' };
 
 const vectores = {
-  version: '1.3',
+  version: '1.4',
   nota: 'Generado por shared/protocolo/generar_vectores.mjs. No editar a mano. Bytes en hex separados por espacios.',
   comandos: [
     { nombre: 'expresion enamorado', hex: hex(comando.expresion('enamorado')) },
@@ -96,6 +106,16 @@ const vectores = {
     { nombre: 'olvidar red', hex: hex(comando.olvidarRed()) },
     { nombre: 'reproducir saludo', hex: hex(comando.reproducir('saludo')) },
     { nombre: 'reproducir parar', hex: hex(comando.reproducir('')) },
+    // v1.4: el motor de vida.
+    { nombre: 'evento sacudida-fuerte', hex: hex(comando.evento('sacudida-fuerte')) },
+    { nombre: 'evento caricia', hex: hex(comando.evento('caricia')) },
+    { nombre: 'hora', epoch: 1793000000, zona: -180, hex: hex(comando.hora(1793000000, -180)) },
+    { nombre: 'vida', hex: hex(comando.vida()) },
+    { nombre: 'vida superposicion', hex: hex(comando.vida(true)) },
+    { nombre: 'memoria', hex: hex(comando.memoria()) },
+    { nombre: 'registro', hex: hex(comando.registro()) },
+    { nombre: 'comportamiento practicar-caras', hex: hex(comando.comportamiento('practicar-caras')) },
+    { nombre: 'restaurar', hex: hex(comando.restaurar(codificarMemoria(MEMORIA_PRUEBA))) },
     { nombre: 'ota cancelar', hex: hex(ota.cancelar()) },
   ],
   ota: {
@@ -132,6 +152,8 @@ const vectores = {
     tamanoBloque: 64,
     escrituras: escriturasDeConfig(ejemplo, 64).map(hex),
   },
+  // La memoria del motor de vida (112 bytes con CRC) y lo que dice.
+  memoria: { hex: hex(codificarMemoria(MEMORIA_PRUEBA)), campos: { dias: 42, caricias: 321, toques: 1234, racha: 5, hitos: 11, hora9: 30, afecto: 140 } },
   estados: [
     {
       campos: { bateria: null, humor: 0.2, modo: 'mascota', dormido: false, fija: false, emparejando: true, autenticado: false, wifi: false, nube: false, redConfigurada: false, actualizando: false, expresion: 'neutral', nombre: 'bicho', serie: '', id: 'A1B2C3D4E5F6', ancho: 320, alto: 172, redonda: false, version: '0.2.0', perfil: 'dev-147b', crcConfig: 0, encendido: 5 },

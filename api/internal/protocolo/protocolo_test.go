@@ -17,7 +17,11 @@ import (
 
 type vectores struct {
 	Comandos []map[string]any `json:"comandos"`
-	Config   struct {
+	Memoria  struct {
+		Hex    string         `json:"hex"`
+		Campos map[string]int `json:"campos"`
+	} `json:"memoria"`
+	Config struct {
 		JSON         string   `json:"json"`
 		TamanoBloque int      `json:"tamanoBloque"`
 		Escrituras   []string `json:"escrituras"`
@@ -84,7 +88,13 @@ func TestComandos(t *testing.T) {
 		"imagen listar": ListarImagenes(), "imagen pedir 5": PedirImagen(5), "red": red, "red abierta": abierta,
 		"nube": nube, "olvidar red": OlvidarRed(), "reproducir saludo": Reproducir("saludo"), "reproducir parar": Reproducir(""),
 		"ota cancelar": {OtaCancelar},
+		"hora":         Hora(1793000000, -180), "vida": Vida(nil), "memoria": PedirMemoria(), "registro": PedirRegistro(),
 	}
+	si := true
+	casos["vida superposicion"] = Vida(&si)
+	casos["comportamiento practicar-caras"] = Comportamiento("practicar-caras")
+	fuerte, _ := Evento("sacudida-fuerte")
+	casos["evento sacudida-fuerte"] = fuerte
 	for n, b := range casos {
 		if hx(b) != s(n, "hex") {
 			t.Errorf("%s: %s, esperaba %s", n, hx(b), s(n, "hex"))
@@ -182,5 +192,54 @@ func TestQrYArmador(t *testing.T) {
 	got, err := a.Cerrar(uint32(len(texto)), Crc32(texto))
 	if err != nil || string(got) != string(texto) {
 		t.Fatalf("armador: %v", err)
+	}
+}
+
+func TestMemoria(t *testing.T) {
+	v := cargar(t)
+	b := dehex(v.Memoria.Hex)
+	m, err := LeerMemoria(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := v.Memoria.Campos
+	if int(m.Dias) != c["dias"] || int(m.Caricias) != c["caricias"] || int(m.Toques) != c["toques"] || m.Horas[9] != c["hora9"] {
+		t.Errorf("memoria: %+v", m)
+	}
+	if len(m.Hitos) != 3 || m.Hitos[0] != "primer-dia" || m.Hitos[2] != "cien-caricias" {
+		t.Errorf("hitos: %v", m.Hitos)
+	}
+	r, err := Restaurar(b)
+	if err != nil || hx(r) != porNombre(v, "restaurar") {
+		t.Errorf("restaurar: %v", err)
+	}
+	b[10] ^= 1
+	if _, err := LeerMemoria(b); err == nil {
+		t.Error("tendría que rechazar el CRC")
+	}
+}
+
+func porNombre(v vectores, n string) string {
+	for _, c := range v.Comandos {
+		if c["nombre"] == n {
+			return c["hex"].(string)
+		}
+	}
+	return ""
+}
+
+func TestVida(t *testing.T) {
+	b := []byte{CmdVida | Respuesta, Ok, 255, 128, 0, 10, 20, 30, 40, 1, 2, 3, 4, 5, 6, 3,
+		5, 'h', 'i', 'p', 'o', 'x', 7, 'n', 'e', 'u', 't', 'r', 'a', 'l', 1, 2, 'a', 'b', 150, 30}
+	v, err := LeerVida(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Estado["energia"] != 1 || !v.Dormido || !v.Sonando || v.Comportamiento != "hipox" || v.Visible != "neutral" ||
+		len(v.Candidatos) != 1 || v.Candidatos[0].Puntaje != 1.5 || v.Fps != 30 {
+		t.Errorf("vida: %+v", v)
+	}
+	if _, err := LeerVida(b[:12]); err == nil {
+		t.Error("tendría que rechazar una corta")
 	}
 }

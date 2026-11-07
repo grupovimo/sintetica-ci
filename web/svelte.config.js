@@ -13,6 +13,8 @@ export default {
       // El protocolo y QOI de referencia: los mismos archivos que usan el
       // simulador y los tests (sim/web).
       $compartido: '../sim/web',
+      // Los datos base del motor de vida (expresiones, comportamientos, reglas, personalidades).
+      $formato: '../shared/formato',
     },
   },
 };

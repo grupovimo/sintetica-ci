@@ -20,7 +20,7 @@ func abrirPrueba(t *testing.T) *Almacen {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, tabla := range []string{"actualizaciones", "firmwares", "biblioteca", "sincro", "imagenes", "configs", "credenciales", "bichos", "sesiones", "enlaces", "usuarios"} {
+	for _, tabla := range []string{"memorias", "actualizaciones", "firmwares", "biblioteca", "sincro", "imagenes", "configs", "credenciales", "bichos", "sesiones", "enlaces", "usuarios"} {
 		if _, err := a.db.Exec(ctx, "delete from "+tabla); err != nil {
 			t.Fatal(err)
 		}
@@ -153,5 +153,38 @@ func TestConfigsYSincro(t *testing.T) {
 	s, _ = a.LeerSincro(ctx, id)
 	if s.ConfigCrc == nil || *s.ConfigCrc != 22 || len(s.Imagenes) != 1 || s.Imagenes[5] != 88 {
 		t.Fatalf("sincro: %+v", s)
+	}
+}
+
+func TestMemoriaYMudanza(t *testing.T) {
+	a := abrirPrueba(t)
+	ctx := context.Background()
+	for _, id := range []string{"AAAAAAAAAAAA", "BBBBBBBBBBBB"} {
+		if err := a.AsegurarBicho(ctx, id, "virtual", true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := a.LeerMemoria(ctx, "AAAAAAAAAAAA"); err != ErrNoEncontrado {
+		t.Fatalf("sin memoria: %v", err)
+	}
+	if err := a.Mudar(ctx, "AAAAAAAAAAAA", "BBBBBBBBBBBB"); err != ErrNoEncontrado {
+		t.Fatalf("mudar sin memoria: %v", err)
+	}
+	if err := a.GuardarMemoria(ctx, "AAAAAAAAAAAA", []byte{1, 2, 3}); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.Mudar(ctx, "AAAAAAAAAAAA", "BBBBBBBBBBBB"); err != nil {
+		t.Fatal(err)
+	}
+	m, err := a.LeerMemoria(ctx, "BBBBBBBBBBBB")
+	if err != nil || len(m.Deseada) != 3 || m.DeseadaDesde != "AAAAAAAAAAAA" || m.Datos != nil {
+		t.Fatalf("pendiente: %+v %v", m, err)
+	}
+	if err := a.MemoriaRecibida(ctx, "BBBBBBBBBBBB"); err != nil {
+		t.Fatal(err)
+	}
+	m, _ = a.LeerMemoria(ctx, "BBBBBBBBBBBB")
+	if len(m.Datos) != 3 || m.Deseada != nil || m.Actualizada == nil {
+		t.Fatalf("recibida: %+v", m)
 	}
 }

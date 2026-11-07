@@ -86,7 +86,8 @@ func (r *Relevo) Relevar(ctx context.Context, usuarioID, autor, conexion, bichoI
 		case protocolo.CmdVincular, protocolo.CmdRed, protocolo.CmdNube:
 			return []Marco{resp(car, op, protocolo.NoAutorizado, "eso solo se hace por BLE, cerca del bicho")}, nil
 		case protocolo.CmdExpresion, protocolo.CmdNombre, protocolo.CmdEvento, protocolo.CmdDesvincular,
-			protocolo.CmdOlvidarRed, protocolo.CmdReproducir:
+			protocolo.CmdOlvidarRed, protocolo.CmdReproducir, protocolo.CmdHora, protocolo.CmdVida,
+			protocolo.CmdMemoria, protocolo.CmdRestaurar, protocolo.CmdRegistro, protocolo.CmdComportamiento:
 			if err := r.n.Enviar(bichoID, car, m); err != nil {
 				return []Marco{resp(car, op, protocolo.SinRed, err.Error())}, nil
 			}

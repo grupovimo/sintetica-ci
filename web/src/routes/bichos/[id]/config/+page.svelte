@@ -1,6 +1,6 @@
 <script lang="ts">
   import { usarBicho } from '$lib/bicho.svelte';
-  import { clonar, MODOS, type Config } from '$lib/formato';
+  import { clonar, MODOS, NOMBRES_PRESET, NOMBRES_RASGO, PRESETS, RASGOS, type Config } from '$lib/formato';
   import { nucleoEditor } from '$lib/nucleo';
   import Pantalla from '$lib/componentes/Pantalla.svelte';
   import { pantallaDe } from '$lib/tipos';
@@ -24,12 +24,21 @@
   });
   const sucio = $derived(JSON.stringify(c) !== JSON.stringify(b.config));
 
-  let sueno = $state({ activo: !!b.config.personalidad?.sueno, desde: b.config.personalidad?.sueno?.slice(0, 5) ?? '23:30', hasta: b.config.personalidad?.sueno?.slice(6) ?? '08:00' });
-  function ponerSueno() {
-    const p = { ...c.personalidad };
-    if (sueno.activo) p.sueno = `${sueno.desde}-${sueno.hasta}`;
-    else delete p.sueno;
-    c.personalidad = p;
+  // Horario (v2). Una config v1 con "sueno" (HH:MM-HH:MM, cuándo duerme) se pasa al horario.
+  const sueno0 = b.config.personalidad?.sueno;
+  let horario = $state({
+    despierta: b.config.horario?.despierta ?? (sueno0 ? sueno0.slice(6) : '08:00'),
+    duerme: b.config.horario?.duerme ?? (sueno0 ? sueno0.slice(0, 5) : '23:30'),
+  });
+  function ponerHorario() {
+    c.horario = { despierta: horario.despierta, duerme: horario.duerme };
+    if (c.personalidad?.sueno) { const { sueno: _, ...resto } = c.personalidad; c.personalidad = resto; }
+  }
+  const rasgo = (r: string) => (c.personalidad?.[r as keyof typeof PRESETS.equilibrado] as number | undefined) ??
+    (PRESETS[c.personalidad?.preset ?? 'equilibrado']?.[r as keyof typeof PRESETS.equilibrado] as number) ?? 0.5;
+  function ponerPreset(p: string) {
+    // Un preset pone los seis rasgos (después se pueden ajustar uno por uno).
+    c.personalidad = { ...(p ? { preset: p } : {}), ...(PRESETS[p] ?? {}) };
   }
 
   const opcionesLista = $derived([
@@ -52,6 +61,10 @@
     error = ok = '';
     const limpia = clonar($state.snapshot(c)) as Config;
     if (limpia.lista && limpia.lista.length === 0) delete limpia.lista;
+    // La web guarda siempre en v2 (el motor de vida); la v1 se sigue leyendo.
+    limpia.version = 2;
+    if (limpia.dueno && !limpia.dueno.nombre && !limpia.dueno.cumple) delete limpia.dueno;
+    if (limpia.dueno) for (const k of ['nombre', 'cumple'] as const) if (!limpia.dueno[k]) delete limpia.dueno[k];
     const e = await b.guardar(limpia);
     guardando = false;
     if (e) error = e;
@@ -112,22 +125,39 @@
 
     <section class="tarjeta grilla">
       <h2>Personalidad</h2>
-      <div class="campos">
-        <label><span class="etiqueta">Energía · {(c.personalidad?.energia ?? 0.5).toFixed(2)}</span>
-          <input type="range" min="0" max="1" step="0.05" value={c.personalidad?.energia ?? 0.5} oninput={(e) => (c.personalidad = { ...c.personalidad, energia: +e.currentTarget.value })} />
-          <span class="nota">Cuánto mira a los costados y cada cuánto sorprende.</span>
-        </label>
-        <label><span class="etiqueta">Timidez · {(c.personalidad?.timidez ?? 0.3).toFixed(2)}</span>
-          <input type="range" min="0" max="1" step="0.05" value={c.personalidad?.timidez ?? 0.3} oninput={(e) => (c.personalidad = { ...c.personalidad, timidez: +e.currentTarget.value })} />
-        </label>
+      <p class="nota">Cambia qué le da ganas de hacer, qué tan rápido se mueve y cómo reacciona. Con el tiempo, el trato lo cambia un poco (hasta un 10 %).</p>
+      <div class="presets" role="group" aria-label="Presets">
+        {#each Object.keys(PRESETS) as p}
+          <button class="chico" aria-pressed={c.personalidad?.preset === p} onclick={() => ponerPreset(p)}>{NOMBRES_PRESET[p] ?? p}</button>
+        {/each}
       </div>
-      <label class="fila"><input type="checkbox" bind:checked={sueno.activo} onchange={ponerSueno} /> <span>Duerme de noche</span></label>
-      {#if sueno.activo}
-        <div class="campos">
-          <label><span class="etiqueta">Desde</span><input type="time" bind:value={sueno.desde} onchange={ponerSueno} /></label>
-          <label><span class="etiqueta">Hasta</span><input type="time" bind:value={sueno.hasta} onchange={ponerSueno} /></label>
-        </div>
-      {/if}
+      <div class="campos">
+        {#each RASGOS as r}
+          <label><span class="etiqueta">{NOMBRES_RASGO[r][0]} · {rasgo(r).toFixed(2)}</span>
+            <input type="range" min="0" max="1" step="0.05" value={rasgo(r)}
+              oninput={(e) => (c.personalidad = { ...c.personalidad, [r]: +e.currentTarget.value })} />
+            <span class="nota">Alto: {NOMBRES_RASGO[r][1].toLowerCase()}. Bajo: {NOMBRES_RASGO[r][2].toLowerCase()}.</span>
+          </label>
+        {/each}
+      </div>
+    </section>
+
+    <section class="tarjeta grilla">
+      <h2>Su día</h2>
+      <p class="nota">Vive en tu horario: fuera de él, cuenta ovejas y duerme (y sueña). A la mañana se despierta solo.</p>
+      <div class="campos">
+        <label><span class="etiqueta">Se despierta</span><input type="time" bind:value={horario.despierta} onchange={ponerHorario} /></label>
+        <label><span class="etiqueta">Se duerme</span><input type="time" bind:value={horario.duerme} onchange={ponerHorario} /></label>
+        <label><span class="etiqueta">Tu nombre</span><input maxlength="24" value={c.dueno?.nombre ?? ''} placeholder="(opcional)"
+          oninput={(e) => (c.dueno = { ...c.dueno, nombre: e.currentTarget.value || undefined })} /></label>
+        <label><span class="etiqueta">Tu cumpleaños (MM-DD)</span><input maxlength="5" pattern="[0-1][0-9]-[0-3][0-9]" value={c.dueno?.cumple ?? ''} placeholder="03-14"
+          oninput={(e) => (c.dueno = { ...c.dueno, cumple: e.currentTarget.value || undefined })} /></label>
+        <label><span class="etiqueta">El cumpleaños del bicho (MM-DD)</span><input maxlength="5" value={c.cumple ?? ''} placeholder="11-07"
+          oninput={(e) => (c.cumple = e.currentTarget.value || undefined)} /></label>
+        <label><span class="etiqueta">Brillo máximo · {Math.round((c.limites_marca?.brillo_max ?? 1) * 100)} %</span>
+          <input type="range" min="0.2" max="1" step="0.05" value={c.limites_marca?.brillo_max ?? 1}
+            oninput={(e) => (c.limites_marca = { ...c.limites_marca, brillo_max: +e.currentTarget.value })} /></label>
+      </div>
     </section>
 
     <section class="tarjeta grilla">
@@ -194,4 +224,5 @@
   .dialogo { max-width: 760px; width: 100%; max-height: 92vh; overflow: auto; }
   textarea { font-size: 13px; min-height: 420px; }
   @media (max-width: 960px) { .dos { grid-template-columns: 1fr; } .lateral { position: static; } }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
 </style>
