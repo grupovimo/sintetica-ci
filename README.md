@@ -3,7 +3,12 @@
 El sistema de los bichos de Sintética Labs: la capa que hace que la cara nunca
 sea una imagen estática y que cada dueño edite de punta a punta.
 
-Hasta ahora (hitos M0 a M6 de `docs/especificacion.md`): el formato compartido
+**El motor de vida v2** ([docs/motor-de-vida.md](docs/motor-de-vida.md)): una
+sola cara viva, por parámetros y resortes (el "Motor de caras v0" portado al
+núcleo), con estado interno, personalidad, comportamientos, ritmo diario,
+sueños y memoria de la relación.
+
+Hasta ahora (hitos M0 a M6 de `docs/especificacion.md`, más el motor de vida): el formato compartido
 de caras, animaciones y reglas; el núcleo del firmware con WiFi, MQTT y OTA
 firmada; un simulador que corre el mismo núcleo en el navegador; las apps
 nativas; el broche; y la nube: una API en Go con cuentas por link mágico,
@@ -13,8 +18,8 @@ EMQX, Postgres, la web con los editores y bichos virtuales, todo en Docker.
 
 | | |
 | --- | --- |
-| `shared/formato/` | JSON Schema de la configuración, las 16 caras base y las referencias del manual |
-| `firmware/nucleo/` | El núcleo en C++17 autocontenido: render, motor de vida, gestos, reglas, protocolo BLE |
+| `shared/formato/` | JSON Schema de la configuración (v2), las 16 caras base (dibujos), las referencias del manual y, en `vida/`, las expresiones, comportamientos, reglas y personalidades del motor de vida |
+| `firmware/nucleo/` | El núcleo en C++17 autocontenido: el rostro paramétrico (`rostro.*`), el motor de vida (`motor_vida.*`), los dibujos (`cara.*`), gestos, reglas, protocolo |
 | `firmware/perfiles/dev-147b/` | El perfil para la Waveshare ESP32-S3-LCD-1.47B (PlatformIO + LovyanGFX + NimBLE) |
 | `firmware/perfiles/broche-c3/` | El broche: ESP32-C3 SuperMini + GC9A01 redonda; ver su README |
 | `firmware/perfiles/comun/` | Lo que comparten las placas ESP32 (BLE, almacenamiento, taller) |
@@ -29,7 +34,7 @@ EMQX, Postgres, la web con los editores y bichos virtuales, todo en Docker.
 | `ios/` | App de iOS (SwiftUI + CoreBluetooth); ver `ios/README.md` |
 | `firmware/test/` | Tests en la PC y tests de oro contra el manual de marca |
 | `sim/` | La página del simulador y su test de punta a punta |
-| `docs/` | La especificación, el protocolo, la nube y cómo levantarlo en local |
+| `docs/` | La especificación, el motor de vida, el protocolo, la nube y cómo levantarlo en local; `docs/referencia/`, el motor de caras v0; `docs/empresa/`, papeles |
 
 ## Requisitos
 

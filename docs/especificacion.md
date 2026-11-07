@@ -63,6 +63,7 @@ el tiempo (posición, escala, giro, color y opacidad) y una curva por tramo.
 | M4 | Broche: perfil `broche-c3`, pulsador y sueño profundo | Un toque cambia la animación, mantenerlo lo duerme, otro toque lo despierta; dormido gasta menos de 0,3 mA | Listo en el simulador y compila; falta armarlo y medir el consumo dormido |
 | M5 | Backend en el VPS: cuentas, configuraciones, MQTT y OTA firmada | Un bicho con WiFi recibe un cambio hecho desde otro celu y se actualiza solo | Listo en local con Docker y probado de punta a punta con el bicho virtual; falta la placa con WiFi y subirlo al VPS |
 | M6 | Web: editor de caras, animaciones y reglas | Una cara creada en la web se ve igual en la app y en el bicho | Listo en local (el mismo núcleo en WebAssembly dibuja la web, las apps y el bicho); falta probarlo con la placa |
+| V2 | Motor de vida v2 (pestaña "Motor de vida" del doc; [motor-de-vida.md](motor-de-vida.md)) | Una sola cara viva por parámetros y resortes, con estado interno, personalidad, comportamientos, ritmo diario y memoria; los criterios de aceptación de la spec | Listo en el núcleo con los criterios en tests (24 h simuladas), en el simulador, la API (memoria, mudanza, hora), la web (Vida, Expresiones, Comportamientos) y las apps (personalidad y horario); compila para las dos placas; falta medir fps y batería en la placa |
 | M7 | Cubito: voz, IA con clave propia y servidor MCP | Le hablás, responde con voz y cara; el Claude del usuario le cambia la cara por MCP | — |
 | M8 | Producción: paso a ESP-IDF, secure boot, flash encryption, rollback | Una OTA fallida vuelve sola a la versión anterior | — |
 
@@ -155,6 +156,27 @@ se sube nada al VPS (ver [local.md](local.md) y [nube.md](nube.md)).
   caras y animaciones por cuenta. Dibuja con el mismo núcleo en WebAssembly.
 - **Las apps** entran a la cuenta, suman bichos, les pasan el WiFi, instalan
   firmware por BLE y manejan por la nube los bichos que están lejos.
+
+### Decisiones de la etapa 5 (motor de vida v2, 7/11/2026)
+
+- La cara del bicho pasa a ser **paramétrica** (el "Motor de caras v0" portado a
+  la CPU, `nucleo/rostro.cpp`) y la mueven resortes. Las caras de formas (v1)
+  siguen como **dibujos**: las del manual quedan para los tests de oro y como
+  base de los dibujos propios; un dibujo propio del usuario se muestra encima
+  del rostro con fundido. Las 16 del manual existen también como expresiones
+  paramétricas con el mismo nombre (y 21 más).
+- Config **v2** (la v1 sigue valiendo). Los datos base del motor (expresiones,
+  comportamientos, reglas y personalidades) son JSON en `shared/formato/vida/`,
+  embebidos y parseados uno por uno al arrancar.
+- El motor no duerme a los 10 min sin interacción (eso era del manual v1): vive
+  el horario del dueño (por defecto 8:00 a 23:30), con siestas, sueños y un
+  despertar; sin hora, duerme cuando tiene mucho sueño.
+- Protocolo **v1.4**: eventos nuevos (8 a 30) y los comandos Hora, Vida,
+  Memoria, Restaurar, Registro y Comportamiento.
+- La memoria del bicho viaja a la cuenta (la API la pide cada 5 min) y se muda
+  de placa con `POST /v1/bichos/{id}/mudar`.
+- RAM: en la 1.47B el `Sistema` va en la PSRAM; en el broche se compactaron los
+  datos. Las referencias a "16 caras" del manual siguen valiendo para los dibujos.
 
 ### Diferencias con el ejemplo del doc
 

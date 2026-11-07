@@ -98,7 +98,24 @@ núcleo), no se reintenta hasta que cambie.
   desde la base; los comandos van al bicho y su respuesta llega por los eventos.
 - **Eventos en vivo** (SSE): `GET /v1/eventos` (todos los bichos de la cuenta) o
   `GET /v1/bichos/{id}/eventos`: `estado` (con los bytes crudos en `crudo`),
-  `conexion`, `sincro`, `config`, `imagenes`, `ota`, `marco` y `bicho`.
+  `conexion`, `sincro`, `config`, `imagenes`, `ota`, `marco`, `memoria` y `bicho`.
+
+## El motor de vida (v1.4)
+
+- **La hora**: a cada bicho que se conecta (y cada 6 h) la API le manda el
+  comando Hora (UTC y la zona de Argentina). Las apps hacen lo mismo por BLE.
+- **La memoria** (lo que el bicho recuerda: días juntos, caricias, hitos, a qué
+  hora aparecés): la API se la pide cada 5 minutos mientras está conectado y la
+  guarda (`memorias`, migración `002_memoria.sql`).
+  `GET /v1/bichos/{id}/memoria` la devuelve decodificada (el diario de la web).
+- **La mudanza** (cambio de placa): `POST /v1/bichos/{id}/mudar {desde}` copia
+  la memoria y la config de otro bicho de la cuenta a este; la memoria queda
+  pendiente (`deseada`) hasta que el bicho la confirma con el comando
+  Restaurar. Si el bicho pasa a otra cuenta, su memoria guardada en la API se
+  borra con el resto de sus datos (la del bicho, no: es suya).
+- El relevo de marcos deja pasar Hora, Vida, Memoria, Restaurar, Registro y
+  Comportamiento, así la web y las apps lejos del bicho los usan igual que por
+  BLE (la respuesta llega por los eventos).
 
 ## OTA
 

@@ -53,7 +53,15 @@ compilar.
    la firma, reinicia y queda confirmado a los 30 s. Un archivo que empieza con
    `FALLAR` simula un firmware roto: el bicho vuelve solo a la versión anterior.
 
-Hay una prueba automática que hace todo eso:
+7. **El motor de vida**: en el bicho, la pestaña **Vida** muestra lo que siente
+   y lo que está haciendo (en vivo), deja mandarle eventos (una caricia, una
+   sacudida fuerte…) y prender la superposición de depuración en su pantalla;
+   abajo, su diario (lo trae cada 5 min). **Config** tiene la personalidad
+   (presets y seis rasgos) y su horario; **Expresiones** y **Comportamientos**,
+   los editores (con vista previa y "probar en el bicho"). Para verlo vivir
+   rápido, el simulador (`npm run sim`) tiene "un día en 2 minutos".
+
+Hay una prueba automática que hace todo eso (y la memoria y la mudanza):
 
 ```sh
 ADMIN_EMAILS=@ejemplo.com docker compose up -d --build

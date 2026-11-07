@@ -1,4 +1,4 @@
-# Protocolo de SintéticaOS (v1.3)
+# Protocolo de SintéticaOS (v1.4)
 
 Un servicio GATT propio. Todos los enteros van en little-endian. La
 implementación de referencia es `firmware/nucleo/protocolo.*` y
@@ -126,9 +126,52 @@ veces más rápido.
 | `0x17` Nube | `[n][url][n][usuario][n][clave]` (url `mqtt://` o `mqtts://`, hasta 160 bytes) | Las credenciales MQTT que da la API al sumar el bicho a una cuenta. Solo por BLE (v1.3). |
 | `0x18` Olvidar red | — | Olvida el WiFi y la nube (v1.3). |
 | `0x19` Reproducir | nombre de una animación (vacío = parar) | La reproduce; si la animación tiene `"repetir": true`, hasta que la paren (v1.3). |
+| `0x1A` Hora | `[u32 epoch UTC][i16 zona en minutos]` (Argentina: −180) | La hora, para el ritmo diario y la memoria. Las apps la mandan al conectarse (el broche no tiene WiFi) y la API a cada bicho que se conecta y cada 6 h. El ESP32 la guarda en su reloj, que sigue andando en sueño profundo (v1.4). |
+| `0x1B` Vida | — o `[u8 superposición]` | Responde el estado del motor de vida (abajo); con `1`/`0` prende o apaga la superposición de depuración en la pantalla (v1.4). |
+| `0x1C` Memoria | — | Responde `[0x9C][0x00][memoria, 112 bytes]` (v1.4). |
+| `0x1D` Restaurar | memoria (112 bytes, con su CRC) | La reemplaza: la mudanza a otra placa (v1.4). |
+| `0x1E` Registro | — | Responde `[0x9E][0x00][n][n × (u32 segundos desde que arrancó, u8 tipo, u8 dato)]`: tipo 0 evento, 1 comportamiento, 2 dormir (1) / despertar (0), 3 hito (v1.4). |
+| `0x1F` Comportamiento | nombre | Empieza ese comportamiento ya (para probarlo desde un editor). `0x07` si no existe (v1.4). |
 
-Eventos: `0` tacto, `1` doble toque, `2` levantado, `3` sacudida, `4` boca abajo,
-`5` vinculado, `6` app abierta, `7` despertado.
+Eventos (el índice del comando `0x12`; los nombres son los de las reglas):
+
+| | | | |
+| --- | --- | --- | --- |
+| `0` tacto | `1` doble-toque | `2` levantado | `3` sacudida |
+| `4` boca-abajo | `5` vinculado | `6` app-abierta | `7` despertado |
+| `8` caricia | `9` muchos-toques | `10` sacudida-suave | `11` sacudida-fuerte |
+| `12` inclinado | `13` caida | `14` voz | `15` nombre |
+| `16` ruido | `17` musica | `18` silencio | `19` notificacion |
+| `20` llamada | `21` bateria-baja | `22` bateria-critica | `23` enchufado |
+| `24` desenchufado | `25` cargado | `26` sin-wifi | `27` cambio-de-cara |
+| `28` bicho-cerca | `29` volvio | `30` hito | |
+
+Los 8 primeros son de la v1; del 8 en adelante, del motor de vida (v1.4).
+`volvio` y `hito` los genera el motor (mandarlos sirve para probar).
+
+### Vida (v1.4)
+
+`[0x9B][0x00][7 × estado][6 × rasgos][flags][n][comportamiento][n][se ve][n candidatos]{[n][nombre][puntaje × 100]}[fps]`
+
+- Estado (0–255 = 0–1): energía, ánimo, afecto, aburrimiento, curiosidad, sueño, estrés.
+- Rasgos (0–255, con la deriva): energía, sociabilidad, picardía, timidez, curiosidad, mal genio.
+- Flags: bit 0 dormido, 1 soñando, 2 superposición prendida.
+- Candidatos: los tres mejores del último sorteo del selector.
+
+### Memoria (v1.4)
+
+112 bytes, little-endian: `[versión = 1]`, u32 nacimiento (epoch local),
+u32 última interacción, u32 rencor hasta, u32 último día (epoch/86400),
+u16 días juntos, u16 racha, u16 racha máxima, u32 caricias, u32 toques,
+u32 sacudidas, 24 × u8 a qué hora aparece el dueño, 8 × i8 gustos (caricia,
+tacto, voz, música, nombre, levantado, sacudida suave, app abierta), u16 hitos
+(bits: primer día, 7 días, 30 días, 100 caricias, 100 días, 1000 caricias),
+u16 año del último cumpleaños del bicho festejado, u16 ídem del dueño,
+6 × i8 deriva de los rasgos (centésimos), 7 × u8 estado, u32 epoch del estado,
+u16 ausencia máxima (horas), u8 afecto ganado hoy, ceros hasta el byte 108 y el
+CRC-32 de los primeros 108 en los últimos 4. Implementaciones:
+`codificarMemoria`/`decodificarMemoria` (C++), `leerMemoria`/`codificarMemoria`
+(JS), `protocolo.LeerMemoria` (Go).
 
 ## Estado
 
