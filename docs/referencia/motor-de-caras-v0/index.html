@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Motor de caras · Sintética Labs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,900&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{--papel:#FBFAF7;--tinta:#141210;--naranja:#F5501A;--prof:#B83C0C;--pant:#0B0A09}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--papel);color:var(--tinta);font-family:'JetBrains Mono',ui-monospace,monospace;-webkit-tap-highlight-color:transparent}
+  body{min-height:100vh;display:grid;grid-template-rows:auto 1fr auto;gap:20px;padding:20px 20px 28px;
+    background-image:radial-gradient(#14121012 1px,transparent 1.2px);background-size:6px 6px}
+  header{display:flex;justify-content:space-between;align-items:baseline}
+  .marca{font:900 20px/1 'Archivo',sans-serif;font-stretch:125%;letter-spacing:-.02em}
+  .marca b{color:var(--naranja)}
+  .tag{font-size:11px;opacity:.6}
+  main{display:grid;place-items:center}
+  .bicho{position:relative;width:min(78vw,56vh,520px);aspect-ratio:1;border-radius:22%;background:var(--naranja);
+    box-shadow:inset 0 -14px 0 var(--prof),inset 0 10px 18px #ffffff55,0 30px 60px -20px #B83C0C88;padding:7%;transition:transform .2s}
+  .bicho:active{transform:scale(.985)}
+  .pantalla{position:relative;width:100%;height:100%;border-radius:18%;overflow:hidden;background:var(--pant);
+    box-shadow:inset 0 4px 10px #000c,0 2px 0 #ffffff44}
+  canvas{width:100%;height:100%;display:block;touch-action:none;cursor:pointer}
+  .estado{position:absolute;left:0;right:0;bottom:-38px;text-align:center;font-size:12px;opacity:.7}
+  .teclas{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;max-width:980px;margin:0 auto;width:100%}
+  .teclas button,.vida{all:unset;cursor:pointer;text-align:center;padding:12px 10px;border-radius:999px;font-size:12px;white-space:nowrap;
+    background:#fff;box-shadow:inset 0 -4px 0 #1412101f,inset 0 2px 0 #fff,0 1px 0 #14121022;transition:transform .1s}
+  .teclas button:active,.vida:active{transform:translateY(2px);box-shadow:inset 0 -1px 0 #1412101f}
+  .teclas button.on{background:var(--naranja);color:var(--tinta);box-shadow:inset 0 -4px 0 var(--prof),inset 0 2px 0 #ffffff66}
+  .fila{display:flex;justify-content:center;gap:8px;margin-bottom:10px}
+  .vida.on{background:var(--tinta);color:var(--papel);box-shadow:inset 0 -4px 0 #000,inset 0 2px 0 #ffffff22}
+</style>
+</head>
+<body>
+<header><div class="marca">sintética <b>labs</b></div><div class="tag">motor de caras · v0</div></header>
+<main>
+  <div class="bicho" id="bicho">
+    <div class="pantalla"><canvas id="c"></canvas></div>
+    <div class="estado" id="estado">tocalo · seguí con el mouse · sacudí el celu</div>
+  </div>
+</main>
+<footer>
+  <div class="fila"><button class="vida on" id="vida">vida autónoma: sí</button></div>
+  <div class="teclas" id="teclas"></div>
+</footer>
+
+<script>
+// ---------- expresiones = parámetros ----------
+const BASE_EYE = {w:.105,h:.23,r:1,tilt:0,lt:0,lta:0,lb:0,lba:0,smile:0,heart:0};
+const BASE_G = {gx:0,gy:0,ey:0,sep:.3,ftilt:0,spin:0,glitch:0,dim:0,mo:0,mw:.07,orbit:0,pulse:0,beat:0,hue:0};
+const EXPR = {
+  neutral:{},
+  contento:{eye:{w:.13,h:.2,smile:.85},gy:.04},
+  sospecha:{eye:{w:.12,lt:.42,lb:.22},gx:.16,ftilt:-.04},
+  sorpresa:{eye:{w:.15,h:.17},mo:.07,mw:.06,ey:.04,sep:.32},
+  dormido:{eye:{w:.12,lt:.5,lb:.5},gy:-.06,ftilt:.1},
+  enojado:{eye:{w:.13,h:.2,lt:.36,lta:.55},gy:-.03,sep:.28},
+  triste:{eye:{h:.22,lt:.3,lta:-.5},gy:-.09,sep:.31},
+  'guiño':{L:{w:.12,h:.24},R:{w:.13,lt:.5,lb:.5,smile:.9},ftilt:-.08},
+  enamorado:{eye:{heart:1,w:.14,h:.14},beat:1},
+  mareado:{L:{h:.26},R:{h:.17,w:.09},spin:1,ftilt:.06},
+  escuchando:{eye:{w:.115,h:.25},pulse:1,gy:.03},
+  pensando:{L:{lb:.25},R:{lt:.28,lta:.25},gx:-.14,gy:.14,ftilt:.08},
+  curioso:{L:{w:.13,h:.29},R:{h:.19,lt:.18},gx:.08,ftilt:-.13},
+  'batería baja':{eye:{w:.09,h:.13,lt:.35},dim:.55,gy:-.1,hue:.5},
+  actualizando:{eye:{w:.06,h:.06},orbit:1,sep:.26},
+  glitch:{glitch:1,L:{lt:.2},R:{h:.27}}
+};
+const EYE_KEYS = Object.keys(BASE_EYE), G_KEYS = Object.keys(BASE_G);
+
+// ---------- resortes ----------
+function spring(v,k=170,c=17){ return {v, t:v, vel:0, k, c}; }
+const S = { L:{}, R:{}, G:{} };
+EYE_KEYS.forEach(k=>{ S.L[k]=spring(BASE_EYE[k]); S.R[k]=spring(BASE_EYE[k]); });
+G_KEYS.forEach(k=>{ S.G[k]=spring(BASE_G[k], k==='glitch'?300:140, k==='glitch'?24:16); });
+const life = { blink:spring(0,900,40), sx:spring(0,380,28), sy:spring(0,380,28), sq:spring(1,260,11) };
+function step(s,dt){ const a = s.k*(s.t-s.v) - s.c*s.vel; s.vel += a*dt; s.v += s.vel*dt; }
+
+let current = 'neutral';
+function setExpr(name, kick=true){
+  const e = EXPR[name]; if(!e) return;
+  current = name;
+  for(const side of ['L','R']){
+    const o = Object.assign({}, BASE_EYE, e.eye||{}, e[side]||{});
+    EYE_KEYS.forEach(k=> S[side][k].t = o[k]);
+  }
+  const g = Object.assign({}, BASE_G, e);
+  G_KEYS.forEach(k=> S.G[k].t = g[k]);
+  if(kick) life.sq.vel -= 2.2;          // anticipación: se aplasta y rebota
+  document.querySelectorAll('#teclas button').forEach(b=>b.classList.toggle('on', b.dataset.e===name));
+}
+
+// ---------- WebGL ----------
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl',{antialias:false,premultipliedAlpha:false});
+const VS = `attribute vec2 p; void main(){ gl_Position=vec4(p,0.,1.); }`;
+const FS = `precision highp float;
+uniform vec2 uRes; uniform float uT;
+uniform vec4 uA[2], uB[2], uC[2];      // ojo: (cx,cy,w,h) (r,tilt,lt,lta) (lb,lba,smile,heart)
+uniform vec4 uG1;                      // spin-phase, glitch, dim, ftilt
+uniform vec4 uG2;                      // mouthOpen, mouthW, scaleY, scaleX
+uniform vec4 uG3;                      // spin amount, hue, glitchSeed, mouthY
+mat2 rot(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }
+float dot2(vec2 v){ return dot(v,v); }
+float sdRB(vec2 p, vec2 b, float r){ vec2 q=abs(p)-b+r; return length(max(q,0.))+min(max(q.x,q.y),0.)-r; }
+float sdHeart(vec2 p){ p.x=abs(p.x);
+  if(p.y+p.x>1.) return sqrt(dot2(p-vec2(.25,.75)))-sqrt(2.)/4.;
+  return sqrt(min(dot2(p-vec2(0.,1.)), dot2(p-.5*max(p.x+p.y,0.))))*sign(p.x-p.y); }
+float hash(float n){ return fract(sin(n)*43758.5453); }
+float eye(vec2 p, vec4 A, vec4 B, vec4 C, float side){
+  vec2 q = p - A.xy;
+  float sw = uG3.x;
+  if(sw>.001){ q = rot(sw*(5.5*length(q)) + uG1.x*sw) * q; }
+  q = rot(B.y*side) * q;
+  float w=A.z, h=A.w;
+  float d = sdRB(q, vec2(w,h), B.x*min(w,h));
+  if(C.w>.001){ float s=max(w,h)*1.9; d = mix(d, sdHeart(q/s+vec2(0.,.55))*s, C.w); }
+  float a2 = B.w*side, kT = h*(1.-2.*B.z);
+  float dT = dot(q-vec2(0.,kT), vec2(-sin(a2), cos(a2)));
+  float b2 = C.y*side, kB = -h*(1.-2.*C.x);
+  float dB = dot(q-vec2(0.,kB), vec2(sin(b2), -cos(b2)));
+  float dl = max(d, max(dT, dB));
+  if(C.z>.001){ float R=w*.68; vec2 cc=vec2(0., -h-R + C.z*h*1.5); vec2 qc=q-cc; qc.y-=clamp(qc.y,-2.,0.); dl = max(dl, -(length(qc)-R)); }
+  float closed = smoothstep(.86, .99, B.z + C.x);
+  float Rr = min(40., w/max(C.z*.75,.001)); vec2 qa = q - vec2(0., -Rr + C.z*.02);
+  float dLine = max(max(abs(length(qa)-Rr)-.022, abs(q.x)-w*.95), -qa.y);
+  dLine = min(dLine, length(vec2(abs(q.x)-w*.95, q.y + Rr - sqrt(max(Rr*Rr - w*w*.9025,0.)) - C.z*.02))-.022);
+  return min(dl + closed*.03, mix(9., dLine, closed));
+}
+float face(vec2 p){
+  float d = min(eye(p,uA[0],uB[0],uC[0],-1.), eye(p,uA[1],uB[1],uC[1],1.));
+  if(uG2.x>.002){ vec2 ab=vec2(uG2.y,uG2.x); vec2 q=p-vec2((uA[0].x+uA[1].x)*.5, uG3.w);
+    d = min(d, (length(q/ab)-1.)*min(ab.x,ab.y)); }
+  return d;
+}
+void main(){
+  float m = min(uRes.x,uRes.y);
+  vec2 p = (gl_FragCoord.xy - .5*uRes)/(m*.5);
+  p = rot(-uG1.w)*p; p.y /= uG2.z; p.x /= uG2.w;
+  float g = uG1.y, px = 2.6/m;
+  vec3 eyeC = mix(vec3(1.,.416,.2), vec3(1.,.22,.12), uG3.y) * (1.-uG1.z*.55);
+  vec3 bg = vec3(.043,.039,.035);
+  vec3 fill, glow;
+  if(g>.01){
+    float band = floor(p.y*14. + uG3.z*7.);
+    float off = (hash(band + uG3.z*13.)-.5) * g * .22 * step(.55, hash(band*1.7+uG3.z));
+    vec2 pp = p + vec2(off,0.);
+    float dr = face(pp+vec2(g*.035,0.)), dg = face(pp), db = face(pp-vec2(g*.035,0.));
+    fill = vec3(1.-smoothstep(0.,px,dr), 1.-smoothstep(0.,px,dg), 1.-smoothstep(0.,px,db));
+    glow = vec3(exp(-max(dg,0.)*16.));
+  } else {
+    float d = face(p);
+    fill = vec3(1.-smoothstep(0.,px,d));
+    glow = vec3(exp(-max(d,0.)*16.));
+  }
+  vec3 col = bg + eyeC*glow*.22;
+  col = mix(col, eyeC, fill);
+  vec2 uv = gl_FragCoord.xy/uRes;
+  col *= .94 + .06*sin(gl_FragCoord.y*3.14159*.5);
+  col += (hash(dot(gl_FragCoord.xy, vec2(12.9898,78.233)) + uT)-.5)*.035;
+  col *= 1. - .35*dot2(uv-.5);
+  gl_FragColor = vec4(col,1.);
+}`;
+function sh(t,s){ const o=gl.createShader(t); gl.shaderSource(o,s); gl.compileShader(o); if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(o)); return o; }
+const prog=gl.createProgram(); gl.attachShader(prog,sh(gl.VERTEX_SHADER,VS)); gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,FS));
+gl.linkProgram(prog); gl.useProgram(prog);
+gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+const al=gl.getAttribLocation(prog,'p'); gl.enableVertexAttribArray(al); gl.vertexAttribPointer(al,2,gl.FLOAT,false,0,0);
+const U=n=>gl.getUniformLocation(prog,n);
+const u={res:U('uRes'),t:U('uT'),A:U('uA'),B:U('uB'),C:U('uC'),G1:U('uG1'),G2:U('uG2'),G3:U('uG3')};
+
+function resize(){ const r=canvas.getBoundingClientRect(), d=Math.min(devicePixelRatio,2);
+  canvas.width=Math.round(r.width*d); canvas.height=Math.round(r.height*d); gl.viewport(0,0,canvas.width,canvas.height); }
+new ResizeObserver(resize).observe(canvas); resize();
+
+// ---------- vida ----------
+let T=0, last=performance.now(), nextBlink=1.5, blinkUntil=-1, nextSac=1, spinPhase=0, orbitPhase=0;
+let mouse=null, mouseAt=-99, glitchSeed=0, nextGl=0;
+let auto=true, lastTouch=0, autoUntil=0, nextAuto=4, reactUntil=0;
+const rnd=(a,b)=>a+Math.random()*(b-a);
+
+function tick(now){
+  let dt=Math.min(.05,(now-last)/1000); last=now; T+=dt;
+  const sleeping = current==='dormido';
+
+  // parpadeo (a veces doble)
+  if(!sleeping && T>nextBlink){ life.blink.t=1; blinkUntil=T+.085;
+    nextBlink = T + (Math.random()<.18 ? .22 : rnd(2.2,6)); }
+  if(T>blinkUntil) life.blink.t=0;
+  // mirada: el mouse manda; si no, saccades
+  if(mouse && T-mouseAt<2.5){ life.sx.t=mouse[0]*.13; life.sy.t=mouse[1]*.09; }
+  else if(T>nextSac){ life.sx.t = sleeping?0:rnd(-.07,.07); life.sy.t = sleeping?0:rnd(-.04,.04); nextSac=T+rnd(.7,3); }
+  // vida autónoma
+  if(auto){
+    if(T-lastTouch>45 && current!=='dormido'){ setExpr('dormido'); }
+    else if(current!=='dormido' && T>reactUntil){
+      if(autoUntil && T>autoUntil){ setExpr('neutral'); autoUntil=0; nextAuto=T+rnd(4,9); }
+      else if(!autoUntil && T>nextAuto){
+        const pool=['contento','curioso','sospecha','pensando','escuchando','guiño','sorpresa','contento','enamorado','glitch','mareado'];
+        setExpr(pool[Math.floor(Math.random()*pool.length)]); autoUntil=T+rnd(2.2,4);
+      }
+    }
+  }
+  if(reactUntil && T>reactUntil){ reactUntil=0; setExpr('neutral'); }
+
+  for(const side of ['L','R']) EYE_KEYS.forEach(k=>step(S[side][k],dt));
+  G_KEYS.forEach(k=>step(S.G[k],dt)); Object.values(life).forEach(s=>step(s,dt));
+
+  const G={}; G_KEYS.forEach(k=>G[k]=S.G[k].v);
+  spinPhase += dt*3.2*G.spin; orbitPhase += dt*4.5*G.orbit;
+  const breathe = sleeping ? 1+.035*Math.sin(T*.9) : 1+.012*Math.sin(T*1.7);
+  const sq = life.sq.v;
+  const sYv = breathe*sq, sXv = 1/Math.sqrt(Math.max(.5,sq));
+  const bob = .012*Math.sin(T*1.1) + (sleeping?.02*Math.sin(T*.9):0);
+  const ph = (T*1.15)%1, hb = Math.exp(-Math.pow((ph-.1)*22,2)) + .65*Math.exp(-Math.pow((ph-.3)*22,2));
+  const pulse = 1 + G.pulse*(.09+.09*Math.sin(T*9)*Math.sin(T*2.3));
+  const ftilt = G.ftilt + G.spin*.12*Math.sin(T*2.5);
+  if(G.glitch>.05 && T>nextGl){ glitchSeed=Math.random()*100; nextGl=T+rnd(.04,.18); }
+  const gl1 = G.glitch*(.35+.65*(Math.sin(T*23)>.6?1:0));
+
+  const A=[],B=[],C=[];
+  ['L','R'].forEach((side,i)=>{
+    const e={}; EYE_KEYS.forEach(k=>e[k]=S[side][k].v);
+    const sgn = i? 1:-1;
+    let cx = sgn*G.sep + G.gx + life.sx.v, cy = G.ey + G.gy + life.sy.v + bob;
+    if(G.orbit>.001){ const a=orbitPhase + i*Math.PI; const r=G.sep*.9;
+      cx = cx*(1-G.orbit) + (Math.cos(a)*r)*G.orbit; cy = cy*(1-G.orbit) + (Math.sin(a)*r*.55)*G.orbit; }
+    const s = 1 + G.beat*.16*hb;
+    const bl = life.blink.v;
+    const lt = e.lt + (.5-e.lt)*bl, lb = e.lb + (.5-e.lb)*bl;
+    A.push(cx,cy,e.w*s,e.h*s*pulse); B.push(e.r,e.tilt,lt,e.lta); C.push(lb,e.lba,e.smile,e.heart);
+  });
+  gl.uniform2f(u.res,canvas.width,canvas.height); gl.uniform1f(u.t,T);
+  gl.uniform4fv(u.A,A); gl.uniform4fv(u.B,B); gl.uniform4fv(u.C,C);
+  gl.uniform4f(u.G1, spinPhase, gl1, G.dim, ftilt);
+  gl.uniform4f(u.G2, G.mo, G.mw, sYv, sXv);
+  gl.uniform4f(u.G3, G.spin, G.hue, glitchSeed, -.42 + G.ey + G.gy*.5 + bob);
+  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  requestAnimationFrame(tick);
+}
+
+// ---------- interacción ----------
+function touched(){ lastTouch=T; }
+canvas.addEventListener('pointermove', e=>{ const r=canvas.getBoundingClientRect();
+  mouse=[ (e.clientX-r.left)/r.width*2-1, -((e.clientY-r.top)/r.height*2-1) ]; mouseAt=T; touched(); });
+window.addEventListener('pointermove', e=>{ const r=canvas.getBoundingClientRect();
+  const x=(e.clientX-r.left-r.width/2)/(r.width), y=-(e.clientY-r.top-r.height/2)/(r.height);
+  mouse=[Math.max(-1,Math.min(1,x*1.4)), Math.max(-1,Math.min(1,y*1.4))]; mouseAt=T; });
+canvas.addEventListener('pointerdown', ()=>{ touched();
+  if(current==='dormido'){ setExpr('sorpresa'); reactUntil=T+1.2; return; }
+  const r=['contento','guiño','sorpresa','enamorado'][Math.floor(Math.random()*4)];
+  setExpr(r); reactUntil=T+1.4; });
+let lastShake=0;
+window.addEventListener('devicemotion', e=>{ const a=e.accelerationIncludingGravity; if(!a) return;
+  const m=Math.hypot(a.x||0,a.y||0,a.z||0); if(m>24 && T-lastShake>1.5){ lastShake=T; touched(); setExpr('mareado'); reactUntil=T+2.6; } });
+
+const teclas=document.getElementById('teclas');
+Object.keys(EXPR).forEach((n,i)=>{ const b=document.createElement('button'); b.dataset.e=n;
+  b.textContent=(i<9?(i+1)+' · ':'')+n; b.onclick=()=>{ touched(); reactUntil=0; autoUntil=0; nextAuto=T+8; setExpr(n); }; teclas.appendChild(b); });
+const vida=document.getElementById('vida');
+vida.onclick=()=>{ auto=!auto; vida.classList.toggle('on',auto); vida.textContent='vida autónoma: '+(auto?'sí':'no'); touched(); };
+window.addEventListener('keydown', e=>{ const n=Object.keys(EXPR)[+e.key-1]; if(n && e.key!=='0'){ touched(); autoUntil=0; nextAuto=T+8; setExpr(n);} });
+
+setExpr('neutral', false);
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
