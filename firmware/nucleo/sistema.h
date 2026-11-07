@@ -49,6 +49,12 @@ class Sistema {
   int cantidadDeClaves() const { return nClaves_; }
   // Da por autenticada la conexión actual (vista previa local en las apps).
   void confiar() { autenticado_ = true; }
+  // Vista previa de las apps: nunca muestra el QR y confía en quien escribe.
+  void modoVistaPrevia() {
+    vistaPrevia_ = true;
+    emparejando_ = false;
+    autenticado_ = true;
+  }
 
  private:
   void responder(uint8_t car, uint8_t op, protocolo::Codigo c, const char* detalle = nullptr);
@@ -86,6 +92,7 @@ class Sistema {
   bool emparejando_ = false;
   uint32_t emparejarHasta_ = 0;  // 0 = hasta que se vincule
   bool autenticado_ = false;
+  bool vistaPrevia_ = false;
   uint8_t fallos_ = 0;
   uint32_t bloqueoHasta_ = 0;
 

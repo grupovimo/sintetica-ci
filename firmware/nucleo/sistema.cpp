@@ -115,7 +115,7 @@ void Sistema::falla(uint32_t ahora) {
 }
 
 void Sistema::bleConexion(bool conectado) {
-  autenticado_ = false;
+  autenticado_ = vistaPrevia_;
   receptor_.reiniciar();
   log(conectado ? "celu conectado" : "celu desconectado");
 }
@@ -227,6 +227,7 @@ void Sistema::tick() {
   if (emparejando_ && emparejarHasta_ && nClaves_ > 0 && static_cast<int32_t>(ahora - emparejarHasta_) >= 0)
     emparejando_ = false;
 
+  if (vistaPrevia_) emparejando_ = false;
   if (emparejando_) {
     dibujarEmparejamiento(lienzo_, serie_, qr_, "ESPERANDO VÍNCULO");
   } else {

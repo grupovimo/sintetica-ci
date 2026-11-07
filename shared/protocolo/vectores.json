@@ -1,0 +1,161 @@
+{
+  "version": "1.1",
+  "nota": "Generado por shared/protocolo/generar_vectores.mjs. No editar a mano. Bytes en hex separados por espacios.",
+  "comandos": [
+    {
+      "nombre": "expresion enamorado",
+      "hex": "10 65 6e 61 6d 6f 72 61 64 6f"
+    },
+    {
+      "nombre": "expresion automatica",
+      "hex": "10"
+    },
+    {
+      "nombre": "nombre Toto",
+      "hex": "11 54 6f 74 6f"
+    },
+    {
+      "nombre": "nombre con tilde",
+      "texto": "Ñandú",
+      "hex": "11 c3 91 61 6e 64 c3 ba"
+    },
+    {
+      "nombre": "evento sacudida",
+      "hex": "12 03"
+    },
+    {
+      "nombre": "vincular",
+      "codigo": "K7Q2XM",
+      "hex": "13 4b 37 51 32 58 4d"
+    },
+    {
+      "nombre": "autenticar",
+      "clave": "00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff",
+      "hex": "14 00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff"
+    },
+    {
+      "nombre": "desvincular",
+      "hex": "15"
+    },
+    {
+      "nombre": "pedir config",
+      "hex": "04"
+    }
+  ],
+  "config": {
+    "json": "{\"version\":1,\"nombre\":\"Toto\",\"cara\":{\"ojos\":\"pastilla\",\"color\":\"#FF6A33\",\"tamano\":1},\"personalidad\":{\"energia\":0.6,\"timidez\":0.3,\"sueno\":\"23:30-08:00\"},\"expresiones\":{\"contento\":{\"formas\":[{\"forma\":\"arco\",\"puntos\":[[-0.4,0.1125],[-0.3125,-0.175],[-0.2125,0.1125]],\"trazo\":0.1},{\"forma\":\"arco\",\"puntos\":[[0.2125,0.1125],[0.3125,-0.175],[0.4,0.1125]],\"trazo\":0.1}]}},\"reglas\":[{\"si\":\"sacudida\",\"entonces\":[\"expresion:mareado\",\"sonido:boing\"]},{\"si\":\"bateria<15\",\"entonces\":[\"expresion:bateria-baja\"]}],\"modo\":\"mascota\"}",
+    "tamanoBloque": 64,
+    "escrituras": [
+      "01 05 02 00 00 8d 42 d8 33",
+      "02 00 00 00 00 7b 22 76 65 72 73 69 6f 6e 22 3a 31 2c 22 6e 6f 6d 62 72 65 22 3a 22 54 6f 74 6f 22 2c 22 63 61 72 61 22 3a 7b 22 6f 6a 6f 73 22 3a 22 70 61 73 74 69 6c 6c 61 22 2c 22 63 6f 6c",
+      "02 3b 00 00 00 6f 72 22 3a 22 23 46 46 36 41 33 33 22 2c 22 74 61 6d 61 6e 6f 22 3a 31 7d 2c 22 70 65 72 73 6f 6e 61 6c 69 64 61 64 22 3a 7b 22 65 6e 65 72 67 69 61 22 3a 30 2e 36 2c 22 74 69",
+      "02 76 00 00 00 6d 69 64 65 7a 22 3a 30 2e 33 2c 22 73 75 65 6e 6f 22 3a 22 32 33 3a 33 30 2d 30 38 3a 30 30 22 7d 2c 22 65 78 70 72 65 73 69 6f 6e 65 73 22 3a 7b 22 63 6f 6e 74 65 6e 74 6f 22",
+      "02 b1 00 00 00 3a 7b 22 66 6f 72 6d 61 73 22 3a 5b 7b 22 66 6f 72 6d 61 22 3a 22 61 72 63 6f 22 2c 22 70 75 6e 74 6f 73 22 3a 5b 5b 2d 30 2e 34 2c 30 2e 31 31 32 35 5d 2c 5b 2d 30 2e 33 31 32",
+      "02 ec 00 00 00 35 2c 2d 30 2e 31 37 35 5d 2c 5b 2d 30 2e 32 31 32 35 2c 30 2e 31 31 32 35 5d 5d 2c 22 74 72 61 7a 6f 22 3a 30 2e 31 7d 2c 7b 22 66 6f 72 6d 61 22 3a 22 61 72 63 6f 22 2c 22 70",
+      "02 27 01 00 00 75 6e 74 6f 73 22 3a 5b 5b 30 2e 32 31 32 35 2c 30 2e 31 31 32 35 5d 2c 5b 30 2e 33 31 32 35 2c 2d 30 2e 31 37 35 5d 2c 5b 30 2e 34 2c 30 2e 31 31 32 35 5d 5d 2c 22 74 72 61 7a",
+      "02 62 01 00 00 6f 22 3a 30 2e 31 7d 5d 7d 7d 2c 22 72 65 67 6c 61 73 22 3a 5b 7b 22 73 69 22 3a 22 73 61 63 75 64 69 64 61 22 2c 22 65 6e 74 6f 6e 63 65 73 22 3a 5b 22 65 78 70 72 65 73 69 6f",
+      "02 9d 01 00 00 6e 3a 6d 61 72 65 61 64 6f 22 2c 22 73 6f 6e 69 64 6f 3a 62 6f 69 6e 67 22 5d 7d 2c 7b 22 73 69 22 3a 22 62 61 74 65 72 69 61 3c 31 35 22 2c 22 65 6e 74 6f 6e 63 65 73 22 3a 5b",
+      "02 d8 01 00 00 22 65 78 70 72 65 73 69 6f 6e 3a 62 61 74 65 72 69 61 2d 62 61 6a 61 22 5d 7d 5d 2c 22 6d 6f 64 6f 22 3a 22 6d 61 73 63 6f 74 61 22 7d",
+      "03"
+    ]
+  },
+  "estados": [
+    {
+      "campos": {
+        "bateria": null,
+        "humor": 0.2,
+        "modo": "mascota",
+        "dormido": false,
+        "fija": false,
+        "emparejando": true,
+        "autenticado": false,
+        "expresion": "neutral",
+        "nombre": "bicho",
+        "serie": "",
+        "id": "A1B2C3D4E5F6"
+      },
+      "hex": "02 ff 14 00 04 07 6e 65 75 74 72 61 6c 05 62 69 63 68 6f 00 0c 41 31 42 32 43 33 44 34 45 35 46 36"
+    },
+    {
+      "campos": {
+        "bateria": 87,
+        "humor": -0.35,
+        "modo": "reloj",
+        "dormido": true,
+        "fija": true,
+        "emparejando": false,
+        "autenticado": true,
+        "expresion": "dormido",
+        "nombre": "Ñandú",
+        "serie": "001",
+        "id": "00AABBCCDDEE"
+      },
+      "hex": "02 57 dd 01 0b 07 64 6f 72 6d 69 64 6f 07 c3 91 61 6e 64 c3 ba 03 30 30 31 0c 30 30 41 41 42 42 43 43 44 44 45 45"
+    }
+  ],
+  "respuestas": [
+    {
+      "hex": "90 00",
+      "op": 16,
+      "ok": true,
+      "codigo": 0,
+      "detalle": ""
+    },
+    {
+      "hex": "91 09 76 69 6e 63 75 6c c3 a1 20 6f 20 61 75 74 65 6e 74 69 63 c3 a1 20 70 72 69 6d 65 72 6f",
+      "op": 17,
+      "ok": false,
+      "codigo": 9,
+      "detalle": "vinculá o autenticá primero"
+    },
+    {
+      "hex": "93 00 00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff",
+      "op": 19,
+      "ok": true,
+      "codigo": 0,
+      "clave": "00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff"
+    },
+    {
+      "hex": "93 0a",
+      "op": 19,
+      "ok": false,
+      "codigo": 10,
+      "detalle": ""
+    }
+  ],
+  "qr": [
+    {
+      "texto": "SINTETICA:V1/A1B2C3D4E5F6/K7Q2XM",
+      "id": "A1B2C3D4E5F6",
+      "codigo": "K7Q2XM"
+    },
+    {
+      "texto": "SINTETICA:V1/A1B2C3D4E5F6/K7Q2X0",
+      "id": null
+    },
+    {
+      "texto": "https://example.com",
+      "id": null
+    }
+  ],
+  "anuncios": [
+    {
+      "hex": "ff ff a1 b2 c3 d4 e5 f6",
+      "id": "A1B2C3D4E5F6"
+    },
+    {
+      "hex": "4c 00 02 15",
+      "id": null
+    }
+  ],
+  "crc32": [
+    {
+      "texto": "123456789",
+      "crc": "cbf43926"
+    },
+    {
+      "texto": "{\"version\":1,\"nombre\":\"Toto\",\"cara\":{\"ojos\":\"pastilla\",\"color\":\"#FF6A33\",\"tamano\":1},\"personalidad\":{\"energia\":0.6,\"timidez\":0.3,\"sueno\":\"23:30-08:00\"},\"expresiones\":{\"contento\":{\"formas\":[{\"forma\":\"arco\",\"puntos\":[[-0.4,0.1125],[-0.3125,-0.175],[-0.2125,0.1125]],\"trazo\":0.1},{\"forma\":\"arco\",\"puntos\":[[0.2125,0.1125],[0.3125,-0.175],[0.4,0.1125]],\"trazo\":0.1}]}},\"reglas\":[{\"si\":\"sacudida\",\"entonces\":[\"expresion:mareado\",\"sonido:boing\"]},{\"si\":\"bateria<15\",\"entonces\":[\"expresion:bateria-baja\"]}],\"modo\":\"mascota\"}",
+      "crc": "33d8428d"
+    }
+  ]
+}

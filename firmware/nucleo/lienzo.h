@@ -8,8 +8,8 @@
 
 namespace sintetica {
 
-constexpr int MAX_ANCHO = 320;
-constexpr int MAX_ALTO = 320;
+constexpr int MAX_ANCHO = 640;  // 640: la vista previa de las apps se dibuja al doble
+constexpr int MAX_ALTO = 640;
 
 inline uint16_t a565(uint32_t rgb) {
   return static_cast<uint16_t>(((rgb >> 8) & 0xF800) | ((rgb >> 5) & 0x07E0) | ((rgb >> 3) & 0x001F));

@@ -15,9 +15,13 @@ file(GLOB NUCLEO_FUENTES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/nucleo/*.
 add_library(nucleo STATIC ${NUCLEO_FUENTES})
 target_include_directories(nucleo PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/nucleo)
 
+add_library(sintetica_c STATIC api/sintetica_c.cpp)
+target_link_libraries(sintetica_c nucleo)
+target_include_directories(sintetica_c PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/api)
+
 file(GLOB TEST_FUENTES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/test/test_*.cpp)
 add_executable(pruebas ${TEST_FUENTES} test/principal.cpp)
-target_link_libraries(pruebas nucleo)
+target_link_libraries(pruebas nucleo sintetica_c)
 target_compile_definitions(pruebas PRIVATE RAIZ_REPO="${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 add_executable(render_caras herramientas/render_caras.cpp)
@@ -26,6 +30,7 @@ target_link_libraries(render_caras nucleo)
 enable_testing()
 add_test(NAME nucleo COMMAND pruebas)
 add_test(NAME caras_embebidas COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/herramientas/embeber_caras.py --verificar)
+add_test(NAME vectores_generados COMMAND node ${CMAKE_CURRENT_SOURCE_DIR}/../shared/protocolo/generar_vectores.mjs --verificar)
 add_test(NAME fuentes_generadas COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/herramientas/generar_fuentes.py --verificar)
 add_test(NAME qr_legible COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/test/oro/leer_qr.py $<TARGET_FILE:render_caras>)
 add_test(NAME caras_de_oro
