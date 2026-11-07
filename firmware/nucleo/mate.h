@@ -77,6 +77,12 @@ inline bool iguales(const char* a, const char* b) {
   while (*a && *a == *b) a++, b++;
   return *a == *b;
 }
+// Compara los primeros n bytes (sin cortar en un terminador).
+inline bool iguales(const char* a, const char* b, size_t n) {
+  for (size_t i = 0; i < n; i++)
+    if (a[i] != b[i]) return false;
+  return true;
+}
 // Copia con terminador; devuelve cuántos bytes copió (sin el terminador).
 inline size_t copiarTexto(char* dst, size_t cap, const char* src, size_t n) {
   if (cap == 0) return 0;

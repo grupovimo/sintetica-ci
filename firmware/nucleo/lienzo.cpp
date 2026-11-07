@@ -191,6 +191,12 @@ void Lienzo::trazo(const Punto* p, int n, float grosor, uint32_t rgb) {
   }
 }
 
+void Lienzo::rectangulo(int x, int y, int w, int h, uint32_t rgb) {
+  const uint16_t c = a565(rgb);
+  for (int j = maxi(0, y); j < mini(alto_, y + h); j++)
+    for (int i = maxi(0, x); i < mini(ancho_, x + w); i++) px_[j * ancho_ + i] = c;
+}
+
 void Lienzo::correrFilas(int y0, int y1, int dx, uint32_t fondo) {
   y0 = maxi(0, y0), y1 = mini(alto_, y1);
   if (dx == 0 || y0 >= y1) return;

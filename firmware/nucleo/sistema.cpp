@@ -1,10 +1,20 @@
 #include "sistema.h"
 
+#include "emparejamiento.h"
+
 namespace sintetica {
 
 namespace {
 constexpr const char* CLAVE_CONFIG = "config";
 constexpr const char* CLAVE_AJUSTES = "ajustes";
+constexpr const char* CLAVE_SERIE = "serie";
+constexpr const char* CLAVE_CODIGO = "codigo";
+constexpr const char* CLAVE_CLAVES = "claves";
+constexpr uint32_t QR_POR_BOTON_MS = 120000;  // el QR del botón dura 2 min
+constexpr uint8_t FALLOS_MAXIMOS = 5;
+constexpr uint32_t BLOQUEO_MS = 30000;
+// Sin letras ni números que se confundan (0/O, 1/I/L).
+const char ALFABETO_CODIGO[] = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
 // Memoria grande, fuera de la pila.
 char g_textoConfig[MAX_CONFIG_BYTES + 1];
@@ -17,6 +27,9 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, int ancho, int alto) {
   hal_ = hal;
   largoUltimoEstado_ = 0;  // que se notifique el estado del arranque
   receptor_.reiniciar();
+  autenticado_ = false;
+  fallos_ = 0;
+  leerIdentidad();
   lienzo_.iniciar(pixeles, ancho, alto);
   vista_ = Vista::para(ancho, alto);
 
@@ -45,6 +58,66 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, int ancho, int alto) {
   motor_.iniciar(&config_, hal_.semilla ? hal_.semilla() : ahora, ahora);
   leerAjustes();
   log("SintéticaOS listo");
+}
+
+void Sistema::leerIdentidad() {
+  const char* id = hal_.identificador ? hal_.identificador() : nullptr;
+  copiarTexto(id_, sizeof id_, id && id[0] ? id : "000000000000");
+
+  serie_[0] = 0;
+  int n = hal_.leer ? hal_.leer(CLAVE_SERIE, reinterpret_cast<uint8_t*>(serie_), sizeof serie_ - 1) : -1;
+  serie_[n > 0 ? n : 0] = 0;
+
+  // El código del QR se genera una vez, en el primer arranque, y queda fijo.
+  n = hal_.leer ? hal_.leer(CLAVE_CODIGO, reinterpret_cast<uint8_t*>(codigo_), 6) : -1;
+  if (n != 6) {
+    for (int i = 0; i < 6; i++) {
+      uint32_t r = hal_.semilla ? hal_.semilla() : hal_.ahoraMs() * 2654435761u + static_cast<uint32_t>(i);
+      codigo_[i] = ALFABETO_CODIGO[r % (sizeof ALFABETO_CODIGO - 1)];
+    }
+    if (hal_.guardar) hal_.guardar(CLAVE_CODIGO, reinterpret_cast<const uint8_t*>(codigo_), 6);
+  }
+  codigo_[6] = 0;
+
+  uint8_t b[4 * 16];
+  n = hal_.leer ? hal_.leer(CLAVE_CLAVES, b, sizeof b) : -1;
+  nClaves_ = n > 0 ? static_cast<uint8_t>(n / 16) : 0;
+  copiarBytes(claves_, b, nClaves_ * 16u);
+  emparejando_ = nClaves_ == 0;  // sin ningún celu vinculado, muestra el QR
+  emparejarHasta_ = 0;
+  armarQr();
+}
+
+void Sistema::armarQr() {
+  copiarTexto(qr_, sizeof qr_, PREFIJO_QR);
+  size_t n = largo(qr_);
+  n += copiarTexto(qr_ + n, sizeof qr_ - n, id_);
+  n += copiarTexto(qr_ + n, sizeof qr_ - n, "/");
+  copiarTexto(qr_ + n, sizeof qr_ - n, codigo_);
+}
+
+void Sistema::fijarSerie(const char* serie) {
+  copiarTexto(serie_, sizeof serie_, serie);
+  if (hal_.guardar) hal_.guardar(CLAVE_SERIE, reinterpret_cast<const uint8_t*>(serie_), largo(serie_));
+}
+
+void Sistema::guardarClaves() {
+  if (hal_.guardar) hal_.guardar(CLAVE_CLAVES, &claves_[0][0], nClaves_ * 16u);
+}
+
+bool Sistema::bloqueado(uint32_t ahora) const {
+  return fallos_ >= FALLOS_MAXIMOS && static_cast<int32_t>(ahora - bloqueoHasta_) < 0;
+}
+
+void Sistema::falla(uint32_t ahora) {
+  if (fallos_ < 255) fallos_++;
+  if (fallos_ >= FALLOS_MAXIMOS) bloqueoHasta_ = ahora + BLOQUEO_MS;
+}
+
+void Sistema::bleConexion(bool conectado) {
+  autenticado_ = false;
+  receptor_.reiniciar();
+  log(conectado ? "celu conectado" : "celu desconectado");
 }
 
 void Sistema::leerAjustes() {
@@ -146,8 +219,20 @@ void Sistema::tick() {
   ctx.expresionEstado = expresionDeEstado();
   motor_.tick(ahora, ctx);
 
-  lienzo_.limpiar(paleta::PANTALLA);
-  dibujarExpresion(lienzo_, vista_, config_.expresiones[motor_.expresionVisible()], motor_.estado());
+  // Mantener el botón 5 s muestra el QR para vincular otro celu.
+  if (gestos_.sacarMantenido()) {
+    emparejando_ = true;
+    emparejarHasta_ = ahora + QR_POR_BOTON_MS;
+  }
+  if (emparejando_ && emparejarHasta_ && nClaves_ > 0 && static_cast<int32_t>(ahora - emparejarHasta_) >= 0)
+    emparejando_ = false;
+
+  if (emparejando_) {
+    dibujarEmparejamiento(lienzo_, serie_, qr_, "ESPERANDO VÍNCULO");
+  } else {
+    lienzo_.limpiar(paleta::PANTALLA);
+    dibujarExpresion(lienzo_, vista_, config_.expresiones[motor_.expresionVisible()], motor_.estado());
+  }
   if (hal_.presentar) hal_.presentar(lienzo_.pixeles(), lienzo_.ancho(), lienzo_.alto());
   notificarEstadoSiCambio();
 }
@@ -160,14 +245,18 @@ size_t Sistema::estadoBle(uint8_t* salida, size_t cap) const {
   p.modo = static_cast<uint8_t>(config_.modo);
   p.dormido = motor_.dormido();
   p.fija = motor_.expresionFija() >= 0;
+  p.emparejando = emparejando_;
+  p.autenticado = autenticado_;
   p.expresion = config_.expresiones[motor_.expresionVisible()].nombre;
   p.nombre = nombre();
+  p.serie = serie_;
+  p.id = id_;
   return protocolo::codificarEstado(p, salida, cap);
 }
 
 void Sistema::notificarEstadoSiCambio() {
   if (!hal_.notificar) return;
-  uint8_t b[64];
+  uint8_t b[96];
   size_t n = estadoBle(b, sizeof b);
   // El humor cambia de a poco: no notificar por eso solo.
   bool igual = n == largoUltimoEstado_;
@@ -214,6 +303,54 @@ void Sistema::bleEscribir(uint8_t car, const uint8_t* d, size_t n) {
   using namespace protocolo;
   if (n < 1) return;
   const uint8_t op = d[0];
+  const uint32_t ahora = hal_.ahoraMs();
+
+  // Vincular y autenticar son lo único que se puede hacer sin estar autenticado.
+  if (car == CarComando && op == CmdVincular) {
+    if (bloqueado(ahora)) return responder(car, op, NoAutorizado, "demasiados intentos: esperá 30 s");
+    if (!emparejando_) return responder(car, op, NoEmparejando, "mantené el botón 5 s para ver el QR");
+    if (n != 7 || !iguales(reinterpret_cast<const char*>(d + 1), codigo_, 6)) {
+      falla(ahora);
+      return responder(car, op, NoAutorizado, "el código no coincide");
+    }
+    // Clave nueva para este celu; si ya hay 4, se olvida la más vieja.
+    if (nClaves_ == 4) {
+      for (int i = 0; i < 3; i++) copiarBytes(claves_[i], claves_[i + 1], 16);
+      nClaves_ = 3;
+    }
+    uint8_t* clave = claves_[nClaves_++];
+    for (int i = 0; i < 16; i += 4) {
+      uint32_t r = hal_.semilla ? hal_.semilla() : ahora * 2654435761u + static_cast<uint32_t>(i);
+      for (int k = 0; k < 4; k++) clave[i + k] = static_cast<uint8_t>(r >> (8 * k));
+    }
+    guardarClaves();
+    fallos_ = 0;
+    autenticado_ = true;
+    emparejando_ = false;
+    uint8_t r[18] = {static_cast<uint8_t>(op | Respuesta), Ok};
+    copiarBytes(r + 2, clave, 16);
+    if (hal_.notificar) hal_.notificar(car, r, sizeof r);
+    evento(Evento::Vinculado);
+    log("celu vinculado");
+    return;
+  }
+  if (car == CarComando && op == CmdAutenticar) {
+    if (bloqueado(ahora)) return responder(car, op, NoAutorizado, "demasiados intentos: esperá 30 s");
+    bool ok = false;
+    for (int k = 0; n == 17 && k < nClaves_; k++) {
+      uint8_t dif = 0;  // comparar todo, sin cortar en el primer byte distinto
+      for (int i = 0; i < 16; i++) dif |= claves_[k][i] ^ d[1 + i];
+      ok = ok || dif == 0;
+    }
+    if (!ok) {
+      falla(ahora);
+      return responder(car, op, NoAutorizado, "clave desconocida: hay que vincular de nuevo");
+    }
+    fallos_ = 0;
+    autenticado_ = true;
+    return responder(car, op, Ok);
+  }
+  if (!autenticado_) return responder(car, op, NoAutorizado, "vinculá o autenticá primero");
 
   if (car == CarConfig) {
     switch (op) {
@@ -274,6 +411,16 @@ void Sistema::bleEscribir(uint8_t car, const uint8_t* d, size_t n) {
         copiarTexto(nombre_, sizeof nombre_, reinterpret_cast<const char*>(d + 1), n - 1);
         guardarAjustes();
         return responder(car, op, Ok);
+      }
+      case CmdDesvincular: {
+        nClaves_ = 0;
+        llenarBytes(claves_, 0, sizeof claves_);
+        guardarClaves();
+        emparejando_ = true;
+        emparejarHasta_ = 0;
+        responder(car, op, Ok);
+        autenticado_ = false;
+        return;
       }
       case CmdEvento: {
         if (n != 2 || d[1] >= static_cast<uint8_t>(Evento::Cantidad)) return responder(car, op, Malformado);

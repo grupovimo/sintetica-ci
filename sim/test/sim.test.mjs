@@ -7,12 +7,16 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { crearSimulador, memoriaVolatil } from '../web/sim.js';
-import { ArmadorDeConfig, Car, comando, escriturasDeConfig, leerEstado, leerRespuesta, pedirConfig } from '../web/protocolo.js';
+import {
+  ArmadorDeConfig, Car, comando, escriturasDeConfig, idDeAnuncio, leerEstado, leerQr, leerRespuesta, pedirConfig,
+} from '../web/protocolo.js';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
 const wasm = fs.readFileSync(path.join(aqui, '../dist/sinteticaos.wasm'));
 
-async function nuevo(almacen = memoriaVolatil()) {
+// Como la app: se conecta y, si el bicho muestra el QR, vincula; si no, se autentica.
+let claveCelu = null;
+async function nuevo(almacen = memoriaVolatil(), { vincular = true } = {}) {
   const reloj = { t: 0 };
   const notis = [];
   let cuadros = 0;
@@ -21,16 +25,28 @@ async function nuevo(almacen = memoriaVolatil()) {
     alNotificar: (c, b) => notis.push({ c, b }), alPresentar: () => cuadros++,
   });
   const correr = (ms) => { for (let i = 0; i < ms; i += 20) { reloj.t += 20; sim.tick(); } };
+  sim.bleConexion(true);
+  if (vincular) {
+    if (sim.emparejando()) {
+      sim.bleEscribir(Car.comando, comando.vincular(leerQr(sim.qr()).codigo));
+      claveCelu = leerRespuesta(notis.filter((n) => n.c === Car.comando).at(-1).b).clave;
+      correr(3200);  // que pase el guiño del vínculo
+    } else {
+      sim.bleEscribir(Car.comando, comando.autenticar(claveCelu));
+    }
+    notis.length = 0;
+  }
   return { sim, reloj, notis, correr, cuadros: () => cuadros, almacen };
 }
 
 test('arranca con las 16 caras y en neutral', async () => {
-  const { sim, correr, cuadros } = await nuevo();
+  const { sim, correr, cuadros } = await nuevo(memoriaVolatil(), { vincular: false });
   assert.equal(sim.expresiones().length, 16);
   assert.deepEqual(sim.expresiones().slice(0, 3), ['neutral', 'contento', 'sospecha']);
   correr(200);
   assert.equal(sim.expresionVisible(), 'neutral');
   assert.equal(cuadros(), 10);
+  assert.equal(sim.emparejando(), true);
   assert.equal(sim.version(), '0.1.0');
 });
 
@@ -76,6 +92,8 @@ test('M2: expresión y nombre por BLE sobreviven a un reinicio', async () => {
   assert.equal(b.sim.expresionVisible(), 'enamorado');
   assert.equal(b.sim.nombre(), 'Toto');
   const estado = leerEstado(b.sim.bleLeerEstado());
+  assert.equal(estado.id, 'A1B2C3D4E5F6');
+  assert.equal(estado.autenticado, true);
   assert.equal(estado.nombre, 'Toto');
   assert.equal(estado.expresion, 'enamorado');
   assert.equal(estado.fija, true);
@@ -110,4 +128,35 @@ test('M2: una config inválida explica por qué y no cambia nada', async () => {
   assert.equal(r.mensaje, 'config inválida');
   assert.match(r.detalle, /tamano/);
   assert.equal(sim.nombre(), 'bicho');
+});
+
+test('M3: sin vincular no se escribe; con el QR se vincula y la clave sirve después', async () => {
+  const almacen = memoriaVolatil();
+  const a = await nuevo(almacen, { vincular: false });
+  a.sim.bleEscribir(Car.comando, comando.nombre('Intruso'));
+  assert.equal(leerRespuesta(a.notis.at(-1).b).mensaje, 'no autorizado');
+  const qr = leerQr(a.sim.qr());
+  assert.deepEqual(qr && qr.id, 'A1B2C3D4E5F6');
+  a.sim.bleEscribir(Car.comando, comando.vincular('ZZZZZZ'));
+  assert.equal(leerRespuesta(a.notis.at(-1).b).ok, false);
+  a.sim.bleEscribir(Car.comando, comando.vincular(qr.codigo));
+  const r = leerRespuesta(a.notis.filter((n) => n.c === Car.comando).at(-1).b);
+  assert.equal(r.ok, true);
+  assert.equal(r.clave.length, 16);
+  assert.equal(a.sim.emparejando(), false);
+
+  const b = await nuevo(almacen, { vincular: false });  // reinicio y conexión nueva
+  b.sim.bleEscribir(Car.comando, comando.nombre('Toto'));
+  assert.equal(leerRespuesta(b.notis.at(-1).b).mensaje, 'no autorizado');
+  b.sim.bleEscribir(Car.comando, comando.autenticar(r.clave));
+  b.sim.bleEscribir(Car.comando, comando.nombre('Toto'));
+  assert.equal(leerRespuesta(b.notis.at(-1).b).ok, true);
+});
+
+test('M3: el id del anuncio BLE y el número de serie', async () => {
+  assert.equal(idDeAnuncio(Uint8Array.from([0xff, 0xff, 0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6])), 'A1B2C3D4E5F6');
+  assert.equal(idDeAnuncio(Uint8Array.from([0x4c, 0x00, 1, 2])), null);
+  const { sim } = await nuevo();
+  sim.fijarSerie('001');
+  assert.equal(leerEstado(sim.bleLeerEstado()).serie, '001');
 });

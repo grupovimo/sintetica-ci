@@ -28,6 +28,9 @@ enum Op : uint8_t {
   CmdExpresion = 0x10,   // nombre UTF-8; vacío = volver a automático
   CmdNombre = 0x11,      // nombre UTF-8, 1 a 24 bytes
   CmdEvento = 0x12,      // u8 evento
+  CmdVincular = 0x13,    // código del QR (6 bytes) → responde con una clave de 16 bytes
+  CmdAutenticar = 0x14,  // clave de 16 bytes (en cada conexión nueva)
+  CmdDesvincular = 0x15, // olvida todas las claves y vuelve a mostrar el QR
   // Respuestas (notificación): op | 0x80, código, [detalle]
   Respuesta = 0x80,
   ConfigTrozo = 0x84,    // u32 desplazamiento, datos (respuesta a ConfigPedir)
@@ -44,6 +47,8 @@ enum Codigo : uint8_t {
   SinInicio = 6,
   NoExiste = 7,
   Malformado = 8,
+  NoAutorizado = 9,      // falta vincular o autenticar, o el código/clave no coincide
+  NoEmparejando = 10,    // para vincular, el bicho tiene que estar mostrando el QR
   NoImplementado = 0xFF,
 };
 
@@ -83,10 +88,16 @@ struct EstadoPublico {
   uint8_t modo = 0;
   bool dormido = false;
   bool fija = false;
+  bool emparejando = false;
+  bool autenticado = false;
   const char* expresion = "";
   const char* nombre = "";
+  const char* serie = "";
+  const char* id = "";
 };
-// [versión=1][batería][humor][modo][flags][n][expresión][n][nombre]
+constexpr uint8_t VERSION_ESTADO = 2;
+// [versión=2][batería][humor][modo][flags][n][expresión][n][nombre][n][serie][n][id]
+// flags: bit 0 dormido, 1 expresión fija, 2 mostrando el QR, 3 esta conexión autenticada
 size_t codificarEstado(const EstadoPublico& e, uint8_t* salida, size_t cap);
 
 }  // namespace protocolo

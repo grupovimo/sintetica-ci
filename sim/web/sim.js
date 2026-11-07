@@ -16,6 +16,7 @@ export async function crearSimulador(opciones) {
     bateria = () => -1,
     minutoDelDia = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); },
     semilla = () => (Math.random() * 0xffffffff) >>> 0,
+    identificador = 'A1B2C3D4E5F6',
   } = opciones;
 
   let memoria;
@@ -29,7 +30,12 @@ export async function crearSimulador(opciones) {
   };
   let rgba = null;
 
+  let pId = 0;
   const env = {
+    js_identificador: () => {
+      if (!pId) { pId = x.sim_intercambio() + x.sim_intercambio_cap() - 16; bytes(pId, 13).set([...new TextEncoder().encode(identificador.slice(0, 12)), 0]); }
+      return pId;
+    },
     js_ahora: () => (Math.floor(ahora() - inicio) >>> 0),
     js_semilla: () => semilla() >>> 0,
     js_presentar: (p, w, h) => {
@@ -62,7 +68,7 @@ export async function crearSimulador(opciones) {
 
   const fuente = wasm instanceof Response ? await wasm.arrayBuffer() : wasm;
   const { instance } = await WebAssembly.instantiate(fuente, { env });
-  const x = instance.exports;
+  var x = instance.exports;
   memoria = x.memory;
   x.__wasm_call_ctors();
   x.sim_iniciar();
@@ -80,6 +86,14 @@ export async function crearSimulador(opciones) {
       x.sim_ble_escribir(caracteristica, datos.length);
     },
     bleLeerEstado: () => bytes(x.sim_intercambio(), x.sim_ble_estado()).slice(),
+    bleConexion: (conectado) => x.sim_conexion(conectado ? 1 : 0),
+    qr: () => cadena(x.sim_qr()),
+    emparejando: () => x.sim_emparejando() === 1,
+    fijarSerie: (s) => {
+      const p = x.sim_intercambio() + x.sim_intercambio_cap() - 32;
+      bytes(p, 14).set([...new TextEncoder().encode(s.slice(0, 12)), 0]);
+      x.sim_fijar_serie(p);
+    },
     expresiones: () => Array.from({ length: x.sim_cantidad_expresiones() }, (_, i) => cadena(x.sim_nombre_expresion(i))),
     expresionVisible: () => cadena(x.sim_nombre_expresion(x.sim_expresion_visible())),
     nombre: () => cadena(x.sim_nombre()),

@@ -26,5 +26,7 @@ target_link_libraries(render_caras nucleo)
 enable_testing()
 add_test(NAME nucleo COMMAND pruebas)
 add_test(NAME caras_embebidas COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/herramientas/embeber_caras.py --verificar)
+add_test(NAME fuentes_generadas COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/herramientas/generar_fuentes.py --verificar)
+add_test(NAME qr_legible COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/test/oro/leer_qr.py $<TARGET_FILE:render_caras>)
 add_test(NAME caras_de_oro
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/test/oro/comparar.py $<TARGET_FILE:render_caras>)

@@ -9,6 +9,7 @@ using namespace sintetica;
 
 extern "C" {
 IMPORTAR(js_ahora) uint32_t js_ahora();
+IMPORTAR(js_identificador) const char* js_identificador();
 IMPORTAR(js_semilla) uint32_t js_semilla();
 IMPORTAR(js_presentar) void js_presentar(const uint16_t* pixeles, int ancho, int alto);
 IMPORTAR(js_minuto) int js_minuto();
@@ -58,6 +59,7 @@ extern "C" {
 __attribute__((export_name("sim_iniciar"))) void sim_iniciar() {
   Hal h;
   h.ahoraMs = js_ahora;
+  h.identificador = js_identificador;
   h.semilla = js_semilla;
   h.presentar = js_presentar;
   h.minutoDelDia = js_minuto;
@@ -100,5 +102,9 @@ __attribute__((export_name("sim_expresion_visible"))) int sim_expresion_visible(
 }
 __attribute__((export_name("sim_nombre"))) const char* sim_nombre() { return g_sistema.nombre(); }
 __attribute__((export_name("sim_cierre"))) float sim_cierre() { return g_sistema.motor().estado().cierre; }
+__attribute__((export_name("sim_conexion"))) void sim_conexion(int conectado) { g_sistema.bleConexion(conectado != 0); }
+__attribute__((export_name("sim_qr"))) const char* sim_qr() { return g_sistema.contenidoQr(); }
+__attribute__((export_name("sim_emparejando"))) int sim_emparejando() { return g_sistema.emparejando() ? 1 : 0; }
+__attribute__((export_name("sim_fijar_serie"))) void sim_fijar_serie(const char* s) { g_sistema.fijarSerie(s); }
 __attribute__((export_name("sim_version"))) const char* sim_version() { return VERSION_SINTETICAOS; }
 }

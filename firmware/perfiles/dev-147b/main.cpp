@@ -6,6 +6,7 @@
 #include <NimBLEDevice.h>
 #include <Preferences.h>
 #include <Wire.h>
+#include <esp_mac.h>
 
 #include "pines.h"
 #include "sistema.h"
@@ -102,6 +103,7 @@ bool imuLeer(float* ax, float* ay, float* az) {
 
 // --- BLE --------------------------------------------------------------------------
 
+// car 0 = cambio de conexión (datos[0]: 1 conectado, 0 desconectado).
 struct Escritura {
   uint8_t car;
   uint16_t n;
@@ -127,6 +129,18 @@ class AlEscribir : public NimBLECharacteristicCallbacks {
   }
 };
 
+class AlConectar : public NimBLEServerCallbacks {
+  void avisar(uint8_t conectado) {
+    static Escritura e;
+    e.car = 0;
+    e.n = 1;
+    e.datos[0] = conectado;
+    xQueueSend(g_colaBle, &e, 0);
+  }
+  void onConnect(NimBLEServer*) override { avisar(1); }
+  void onDisconnect(NimBLEServer*) override { avisar(0); }
+};
+
 class AlLeerEstado : public NimBLECharacteristicCallbacks {
   void onRead(NimBLECharacteristic* c) override {
     uint8_t b[64];
@@ -140,6 +154,8 @@ void bleIniciar(const char* nombre) {
   NimBLEDevice::init(nombre);
   NimBLEDevice::setMTU(517);
   NimBLEServer* servidor = NimBLEDevice::createServer();
+  static AlConectar conexiones;
+  servidor->setCallbacks(&conexiones);
   NimBLEService* s = servidor->createService(protocolo::UUID_SERVICIO);
   using P = NIMBLE_PROPERTY;
   g_car[protocolo::CarConfig] = s->createCharacteristic(protocolo::UUID_CONFIG, P::WRITE | P::WRITE_NR | P::NOTIFY);
@@ -155,6 +171,14 @@ void bleIniciar(const char* nombre) {
   s->start();
   NimBLEAdvertising* a = NimBLEDevice::getAdvertising();
   a->addServiceUUID(protocolo::UUID_SERVICIO);
+  // El id del bicho (la MAC) en los datos del fabricante, para que la app
+  // encuentre el bicho del QR sin conectarse a todos. 0xFFFF = sin empresa
+  // asignada por el Bluetooth SIG (reservado para pruebas).
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_BT);
+  std::string datos("\xFF\xFF", 2);
+  datos.append(reinterpret_cast<const char*>(mac), 6);
+  a->setManufacturerData(datos);
   a->setScanResponse(true);
   a->start();
   servidor->advertiseOnDisconnect(true);
@@ -162,8 +186,41 @@ void bleIniciar(const char* nombre) {
 
 // --- HAL --------------------------------------------------------------------------
 
+char g_id[13];
+
+const char* identificador() {
+  if (!g_id[0]) {
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_BT);
+    snprintf(g_id, sizeof g_id, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  }
+  return g_id;
+}
+
+// Comandos de taller por USB serie: "serie 001" graba el número de unidad.
+void atenderSerie() {
+  static char linea[48];
+  static size_t n = 0;
+  while (Serial.available()) {
+    char c = static_cast<char>(Serial.read());
+    if (c != '\n' && c != '\r') {
+      if (n < sizeof linea - 1) linea[n++] = c;
+      continue;
+    }
+    linea[n] = 0;
+    if (n > 6 && strncmp(linea, "serie ", 6) == 0 && n - 6 <= 12) {
+      g_sistema.fijarSerie(linea + 6);
+      Serial.printf("[taller] unidad #%s grabada\n", g_sistema.serie());
+    } else if (n > 0) {
+      Serial.println("[taller] comandos: serie <número, hasta 12 caracteres>");
+    }
+    n = 0;
+  }
+}
+
 Hal armarHal() {
   Hal h;
+  h.identificador = identificador;
   h.ahoraMs = [] { return static_cast<uint32_t>(millis()); };
   h.semilla = [] { return static_cast<uint32_t>(esp_random()); };
   h.presentar = [](const uint16_t* px, int w, int alto) {
@@ -215,11 +272,18 @@ void setup() {
   g_sistema.iniciar(armarHal(), g_pixeles, ANCHO, ALTO);
   if (!g_hayImu) Serial.println("[sintetica] no encontré el QMI8658: sin sacudidas");
   bleIniciar(g_sistema.nombre());
+  Serial.printf("[taller] id %s · unidad #%s · %s\n", g_sistema.identificador(),
+                g_sistema.serie()[0] ? g_sistema.serie() : "(sin grabar)",
+                g_sistema.emparejando() ? "esperando vínculo" : "ya vinculado");
 }
 
 void loop() {
   static Escritura e;
-  while (g_colaBle && xQueueReceive(g_colaBle, &e, 0) == pdTRUE) g_sistema.bleEscribir(e.car, e.datos, e.n);
+  while (g_colaBle && xQueueReceive(g_colaBle, &e, 0) == pdTRUE) {
+    if (e.car == 0) g_sistema.bleConexion(e.datos[0] != 0);
+    else g_sistema.bleEscribir(e.car, e.datos, e.n);
+  }
+  atenderSerie();
 
   const bool apretado = digitalRead(pines::BOTON_BOOT) == LOW || (pines::TTP223 >= 0 && digitalRead(pines::TTP223) == HIGH);
   g_sistema.tacto(apretado);

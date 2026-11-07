@@ -40,6 +40,10 @@ class Lienzo {
   void poligono(const Punto* p, int n, uint32_t rgb);
   // Línea poligonal con puntas y uniones redondas.
   void trazo(const Punto* p, int n, float grosor, uint32_t rgb);
+  // Mezcla un píxel con una cobertura de 0 a 1 (lo usan el texto y el QR).
+  void cubrir(int x, int y, float cobertura, uint32_t rgb) { mezclarPixel(x, y, cobertura, rgb); }
+  // Rectángulo lleno alineado a píxeles, sin antialias.
+  void rectangulo(int x, int y, int w, int h, uint32_t rgb);
   // Corre en horizontal las filas [y0, y1) dx píxeles, rellenando con `fondo`.
   void correrFilas(int y0, int y1, int dx, uint32_t fondo);
 

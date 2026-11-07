@@ -42,21 +42,28 @@ Codigo Receptor::fin() {
 }
 
 size_t codificarEstado(const EstadoPublico& e, uint8_t* s, size_t cap) {
-  const size_t ne = largo(e.expresion), nn = largo(e.nombre);
-  const size_t total = 5 + 1 + ne + 1 + nn;
-  if (cap < total || ne > 255 || nn > 255) return 0;
+  const size_t ne = largo(e.expresion), nn = largo(e.nombre), ns = largo(e.serie), ni = largo(e.id);
+  const size_t total = 5 + 1 + ne + 1 + nn + 1 + ns + 1 + ni;
+  if (cap < total || ne > 255 || nn > 255 || ns > 255 || ni > 255) return 0;
   size_t i = 0;
-  s[i++] = 1;
+  s[i++] = VERSION_ESTADO;
   s[i++] = e.bateria;
   s[i++] = static_cast<uint8_t>(e.humor);
   s[i++] = e.modo;
-  s[i++] = static_cast<uint8_t>((e.dormido ? 1 : 0) | (e.fija ? 2 : 0));
+  s[i++] = static_cast<uint8_t>((e.dormido ? 1 : 0) | (e.fija ? 2 : 0) | (e.emparejando ? 4 : 0) |
+                                (e.autenticado ? 8 : 0));
   s[i++] = static_cast<uint8_t>(ne);
   copiarBytes(s + i, e.expresion, ne);
   i += ne;
   s[i++] = static_cast<uint8_t>(nn);
   copiarBytes(s + i, e.nombre, nn);
   i += nn;
+  s[i++] = static_cast<uint8_t>(ns);
+  copiarBytes(s + i, e.serie, ns);
+  i += ns;
+  s[i++] = static_cast<uint8_t>(ni);
+  copiarBytes(s + i, e.id, ni);
+  i += ni;
   return i;
 }
 

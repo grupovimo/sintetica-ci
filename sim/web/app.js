@@ -2,7 +2,7 @@
 // botones de sensores y el panel BLE, que manda los mismos bytes que la app.
 import { almacenLocal, crearSimulador } from './sim.js';
 import {
-  ArmadorDeConfig, Car, comando, escriturasDeConfig, Eventos, leerEstado, leerRespuesta, pedirConfig,
+  ArmadorDeConfig, Car, comando, escriturasDeConfig, Eventos, leerEstado, leerQr, leerRespuesta, pedirConfig,
 } from './protocolo.js';
 
 const $ = (id) => document.getElementById(id);
@@ -13,7 +13,22 @@ const registro = $('registro');
 const almacen = almacenLocal();
 
 const NOMBRES_CAR = { 1: 'config', 2: 'comando', 3: 'estado', 4: 'ota' };
-const NOMBRES_OP = { 0x10: 'expresión', 0x11: 'nombre', 0x12: 'evento', 0x01: 'inicio', 0x02: 'bloque', 0x03: 'fin', 0x04: 'pedir' };
+const NOMBRES_OP = {
+  0x10: 'expresión', 0x11: 'nombre', 0x12: 'evento', 0x13: 'vincular', 0x14: 'autenticar', 0x15: 'desvincular',
+  0x01: 'inicio', 0x02: 'bloque', 0x03: 'fin', 0x04: 'pedir',
+};
+
+// La clave que el bicho le dio a "este celu" al vincular (como la guardaría la app).
+const CLAVE_CELU = 'sinteticaos-celu:clave';
+let claveEnMemoria = null;  // por si el navegador no deja usar localStorage
+function claveGuardada() {
+  try { const s = localStorage.getItem(CLAVE_CELU); if (s) return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)); } catch { /* sin almacenamiento */ }
+  return claveEnMemoria;
+}
+function guardarClave(clave) {
+  claveEnMemoria = clave;
+  try { if (clave) localStorage.setItem(CLAVE_CELU, btoa(String.fromCharCode(...clave))); else localStorage.removeItem(CLAVE_CELU); } catch { /* sin almacenamiento */ }
+}
 
 let sim = null;
 let bateria = -1;
@@ -52,6 +67,8 @@ function alNotificar(car, b) {
     } catch (e) { anotar(`← config  ${e.message}`, 'mal'); }
     return;
   }
+  if (r.clave) { guardarClave(r.clave); anotar('· este celu quedó vinculado: guardé la clave'); }
+  if (r.op === 0x15 && r.ok) guardarClave(null);
   const op = NOMBRES_OP[r.op] ?? `0x${r.op.toString(16)}`;
   anotar(`← ${NOMBRES_CAR[car]} ${op}  ${r.mensaje}${r.detalle ? ': ' + r.detalle : ''}`, r.ok ? '' : 'mal');
 }
@@ -60,8 +77,10 @@ function mostrarEstado(e) {
   $('f-nombre').textContent = e.nombre;
   $('f-expresion').textContent = e.expresion + (e.fija ? ' (fija)' : '');
   $('f-humor').textContent = (e.humor >= 0 ? '+' : '') + e.humor.toFixed(2);
-  $('f-estado').textContent = e.dormido ? 'durmiendo' : (e.bateria == null ? 'despierto' : `despierto · ${e.bateria}%`);
-  $('placa-serie').textContent = `${e.nombre} · SintéticaOS ${sim?.version() ?? ''}`;
+  $('f-estado').textContent = e.emparejando ? 'mostrando el QR'
+    : e.dormido ? 'durmiendo' : (e.bateria == null ? 'despierto' : `despierto · ${e.bateria}%`);
+  $('placa-serie').textContent = `${e.serie ? 'Unidad #' + e.serie : 'Sin número'} · ${e.nombre} · SintéticaOS ${sim?.version() ?? ''}`;
+  $('b-vincular').disabled = !e.emparejando;
   $('b-auto').setAttribute('aria-pressed', String(!e.fija));
   for (const b of $('caras').children) b.setAttribute('aria-pressed', String(e.fija && b.dataset.nombre === e.expresion));
 }
@@ -106,6 +125,9 @@ async function arrancar() {
     alLed: (rgb) => { $('led').style.background = `#${rgb.toString(16).padStart(6, '0')}`; },
   });
   armarCaras();
+  sim.bleConexion(true);
+  const clave = claveGuardada();
+  if (clave && !sim.emparejando()) escribir(Car.comando, comando.autenticar(clave), '(clave guardada de este celu)');
   sim.tick();
   mostrarEstado(leerEstado(sim.bleLeerEstado()));
 }
@@ -170,8 +192,18 @@ function enlazar() {
     escrituras.forEach((b, i) => escribir(Car.config, b, i === 0 ? `(${json.length} bytes en ${escrituras.length - 2} bloques)` : ''));
   });
   $('b-pedir').addEventListener('click', () => escribir(Car.config, pedirConfig()));
+  $('b-vincular').addEventListener('click', () => {
+    const qr = leerQr(sim.qr());
+    anotar(`· escaneé el QR: ${sim.qr()}`);
+    if (qr) escribir(Car.comando, comando.vincular(qr.codigo));
+  });
+  $('b-desvincular').addEventListener('click', () => escribir(Car.comando, comando.desvincular()));
+  $('b-serie').addEventListener('click', () => {
+    const s = $('i-serie').value.trim();
+    if (s) { sim.fijarSerie(s); anotar(`· taller: unidad #${s} grabada (por USB, no por BLE)`); }
+  });
   $('b-reiniciar').addEventListener('click', async () => { anotar('· reinicio: la memoria queda'); await arrancar(); });
-  $('b-borrar').addEventListener('click', async () => { almacen.borrar(); anotar('· memoria borrada'); await arrancar(); });
+  $('b-borrar').addEventListener('click', async () => { almacen.borrar(); guardarClave(null); anotar('· memoria del bicho y clave del celu borradas'); await arrancar(); });
 
   document.addEventListener('keydown', (e) => {
     if (e.target.closest('input, textarea, select') || e.repeat) return;

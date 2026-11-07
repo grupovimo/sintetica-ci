@@ -7,6 +7,7 @@
 #include <string>
 
 #include "cara.h"
+#include "emparejamiento.h"
 #include "formato.h"
 
 using namespace sintetica;
@@ -47,6 +48,18 @@ int main(int argc, char** argv) {
     }
     std::fclose(f);
   }
-  std::printf("%d caras en %s\n", g_config.nExpresiones, carpeta.c_str());
+  // La pantalla de emparejamiento, con el número de serie del manual.
+  dibujarEmparejamiento(lienzo, "001", "SINTETICA:V1/A1B2C3D4E5F6/K7Q2XM", "ESPERANDO VÍNCULO");
+  FILE* f = std::fopen((carpeta + "/emparejamiento.ppm").c_str(), "wb");
+  if (!f) return 1;
+  std::fprintf(f, "P6\n320 172\n255\n");
+  for (int p = 0; p < 320 * 172; p++) {
+    uint32_t c = de565(g_pixeles[p]);
+    unsigned char rgb[3] = {static_cast<unsigned char>(c >> 16), static_cast<unsigned char>(c >> 8),
+                            static_cast<unsigned char>(c)};
+    std::fwrite(rgb, 1, 3, f);
+  }
+  std::fclose(f);
+  std::printf("%d caras y la pantalla de emparejamiento en %s\n", g_config.nExpresiones, carpeta.c_str());
   return 0;
 }

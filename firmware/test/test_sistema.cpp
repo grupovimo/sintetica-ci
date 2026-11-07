@@ -23,7 +23,12 @@ Sistema g_s;
 Hal halFalso() {
   Hal h;
   h.ahoraMs = [] { return g_ahora; };
-  h.semilla = [] { return 42u; };
+  h.semilla = [] {
+    static uint32_t x = 42;
+    x = x * 1664525u + 1013904223u;
+    return x;
+  };
+  h.identificador = [] { return "A1B2C3D4E5F6"; };
   h.bateria = [] { return g_bateria; };
   h.guardar = [](const char* k, const uint8_t* d, size_t n) {
     g_flash[k] = std::vector<uint8_t>(d, d + n);
@@ -40,10 +45,28 @@ Hal halFalso() {
   return h;
 }
 
-void arrancar() {
+std::vector<uint8_t> g_clave;  // la que dio el último vínculo
+
+void arrancar(bool autenticar = true) {
   g_ahora = 1000;
   g_notis.clear();
   g_s.iniciar(halFalso(), g_px, 320, 172);
+  g_s.bleConexion(true);
+  if (!autenticar) return;
+  if (g_s.emparejando()) {
+    std::vector<uint8_t> v{CmdVincular};
+    v.insert(v.end(), g_s.codigo(), g_s.codigo() + 6);
+    g_s.bleEscribir(CarComando, v.data(), v.size());
+    for (auto& n : g_notis)
+      if (n.first == CarComando && n.second[0] == (CmdVincular | Respuesta) && n.second[1] == Ok)
+        g_clave.assign(n.second.begin() + 2, n.second.end());
+    for (int i = 0; i < 160; i++) g_ahora += 20, g_s.tick();  // que pase el guiño del vínculo
+  } else {
+    std::vector<uint8_t> v{CmdAutenticar};
+    v.insert(v.end(), g_clave.begin(), g_clave.end());
+    g_s.bleEscribir(CarComando, v.data(), v.size());
+  }
+  g_notis.clear();
 }
 
 void correr(uint32_t ms) {
@@ -89,11 +112,11 @@ std::string expresionActual() { return g_s.config().expresiones[g_s.motor().expr
 
 PRUEBA("sistema: arranca en neutral y dibuja") {
   g_flash.clear();
-  arrancar();
+  arrancar(false);
   correr(200);
   VERIFICAR(expresionActual() == "neutral");
   VERIFICAR(std::string(g_s.nombre()) == "bicho");
-  // Se notificó el estado al menos una vez.
+  // Se notificó el estado del arranque.
   bool hubo = false;
   for (auto& n : g_notis) hubo = hubo || n.first == CarEstado;
   VERIFICAR(hubo);
@@ -149,7 +172,7 @@ PRUEBA("protocolo: comando de expresión y nombre, y sobreviven a un reinicio") 
 
   uint8_t est[64];
   size_t n = g_s.estadoBle(est, sizeof est);
-  VERIFICAR(n > 6 && est[0] == 1 && (est[4] & 2));
+  VERIFICAR(n > 6 && est[0] == 2 && (est[4] & 2));
   VERIFICAR(std::string(reinterpret_cast<char*>(est + 6), est[5]) == "enamorado");
 
   escribir(CarComando, bytes({CmdExpresion}));  // vacío = automático
@@ -237,4 +260,130 @@ PRUEBA("sistema: una config guardada rota no impide arrancar") {
   correr(200);
   VERIFICAR(expresionActual() == "neutral");
   VERIFICAR(std::string(g_s.nombre()) == "bicho");
+}
+
+// --- Vínculo y autenticación (protocolo v1.1) ---------------------------------
+
+namespace {
+uint8_t ultimaRespuesta(uint8_t op) {
+  for (auto it = g_notis.rbegin(); it != g_notis.rend(); ++it)
+    if (it->first == CarComando && it->second[0] == (op | Respuesta)) return it->second[1];
+  return 0xEE;
+}
+std::vector<uint8_t> conBytes(uint8_t op, const char* s, size_t n) {
+  std::vector<uint8_t> v{op};
+  v.insert(v.end(), s, s + n);
+  return v;
+}
+}  // namespace
+
+PRUEBA("vínculo: el primer arranque muestra el QR con id y código") {
+  g_flash.clear();
+  arrancar(false);
+  VERIFICAR(g_s.emparejando());
+  VERIFICAR(std::string(g_s.identificador()) == "A1B2C3D4E5F6");
+  VERIFICAR(std::string(g_s.codigo()).size() == 6);
+  VERIFICAR(std::string(g_s.contenidoQr()) == std::string("SINTETICA:V1/A1B2C3D4E5F6/") + g_s.codigo());
+  std::string codigo = g_s.codigo();
+  arrancar(false);  // el código no cambia entre reinicios
+  VERIFICAR(codigo == g_s.codigo());
+}
+
+PRUEBA("vínculo: sin autenticar no se escribe, pero el estado se lee") {
+  g_flash.clear();
+  arrancar(false);
+  escribir(CarComando, conTexto(CmdNombre, "Intruso"));
+  VERIFICAR(ultimaRespuesta(CmdNombre) == NoAutorizado);
+  escribir(CarConfig, bytes({ConfigPedir}));
+  VERIFICAR(g_notis.back().second[1] == NoAutorizado);
+  VERIFICAR(std::string(g_s.nombre()) == "bicho");
+  uint8_t est[96];
+  VERIFICAR(g_s.estadoBle(est, sizeof est) > 0 && (est[4] & 4) && !(est[4] & 8));
+}
+
+PRUEBA("vínculo: código malo, código bueno, y guiño al vincular") {
+  g_flash.clear();
+  arrancar(false);
+  escribir(CarComando, conBytes(CmdVincular, "XXXXXX", 6));
+  VERIFICAR(ultimaRespuesta(CmdVincular) == NoAutorizado);
+  VERIFICAR(g_s.emparejando());
+  g_notis.clear();
+  escribir(CarComando, conBytes(CmdVincular, g_s.codigo(), 6));
+  VERIFICAR(ultimaRespuesta(CmdVincular) == Ok);
+  VERIFICAR(g_notis.back().second.size() == 18);
+  VERIFICAR(!g_s.emparejando());
+  VERIFICAR(g_s.cantidadDeClaves() == 1);
+  correr(200);
+  VERIFICAR(expresionActual() == "guino");
+  // Ya vinculado, el código solo no alcanza: hay que mostrar el QR de nuevo.
+  escribir(CarComando, conBytes(CmdVincular, g_s.codigo(), 6));
+  VERIFICAR(ultimaRespuesta(CmdVincular) == NoEmparejando);
+}
+
+PRUEBA("vínculo: cada conexión se autentica, y la clave sobrevive a un reinicio") {
+  g_flash.clear();
+  arrancar();  // vincula y guarda g_clave
+  escribir(CarComando, conTexto(CmdNombre, "Toto"));
+  VERIFICAR(ultimaRespuesta(CmdNombre) == Ok);
+  g_s.bleConexion(false);
+  g_s.bleConexion(true);
+  escribir(CarComando, conTexto(CmdNombre, "Otro"));
+  VERIFICAR(ultimaRespuesta(CmdNombre) == NoAutorizado);
+  std::vector<uint8_t> mala(17, 7);
+  mala[0] = CmdAutenticar;
+  escribir(CarComando, mala);
+  VERIFICAR(ultimaRespuesta(CmdAutenticar) == NoAutorizado);
+  arrancar();  // reinicio + autenticar con la clave guardada
+  VERIFICAR(!g_s.emparejando());
+  escribir(CarComando, conTexto(CmdNombre, "Pochi"));
+  VERIFICAR(ultimaRespuesta(CmdNombre) == Ok);
+  VERIFICAR(std::string(g_s.nombre()) == "Pochi");
+}
+
+PRUEBA("vínculo: 5 intentos fallidos bloquean 30 s") {
+  g_flash.clear();
+  arrancar(false);
+  for (int i = 0; i < 5; i++) escribir(CarComando, conBytes(CmdVincular, "ZZZZZZ", 6));
+  escribir(CarComando, conBytes(CmdVincular, g_s.codigo(), 6));
+  VERIFICAR(ultimaRespuesta(CmdVincular) == NoAutorizado);
+  g_ahora += 31000;
+  escribir(CarComando, conBytes(CmdVincular, g_s.codigo(), 6));
+  VERIFICAR(ultimaRespuesta(CmdVincular) == Ok);
+}
+
+PRUEBA("vínculo: mantener el botón 5 s muestra el QR por 2 min") {
+  g_flash.clear();
+  arrancar();
+  VERIFICAR(!g_s.emparejando());
+  g_s.tacto(true);
+  correr(5100);
+  g_s.tacto(false);
+  correr(100);
+  VERIFICAR(g_s.emparejando());
+  correr(121000);
+  VERIFICAR(!g_s.emparejando());
+}
+
+PRUEBA("vínculo: desvincular olvida las claves y vuelve al QR") {
+  g_flash.clear();
+  arrancar();
+  escribir(CarComando, bytes({CmdDesvincular}));
+  VERIFICAR(ultimaRespuesta(CmdDesvincular) == Ok);
+  VERIFICAR(g_s.emparejando());
+  VERIFICAR(g_s.cantidadDeClaves() == 0);
+  escribir(CarComando, conTexto(CmdNombre, "x"));
+  VERIFICAR(ultimaRespuesta(CmdNombre) == NoAutorizado);
+}
+
+PRUEBA("vínculo: el número de serie se guarda y viaja en el estado") {
+  g_flash.clear();
+  arrancar();
+  g_s.fijarSerie("001");
+  arrancar();
+  VERIFICAR(std::string(g_s.serie()) == "001");
+  uint8_t est[96];
+  size_t n = g_s.estadoBle(est, sizeof est);
+  std::string todo(reinterpret_cast<char*>(est), n);
+  VERIFICAR(todo.find("001") != std::string::npos);
+  VERIFICAR(todo.find("A1B2C3D4E5F6") != std::string::npos);
 }

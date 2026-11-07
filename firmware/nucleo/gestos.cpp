@@ -22,6 +22,7 @@ void Gestos::tacto(bool apretado, uint32_t ahora) {
   if (apretado) {
     desde_ = ahora;
     caricia_ = false;
+    largo_ = false;
     return;
   }
   const uint32_t dur = ahora - desde_;
@@ -36,6 +37,10 @@ void Gestos::tacto(bool apretado, uint32_t ahora) {
 }
 
 void Gestos::tick(uint32_t ahora) {
+  if (apretado_ && !largo_ && ahora - desde_ >= umbrales::MANTENIDO_MS) {
+    largo_ = true;
+    mantenido_ = true;
+  }
   if (apretado_ && !caricia_ && ahora - desde_ >= umbrales::CARICIA_MS) {
     caricia_ = true;
     toquePendiente_ = false;

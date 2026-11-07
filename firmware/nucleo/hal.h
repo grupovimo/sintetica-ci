@@ -10,6 +10,9 @@ namespace sintetica {
 struct Hal {
   // Milisegundos desde que arrancó (puede dar la vuelta; el núcleo lo tolera).
   uint32_t (*ahoraMs)() = nullptr;
+  // Identificador único del bicho, 12 caracteres hexadecimales en mayúscula
+  // (en la placa, la MAC). nullptr = "000000000000".
+  const char* (*identificador)() = nullptr;
   // Una semilla para el azar (ruido del ADC, RNG de hardware, etc.).
   uint32_t (*semilla)() = nullptr;
   // Muestra el framebuffer RGB565 completo.

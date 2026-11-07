@@ -147,6 +147,12 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--linea);
         </div>
         <p class="nota">También se puede tocar la pantalla: un toque, dos seguidos, o mantener apretado para acariciarlo. Con el teclado: <kbd>Espacio</kbd> toca, <kbd>S</kbd> sacude.</p>
         <div class="dos">
+          <label for="i-serie"><span class="etiqueta">Número de unidad (taller, por USB)</span>
+            <input type="text" id="i-serie" maxlength="12" value="001" autocomplete="off">
+          </label>
+          <button id="b-serie">Grabar</button>
+        </div>
+        <div class="dos">
           <label for="r-bateria"><span class="etiqueta">Batería: <span id="v-bateria">sin batería</span></span>
             <input type="range" id="r-bateria" min="-1" max="100" value="-1">
           </label>
@@ -167,6 +173,11 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--linea);
 
       <section aria-labelledby="t-ble">
         <h2 id="t-ble">BLE</h2>
+        <div class="fila">
+          <button id="b-vincular" class="primario">Escanear el QR y vincular</button>
+          <button id="b-desvincular">Desvincular</button>
+        </div>
+        <p class="nota">Sin vincular, el bicho rechaza todo lo que se escriba (código 0x09). Para ver el QR de nuevo, mantené apretado Tocar 5 segundos.</p>
         <div class="dos">
           <label for="i-nombre"><span class="etiqueta">Nombre (comando 0x11)</span>
             <input type="text" id="i-nombre" maxlength="24" value="Toto" autocomplete="off">
@@ -177,7 +188,7 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--linea);
           <textarea id="t-config" spellcheck="false"></textarea>
         </label>
         <div class="fila">
-          <button id="b-mandar" class="primario">Mandar config</button>
+          <button id="b-mandar">Mandar config</button>
           <button id="b-pedir">Pedir config</button>
           <button id="b-reiniciar">Reiniciar bicho</button>
           <button id="b-borrar">Borrar memoria</button>

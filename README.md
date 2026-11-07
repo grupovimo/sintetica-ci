@@ -19,7 +19,8 @@ mismo núcleo en el navegador.
 
 ## Requisitos
 
-- Node 22, Python 3 con Pillow y NumPy (para los tests de oro), CMake, clang y
+- Node 22, Python 3 con Pillow, NumPy y OpenCV (`opencv-python-headless`, para los
+  tests de oro y del QR), CMake, clang y
   wasm-ld (para el simulador; no hace falta Emscripten).
 - PlatformIO para el firmware: `pip install platformio`.
 - Playwright con Chromium solo para regenerar las referencias de oro.

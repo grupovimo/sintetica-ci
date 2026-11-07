@@ -11,6 +11,7 @@ namespace umbrales {
 constexpr uint32_t TOQUE_MAX_MS = 400;        // más largo deja de ser un toque
 constexpr uint32_t DOBLE_TOQUE_MS = 350;      // ventana para el segundo toque
 constexpr uint32_t CARICIA_MS = 600;          // mantener apretado = caricia
+constexpr uint32_t MANTENIDO_MS = 5000;       // mantener 5 s = mostrar el QR para vincular
 constexpr float SACUDIDA_G = 1.0f;            // desvío de |a| respecto de 1 g
 constexpr int SACUDIDA_PICOS = 3;
 constexpr uint32_t SACUDIDA_VENTANA_MS = 800;
@@ -33,6 +34,12 @@ class Gestos {
 
   // Saca el próximo evento; devuelve false si no hay.
   bool sacar(Evento* e);
+  // true una vez cuando el botón estuvo apretado 5 s seguidos.
+  bool sacarMantenido() {
+    bool m = mantenido_;
+    mantenido_ = false;
+    return m;
+  }
 
  private:
   void poner(Evento e);
@@ -43,6 +50,7 @@ class Gestos {
   bool apretado_ = false;
   uint32_t desde_ = 0;
   bool caricia_ = false;
+  bool largo_ = false, mantenido_ = false;
   bool toquePendiente_ = false;
   uint32_t finToque_ = 0;
 
