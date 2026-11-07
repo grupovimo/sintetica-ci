@@ -10,3 +10,7 @@ android/build/
 android/app/build/
 android/app/.cxx/
 android/local.properties
+
+# Claves de firma de las OTA (npm run claves): nunca al repo.
+claves/
+firmware/perfiles/comun/clave_ota.h

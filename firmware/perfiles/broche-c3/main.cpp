@@ -7,6 +7,7 @@
 #include <esp_sleep.h>
 
 #include "comun.h"
+#include "ota.h"
 #include "pines.h"
 #include "sistema.h"
 
@@ -68,10 +69,14 @@ Hal armarHal() {
     if (mv < 2500) return -1;  // sin batería o sin el divisor
     return static_cast<int>(constrain((static_cast<int>(mv) - 3300) * 100 / (4200 - 3300), 0, 100));
   };
+  comun::otaCompletarHal(h, false);  // sin WiFi: la OTA llega por BLE, desde la app
   return h;
 }
 
 void dormir() {
+  // Al despertar arranca de nuevo: si el firmware estaba a prueba, el
+  // bootloader volvería al anterior. Si llegó a dormirse, anda.
+  comun::otaConfirmar();
   Serial.println("[sintetica] a dormir; un toque lo despierta");
   Serial.flush();
   g_lcd.setBrightness(0);
@@ -97,6 +102,8 @@ void setup() {
 
   Perfil p;
   p.ancho = LADO, p.alto = LADO, p.filasFranja = FILAS, p.redonda = true, p.boton = Perfil::Boton::Broche;
+  p.nombre = "broche-c3";
+  p.version = SINTETICA_VERSION;
   g_sistema.iniciar(armarHal(), g_franja, p);
   comun::bleIniciar(g_sistema, g_sistema.nombre());
   comun::tallerSaludo(g_sistema);
@@ -104,6 +111,7 @@ void setup() {
 
 void loop() {
   comun::bleAtender(g_sistema);
+  comun::otaAtender(g_sistema, true);
   comun::tallerAtender(g_sistema);
 
   const bool apretado = digitalRead(pines::BOTON) == LOW;

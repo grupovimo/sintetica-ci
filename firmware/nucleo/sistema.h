@@ -75,6 +75,7 @@ class Sistema {
   bool nube(char* url, size_t capUrl, char* usuario, size_t capUsuario, char* clave, size_t capClave) const;
   void conexiones(bool wifi, bool nube);
   bool wifiConectado() const { return wifi_; }
+  bool redConfigurada() const { return redConfigurada_; }
   bool nubeConectada() const { return nube_; }
   // El perfil avisa cómo va una OTA (código protocolo::Codigo, 0-100 %).
   void otaProgreso(uint8_t codigo, uint8_t porcentaje, const char* detalle = nullptr);

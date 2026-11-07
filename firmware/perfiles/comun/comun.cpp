@@ -30,7 +30,8 @@ void encolar(uint8_t car, const uint8_t* d, size_t n) {
   e.car = car;
   e.n = static_cast<uint16_t>(n);
   memcpy(e.datos, d, n);
-  xQueueSend(g_cola, &e, pdMS_TO_TICKS(50));
+  // Si el loop está ocupado (escribiendo la flash), esperar: frena al celu.
+  if (xQueueSend(g_cola, &e, pdMS_TO_TICKS(500)) != pdTRUE) Serial.println("[ble] se llenó la cola: perdí una escritura");
 }
 
 class AlEscribir : public NimBLECharacteristicCallbacks {
@@ -46,7 +47,7 @@ class AlEscribir : public NimBLECharacteristicCallbacks {
 
 class AlLeerEstado : public NimBLECharacteristicCallbacks {
   void onRead(NimBLECharacteristic* c) override {
-    uint8_t b[96];
+    uint8_t b[protocolo::MAX_ESTADO];
     c->setValue(b, g_sistema ? g_sistema->estadoBle(b, sizeof b) : 0);
   }
 };
@@ -128,7 +129,7 @@ void completarHal(Hal& h) {
 
 void bleIniciar(Sistema& s, const char* nombre) {
   g_sistema = &s;
-  g_cola = xQueueCreate(8, sizeof(Escritura));
+  g_cola = xQueueCreate(16, sizeof(Escritura));  // las OTA y las imágenes llegan rápido
   NimBLEDevice::init(nombre);
   NimBLEDevice::setMTU(517);
   NimBLEServer* servidor = NimBLEDevice::createServer();
@@ -139,7 +140,7 @@ void bleIniciar(Sistema& s, const char* nombre) {
   g_car[protocolo::CarConfig] = srv->createCharacteristic(protocolo::UUID_CONFIG, P::WRITE | P::WRITE_NR | P::NOTIFY);
   g_car[protocolo::CarComando] = srv->createCharacteristic(protocolo::UUID_COMANDO, P::WRITE | P::NOTIFY);
   g_car[protocolo::CarEstado] = srv->createCharacteristic(protocolo::UUID_ESTADO, P::READ | P::NOTIFY);
-  g_car[protocolo::CarOta] = srv->createCharacteristic(protocolo::UUID_OTA, P::WRITE | P::NOTIFY);
+  g_car[protocolo::CarOta] = srv->createCharacteristic(protocolo::UUID_OTA, P::WRITE | P::WRITE_NR | P::NOTIFY);
   g_car[protocolo::CarImagen] = srv->createCharacteristic(protocolo::UUID_IMAGEN, P::WRITE | P::WRITE_NR | P::NOTIFY);
   static AlEscribir config(protocolo::CarConfig), cmd(protocolo::CarComando), ota(protocolo::CarOta),
       imagen(protocolo::CarImagen);

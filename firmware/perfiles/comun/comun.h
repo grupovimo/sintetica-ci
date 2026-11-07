@@ -7,6 +7,12 @@
 
 #include "sistema.h"
 
+// La versión del firmware (la que va en el estado y en las OTA). Para una
+// versión nueva: PLATFORMIO_BUILD_FLAGS='-DSINTETICA_VERSION=\"0.2.1\"' pio run
+#ifndef SINTETICA_VERSION
+#define SINTETICA_VERSION sintetica::VERSION_SINTETICAOS
+#endif
+
 namespace comun {
 
 const char* identificador();  // la MAC de Bluetooth, 12 caracteres hexadecimales

@@ -6,6 +6,8 @@
 #include <Wire.h>
 
 #include "comun.h"
+#include "nube.h"
+#include "ota.h"
 #include "pines.h"
 #include "sistema.h"
 
@@ -107,7 +109,10 @@ Hal armarHal() {
   h.presentar = [](const uint16_t* px, int w, int alto) {
     g_lcd.pushImage(0, 0, w, alto, reinterpret_cast<const lgfx::rgb565_t*>(px));
   };
-  h.minutoDelDia = [] { return -1; };  // sin hora hasta tener NTP o la app
+  h.minutoDelDia = comun::nubeMinutoDelDia;  // por NTP, cuando hay WiFi
+  h.notificarNube = comun::nubeNotificar;
+  h.redCambio = comun::nubeReconfigurar;
+  comun::otaCompletarHal(h, true);
   h.bateria = [] {
     const uint32_t mv = analogReadMilliVolts(pines::BATERIA_ADC) * 3;
     if (mv < 2500) return -1;  // sin batería conectada
@@ -138,14 +143,21 @@ void setup() {
   if (!g_pixeles) g_pixeles = static_cast<uint16_t*>(heap_caps_malloc(ANCHO * ALTO * 2, MALLOC_CAP_8BIT));
 
   g_hayImu = imuIniciar();
-  g_sistema.iniciar(armarHal(), g_pixeles, ANCHO, ALTO);
+  Perfil p;
+  p.ancho = ANCHO, p.alto = ALTO;
+  p.nombre = "dev-147b";
+  p.version = SINTETICA_VERSION;
+  g_sistema.iniciar(armarHal(), g_pixeles, p);
   if (!g_hayImu) Serial.println("[sintetica] no encontré el QMI8658: sin sacudidas");
   comun::bleIniciar(g_sistema, g_sistema.nombre());
+  comun::nubeIniciar(g_sistema);
   comun::tallerSaludo(g_sistema);
 }
 
 void loop() {
   comun::bleAtender(g_sistema);
+  comun::nubeAtender(g_sistema);
+  comun::otaAtender(g_sistema, comun::nubeSana(g_sistema));
   comun::tallerAtender(g_sistema);
 
   const bool apretado = digitalRead(pines::BOTON_BOOT) == LOW || (pines::TTP223 >= 0 && digitalRead(pines::TTP223) == HIGH);

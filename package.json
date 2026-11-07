@@ -11,7 +11,8 @@
     "test:sim": "sh sim/compilar.sh && node sim/empaquetar.mjs && node --test sim/test/sim.test.mjs",
     "sim": "sh sim/compilar.sh && node sim/servir.mjs",
     "empaquetar": "sh sim/compilar.sh && node sim/empaquetar.mjs",
-    "caras": "python3 shared/formato/herramientas/generar_caras.py && python3 firmware/herramientas/embeber_caras.py"
+    "caras": "python3 shared/formato/herramientas/generar_caras.py && python3 firmware/herramientas/embeber_caras.py",
+    "claves": "node herramientas/claves.mjs"
   },
   "devDependencies": {
     "ajv": "8.17.1"
