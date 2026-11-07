@@ -48,6 +48,13 @@ class EditorConfigTest {
         assertEquals("22:00", a.suenoDesde)
     }
 
+    @Test fun listaYRotar() {
+        val nueva = EditorConfig.escribir(ejemplo, EditorConfig.leer(ejemplo).copy(lista = listOf("imagen:0", "cara:guino"), rotar = 15))
+        val a = EditorConfig.leer(nueva)
+        assertEquals(listOf("imagen:0", "cara:guino"), a.lista)
+        assertEquals(15, a.rotar)
+    }
+
     @Test fun horas() {
         assertTrue(EditorConfig.hhmmValido("23:30"))
         assertFalse(EditorConfig.hhmmValido("24:00"))

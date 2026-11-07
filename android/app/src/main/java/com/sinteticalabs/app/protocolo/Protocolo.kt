@@ -13,11 +13,12 @@ object Uuids {
     val COMANDO: UUID = UUID.fromString("5157e71c-a000-4b1c-8a5e-000000000003")
     val ESTADO: UUID = UUID.fromString("5157e71c-a000-4b1c-8a5e-000000000004")
     val OTA: UUID = UUID.fromString("5157e71c-a000-4b1c-8a5e-000000000005")
+    val IMAGEN: UUID = UUID.fromString("5157e71c-a000-4b1c-8a5e-000000000006")
     val CCCD: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 }
 
 enum class Car(val id: Int, val uuid: UUID) {
-    CONFIG(1, Uuids.CONFIG), COMANDO(2, Uuids.COMANDO), ESTADO(3, Uuids.ESTADO), OTA(4, Uuids.OTA);
+    CONFIG(1, Uuids.CONFIG), COMANDO(2, Uuids.COMANDO), ESTADO(3, Uuids.ESTADO), OTA(4, Uuids.OTA), IMAGEN(5, Uuids.IMAGEN);
 
     companion object {
         fun de(id: Int) = entries.firstOrNull { it.id == id }
@@ -36,6 +37,11 @@ object Op {
     const val VINCULAR = 0x13
     const val AUTENTICAR = 0x14
     const val DESVINCULAR = 0x15
+    const val IMG_INICIO = 0x20
+    const val IMG_BLOQUE = 0x21
+    const val IMG_FIN = 0x22
+    const val IMG_BORRAR = 0x23
+    const val IMG_LISTAR = 0x24
     const val RESPUESTA = 0x80
     const val CONFIG_TROZO = 0x84
     const val CONFIG_CIERRE = 0x85
@@ -47,7 +53,7 @@ val MODOS = listOf("mascota", "reloj", "pomodoro", "clima", "notificaciones")
 private val MENSAJES = mapOf(
     0 to "ok", 1 to "muy grande", 2 to "fuera de orden", 3 to "CRC distinto", 4 to "JSON inválido",
     5 to "config inválida", 6 to "sin inicio", 7 to "no existe", 8 to "malformado", 9 to "no autorizado",
-    10 to "no está mostrando el QR", 255 to "no implementado",
+    10 to "no está mostrando el QR", 11 to "imagen inválida", 255 to "no implementado",
 )
 
 private fun u32(v: Long) = byteArrayOf((v and 0xFF).toByte(), (v shr 8 and 0xFF).toByte(), (v shr 16 and 0xFF).toByte(), (v shr 24 and 0xFF).toByte())
@@ -76,6 +82,38 @@ object Comando {
     fun autenticar(clave: ByteArray) = byteArrayOf(Op.AUTENTICAR.toByte()) + clave
     fun desvincular() = byteArrayOf(Op.DESVINCULAR.toByte())
     fun pedirConfig() = byteArrayOf(Op.CONFIG_PEDIR.toByte())
+}
+
+/** Una imagen QOI (del tamaño de la pantalla) en las escrituras de la característica Imagen. */
+fun escriturasDeImagen(espacio: Int, qoi: ByteArray, tamanoBloque: Int = 180): List<ByteArray> {
+    val porBloque = tamanoBloque - 5
+    val salida = mutableListOf(byteArrayOf(Op.IMG_INICIO.toByte(), espacio.toByte()) + u32(qoi.size.toLong()) + u32(crc32(qoi)))
+    var off = 0
+    while (off < qoi.size) {
+        val fin = minOf(qoi.size, off + porBloque)
+        salida += byteArrayOf(Op.IMG_BLOQUE.toByte()) + u32(off.toLong()) + qoi.copyOfRange(off, fin)
+        off = fin
+    }
+    salida += byteArrayOf(Op.IMG_FIN.toByte())
+    return salida
+}
+
+object Imagen {
+    fun borrar(espacio: Int) = byteArrayOf(Op.IMG_BORRAR.toByte(), espacio.toByte())
+    fun listar() = byteArrayOf(Op.IMG_LISTAR.toByte())
+}
+
+data class EspacioImagen(val espacio: Int, val largo: Long, val crc: Long)
+
+/** La respuesta a Imagen.listar(): los espacios ocupados. */
+fun leerListaImagenes(b: ByteArray): List<EspacioImagen> {
+    val l = mutableListOf<EspacioImagen>()
+    var i = 3
+    while (i + 9 <= b.size) {
+        l += EspacioImagen(b[i].toInt() and 0xFF, leerU32(b, i + 1), leerU32(b, i + 5))
+        i += 9
+    }
+    return l
 }
 
 /** Parte la config (texto JSON) en las escrituras de la característica Config. */
@@ -131,7 +169,10 @@ class ArmadorDeConfig {
     }
 }
 
+data class Pantalla(val ancho: Int, val alto: Int, val redonda: Boolean)
+
 data class Estado(
+    val pantalla: Pantalla = Pantalla(320, 172, false),
     val bateria: Int?,
     val humor: Float,
     val modo: String,
@@ -147,7 +188,7 @@ data class Estado(
 
 fun leerEstado(b: ByteArray): Estado {
     val version = b[0].toInt()
-    require(version == 1 || version == 2) { "versión de estado desconocida: $version" }
+    require(version in 1..3) { "versión de estado desconocida: $version" }
     var i = 5
     fun campo(): String {
         val n = b[i].toInt() and 0xFF
@@ -160,7 +201,13 @@ fun leerEstado(b: ByteArray): Estado {
     val serie = if (version >= 2) campo() else ""
     val id = if (version >= 2) campo() else ""
     val flags = b[4].toInt()
+    val pantalla = if (version >= 3) Pantalla(
+        (b[i].toInt() and 0xFF) or ((b[i + 1].toInt() and 0xFF) shl 8),
+        (b[i + 2].toInt() and 0xFF) or ((b[i + 3].toInt() and 0xFF) shl 8),
+        b[i + 4].toInt() == 1,
+    ) else Pantalla(320, 172, false)
     return Estado(
+        pantalla = pantalla,
         bateria = (b[1].toInt() and 0xFF).takeIf { it != 255 },
         humor = b[2] / 100f,
         modo = MODOS.getOrElse(b[3].toInt() and 0xFF) { "?" },

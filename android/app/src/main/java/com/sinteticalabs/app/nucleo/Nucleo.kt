@@ -17,7 +17,11 @@ object Nucleo {
         System.loadLibrary("sintetica")
     }
 
-    external fun iniciar(ancho: Int, alto: Int, identificador: String, anfitrion: Anfitrion?)
+    /** redonda: el broche; broche: con el pulsador del broche (toque = siguiente). */
+    fun iniciar(ancho: Int, alto: Int, identificador: String, anfitrion: Anfitrion?, redonda: Boolean = false, broche: Boolean = false) =
+        iniciarNativo(ancho, alto, identificador, anfitrion, redonda, broche)
+
+    private external fun iniciarNativo(ancho: Int, alto: Int, identificador: String, anfitrion: Anfitrion?, redonda: Boolean, broche: Boolean)
     external fun vistaPrevia()
     external fun tick()
     external fun pixeles(destino: IntArray)
@@ -31,6 +35,7 @@ object Nucleo {
     external fun expresiones(): Array<String>
     external fun expresionVisible(): String
     external fun qr(): String
+    external fun imagenVisible(): Int
     external fun version(): String
 }
 

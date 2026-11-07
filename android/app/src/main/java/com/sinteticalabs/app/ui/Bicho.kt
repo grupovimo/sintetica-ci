@@ -1,6 +1,25 @@
 package com.sinteticalabs.app.ui
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import com.sinteticalabs.app.bicho.PrepararImagen
+import com.sinteticalabs.app.datos.CacheImagenes
+import com.sinteticalabs.app.protocolo.EspacioImagen
+import com.sinteticalabs.app.protocolo.Pantalla
+import com.sinteticalabs.app.protocolo.crc32
+import com.sinteticalabs.app.protocolo.escriturasDeImagen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -59,8 +78,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-/** "demo" = probar sin bicho (el núcleo corre en el celu). */
+/** "demo" = probar sin bicho (el núcleo corre en el celu), como la 1.47B o como el broche. */
 const val ID_DEMO = "demo"
+const val ID_DEMO_BROCHE = "demo-broche"
 
 sealed interface Conexion {
     data object Conectando : Conexion
@@ -78,13 +98,20 @@ class BichoViewModel(app: Application) : AndroidViewModel(app) {
     private val _aviso = MutableStateFlow<String?>(null)
     val aviso: StateFlow<String?> = _aviso
     val expresiones = MutableStateFlow<List<String>>(emptyList())
+    val espacios = MutableStateFlow<List<EspacioImagen>>(emptyList())
+    val miniaturas = MutableStateFlow<Map<Int, Bitmap>>(emptyMap())
+    val progreso = MutableStateFlow<Float?>(null)
+    /** La pantalla del bicho (la que dice el estado v3); la vista previa va al doble. */
+    var pantalla = Pantalla(320, 172, false)
+        private set
+    private val cache = CacheImagenes(app)
 
     var cliente: ClienteBicho? = null
         private set
     var id: String = ""
         private set
     private var configTexto = "{\"version\":1}"
-    val esDemo get() = id == ID_DEMO
+    val esDemo get() = id.startsWith(ID_DEMO)
 
     fun abrir(id: String) {
         if (this.id == id) return
@@ -98,8 +125,9 @@ class BichoViewModel(app: Application) : AndroidViewModel(app) {
         try {
             val c: ClienteBicho
             if (esDemo) {
-                c = ClienteBicho(TransporteVirtual(), viewModelScope)
+                c = ClienteBicho(TransporteVirtual(broche = id == ID_DEMO_BROCHE), viewModelScope)
                 c.conectar()
+                pantalla = c.estado.value?.pantalla ?: pantalla
             } else {
                 val v = Vinculados(getApplication()).buscar(id) ?: throw IllegalStateException("Este bicho no está vinculado.")
                 val cerca = buscarBicho(getApplication(), id)
@@ -112,8 +140,9 @@ class BichoViewModel(app: Application) : AndroidViewModel(app) {
                     c.cerrar()
                     return
                 }
-                // La vista previa: un núcleo local con la misma config.
-                Nucleo.iniciar(640, 344, id, AnfitrionEnMemoria())
+                // La vista previa: un núcleo local con la misma config, al doble de la pantalla.
+                pantalla = c.estado.value?.pantalla ?: pantalla
+                Nucleo.iniciar(pantalla.ancho * 2, pantalla.alto * 2, id, AnfitrionEnMemoria(), redonda = pantalla.redonda)
                 Nucleo.vistaPrevia()
             }
             cliente = c
@@ -121,6 +150,7 @@ class BichoViewModel(app: Application) : AndroidViewModel(app) {
             _ajustes.value = EditorConfig.leer(configTexto)
             if (!esDemo) aplicarEnVistaPrevia(configTexto)
             expresiones.value = Nucleo.expresiones().toList()
+            refrescarImagenes()
             _conexion.value = Conexion.Lista
             // Copiar la expresión del bicho en la vista previa.
             if (!esDemo) viewModelScope.launch {
@@ -129,6 +159,53 @@ class BichoViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: Exception) {
             _conexion.value = Conexion.Error(e.message ?: "No me pude conectar con el bicho.")
         }
+    }
+
+    /** Los espacios ocupados; la vista previa recibe las que este celu tiene guardadas. */
+    private suspend fun refrescarImagenes() {
+        val c = cliente ?: return
+        val lista = runCatching { c.listarImagenes() }.getOrDefault(emptyList())
+        espacios.value = lista
+        val minis = mutableMapOf<Int, Bitmap>()
+        for (e in lista) {
+            val mandada = cache.mandada(id, e.espacio) ?: continue
+            if (crc32(mandada) != e.crc) continue  // la cambió otro celu
+            val vista = cache.vistaPrevia(id, e.espacio) ?: continue
+            if (!esDemo) for (w in escriturasDeImagen(e.espacio, vista, 512)) Nucleo.bleEscribir(Car.IMAGEN.id, w)
+            withContext(Dispatchers.Default) { PrepararImagen.decodificar(mandada) }?.let { minis[e.espacio] = it }
+        }
+        miniaturas.value = minis
+    }
+
+    fun subirImagen(espacio: Int, uri: Uri) = viewModelScope.launch {
+        val c = cliente ?: return@launch
+        try {
+            progreso.value = 0f
+            val (qoi, vista) = withContext(Dispatchers.Default) {
+                val fuente = ImageDecoder.decodeBitmap(ImageDecoder.createSource(getApplication<Application>().contentResolver, uri)) { d, _, _ ->
+                    d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                }
+                val p = pantalla
+                val q = PrepararImagen.qoi(PrepararImagen.recortar(fuente, p.ancho, p.alto, p.redonda))
+                // En el modo demo el núcleo ya está al doble: la misma imagen sirve para las dos.
+                q to (if (esDemo) q else PrepararImagen.qoi(PrepararImagen.recortar(fuente, p.ancho * 2, p.alto * 2, p.redonda)))
+            }
+            c.subirImagen(espacio, qoi) { progreso.value = it }
+            cache.guardar(id, espacio, qoi, vista)
+            refrescarImagenes()
+            _aviso.value = "Imagen guardada en el espacio $espacio."
+        } catch (e: Exception) {
+            _aviso.value = e.message ?: "No pude mandar la imagen."
+        } finally {
+            progreso.value = null
+        }
+    }
+
+    fun borrarImagen(espacio: Int) = viewModelScope.launch {
+        runCatching { cliente?.borrarImagen(espacio) }.onFailure { _aviso.value = it.message }
+        cache.borrar(id, espacio)
+        if (!esDemo) Nucleo.bleEscribir(Car.IMAGEN.id, com.sinteticalabs.app.protocolo.Imagen.borrar(espacio))
+        refrescarImagenes()
     }
 
     private fun aplicarEnVistaPrevia(json: String) {
@@ -239,7 +316,7 @@ private fun Contenido(vm: BichoViewModel, alVolver: () -> Unit) {
             Text(if (serie.isNotEmpty()) "UNIDAD #$serie" else "UNIDAD #—", style = Tipos.serie, color = p.naranjaProfundo)
             Text(estado?.nombre ?: a.nombre, style = Tipos.display, color = p.tinta)
         }
-        VistaPrevia("Cara de ${estado?.nombre ?: "el bicho"}: ${estado?.expresion ?: ""}", vm::tocar)
+        VistaPrevia("Cara de ${estado?.nombre ?: "el bicho"}: ${estado?.expresion ?: ""}", vm.pantalla.redonda, vm::tocar)
 
         Column {
             FilaDato("Expresión", (estado?.expresion ?: "—") + if (estado?.fija == true) " (fija)" else "")
@@ -254,6 +331,9 @@ private fun Contenido(vm: BichoViewModel, alVolver: () -> Unit) {
                 expresiones.forEach { e -> Chip(e, seleccionado = estado?.fija == true && estado?.expresion == e) { vm.fijarExpresion(e) } }
             }
         }
+
+        SeccionImagenes(vm)
+        SeccionLista(vm, a, expresiones)
 
         Seccion("Nombre") {
             OutlinedTextField(
@@ -341,4 +421,71 @@ private fun CampoHora(etiqueta: String, valor: String, modifier: Modifier, alCam
         isError = !EditorConfig.hhmmValido(texto),
         onValueChange = { t -> texto = t.take(5); if (EditorConfig.hhmmValido(texto)) alCambiar(texto) },
     )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SeccionImagenes(vm: BichoViewModel) {
+    val p = LocalPaleta.current
+    val espacios by vm.espacios.collectAsState()
+    val miniaturas by vm.miniaturas.collectAsState()
+    val progreso by vm.progreso.collectAsState()
+    var elegido by remember { mutableStateOf(0) }
+    val galeria = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) vm.subirImagen(elegido, uri)
+    }
+    val ocupados = espacios.map { it.espacio }.toSet()
+    Seccion("Imágenes") {
+        Text("Hasta 8. Se recortan a la forma de la pantalla del bicho.", style = Tipos.chico, color = p.tintaSuave)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (i in 0 until 8) {
+                val mini = miniaturas[i]
+                Box(
+                    Modifier.size(64.dp).clip(if (vm.pantalla.redonda) CircleShape else RoundedCornerShape(10.dp))
+                        .background(p.pantalla)
+                        .border(if (i == elegido) 3.dp else 1.dp, if (i == elegido) p.naranja else p.linea, if (vm.pantalla.redonda) CircleShape else RoundedCornerShape(10.dp))
+                        .clickable { elegido = i },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (mini != null) Image(mini.asImageBitmap(), contentDescription = "Imagen $i", modifier = Modifier.fillMaxSize())
+                    else Text(if (i in ocupados) "$i ·" else "$i", style = Tipos.dato, color = p.tintaSuave)
+                }
+            }
+        }
+        progreso?.let { LinearProgressIndicator(progress = { it }, color = p.naranja, trackColor = p.linea, modifier = Modifier.fillMaxWidth()) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            BotonSecundario("Elegir de la galería", { galeria.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, habilitado = progreso == null)
+            if (elegido in ocupados) BotonSecundario("Borrar", { vm.borrarImagen(elegido) })
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SeccionLista(vm: BichoViewModel, a: Ajustes, expresiones: List<String>) {
+    val p = LocalPaleta.current
+    val espacios by vm.espacios.collectAsState()
+    var agregando by remember { mutableStateOf(false) }
+    Seccion("Lista") {
+        Text(
+            if (vm.pantalla.redonda) "Un toque en el broche pasa a lo siguiente." else "Lo que muestra, en orden; puede rotar solo.",
+            style = Tipos.chico, color = p.tintaSuave,
+        )
+        a.lista.forEachIndexed { i, item ->
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text("${i + 1}. " + item.replace("cara:", "").replace("imagen:", "imagen "), style = Tipos.dato, color = p.tinta, modifier = Modifier.weight(1f))
+                TextButton(onClick = { vm.editar(a.copy(lista = a.lista.toMutableList().apply { if (i > 0) add(i - 1, removeAt(i)) })) }, enabled = i > 0) { Text("↑", style = Tipos.boton) }
+                TextButton(onClick = { vm.editar(a.copy(lista = a.lista.toMutableList().apply { if (i < size - 1) add(i + 1, removeAt(i)) })) }, enabled = i < a.lista.size - 1) { Text("↓", style = Tipos.boton) }
+                TextButton(onClick = { vm.editar(a.copy(lista = a.lista.filterIndexed { k, _ -> k != i })) }) { Text("QUITAR", style = Tipos.boton, color = p.naranjaProfundo) }
+            }
+        }
+        if (a.lista.isEmpty()) Text(if (vm.pantalla.redonda) "Vacía: recorre las 16 caras." else "Vacía: se maneja solo.", style = Tipos.dato, color = p.tintaSuave)
+        if (agregando) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                espacios.forEach { e -> Chip("imagen ${e.espacio}", false) { vm.editar(a.copy(lista = a.lista + "imagen:${e.espacio}")); agregando = false } }
+                expresiones.forEach { x -> Chip(x, false) { vm.editar(a.copy(lista = a.lista + "cara:$x")); agregando = false } }
+            }
+        } else if (a.lista.size < 16) BotonSecundario("Agregar", { agregando = true })
+        Deslizador("Rotar sola", a.rotar.toFloat(), 0f..60f, if (a.rotar == 0) "no" else "cada ${a.rotar} min") { vm.editar(a.copy(rotar = it.toInt())) }
+    }
 }

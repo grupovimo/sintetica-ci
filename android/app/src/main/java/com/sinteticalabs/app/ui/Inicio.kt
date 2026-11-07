@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.sinteticalabs.app.datos.Vinculado
 
 @Composable
-fun PantallaInicio(bichos: List<Vinculado>, alElegir: (String) -> Unit, alVincular: () -> Unit, alProbar: () -> Unit) {
+fun PantallaInicio(bichos: List<Vinculado>, alElegir: (String) -> Unit, alVincular: () -> Unit, alProbar: (broche: Boolean) -> Unit) {
     val p = LocalPaleta.current
     Surface(color = p.papel, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.safeDrawingPadding().padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -48,7 +48,10 @@ fun PantallaInicio(bichos: List<Vinculado>, alElegir: (String) -> Unit, alVincul
                 }
             }
             BotonPrimario("Vincular un bicho", alVincular)
-            BotonSecundario("Probar sin bicho", alProbar, Modifier.fillMaxWidth())
+            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BotonSecundario("Probar sin bicho", { alProbar(false) }, Modifier.weight(1f))
+                BotonSecundario("Probar el broche", { alProbar(true) }, Modifier.weight(1f))
+            }
             Spacer(Modifier.padding(4.dp))
         }
     }

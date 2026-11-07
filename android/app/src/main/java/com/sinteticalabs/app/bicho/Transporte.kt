@@ -22,14 +22,16 @@ interface Transporte {
  * "Probar sin bicho": el núcleo corre en el celu y se le habla con los mismos
  * bytes que por BLE. Dibuja con la misma instancia que la vista previa.
  */
-class TransporteVirtual : Transporte {
+class TransporteVirtual(private val broche: Boolean = false) : Transporte {
     override val notificaciones = MutableSharedFlow<Pair<Car, ByteArray>>(extraBufferCapacity = 256)
     private val anfitrion = AnfitrionEnMemoria().apply {
         alNotificar = { c, d -> Car.de(c)?.let { notificaciones.tryEmit(it to d) } }
     }
 
     override suspend fun conectar() = withContext(Dispatchers.Main) {
-        Nucleo.iniciar(640, 344, "000000000000", anfitrion)
+        // Al doble de la pantalla, para que se vea nítido; las imágenes se recortan a este tamaño.
+        if (broche) Nucleo.iniciar(480, 480, "000000000000", anfitrion, redonda = true, broche = true)
+        else Nucleo.iniciar(640, 344, "000000000000", anfitrion)
         Nucleo.vistaPrevia()
         Nucleo.bleConexion(true)
     }

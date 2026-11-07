@@ -32,14 +32,15 @@ import com.sinteticalabs.app.nucleo.Nucleo
  * a 640 × 344 (el doble de la pantalla de 320 × 172, con la misma geometría).
  */
 @Composable
-fun VistaPrevia(descripcion: String, alApretar: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+fun VistaPrevia(descripcion: String, redonda: Boolean, alApretar: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     val p = LocalPaleta.current
-    val ancho = 640
-    val alto = 344
-    val bitmap = remember { Bitmap.createBitmap(ancho, alto, Bitmap.Config.ARGB_8888) }
-    val buffer = remember { IntArray(ancho * alto) }
+    val ancho = Nucleo.ancho()
+    val alto = Nucleo.alto()
+    val bitmap = remember(ancho, alto) { Bitmap.createBitmap(ancho, alto, Bitmap.Config.ARGB_8888) }
+    val buffer = remember(ancho, alto) { IntArray(ancho * alto) }
+    val forma = if (redonda) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(24.dp)
     var cuadro by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(ancho, alto) {
         while (true) {
             withFrameNanos {
                 Nucleo.tick()
@@ -49,12 +50,12 @@ fun VistaPrevia(descripcion: String, alApretar: (Boolean) -> Unit, modifier: Mod
             }
         }
     }
-    Box(modifier.fillMaxWidth().background(p.carcasa, RoundedCornerShape(24.dp)).padding(14.dp)) {
+    Box(modifier.fillMaxWidth().background(p.carcasa, forma).padding(if (redonda) 22.dp else 14.dp)) {
         @Suppress("UNUSED_EXPRESSION") cuadro  // lee el estado para redibujar en cada cuadro
         Image(
             bitmap = bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillWidth,
             filterQuality = FilterQuality.High,
-            modifier = Modifier.fillMaxWidth().aspectRatio(ancho / alto.toFloat()).clip(RoundedCornerShape(10.dp))
+            modifier = Modifier.fillMaxWidth().aspectRatio(ancho / alto.toFloat()).clip(if (redonda) androidx.compose.foundation.shape.CircleShape else RoundedCornerShape(10.dp))
                 .semantics { contentDescription = descripcion }
                 .pointerInput(Unit) {
                     detectTapGestures(onPress = {

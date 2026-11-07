@@ -53,6 +53,7 @@
   "qoi": {
     "ancho": 12,
     "alto": 7,
+    "rgb": "f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a f5 50 1a 06 28 16 0f 2d 17 18 32 18 21 37 19 2a 3c 1a 33 41 1b 3c 46 1c 45 4b 1d 4e 50 1e 57 55 1f 60 5a 20 69 5f 21 09 28 21 12 2d 22 1b 32 23 24 37 24 2d 3c 25 36 41 26 3f 46 27 48 4b 28 51 50 29 5a 55 2a 63 5a 2b 6c 5f 2c 0c 28 2c 15 2d 2d 1e 32 2e 27 37 2f 30 3c 30 0c c8 63 42 46 32 4b 4b 33 54 50 34 5d 55 35 66 5a 36 6f 5f 37 0f 28 37 18 2d 38 21 32 39 2a 37 3a 33 3c 3b 3c 41 3c 45 46 3d 4e 4b 3e 57 50 3f 60 55 40 69 5a 41 72 5f 42 f5 50 1a 1b 2d 43 24 32 44 f5 50 1a 36 3c 46 3f 41 47 f5 50 1a 51 4b 49 5a 50 4a f5 50 1a 6c 5a 4c 75 5f 4d",
     "rgb565": [
       62083,
       62083,
@@ -140,6 +141,8 @@
       29417
     ],
     "hex": "71 6f 69 66 00 00 00 0c 00 00 00 07 03 00 fe f5 50 1a d6 fe 06 28 16 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 fe 09 28 21 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 fe 0c 28 2c a5 c4 a5 c4 a5 c4 a5 c4 fe 0c c8 63 fe 42 46 32 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 fe 0f 28 37 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 fe f5 50 1a fe 1b 2d 43 a5 c4 1a fe 36 3c 46 a5 c4 1a fe 51 4b 49 a5 c4 1a fe 6c 5a 4c a5 c4 00 00 00 00 00 00 00 01",
+    "espacio": 2,
+    "tamanoBloque": 40,
     "escrituras": [
       "20 02 a6 00 00 00 de df 44 3b",
       "21 00 00 00 00 71 6f 69 66 00 00 00 0c 00 00 00 07 03 00 fe f5 50 1a d6 fe 06 28 16 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4",

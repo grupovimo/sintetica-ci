@@ -16,6 +16,7 @@ import android.content.Context
 import android.os.Build
 import android.os.ParcelUuid
 import com.sinteticalabs.app.protocolo.Car
+import com.sinteticalabs.app.protocolo.Op
 import com.sinteticalabs.app.protocolo.Uuids
 import com.sinteticalabs.app.protocolo.idDeAnuncio
 import kotlinx.coroutines.CompletableDeferred
@@ -125,8 +126,9 @@ class TransporteBle(private val contexto: Context, private val dispositivo: Blue
         withTimeout(15_000) { conectado.await() }
         val g = gatt!!
         operacion<Int> { g.requestMtu(185) }
-        for (c in listOf(Car.CONFIG, Car.COMANDO, Car.ESTADO)) {
-            val car = caracteristicas[c] ?: throw ErrorBle("Al bicho le falta la característica ${c.name}.")
+        for (c in listOf(Car.CONFIG, Car.COMANDO, Car.ESTADO, Car.IMAGEN)) {
+            // Imagen es de la v1.2: un firmware viejo no la tiene.
+            val car = caracteristicas[c] ?: if (c == Car.IMAGEN) continue else throw ErrorBle("Al bicho le falta la característica ${c.name}.")
             g.setCharacteristicNotification(car, true)
             val d = car.getDescriptor(Uuids.CCCD) ?: continue
             operacion<Int> {
@@ -139,7 +141,9 @@ class TransporteBle(private val contexto: Context, private val dispositivo: Blue
     override suspend fun escribir(car: Car, datos: ByteArray) {
         val g = gatt ?: throw ErrorBle("No hay conexión.")
         val c = caracteristicas[car] ?: throw ErrorBle("Al bicho le falta la característica ${car.name}.")
-        val tipo = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+        // Los bloques de config e imagen van sin respuesta (mucho más rápido); el resto, con.
+        val bloque = (car == Car.CONFIG && datos[0].toInt() == Op.CONFIG_BLOQUE) || (car == Car.IMAGEN && datos[0].toInt() == Op.IMG_BLOQUE)
+        val tipo = if (bloque) BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE else BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         val status = operacion<Int> {
             if (Build.VERSION.SDK_INT >= 33) g.writeCharacteristic(c, datos, tipo) == BluetoothGatt.GATT_SUCCESS
             else @Suppress("DEPRECATION") run { c.writeType = tipo; c.value = datos; g.writeCharacteristic(c) }

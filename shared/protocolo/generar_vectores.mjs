@@ -66,12 +66,16 @@ const vectores = {
   qoi: {
     ancho: 12,
     alto: 7,
+    // Los píxeles de entrada (RGB, fila por fila): un codificador tiene que dar exactamente `hex`.
+    rgb: hex(Array.from({ length: 12 * 7 }, (_, i) => [rgbaPrueba[i * 4], rgbaPrueba[i * 4 + 1], rgbaPrueba[i * 4 + 2]]).flat()),
     // RGB565 de cada píxel, fila por fila: lo que tiene que dar el decodificador.
     rgb565: Array.from({ length: 12 * 7 }, (_, i) => {
       const r = rgbaPrueba[i * 4], g = rgbaPrueba[i * 4 + 1], b = rgbaPrueba[i * 4 + 2];
       return ((r & 0xf8) << 8) | ((g & 0xfc) << 3) | (b >> 3);
     }),
     hex: hex(qoiPrueba),
+    espacio: 2,
+    tamanoBloque: 40,
     escrituras: escriturasDeImagen(2, qoiPrueba, 40).map(hex),
   },
   config: {

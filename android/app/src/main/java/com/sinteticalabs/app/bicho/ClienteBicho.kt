@@ -3,7 +3,11 @@ package com.sinteticalabs.app.bicho
 import com.sinteticalabs.app.protocolo.ArmadorDeConfig
 import com.sinteticalabs.app.protocolo.Car
 import com.sinteticalabs.app.protocolo.Comando
+import com.sinteticalabs.app.protocolo.EspacioImagen
 import com.sinteticalabs.app.protocolo.Estado
+import com.sinteticalabs.app.protocolo.Imagen
+import com.sinteticalabs.app.protocolo.escriturasDeImagen
+import com.sinteticalabs.app.protocolo.leerListaImagenes
 import com.sinteticalabs.app.protocolo.Op
 import com.sinteticalabs.app.protocolo.Respuesta
 import com.sinteticalabs.app.protocolo.escriturasDeConfig
@@ -105,6 +109,36 @@ class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) 
             if (!r.ok) throw ErrorBicho("El bicho no aceptó la configuración: ${r.detalle.ifEmpty { r.mensaje }}")
         }
         actualizarEstado()
+    }
+
+    /** Manda una imagen QOI (del tamaño de la pantalla) a un espacio, avisando el progreso (0 a 1). */
+    suspend fun subirImagen(espacio: Int, qoi: ByteArray, alProgreso: (Float) -> Unit = {}) {
+        val escrituras = escriturasDeImagen(espacio, qoi)
+        coroutineScope {
+            val fin = async(start = CoroutineStart.UNDISPATCHED) {
+                transporte.notificaciones
+                    .mapNotNull { (c, b) -> if (c == Car.IMAGEN) leerRespuesta(b) as? Respuesta.Resultado else null }
+                    .first { it.op == Op.IMG_FIN || (it.op != Op.IMG_LISTAR && !it.ok) }
+            }
+            escrituras.forEachIndexed { i, e ->
+                transporte.escribir(Car.IMAGEN, e)
+                alProgreso((i + 1f) / escrituras.size)
+            }
+            val r = withTimeout(15_000) { fin.await() }
+            if (!r.ok) throw ErrorBicho("El bicho no aceptó la imagen: ${r.detalle.ifEmpty { r.mensaje }}")
+        }
+    }
+
+    suspend fun borrarImagen(espacio: Int) { exigir(Car.IMAGEN, Imagen.borrar(espacio)) }
+
+    suspend fun listarImagenes(): List<EspacioImagen> = coroutineScope {
+        val espera = async(start = CoroutineStart.UNDISPATCHED) {
+            transporte.notificaciones.mapNotNull { (c, b) -> if (c == Car.IMAGEN && (b[0].toInt() and 0x7F) == Op.IMG_LISTAR) b else null }.first()
+        }
+        transporte.escribir(Car.IMAGEN, Imagen.listar())
+        val b = withTimeout(5_000) { espera.await() }
+        if (b[1].toInt() != 0) throw ErrorBicho((leerRespuesta(b) as Respuesta.Resultado).mensaje)
+        leerListaImagenes(b)
     }
 
     fun cerrar() = transporte.cerrar()

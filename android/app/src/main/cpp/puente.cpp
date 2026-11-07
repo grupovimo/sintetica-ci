@@ -77,7 +77,8 @@ void registrar(void*, const char* m) {
 
 extern "C" {
 
-void JNI(iniciar)(JNIEnv* env, jobject, jint ancho, jint alto, jstring id, jobject anfitrion) {
+void JNI(iniciarNativo)(JNIEnv* env, jobject, jint ancho, jint alto, jstring id, jobject anfitrion, jboolean redonda,
+                  jboolean broche) {
   g_env = env;
   if (g_anfitrion) env->DeleteGlobalRef(g_anfitrion);
   g_anfitrion = anfitrion ? env->NewGlobalRef(anfitrion) : nullptr;
@@ -100,7 +101,7 @@ void JNI(iniciar)(JNIEnv* env, jobject, jint ancho, jint alto, jstring id, jobje
   h.notificar = notificar;
   h.registrar = registrar;
   h.identificador = g_id.c_str();
-  sintetica_iniciar(&h, ancho, alto);
+  sintetica_iniciar_perfil(&h, ancho, alto, redonda ? 1 : 0, broche ? 1 : 0);
 }
 
 void JNI(vistaPrevia)(JNIEnv*, jobject) { sintetica_vista_previa(); }
@@ -164,5 +165,6 @@ jobjectArray JNI(expresiones)(JNIEnv* env, jobject) {
 }
 jstring JNI(expresionVisible)(JNIEnv* env, jobject) { return env->NewStringUTF(sintetica_expresion_visible()); }
 jstring JNI(qr)(JNIEnv* env, jobject) { return env->NewStringUTF(sintetica_qr()); }
+jint JNI(imagenVisible)(JNIEnv*, jobject) { return sintetica_imagen_visible(); }
 jstring JNI(version)(JNIEnv* env, jobject) { return env->NewStringUTF(sintetica_version()); }
 }

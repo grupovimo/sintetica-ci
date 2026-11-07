@@ -19,6 +19,8 @@ data class Ajustes(
     val timidez: Float = 0.3f,       // 0 a 1
     val suenoDesde: String? = null,  // "HH:MM"
     val suenoHasta: String? = null,
+    val lista: List<String> = emptyList(),  // "cara:<nombre>" o "imagen:<0-7>"
+    val rotar: Int = 0,                      // minutos; 0 = no rota
 )
 
 /**
@@ -41,6 +43,8 @@ object EditorConfig {
             timidez = (per?.get("timidez") as? JsonPrimitive)?.floatOrNull ?: 0.3f,
             suenoDesde = sueno?.getOrNull(0),
             suenoHasta = sueno?.getOrNull(1),
+            lista = (raiz["lista"] as? kotlinx.serialization.json.JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.orEmpty(),
+            rotar = (raiz["rotar"] as? JsonPrimitive)?.contentOrNull?.toIntOrNull() ?: 0,
         )
     }
 
@@ -57,6 +61,8 @@ object EditorConfig {
             "nombre" to JsonPrimitive(a.nombre),
             "cara" to mezclar(raiz["cara"], mapOf("color" to a.colorOjos?.let { JsonPrimitive(it) }, "tamano" to redondo(a.tamano))),
             "personalidad" to mezclar(raiz["personalidad"], mapOf("energia" to redondo(a.energia), "timidez" to redondo(a.timidez), "sueno" to sueno)),
+            "lista" to kotlinx.serialization.json.JsonArray(a.lista.map { JsonPrimitive(it) }),
+            "rotar" to JsonPrimitive(a.rotar),
         ))
         // Sin color o sin sueño: se sacan del JSON (vuelven al valor de fábrica).
         val limpia = buildJsonObject {

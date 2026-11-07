@@ -16,6 +16,7 @@ import com.sinteticalabs.app.datos.Vinculados
 import com.sinteticalabs.app.protocolo.DatosQr
 import com.sinteticalabs.app.ui.BichoViewModel
 import com.sinteticalabs.app.ui.ID_DEMO
+import com.sinteticalabs.app.ui.ID_DEMO_BROCHE
 import com.sinteticalabs.app.ui.PantallaBicho
 import com.sinteticalabs.app.ui.PantallaEscanear
 import com.sinteticalabs.app.ui.PantallaInicio
@@ -42,7 +43,7 @@ private fun App() {
                 bichos,
                 alElegir = { nav.navigate("bicho/$it") },
                 alVincular = { nav.navigate("escanear") },
-                alProbar = { nav.navigate("bicho/$ID_DEMO") },
+                alProbar = { broche -> nav.navigate("bicho/" + if (broche) ID_DEMO_BROCHE else ID_DEMO) },
             )
         }
         composable("escanear") {

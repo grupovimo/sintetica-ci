@@ -3,7 +3,10 @@ package com.sinteticalabs.app
 import com.sinteticalabs.app.protocolo.ArmadorDeConfig
 import com.sinteticalabs.app.protocolo.Comando
 import com.sinteticalabs.app.protocolo.Respuesta
+import com.sinteticalabs.app.protocolo.Imagen
+import com.sinteticalabs.app.protocolo.Qoi
 import com.sinteticalabs.app.protocolo.crc32
+import com.sinteticalabs.app.protocolo.escriturasDeImagen
 import com.sinteticalabs.app.protocolo.deHex
 import com.sinteticalabs.app.protocolo.escriturasDeConfig
 import com.sinteticalabs.app.protocolo.hex
@@ -43,6 +46,8 @@ class ProtocoloTest {
         assertEquals(s(porNombre["autenticar"]!!, "hex"), hex(Comando.autenticar(deHex(s(porNombre["autenticar"]!!, "clave")))))
         assertEquals(s(porNombre["desvincular"]!!, "hex"), hex(Comando.desvincular()))
         assertEquals(s(porNombre["pedir config"]!!, "hex"), hex(Comando.pedirConfig()))
+        assertEquals(s(porNombre["imagen borrar 3"]!!, "hex"), hex(Imagen.borrar(3)))
+        assertEquals(s(porNombre["imagen listar"]!!, "hex"), hex(Imagen.listar()))
     }
 
     @Test fun configEnBloques() {
@@ -66,6 +71,9 @@ class ProtocoloTest {
             assertEquals(s(c, "nombre"), est.nombre)
             assertEquals(s(c, "serie"), est.serie)
             assertEquals(s(c, "id"), est.id)
+            assertEquals(c["ancho"]!!.jsonPrimitive.int, est.pantalla.ancho)
+            assertEquals(c["alto"]!!.jsonPrimitive.int, est.pantalla.alto)
+            assertEquals(c["redonda"]!!.jsonPrimitive.boolean, est.pantalla.redonda)
         }
     }
 
@@ -91,6 +99,14 @@ class ProtocoloTest {
             val id = idDeAnuncio(deHex(s(a, "hex")))
             if (a["id"] is JsonNull) assertNull(id) else assertEquals(s(a, "id"), id)
         }
+    }
+
+    @Test fun qoiIgualAlDeReferencia() {
+        val q = v["qoi"]!!.jsonObject
+        val qoi = Qoi.codificar(deHex(s(q, "rgb")), q["ancho"]!!.jsonPrimitive.int, q["alto"]!!.jsonPrimitive.int)
+        assertEquals(s(q, "hex"), hex(qoi))
+        val esperadas = q["escrituras"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertEquals(esperadas, escriturasDeImagen(q["espacio"]!!.jsonPrimitive.int, qoi, q["tamanoBloque"]!!.jsonPrimitive.int).map(::hex))
     }
 
     @Test fun crc() {
