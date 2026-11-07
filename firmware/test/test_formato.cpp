@@ -49,7 +49,7 @@ PRUEBA("formato: la base trae las 16 caras y las reglas del manual") {
                            "triste", "guino", "enamorado", "mareado", "escuchando", "pensando",
                            "curioso", "bateria-baja", "actualizando", "glitch"};
   for (int i = 0; i < 16; i++) VERIFICAR(g_c.indiceExpresion(nombres[i]) == i);
-  VERIFICAR(g_c.nReglas == 9);
+  VERIFICAR(g_c.nReglas >= 30);
   VERIFICAR(!g_c.expresiones[g_c.indiceExpresion("dormido")].parpadea);
 }
 
@@ -57,6 +57,7 @@ PRUEBA("formato: el ejemplo del doc se aplica") {
   std::string t = leerArchivo(std::string(RAIZ_REPO) + "/shared/formato/config-ejemplo.json");
   VERIFICAR(!t.empty());
   VERIFICAR(cargarBase(g_c).ok());
+  const int base = g_c.nReglas;
   ResultadoConfig r = aplicarConfig(g_c, t.c_str(), t.size());
   if (!r.ok()) std::printf("    detalle: %s\n", r.detalle);
   VERIFICAR(r.ok());
@@ -65,7 +66,7 @@ PRUEBA("formato: el ejemplo del doc se aplica") {
   VERIFICAR_CERCA(g_c.energia, 0.6, 1e-6);
   VERIFICAR(g_c.suenoDesde == 23 * 60 + 30 && g_c.suenoHasta == 8 * 60);
   // Las reglas propias van antes que las del manual.
-  VERIFICAR(g_c.nReglas == 12);
+  VERIFICAR(g_c.nReglas == base + 3);
   VERIFICAR(g_c.reglas[0].entonces[0].tipo == Accion::Tipo::Animacion);
   VERIFICAR(g_c.nAnimaciones == 1 && g_c.animaciones[0].sobre == g_c.indiceExpresion("contento"));
   VERIFICAR(g_c.reglas[1].nAcciones == 2);
@@ -78,8 +79,9 @@ PRUEBA("formato: el ejemplo del doc se aplica") {
 
 PRUEBA("formato: una config mala no toca la actual") {
   VERIFICAR(cargarBase(g_c).ok());
+  const int base = g_c.nReglas;
   const char* malas[] = {
-      R"({"version":2})",
+      R"({"version":3})",
       R"({"version":1,"cara":{"tamano":3}})",
       R"({"version":1,"expresiones":{"x":{"formas":[{"forma":"triangulo","x":0,"y":0}]}}})",
       R"({"version":1,"reglas":[{"si":"cosquillas","entonces":["expresion:contento"]}]})",
@@ -93,7 +95,7 @@ PRUEBA("formato: una config mala no toca la actual") {
     VERIFICAR(!r.ok());
   }
   VERIFICAR(std::string(g_c.nombre) == "bicho");
-  VERIFICAR(g_c.nReglas == 9);
+  VERIFICAR(g_c.nReglas == base);
 }
 
 PRUEBA("formato: expresión propia nueva") {

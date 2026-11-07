@@ -5,6 +5,7 @@
 
 #include "json.h"
 #include "mate.h"
+#include "vida_datos.h"
 
 namespace sintetica {
 
@@ -12,8 +13,10 @@ constexpr int MAX_PUNTOS = 12;
 constexpr int MAX_BANDAS = 6;
 constexpr int MAX_FORMAS = 12;
 constexpr int MAX_EXPRESIONES = 24;
-constexpr int MAX_REGLAS = 24;
-constexpr int MAX_ACCIONES = 4;
+constexpr int MAX_REGLAS = 64;         // las del usuario (hasta 24) más las base
+constexpr int MAX_REGLAS_USUARIO = 24;
+constexpr int MAX_ACCIONES = 6;
+constexpr int MAX_Y = 2;               // condiciones extra de una regla ("y")
 constexpr int LARGO_NOMBRE = 25;  // 24 bytes + terminador
 constexpr int MAX_TOKENS_JSON = 2400;
 constexpr size_t MAX_CONFIG_BYTES = 16384;
@@ -68,6 +71,7 @@ struct Forma {
 struct Expresion {
   char nombre[LARGO_NOMBRE] = {};
   bool parpadea = true;
+  bool propia = false;  // vino de la config del usuario (no es una de las 16 base)
   uint8_t nFormas = 0;
   Forma formas[MAX_FORMAS];
 };
@@ -81,8 +85,35 @@ enum class Evento : uint8_t {
   Vinculado,
   AppAbierta,
   Despertado,
+  // v2 (motor de vida). Los números de arriba no cambian: viajan por BLE.
+  Caricia,
+  MuchosToques,
+  SacudidaSuave,
+  SacudidaFuerte,
+  Inclinado,
+  Caida,
+  Voz,
+  Nombre,
+  Ruido,
+  Musica,
+  Silencio,
+  Notificacion,
+  Llamada,
+  BateriaBaja,
+  BateriaCritica,
+  Enchufado,
+  Desenchufado,
+  Cargado,
+  SinWifi,
+  CambioDeCara,
+  BichoCerca,
+  Volvio,      // la primera interacción después de una ausencia (lo genera el motor)
+  Hito,        // un hito de la relación (lo genera el motor)
   Cantidad
 };
+// El evento "padre" (sacudida-fuerte → sacudida, caricia → tacto): si no hay
+// una regla para el evento, se prueba con el padre. Cantidad = no tiene.
+Evento eventoPadre(Evento e);
 const char* nombreEvento(Evento e);
 bool eventoPorNombre(const char* nombre, Evento* salida);
 
@@ -138,12 +169,20 @@ struct Cuadro {
 Cuadro cuadroDePista(const Pista& p, uint32_t t);
 
 struct Accion {
-  enum class Tipo : uint8_t { Expresion, Sonido, Led, Animacion } tipo = Tipo::Expresion;
+  // Expresion: una reacción de unos segundos. Reflejo: inmediata (< 50 ms),
+  // gana sobre todo. Comportamiento: lo empieza ya. Estado: empuja una
+  // variable del estado interno. Particula: suelta una.
+  enum class Tipo : uint8_t { Expresion, Sonido, Led, Animacion, Reflejo, Comportamiento, Estado, Particula } tipo = Tipo::Expresion;
   char argumento[LARGO_NOMBRE] = {};
+  int8_t indice = -1;     // la cara, el comportamiento o la partícula ya resueltos
+  int8_t variable = -1;   // Estado: la VarVida
+  float delta = 0;        // Estado: cuánto
 };
 
 struct Regla {
   Condicion si;
+  uint8_t nY = 0;
+  CondVida y[MAX_Y];      // condiciones extra ("y": "afecto>0.6,noche")
   uint8_t nAcciones = 0;
   Accion entonces[MAX_ACCIONES];
 };
@@ -153,8 +192,8 @@ enum class Modo : uint8_t { Mascota, Reloj, Pomodoro, Clima, Notificaciones };
 // Lo que se muestra, en orden: un toque pasa al siguiente (en el broche) y la
 // lista puede rotar sola.
 struct ElementoLista {
-  enum class Tipo : uint8_t { Cara, Imagen, Animacion } tipo = Tipo::Cara;
-  uint8_t indice = 0;  // expresión, espacio de imagen (0-7) o animación
+  enum class Tipo : uint8_t { Cara, Imagen, Animacion, CaraVida } tipo = Tipo::Cara;
+  uint8_t indice = 0;  // expresión (dibujo), espacio de imagen (0-7), animación o cara paramétrica
 };
 
 struct Config {
@@ -177,9 +216,18 @@ struct Config {
   uint16_t rotarMinutos = 0;  // 0 = no rota sola
   uint8_t nAnimaciones = 0;
   Animacion animaciones[MAX_ANIMACIONES];
+  DatosVida vida;
 
   int indiceExpresion(const char* nombre) const;
   int indiceAnimacion(const char* nombre) const;
+  // Una cara por nombre: un dibujo propio (expresión de formas que vino en la
+  // config del usuario) gana; si no, la paramétrica; si no, el dibujo base.
+  struct Cara {
+    int8_t vida = -1;    // índice en vida.caras
+    int8_t dibujo = -1;  // índice en expresiones
+    bool existe() const { return vida >= 0 || dibujo >= 0; }
+  };
+  Cara resolverCara(const char* nombre) const;
 };
 
 enum class ErrorConfig : uint8_t {

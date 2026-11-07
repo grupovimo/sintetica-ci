@@ -220,7 +220,7 @@ PRUEBA("api C: vista previa al doble, sin QR") {
   sintetica_tick();
   VERIFICAR(sintetica_ancho() == 640 && sintetica_alto() == 344);
   VERIFICAR(std::string(sintetica_expresion_visible()) == "neutral");
-  // Ojo izquierdo de 72 px de alto en la referencia: acá, de 144 (y 100 a 243).
+  // Ojo izquierdo de 72 px de alto en la referencia: acá, de unos 144 (respira y flota un poco).
   int y0 = -1, y1 = -1;
   for (int y = 0; y < 344; y++) {
     uint32_t c = de565(sintetica_pixeles()[y * 640 + 220]);
@@ -229,7 +229,7 @@ PRUEBA("api C: vista previa al doble, sin QR") {
       y1 = y;
     }
   }
-  VERIFICAR(y0 == 100 && y1 == 243);
+  VERIFICAR(std::abs((y1 - y0 + 1) - 144) <= 8 && std::abs((y0 + y1) / 2 - 172) <= 10);
   std::vector<uint8_t> rgba(640 * 344 * 4);
   sintetica_pixeles_rgba(rgba.data());
   VERIFICAR(rgba[(172 * 640 + 220) * 4] == 0xFF && rgba[3] == 255);

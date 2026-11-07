@@ -31,6 +31,57 @@ inline float seno(float x) {
 }
 inline float coseno(float x) { return seno(x + MEDIA_VUELTA / 2); }
 
+inline float fraccion(float x) { return x - piso(x); }
+inline float signo(float x) { return x < 0 ? -1.0f : (x > 0 ? 1.0f : 0.0f); }
+// smoothstep de GLSL.
+inline float suaveEntre(float a, float b, float x) {
+  const float t = limitar((x - a) / (b - a), 0.0f, 1.0f);
+  return t * t * (3.0f - 2.0f * t);
+}
+
+// e^x: 2^(x·log2 e), con la parte entera en el exponente del float y la
+// fraccionaria con un polinomio (error relativo < 2e-4, alcanza para colores y
+// decaimientos). Para x < -80 devuelve 0.
+inline float exponencial(float x) {
+  if (x < -80.0f) return 0.0f;
+  if (x > 80.0f) x = 80.0f;
+  const float t = x * 1.44269504f;
+  const float e = piso(t);
+  const float f = t - e;  // [0, 1)
+  const float p = 1.0f + f * (0.69314718f + f * (0.24022650f + f * (0.05550411f + f * 0.00961813f)));
+  union {
+    float f;
+    uint32_t u;
+  } b;
+  b.u = static_cast<uint32_t>(static_cast<int32_t>(e) + 127) << 23;
+  return p * b.f;
+}
+
+// atan2(y, x) en radianes (error < 0,002 rad).
+inline float arcotangente2(float y, float x) {
+  const float ax = absf(x), ay = absf(y);
+  if (ax < 1e-12f && ay < 1e-12f) return 0.0f;
+  const float a = minf(ax, ay) / maxf(ax, ay);
+  const float s = a * a;
+  float r = ((-0.0464964749f * s + 0.15931422f) * s - 0.327622764f) * s * a + a;
+  if (ay > ax) r = 1.57079637f - r;
+  if (x < 0) r = 3.14159274f - r;
+  if (y < 0) r = -r;
+  return r;
+}
+
+// Hash de un real a [0, 1) (el del v0: fract(sin(n)·43758,5453), pero con
+// enteros para que dé igual en todos lados).
+inline float hashReal(float n) {
+  uint32_t x = static_cast<uint32_t>(static_cast<int32_t>(n * 1000.0f));
+  x ^= x >> 16;
+  x *= 0x7feb352dU;
+  x ^= x >> 15;
+  x *= 0x846ca68bU;
+  x ^= x >> 16;
+  return (x >> 8) * (1.0f / 16777216.0f);
+}
+
 // Curva ease-in-out cúbica, la que pide el manual para el parpadeo.
 inline float suave(float t) {
   t = limitar(t, 0.0f, 1.0f);

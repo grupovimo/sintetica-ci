@@ -1,6 +1,8 @@
 #include "sistema.h"
 
 #include "emparejamiento.h"
+#include "fuentes.h"
+#include "texto.h"
 
 namespace sintetica {
 
@@ -13,6 +15,7 @@ constexpr const char* CLAVE_CLAVES = "claves";
 constexpr const char* CLAVE_IMAGENES = "imagenes";
 constexpr const char* CLAVE_RED = "red";
 constexpr const char* CLAVE_NUBE = "nube";
+constexpr const char* CLAVE_VIDA = "vida";
 
 // Por la nube los trozos pueden ser más grandes que por BLE.
 constexpr size_t TROZO_NUBE = 1024;
@@ -53,6 +56,13 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
   leerIdentidad();
   lienzo_.iniciar(pixeles, perfil.ancho, perfil.alto, perfil.filasFranja);
   vista_ = Vista::para(perfil.ancho, perfil.alto, perfil.redonda);
+  // El resplandor de los ojos cuesta: el broche (sin FPU) no lo dibuja.
+  vistaRostro_ = VistaRostro::para(perfil.ancho, perfil.alto, perfil.redonda, perfil.boton != Perfil::Boton::Broche);
+  horaRef_ = horaRefMs_ = 0;
+  ultimaBateria_ = ultimoCargando_ = -1;
+  sinWifiDesde_ = 0;
+  avisoSinWifi_ = false;
+  depurar_ = false;
 
   ResultadoConfig r = cargarBase(config_);
   if (!r.ok()) log(r.detalle);
@@ -68,7 +78,25 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
 
   const uint32_t ahora = hal_.ahoraMs();
   arranque_ = ahora;
+  ultimoCuadro_ = ahora;
   motor_.iniciar(&config_, hal_.semilla ? hal_.semilla() : ahora, ahora);
+  SalidasVida sv;
+  sv.ctx = this;
+  sv.sonido = [](void* c, const char* n) {
+    auto* s = static_cast<Sistema*>(c);
+    if (s->hal_.sonido) s->hal_.sonido(n);
+  };
+  sv.led = [](void* c, uint32_t rgb) {
+    auto* s = static_cast<Sistema*>(c);
+    if (s->hal_.led) s->hal_.led(rgb);
+  };
+  sv.animacion = [](void* c, int i) { static_cast<Sistema*>(c)->reproducir(i, true); };
+  sv.guardar = [](void* c, const uint8_t* d, size_t n) {
+    auto* s = static_cast<Sistema*>(c);
+    if (s->hal_.guardar) s->hal_.guardar(CLAVE_VIDA, d, n);
+  };
+  motor_.salidas(sv);
+  leerMemoria();
   leerAjustes();
   leerImagenes();
   azar_.sembrar(hal_.semilla ? hal_.semilla() : ahora);
@@ -182,7 +210,7 @@ void Sistema::leerAjustes() {
   if (i + ne > static_cast<size_t>(n)) return;
   copiarTexto(fijaGuardada_, sizeof fijaGuardada_, reinterpret_cast<const char*>(b + i), ne);
   i += ne;
-  motor_.fijar(config_.indiceExpresion(fijaGuardada_));
+  if (!motor_.fijar(fijaGuardada_)) fijaGuardada_[0] = 0;
   if (b[0] == 2 && i < static_cast<size_t>(n)) posLista_ = b[i];
 }
 
@@ -202,61 +230,71 @@ void Sistema::guardarAjustes() {
   hal_.guardar(CLAVE_AJUSTES, b, i);
 }
 
-int Sistema::expresionDeEstado() {
-  const int bat = hal_.bateria ? hal_.bateria() : -1;
-  for (int i = 0; i < config_.nReglas; i++) {
-    const Regla& r = config_.reglas[i];
-    if (r.si.tipo == Condicion::Tipo::Evento) continue;
-    float v;
-    if (r.si.variable == Variable::Bateria) {
-      if (bat < 0) continue;
-      v = static_cast<float>(bat);
-    } else {
-      v = motor_.humor();
-    }
-    const bool cumple = r.si.tipo == Condicion::Tipo::Menor ? v < r.si.valor : v > r.si.valor;
-    if (!cumple) continue;
-    for (int a = 0; a < r.nAcciones; a++)
-      if (r.entonces[a].tipo == Accion::Tipo::Expresion) return config_.indiceExpresion(r.entonces[a].argumento);
-  }
-  return -1;
+void Sistema::leerMemoria() {
+  uint8_t b[LARGO_MEMORIA];
+  const int n = hal_.leer ? hal_.leer(CLAVE_VIDA, b, sizeof b) : -1;
+  Memoria m;
+  if (n == static_cast<int>(LARGO_MEMORIA) && decodificarMemoria(b, LARGO_MEMORIA, &m)) motor_.restaurarMemoria(m);
 }
 
-void Sistema::aplicarAcciones(const Regla& r) {
-  const uint32_t ahora = hal_.ahoraMs();
-  for (int a = 0; a < r.nAcciones; a++) {
-    const Accion& acc = r.entonces[a];
-    switch (acc.tipo) {
-      case Accion::Tipo::Expresion:
-        motor_.reaccionar(config_.indiceExpresion(acc.argumento), ahora);
-        break;
-      case Accion::Tipo::Sonido:
-        if (hal_.sonido) hal_.sonido(acc.argumento);
-        break;
-      case Accion::Tipo::Animacion:
-        reproducir(config_.indiceAnimacion(acc.argumento), true);
-        break;
-      case Accion::Tipo::Led: {
-        uint32_t rgb;
-        bool acento;
-        if (hal_.led && interpretarColor(acc.argumento, &rgb, &acento)) hal_.led(rgb);
-        break;
-      }
-    }
-  }
+void Sistema::evento(Evento e) { motor_.evento(e, hal_.ahoraMs()); }
+
+void Sistema::hora(uint32_t epochUtc, int zonaMinutos) {
+  horaRef_ = static_cast<uint32_t>(static_cast<int64_t>(epochUtc) + static_cast<int64_t>(zonaMinutos) * 60);
+  horaRefMs_ = hal_.ahoraMs();
 }
 
-void Sistema::evento(Evento e) {
-  const uint32_t ahora = hal_.ahoraMs();
-  // Tocarlo mientras duerme es despertarlo de la siesta.
-  if (e == Evento::Tacto && motor_.dormido()) e = Evento::Despertado;
-  motor_.interaccion(ahora);
-  for (int i = 0; i < config_.nReglas; i++) {
-    const Regla& r = config_.reglas[i];
-    if (r.si.tipo == Condicion::Tipo::Evento && r.si.evento == e) {
-      aplicarAcciones(r);
-      break;
+uint32_t Sistema::epoch() const {
+  const uint32_t e = hal_.epoch ? hal_.epoch() : 0;
+  if (e) return e;
+  if (!horaRef_) return 0;
+  return horaRef_ + (hal_.ahoraMs() - horaRefMs_) / 1000u;
+}
+
+int Sistema::minutoDelDia() const {
+  const int m = hal_.minutoDelDia ? hal_.minutoDelDia() : -1;
+  if (m >= 0) return m;
+  const uint32_t e = epoch();
+  return e ? static_cast<int>((e % 86400u) / 60u) : -1;
+}
+
+Contexto Sistema::contexto() const {
+  Contexto c;
+  c.minutoDelDia = minutoDelDia();
+  c.epoch = epoch();
+  c.bateria = hal_.bateria ? hal_.bateria() : -1;
+  c.cargando = hal_.cargando ? hal_.cargando() : -1;
+  return c;
+}
+
+int Sistema::fpsSugerido() const {
+  if (apagado_) return 1;
+  if (motor_.dormido()) return 5;
+  return 30;
+}
+
+// Convierte lo que pasa alrededor (batería, cargador, WiFi) en eventos.
+void Sistema::vigilar(uint32_t ahora) {
+  const Contexto c = contexto();
+  if (c.bateria >= 0 && ultimaBateria_ >= 0) {
+    if (c.bateria < 20 && ultimaBateria_ >= 20) evento(Evento::BateriaBaja);
+    if (c.bateria < 5 && ultimaBateria_ >= 5) evento(Evento::BateriaCritica);
+    if (c.bateria >= 100 && ultimaBateria_ < 100 && c.cargando == 1) evento(Evento::Cargado);
+  }
+  if (c.cargando >= 0 && ultimoCargando_ >= 0 && c.cargando != ultimoCargando_)
+    evento(c.cargando ? Evento::Enchufado : Evento::Desenchufado);
+  ultimaBateria_ = c.bateria;
+  ultimoCargando_ = c.cargando;
+  // Sin WiFi un minuto (teniéndolo configurado): lo busca con la mirada.
+  if (redConfigurada_ && !wifi_ && !vistaPrevia_) {
+    if (!sinWifiDesde_) sinWifiDesde_ = ahora;
+    if (!avisoSinWifi_ && ahora - sinWifiDesde_ >= 60000) {
+      avisoSinWifi_ = true;
+      evento(Evento::SinWifi);
     }
+  } else {
+    sinWifiDesde_ = 0;
+    avisoSinWifi_ = false;
   }
 }
 
@@ -307,7 +345,7 @@ bool Sistema::dibujarImagen(int espacio) {
 
 // La imagen que corresponde mostrar ahora, o -1 si va una cara.
 int Sistema::imagenParaMostrar(uint32_t ahora) {
-  if (apagado_ || emparejando_ || motor_.expresionFija() >= 0 || animPedida_ >= 0 || largoLista() == 0) return -1;
+  if (apagado_ || emparejando_ || motor_.hayFija() || animPedida_ >= 0 || largoLista() == 0) return -1;
   const ElementoLista e = elementoLista(posLista_);
   if (e.tipo != ElementoLista::Tipo::Imagen || imagenes_[e.indice].largo == 0 || subiendo_ == e.indice) return -1;
   // Cada tanto vuelve la cara un par de segundos: nunca una imagen quieta del todo.
@@ -433,14 +471,22 @@ ElementoLista Sistema::elementoLista(int i) const {
 void Sistema::aplicarLista(uint32_t ahora) {
   const int n = largoLista();
   if (n == 0) {
-    motor_.base(-1);
+    motor_.base(Config::Cara());
     return;
   }
   if (posLista_ >= n) posLista_ = 0;
   const ElementoLista e = elementoLista(posLista_);
   // Las imágenes y las animaciones se dibujan aparte; mientras tanto la cara de
   // base es la neutral.
-  motor_.base(e.tipo == ElementoLista::Tipo::Cara ? e.indice : -1);
+  if (e.tipo == ElementoLista::Tipo::Cara) {
+    motor_.base(e.indice);
+  } else if (e.tipo == ElementoLista::Tipo::CaraVida) {
+    Config::Cara c;
+    c.vida = static_cast<int8_t>(e.indice);
+    motor_.base(c);
+  } else {
+    motor_.base(Config::Cara());
+  }
   animListaDesde_ = ahora;
 }
 
@@ -507,34 +553,81 @@ void Sistema::dibujarPantalla(uint32_t ahora) {
     dibujarEmparejamiento(lienzo_, serie_, qr_, "ESPERANDO VÍNCULO", perfil_.redonda);
     return;
   }
-  lienzo_.limpiar(paleta::PANTALLA);
   if (animVisible_ >= 0) {
+    lienzo_.limpiar(paleta::PANTALLA);
     const Animacion& a = config_.animaciones[animVisible_];
     if (a.sobre >= 0) dibujarExpresion(lienzo_, vista_, config_.expresiones[a.sobre], motor_.estado());
     dibujarAnimacion(lienzo_, vista_, a, animT_, motor_.estado());
+    if (depurar_) dibujarDepuracion();
     return;
   }
-  int visible = motor_.expresionVisible();
-  // Manteniendo el botón del broche para dormirlo: muestra que se va a dormir.
-  if (perfil_.boton == Perfil::Boton::Broche && botonApretado_ && !ignorarSoltar_ &&
-      ahora - botonDesde_ >= tiemposBroche::DORMIR_MS) {
-    const int d = config_.indiceExpresion("dormido");
-    if (d >= 0) visible = d;
+  // El rostro paramétrico siempre; un dibujo propio del usuario (formas) va
+  // encima con fundido, nunca con un corte.
+  const int dibujo = motor_.dibujo();
+  const float op = motor_.opacidadDibujo();
+  if (dibujo >= 0 && op >= 0.999f) {
+    lienzo_.limpiar(paleta::PANTALLA);
+  } else {
+    dibujarRostro(lienzo_, vistaRostro_, motor_.cuadro());
   }
-  dibujarExpresion(lienzo_, vista_, config_.expresiones[visible], motor_.estado());
+  if (dibujo >= 0 && op > 0.001f) {
+    lienzo_.opacidad(op);
+    if (op < 0.999f) {
+      // Tapar el rostro de a poco.
+      lienzo_.opacidad(op);
+      lienzo_.pildora(lienzo_.ancho() / 2.0f, (lienzo_.franja() + lienzo_.filasFranja() / 2.0f), lienzo_.ancho() + 4.0f,
+                      lienzo_.filasFranja() + 4.0f, 0, paleta::PANTALLA);
+    }
+    dibujarExpresion(lienzo_, vista_, config_.expresiones[dibujo], motor_.estado());
+    lienzo_.opacidad(1);
+  }
+  if (depurar_) dibujarDepuracion();
+}
+
+void Sistema::dibujarDepuracion() {
+  // Arriba a la izquierda: el comportamiento, el estado interno en barras y los fps.
+  const float x = perfil_.redonda ? 52 : 6;
+  float y = perfil_.redonda ? 52 : 4;
+  char linea[48];
+  const char* c = motor_.nombreComportamiento();
+  size_t n = copiarTexto(linea, sizeof linea, c[0] ? c : "-");
+  for (size_t i = 0; i < n; i++)
+    if (linea[i] >= 'a' && linea[i] <= 'z') linea[i] = static_cast<char>(linea[i] - 32);
+  dibujarTexto(lienzo_, fuentes::MONO_9, linea, x, y + 9, paleta::TINTA);
+  y += 13;
+  const float* e = motor_.estadoInterno();
+  for (int i = 0; i < N_ESTADO; i++) {
+    lienzo_.rectangulo(static_cast<int>(x), static_cast<int>(y + i * 5), 40, 3, paleta::LINEA);
+    lienzo_.rectangulo(static_cast<int>(x), static_cast<int>(y + i * 5), static_cast<int>(40 * limitar(e[i], 0, 1)), 3,
+                       i == 6 ? 0xFF3820 : paleta::NARANJA);
+  }
+  y += N_ESTADO * 5 + 2;
+  const int f = static_cast<int>(fps_ + 0.5f);
+  linea[0] = static_cast<char>('0' + (f / 10) % 10), linea[1] = static_cast<char>('0' + f % 10);
+  copiarTexto(linea + 2, sizeof linea - 2, " FPS");
+  dibujarTexto(lienzo_, fuentes::MONO_9, linea, x, y + 9, paleta::TINTA_SUAVE);
 }
 
 void Sistema::tick() {
   const uint32_t ahora = hal_.ahoraMs();
+  const uint32_t dtCuadro = ahora - ultimoCuadro_;
+  ultimoCuadro_ = ahora;
+  if (dtCuadro > 0 && dtCuadro < 2000) fps_ = mezclar(fps_, 1000.0f / dtCuadro, 0.1f);
   gestos_.tick(ahora);
   Evento e;
   while (gestos_.sacar(&e)) evento(e);
+  // Inclinado: los ojos "caen" hacia donde está la gravedad.
+  float gx, gy;
+  if (gestos_.inclinacion(&gx, &gy)) motor_.seguir(-gx / 0.7f, -gy / 0.7f, ahora);
+  vigilar(ahora);
+  motor_.tick(ahora, contexto());
+  // El broche, de noche y ya dormido, apaga la pantalla hasta la mañana.
+  if (perfil_.boton == Perfil::Boton::Broche && !apagado_ && !vistaPrevia_ && motor_.quiereSuenoProfundo()) dormir();
 
-  Contexto ctx;
-  ctx.minutoDelDia = hal_.minutoDelDia ? hal_.minutoDelDia() : -1;
-  ctx.expresionEstado = expresionDeEstado();
-  motor_.tick(ahora, ctx);
-
+  // Manteniendo el botón del broche para dormirlo: se le cierran los ojos.
+  if (perfil_.boton == Perfil::Boton::Broche && botonApretado_ && !ignorarSoltar_ &&
+      ahora - botonDesde_ >= tiemposBroche::DORMIR_MS && !qrPorBoton_)
+    motor_.reaccionar(config_.resolverCara("dormido"), ahora, 150);
   // Mantener el botón (5 s la mascota, 8 s el broche) muestra el QR para vincular otro celu.
   bool qr = gestos_.sacarMantenido();
   if (perfil_.boton == Perfil::Boton::Broche && botonApretado_ && !ignorarSoltar_ && !qrPorBoton_ &&
@@ -589,10 +682,10 @@ size_t Sistema::estadoBle(uint8_t* salida, size_t cap) const {
   p.humor = static_cast<int8_t>(motor_.humor() * 100);
   p.modo = static_cast<uint8_t>(config_.modo);
   p.dormido = motor_.dormido();
-  p.fija = motor_.expresionFija() >= 0;
+  p.fija = motor_.hayFija();
   p.emparejando = emparejando_;
   p.autenticado = autenticado_;
-  p.expresion = animVisible_ >= 0 ? visible_ : config_.expresiones[motor_.expresionVisible()].nombre;
+  p.expresion = animVisible_ >= 0 ? visible_ : motor_.nombreVisible();
   p.nombre = nombre();
   p.serie = serie_;
   p.id = id_;
@@ -913,6 +1006,57 @@ void Sistema::elegirAnimacion(uint32_t ahora) {
   }
 }
 
+void Sistema::enviarVida() {
+  // [0x9B][0][7 × estado][6 × rasgos][flags][n][comportamiento][n][visible][n cand][n][nombre][puntaje]...[fps]
+  using namespace protocolo;
+  uint8_t b[MAX_NOTIFICACION];
+  size_t i = 0;
+  b[i++] = static_cast<uint8_t>(CmdVida | Respuesta);
+  b[i++] = Ok;
+  const float* e = motor_.estadoInterno();
+  for (int k = 0; k < N_ESTADO; k++) b[i++] = static_cast<uint8_t>(limitar(e[k], 0, 1) * 255 + 0.5f);
+  const Personalidad p = motor_.rasgos();
+  for (int k = 0; k < N_RASGOS; k++) b[i++] = static_cast<uint8_t>(limitar(p[k], 0, 1) * 255 + 0.5f);
+  b[i++] = static_cast<uint8_t>((motor_.dormido() ? 1 : 0) | (motor_.sonando() ? 2 : 0) | (depurar_ ? 4 : 0));
+  auto texto = [&](const char* t) {
+    size_t m = largo(t);
+    if (m > 24) m = 24;
+    b[i++] = static_cast<uint8_t>(m);
+    copiarBytes(b + i, t, m);
+    i += m;
+  };
+  texto(motor_.nombreComportamiento());
+  texto(motor_.nombreVisible());
+  const char* nombres[3];
+  float puntajes[3];
+  const int nc = motor_.candidatos(nombres, puntajes, 3);
+  b[i++] = static_cast<uint8_t>(nc);
+  for (int k = 0; k < nc; k++) {
+    texto(nombres[k]);
+    b[i++] = static_cast<uint8_t>(limitar(puntajes[k], 0, 2.55f) * 100);
+  }
+  b[i++] = static_cast<uint8_t>(limitar(fps_, 0, 255));
+  enviar(CarComando, b, i);
+}
+
+void Sistema::enviarRegistro() {
+  using namespace protocolo;
+  EntradaRegistro r[28];
+  const int n = motor_.registro(r, 28);
+  uint8_t b[3 + 28 * 6];
+  size_t i = 0;
+  b[i++] = static_cast<uint8_t>(CmdRegistro | Respuesta);
+  b[i++] = Ok;
+  b[i++] = static_cast<uint8_t>(n);
+  for (int k = 0; k < n; k++) {
+    escribir32(b + i, r[k].segundos);
+    b[i + 4] = r[k].tipo;
+    b[i + 5] = r[k].dato;
+    i += 6;
+  }
+  enviar(CarComando, b, i);
+}
+
 void Sistema::bleEscribir(uint8_t car, const uint8_t* d, size_t n) {
   canal_ = Canal::Ble;
   procesar(car, d, n);
@@ -1010,12 +1154,13 @@ void Sistema::procesar(uint8_t car, const uint8_t* d, size_t n) {
         receptor_.reiniciar();
         // Un nombre nuevo en la config gana sobre el puesto por comando.
         nombre_[0] = 0;
-        const int fija = config_.indiceExpresion(fijaGuardada_);
-        if (fija < 0) fijaGuardada_[0] = 0;
+        if (!config_.resolverCara(fijaGuardada_).existe()) fijaGuardada_[0] = 0;
         guardarAjustes();
-        motor_.iniciar(&config_, hal_.semilla ? hal_.semilla() : hal_.ahoraMs(), hal_.ahoraMs());
-        motor_.fijar(fija);
+        // El motor sigue con su estado y su memoria: solo cambian los datos.
+        motor_.reconfigurar(&config_);
+        motor_.fijar(fijaGuardada_);
         aplicarLista(hal_.ahoraMs());
+        evento(Evento::CambioDeCara);
         log("config nueva aplicada");
         return responder(car, op, Ok);
       }
@@ -1032,12 +1177,14 @@ void Sistema::procesar(uint8_t car, const uint8_t* d, size_t n) {
         char nombre[LARGO_NOMBRE];
         if (n - 1 >= LARGO_NOMBRE) return responder(car, op, NoExiste);
         copiarTexto(nombre, sizeof nombre, reinterpret_cast<const char*>(d + 1), n - 1);
-        int idx = n == 1 ? -1 : config_.indiceExpresion(nombre);
-        if (n > 1 && idx < 0) return responder(car, op, NoExiste);
-        motor_.fijar(idx);
-        copiarTexto(fijaGuardada_, sizeof fijaGuardada_, idx < 0 ? "" : nombre);
+        if (n > 1 && !config_.resolverCara(nombre).existe()) return responder(car, op, NoExiste);
+        motor_.fijar(n == 1 ? "" : nombre);
+        copiarTexto(fijaGuardada_, sizeof fijaGuardada_, n == 1 ? "" : nombre);
         guardarAjustes();
-        return responder(car, op, Ok);
+        responder(car, op, Ok);
+        // "Se mira en el espejo y prueba la cara nueva".
+        if (n > 1) evento(Evento::CambioDeCara);
+        return;
       }
       case CmdNombre: {
         if (n < 2 || n - 1 > LARGO_NOMBRE - 1) return responder(car, op, Malformado);
@@ -1064,6 +1211,37 @@ void Sistema::procesar(uint8_t car, const uint8_t* d, size_t n) {
       case CmdNube:
       case CmdOlvidarRed:
         return comandoRed(op, d, n);
+      case CmdHora: {
+        if (n != 7) return responder(car, op, Malformado, "[u32 epoch][i16 zona en minutos]");
+        const int16_t zona = static_cast<int16_t>(d[5] | d[6] << 8);
+        if (zona < -840 || zona > 840) return responder(car, op, Malformado, "zona de -14 h a +14 h");
+        hora(leer32(d + 1), zona);
+        return responder(car, op, Ok);
+      }
+      case CmdVida: {
+        if (n == 2) depurar_ = d[1] != 0;
+        else if (n != 1) return responder(car, op, Malformado);
+        return enviarVida();
+      }
+      case CmdMemoria: {
+        uint8_t b[2 + LARGO_MEMORIA];
+        b[0] = static_cast<uint8_t>(op | Respuesta);
+        b[1] = Ok;
+        codificarMemoria(motor_.memoria(), b + 2, LARGO_MEMORIA);
+        enviar(car, b, sizeof b);
+        return;
+      }
+      case CmdRestaurar: {
+        Memoria m;
+        if (n != 1 + LARGO_MEMORIA || !decodificarMemoria(d + 1, LARGO_MEMORIA, &m))
+          return responder(car, op, Malformado, "memoria de 112 bytes con su CRC");
+        motor_.restaurarMemoria(m);
+        if (hal_.guardar) hal_.guardar(CLAVE_VIDA, d + 1, LARGO_MEMORIA);
+        log("memoria restaurada (mudanza)");
+        return responder(car, op, Ok);
+      }
+      case CmdRegistro:
+        return enviarRegistro();
       case CmdReproducir: {
         if (n == 1) {
           reproducir(-1, false);

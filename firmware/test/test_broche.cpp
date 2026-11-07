@@ -166,7 +166,7 @@ PRUEBA("broche: mantener 2 s lo duerme, un toque lo despierta") {
   correr(200);
   g_s.tacto(true);
   correr(2200);
-  VERIFICAR(visible() != "dormido");  // la muestra mientras se mantiene, pero la visible del motor no cambia
+  VERIFICAR(visible() == "dormido");  // mientras se mantiene se le cierran los ojos
   VERIFICAR(!g_s.quiereDormir());
   g_s.tacto(false);
   correr(40);
@@ -227,5 +227,5 @@ PRUEBA("mascota: sin lista, el comportamiento automático de siempre") {
   for (int i = 0; i < 30; i++) g_t += 20, s.tick();
   s.siguiente();  // no hace nada
   VERIFICAR(s.posicionLista() == 0);
-  VERIFICAR(s.motor().base() == -1);
+  VERIFICAR(!s.motor().base().existe());
 }

@@ -1,13 +1,20 @@
 #include "formato.h"
 
+#include "formato_vida.h"
+#include "rostro.h"
+
 #include "caras_base.h"
 
 namespace sintetica {
 
 namespace {
 
-const char* const NOMBRES_EVENTO[] = {"tacto",    "doble-toque", "levantado",   "sacudida",
-                                      "boca-abajo", "vinculado", "app-abierta", "despertado"};
+const char* const NOMBRES_EVENTO[] = {
+    "tacto", "doble-toque", "levantado", "sacudida", "boca-abajo", "vinculado", "app-abierta", "despertado",
+    "caricia", "muchos-toques", "sacudida-suave", "sacudida-fuerte", "inclinado", "caida", "voz", "nombre",
+    "ruido", "musica", "silencio", "notificacion", "llamada", "bateria-baja", "bateria-critica", "enchufado",
+    "desenchufado", "cargado", "sin-wifi", "cambio-de-cara", "bicho-cerca", "volvio", "hito"};
+static_assert(sizeof NOMBRES_EVENTO / sizeof NOMBRES_EVENTO[0] == static_cast<int>(Evento::Cantidad), "eventos");
 
 // Memoria de trabajo compartida (no reentrante: el núcleo corre en un solo hilo).
 TokenJson g_tokens[MAX_TOKENS_JSON];
@@ -151,6 +158,8 @@ ResultadoConfig leerExpresion(const Json& j, int obj, Expresion* e) {
   return {};
 }
 
+}  // namespace
+
 bool nombreValido(const char* s) {
   size_t n = largo(s);
   if (n == 0 || n > 24 || s[0] < 'a' || s[0] > 'z') return false;
@@ -160,6 +169,8 @@ bool nombreValido(const char* s) {
   }
   return true;
 }
+
+namespace {
 
 // Guarda la expresión en `c`: reemplaza la del mismo nombre o la agrega.
 ResultadoConfig guardarExpresion(Config& c, const Expresion& e) {
@@ -208,6 +219,24 @@ bool leerCondicion(const char* s, Condicion* c) {
 }
 
 bool leerAccion(const char* s, Accion* a) {
+  // "estado.animo+0.2"
+  if (iguales(s, "estado.", 7)) {
+    const char* op = s + 7;
+    while (*op && *op != '+' && *op != '-') op++;
+    if (!*op || op == s + 7) return false;
+    VarVida v;
+    if (!varVidaPorNombre(s, static_cast<size_t>(op - s), &v) || static_cast<int>(v) >= N_ESTADO) return false;
+    Json jn;
+    TokenJson t[1];
+    if (jn.parsear(op + 1, largo(op + 1), t, 1) != 1 || jn.tipo(0) != TipoJson::Numero) return false;
+    const float d = jn.numero(0, 0);
+    if (d < 0 || d > 1) return false;
+    a->tipo = Accion::Tipo::Estado;
+    a->variable = static_cast<int8_t>(v);
+    a->delta = *op == '-' ? -d : d;
+    copiarTexto(a->argumento, sizeof a->argumento, s + 7);
+    return true;
+  }
   const char* dos = s;
   while (*dos && *dos != ':') dos++;
   if (!*dos || !dos[1]) return false;
@@ -217,6 +246,9 @@ bool leerAccion(const char* s, Accion* a) {
   else if (iguales(tipo, "sonido")) a->tipo = Accion::Tipo::Sonido;
   else if (iguales(tipo, "led")) a->tipo = Accion::Tipo::Led;
   else if (iguales(tipo, "animacion")) a->tipo = Accion::Tipo::Animacion;
+  else if (iguales(tipo, "reflejo")) a->tipo = Accion::Tipo::Reflejo;
+  else if (iguales(tipo, "comportamiento")) a->tipo = Accion::Tipo::Comportamiento;
+  else if (iguales(tipo, "particula")) a->tipo = Accion::Tipo::Particula;
   else return false;
   return copiarTexto(a->argumento, sizeof a->argumento, dos + 1) > 0;
 }
@@ -308,13 +340,66 @@ ResultadoConfig guardarAnimacion(Config& c, const Animacion& a) {
   return {};
 }
 
-void reglaBase(Config& c, const char* si, const char* expresion) {
-  Regla& r = c.reglas[c.nReglas++];
-  r = Regla();
-  leerCondicion(si, &r.si);
-  r.nAcciones = 1;
-  r.entonces[0].tipo = Accion::Tipo::Expresion;
-  copiarTexto(r.entonces[0].argumento, LARGO_NOMBRE, expresion);
+// Resuelve el argumento de una acción contra la config (y valida que exista).
+const char* resolverAccion(const Config& c, Accion& a) {
+  switch (a.tipo) {
+    case Accion::Tipo::Expresion:
+    case Accion::Tipo::Reflejo:
+      if (!c.resolverCara(a.argumento).existe()) return "regla: expresión que no existe";
+      a.indice = static_cast<int8_t>(c.vida.indiceCara(a.argumento));
+      return nullptr;
+    case Accion::Tipo::Animacion:
+      return c.indiceAnimacion(a.argumento) < 0 ? "regla: animación que no existe" : nullptr;
+    case Accion::Tipo::Comportamiento: {
+      const int i = c.vida.indiceComportamiento(a.argumento);
+      if (i < 0) return "regla: comportamiento que no existe";
+      a.indice = static_cast<int8_t>(i);
+      return nullptr;
+    }
+    case Accion::Tipo::Particula: {
+      TipoParticula t;
+      if (!particulaPorNombre(a.argumento, &t)) return "regla: partícula desconocida";
+      a.indice = static_cast<int8_t>(t);
+      return nullptr;
+    }
+    default:
+      return nullptr;
+  }
+}
+
+// Lee un arreglo de reglas en `destino` (hasta `max`).
+ResultadoConfig leerReglas(const Json& j, int reg, const Config& c, Regla* destino, int max, int* n) {
+  if (j.tipo(reg) != TipoJson::Arreglo) return error(ErrorConfig::Regla, "reglas: no es un arreglo");
+  if (j.cantidad(reg) > max) return error(ErrorConfig::Demasiadas, "reglas: más de 24");
+  *n = j.cantidad(reg);
+  for (int i = 0; i < *n; i++) {
+    int r = j.elemento(reg, i);
+    Regla& regla = destino[i];
+    regla = Regla();
+    char si[LARGO_NOMBRE];
+    if (j.texto(j.buscar(r, "si"), si, sizeof si) <= 0 || !leerCondicion(si, &regla.si))
+      return error(ErrorConfig::Regla, "regla: \"si\" desconocido");
+    const int y = j.buscar(r, "y");
+    if (y >= 0) {
+      char cond[64];
+      if (j.texto(y, cond, sizeof cond) <= 0) return error(ErrorConfig::Regla, "regla: \"y\" inválido");
+      regla.nY = static_cast<uint8_t>(leerCondiciones(cond, regla.y, MAX_Y));
+      if (!regla.nY) return error(ErrorConfig::Regla, "regla: \"y\" inválido (ej. \"afecto>0.6,noche\")");
+    }
+    int ent = j.buscar(r, "entonces");
+    if (!j.valido(ent) || j.tipo(ent) != TipoJson::Arreglo || j.cantidad(ent) < 1 ||
+        j.cantidad(ent) > MAX_ACCIONES)
+      return error(ErrorConfig::Regla, "regla: \"entonces\" de 1 a 6 acciones");
+    for (int a = 0; a < j.cantidad(ent); a++) {
+      char acc[48];
+      if (j.texto(j.elemento(ent, a), acc, sizeof acc) <= 0 || !leerAccion(acc, &regla.entonces[a]))
+        return error(ErrorConfig::Regla, "regla: acción inválida");
+      const char* mal = resolverAccion(c, regla.entonces[a]);
+      if (mal) return error(ErrorConfig::Regla, mal);
+      regla.nAcciones++;
+    }
+  }
+  return {};
 }
 
 }  // namespace
@@ -324,7 +409,34 @@ const char* nombreEvento(Evento e) {
   return i < static_cast<int>(Evento::Cantidad) ? NOMBRES_EVENTO[i] : "?";
 }
 
-bool eventoPorNombre(const char* nombre, Evento* salida) {
+Evento eventoPadre(Evento e) {
+  switch (e) {
+    case Evento::SacudidaSuave:
+    case Evento::SacudidaFuerte:
+      return Evento::Sacudida;
+    case Evento::Caricia:
+    case Evento::MuchosToques:
+      return Evento::Tacto;
+    case Evento::Caida:
+      return Evento::Levantado;
+    case Evento::Nombre:
+      return Evento::Voz;
+    default:
+      return Evento::Cantidad;
+  }
+}
+
+bool eventoPorNombre(const char* nombreOriginal, Evento* salida) {
+  // "sacudida.fuerte", "nombre_escuchado" y "toque" también valen.
+  char nombre[32];
+  copiarTexto(nombre, sizeof nombre, nombreOriginal);
+  for (char* c = nombre; *c; c++)
+    if (*c == '_' || *c == '.') *c = '-';
+  if (iguales(nombre, "toque")) copiarTexto(nombre, sizeof nombre, "tacto");
+  if (iguales(nombre, "nombre-escuchado")) copiarTexto(nombre, sizeof nombre, "nombre");
+  if (iguales(nombre, "ruido-fuerte")) copiarTexto(nombre, sizeof nombre, "ruido");
+  if (iguales(nombre, "silencio-largo")) copiarTexto(nombre, sizeof nombre, "silencio");
+  if (iguales(nombre, "cargando")) copiarTexto(nombre, sizeof nombre, "enchufado");
   for (int i = 0; i < static_cast<int>(Evento::Cantidad); i++) {
     if (iguales(nombre, NOMBRES_EVENTO[i])) {
       *salida = static_cast<Evento>(i);
@@ -468,16 +580,17 @@ ResultadoConfig cargarBase(Config& c) {
     ResultadoConfig r = aplicarExpresion(c, CARAS_BASE[i], largo(CARAS_BASE[i]));
     if (!r.ok()) return r;
   }
-  // Disparadores del manual de marca.
-  reglaBase(c, "tacto", "contento");
-  reglaBase(c, "doble-toque", "sospecha");
-  reglaBase(c, "levantado", "sorpresa");
-  reglaBase(c, "sacudida", "mareado");
-  reglaBase(c, "boca-abajo", "triste");
-  reglaBase(c, "vinculado", "guino");
-  reglaBase(c, "app-abierta", "enamorado");
-  reglaBase(c, "despertado", "enojado");
-  reglaBase(c, "bateria<15", "bateria-baja");
+  // El motor de vida: expresiones paramétricas, comportamientos y reglas base
+  // (shared/formato/vida).
+  ResultadoConfig r = cargarVidaBase(c);
+  if (!r.ok()) return r;
+  const char* reglas = reglasVidaBase();
+  Json j;
+  if (j.parsear(reglas, largo(reglas), g_tokens, MAX_TOKENS_JSON) <= 0) return error(ErrorConfig::JsonInvalido, "reglas base");
+  int n = 0;
+  r = leerReglas(j, 0, c, c.reglas, MAX_REGLAS, &n);
+  if (!r.ok()) return r;
+  c.nReglas = static_cast<uint8_t>(n);
   return {};
 }
 
@@ -491,7 +604,9 @@ ResultadoConfig aplicarSobre(Config& c, const char* texto, size_t n) {
     return error(ErrorConfig::JsonInvalido, "config: JSON inválido");
 
   float version = 0;
-  if (!numeroEn(j, 0, "version", 1, 1, &version)) return error(ErrorConfig::Version, "config: version debe ser 1");
+  if (!numeroEn(j, 0, "version", 1, 2, &version) || (version != 1 && version != 2))
+    return error(ErrorConfig::Version, "config: version debe ser 1 o 2");
+  c.version = static_cast<int>(version);
 
   int nom = j.buscar(0, "nombre");
   if (nom >= 0) {
@@ -521,12 +636,17 @@ ResultadoConfig aplicarSobre(Config& c, const char* texto, size_t n) {
     if (!numeroOpcional(j, per, "energia", 0, 1, &c.energia) ||
         !numeroOpcional(j, per, "timidez", 0, 1, &c.timidez))
       return error(ErrorConfig::Campo, "personalidad: valores entre 0 y 1");
+    c.vida.personalidad.energia = c.energia;
+    c.vida.personalidad.timidez = c.timidez;
     int s = j.buscar(per, "sueno");
     if (s >= 0) {
       char h[16];
       if (j.texto(s, h, sizeof h) != 11 || h[5] != '-' || !leerHora(h, &c.suenoDesde) ||
-          !leerHora(h + 6, &c.suenoHasta))
+          !leerHora(h + 6, &c.suenoHasta) || c.suenoDesde == c.suenoHasta)
         return error(ErrorConfig::Campo, "personalidad: sueno es HH:MM-HH:MM");
+      // La v1 decía cuándo duerme; la v2, el horario en que está despierto.
+      c.vida.duerme = c.suenoDesde;
+      c.vida.despierta = c.suenoHasta;
     }
   }
 
@@ -539,12 +659,25 @@ ResultadoConfig aplicarSobre(Config& c, const char* texto, size_t n) {
       e = Expresion();
       if (j.texto(k, e.nombre, sizeof e.nombre) < 0 || !nombreValido(e.nombre))
         return error(ErrorConfig::Campo, "expresiones: nombre inválido");
+      if (esCaraParametrica(j, k + 1)) {
+        // v2: una expresión paramétrica (ojo, izq, der, gx, ...).
+        ResultadoConfig r = leerCaraVida(j, k + 1, c, e.nombre, true);
+        if (!r.ok()) return r;
+        k = j.saltar(k + 1);
+        continue;
+      }
+      e.propia = true;
       ResultadoConfig r = leerExpresion(j, k + 1, &e);
       if (!r.ok()) return r;
       r = guardarExpresion(c, e);
       if (!r.ok()) return r;
       k = j.saltar(k + 1);
     }
+  }
+
+  {
+    ResultadoConfig r = leerVidaConfig(j, 0, c);
+    if (!r.ok()) return r;
   }
 
   int ans = j.buscar(0, "animaciones");
@@ -566,35 +699,11 @@ ResultadoConfig aplicarSobre(Config& c, const char* texto, size_t n) {
 
   int reg = j.buscar(0, "reglas");
   if (reg >= 0) {
-    if (j.tipo(reg) != TipoJson::Arreglo) return error(ErrorConfig::Regla, "reglas: no es un arreglo");
-    // Las reglas del usuario van primero: ganan sobre las del manual.
-    static Regla propias[MAX_REGLAS];
-    int nPropias = j.cantidad(reg);
-    if (nPropias > MAX_REGLAS) return error(ErrorConfig::Demasiadas, "reglas: más de 24");
-    for (int i = 0; i < nPropias; i++) {
-      int r = j.elemento(reg, i);
-      Regla& regla = propias[i];
-      regla = Regla();
-      char si[LARGO_NOMBRE];
-      if (j.texto(j.buscar(r, "si"), si, sizeof si) <= 0 || !leerCondicion(si, &regla.si))
-        return error(ErrorConfig::Regla, "regla: \"si\" desconocido");
-      int ent = j.buscar(r, "entonces");
-      if (!j.valido(ent) || j.tipo(ent) != TipoJson::Arreglo || j.cantidad(ent) < 1 ||
-          j.cantidad(ent) > MAX_ACCIONES)
-        return error(ErrorConfig::Regla, "regla: \"entonces\" de 1 a 4 acciones");
-      for (int a = 0; a < j.cantidad(ent); a++) {
-        char acc[48];
-        if (j.texto(j.elemento(ent, a), acc, sizeof acc) <= 0 || !leerAccion(acc, &regla.entonces[a]))
-          return error(ErrorConfig::Regla, "regla: acción inválida");
-        if (regla.entonces[a].tipo == Accion::Tipo::Expresion &&
-            c.indiceExpresion(regla.entonces[a].argumento) < 0)
-          return error(ErrorConfig::Regla, "regla: expresión que no existe");
-        if (regla.entonces[a].tipo == Accion::Tipo::Animacion &&
-            c.indiceAnimacion(regla.entonces[a].argumento) < 0)
-          return error(ErrorConfig::Regla, "regla: animación que no existe");
-        regla.nAcciones++;
-      }
-    }
+    // Las reglas del usuario van primero: ganan sobre las base.
+    static Regla propias[MAX_REGLAS_USUARIO];
+    int nPropias = 0;
+    ResultadoConfig rr = leerReglas(j, reg, c, propias, MAX_REGLAS_USUARIO, &nPropias);
+    if (!rr.ok()) return rr;
     int total = nPropias + c.nReglas;
     if (total > MAX_REGLAS) total = MAX_REGLAS;
     for (int i = total - 1; i >= nPropias; i--) c.reglas[i] = c.reglas[i - nPropias];
@@ -612,10 +721,10 @@ ResultadoConfig aplicarSobre(Config& c, const char* texto, size_t n) {
       if (j.texto(j.elemento(lista, i), t, sizeof t) <= 0) return error(ErrorConfig::Campo, "lista: cada elemento es un texto");
       ElementoLista& el = c.lista[c.nLista];
       if (t[0] == 'c' && t[1] == 'a' && t[2] == 'r' && t[3] == 'a' && t[4] == ':') {
-        int idx = c.indiceExpresion(t + 5);
-        if (idx < 0) return error(ErrorConfig::Campo, "lista: una cara que no existe");
-        el.tipo = ElementoLista::Tipo::Cara;
-        el.indice = static_cast<uint8_t>(idx);
+        const Config::Cara cara = c.resolverCara(t + 5);
+        if (!cara.existe()) return error(ErrorConfig::Campo, "lista: una cara que no existe");
+        el.tipo = cara.dibujo >= 0 ? ElementoLista::Tipo::Cara : ElementoLista::Tipo::CaraVida;
+        el.indice = static_cast<uint8_t>(cara.dibujo >= 0 ? cara.dibujo : cara.vida);
       } else if (iguales(t, "animacion:", 10) && t[10]) {
         int idx = c.indiceAnimacion(t + 10);
         if (idx < 0) return error(ErrorConfig::Campo, "lista: una animación que no existe");

@@ -1,4 +1,4 @@
-// Protocolo de SintéticaOS (v1.3), por BLE y por la nube. Documentado en docs/protocolo-ble.md.
+// Protocolo de SintéticaOS (v1.4), por BLE y por la nube. Documentado en docs/protocolo-ble.md.
 // Lo mismo viaja por BLE en la placa y por el panel del simulador.
 #pragma once
 
@@ -43,6 +43,11 @@ enum Op : uint8_t {
   CmdNube = 0x17,        // [n][url mqtt][n][usuario][n][clave]: la cuenta en la nube (v1.3)
   CmdOlvidarRed = 0x18,  // olvida el WiFi y la nube (v1.3)
   CmdReproducir = 0x19,  // nombre de una animación; vacío = parar (v1.3)
+  CmdHora = 0x1A,        // [u32 epoch UTC][i16 minutos de la zona]: la hora (v1.4)
+  CmdVida = 0x1B,        // [u8 superposición 0/1]? → el estado del motor de vida (v1.4)
+  CmdMemoria = 0x1C,     // → [0x9C][0][memoria, 112 bytes] (v1.4)
+  CmdRestaurar = 0x1D,   // [memoria, 112 bytes]: la mudanza (v1.4)
+  CmdRegistro = 0x1E,    // → [0x9E][0][n][n × (u32 segundos, u8 tipo, u8 dato)] (v1.4)
   // Imagen
   ImgInicio = 0x20,      // u8 espacio (0-7), u32 largo, u32 crc32
   ImgBloque = 0x21,      // u32 desplazamiento, datos

@@ -267,7 +267,7 @@ PRUEBA("animación: en la lista, por regla y por comando") {
   // Siguiente en la lista: la cara.
   ble(CarComando, v({CmdExpresion}));
   g_s.siguiente();
-  correr(400);
+  correr(3000);  // (antes se mira en el espejo por la cara que le pusieron)
   VERIFICAR(visible() == "contento");
 }
 

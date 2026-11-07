@@ -14,7 +14,7 @@
 
 namespace sintetica {
 
-constexpr const char* VERSION_SINTETICAOS = "0.2.0";
+constexpr const char* VERSION_SINTETICAOS = "0.3.0";
 
 // Cómo es la placa: la pantalla y qué hace su pulsador.
 struct Perfil {
@@ -59,6 +59,20 @@ class Sistema {
   void tacto(bool apretado);
   void imu(float ax, float ay, float az) { gestos_.imu(ax, ay, az, hal_.ahoraMs()); }
   void evento(Evento e);
+  // Algo que mirar (un dedo en la pantalla táctil, la dirección del sonido), de -1 a 1.
+  void seguir(float x, float y) { motor_.seguir(x, y, hal_.ahoraMs()); }
+  // La hora (lo que manda la app con el comando Hora): epoch UTC y la zona.
+  void hora(uint32_t epochUtc, int zonaMinutos);
+  // La hora local que conoce (0 si no sabe) y el minuto del día (-1).
+  uint32_t epoch() const;
+  int minutoDelDia() const;
+  // Cuántos cuadros por segundo conviene dibujar: despierto 30, tranquilo 15,
+  // dormido 5 (los modos de energía). El perfil espera lo que falte.
+  int fpsSugerido() const;
+  // El broche: de noche se apaga hasta la mañana (o hasta el botón).
+  int segundosHastaDespertar() const { return motor_.segundosHastaDespertar(); }
+  // La superposición de depuración (comportamiento, estado, fps).
+  void depurar(bool si) { depurar_ = si; }
   // Se conectó o desconectó un celu: cada conexión empieza sin autenticar.
   void bleConexion(bool conectado);
   // Una escritura en una característica BLE.
@@ -124,8 +138,12 @@ class Sistema {
 
  private:
   void responder(uint8_t car, uint8_t op, protocolo::Codigo c, const char* detalle = nullptr);
-  void aplicarAcciones(const Regla& r);
-  int expresionDeEstado();
+  Contexto contexto() const;
+  void vigilar(uint32_t ahora);
+  void dibujarDepuracion();
+  void enviarVida();
+  void enviarRegistro();
+  void leerMemoria();
   void guardarAjustes();
   void leerAjustes();
   void enviarConfig();
@@ -165,6 +183,14 @@ class Sistema {
   Perfil perfil_;
   Lienzo lienzo_;
   Vista vista_{};
+  VistaRostro vistaRostro_{};
+  uint32_t horaRef_ = 0, horaRefMs_ = 0;  // la hora que mandó la app
+  bool depurar_ = false;
+  uint32_t ultimoCuadro_ = 0;
+  float fps_ = 0;
+  int ultimaBateria_ = -1, ultimoCargando_ = -1;
+  uint32_t sinWifiDesde_ = 0;
+  bool avisoSinWifi_ = false;
   Config config_;
   MotorVida motor_;
   Gestos gestos_;
