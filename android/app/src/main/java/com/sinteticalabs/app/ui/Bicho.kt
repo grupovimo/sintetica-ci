@@ -65,7 +65,10 @@ import com.sinteticalabs.app.bicho.Ajustes
 import com.sinteticalabs.app.bicho.ClienteBicho
 import com.sinteticalabs.app.bicho.EditorConfig
 import com.sinteticalabs.app.bicho.TransporteBle
+import com.sinteticalabs.app.bicho.TransporteNube
 import com.sinteticalabs.app.bicho.TransporteVirtual
+import com.sinteticalabs.app.datos.Cuenta
+import com.sinteticalabs.app.datos.ErrorApi
 import com.sinteticalabs.app.bicho.buscarBicho
 import com.sinteticalabs.app.datos.Vinculados
 import com.sinteticalabs.app.nucleo.AnfitrionEnMemoria
@@ -81,6 +84,8 @@ import kotlinx.coroutines.launch
 /** "demo" = probar sin bicho (el núcleo corre en el celu), como la 1.47B o como el broche. */
 const val ID_DEMO = "demo"
 const val ID_DEMO_BROCHE = "demo-broche"
+/** "nube:<id>" = un bicho de la cuenta, lejos: por la API en vez de BLE. */
+const val PREFIJO_NUBE = "nube:"
 
 sealed interface Conexion {
     data object Conectando : Conexion
@@ -112,6 +117,14 @@ class BichoViewModel(app: Application) : AndroidViewModel(app) {
         private set
     private var configTexto = "{\"version\":1}"
     val esDemo get() = id.startsWith(ID_DEMO)
+    val esNube get() = id.startsWith(PREFIJO_NUBE)
+    private val idBicho get() = id.removePrefix(PREFIJO_NUBE)
+    private val cuenta = Cuenta(app)
+    val sesion = cuenta.sesion
+    private val _nube = MutableStateFlow<String?>(null)
+    /** Cómo va lo de la nube (WiFi, sumar a la cuenta). */
+    val nube: StateFlow<String?> = _nube
+    val ocupadoNube = MutableStateFlow(false)
 
     fun abrir(id: String) {
         if (this.id == id) return
@@ -128,6 +141,14 @@ class BichoViewModel(app: Application) : AndroidViewModel(app) {
                 c = ClienteBicho(TransporteVirtual(broche = id == ID_DEMO_BROCHE), viewModelScope)
                 c.conectar()
                 pantalla = c.estado.value?.pantalla ?: pantalla
+            } else if (esNube) {
+                val s = cuenta.actual()
+                if (!s.activa) throw IllegalStateException("Entrá a tu cuenta para ver los bichos lejos.")
+                c = ClienteBicho(TransporteNube(cuenta.api(s), idBicho), viewModelScope)
+                c.conectar()
+                pantalla = c.estado.value?.pantalla ?: pantalla
+                Nucleo.iniciar(pantalla.ancho * 2, pantalla.alto * 2, idBicho, AnfitrionEnMemoria(), redonda = pantalla.redonda)
+                Nucleo.vistaPrevia()
             } else {
                 val v = Vinculados(getApplication()).buscar(id) ?: throw IllegalStateException("Este bicho no está vinculado.")
                 val cerca = buscarBicho(getApplication(), id)
@@ -225,8 +246,8 @@ class BichoViewModel(app: Application) : AndroidViewModel(app) {
             val nueva = EditorConfig.escribir(configTexto, _ajustes.value)
             c.mandarConfig(nueva)
             configTexto = nueva
-            if (!esDemo) Vinculados(getApplication()).buscar(id)?.let { Vinculados(getApplication()).guardar(it.copy(nombre = _ajustes.value.nombre)) }
-            _aviso.value = "Guardado en el bicho."
+            if (!esDemo && !esNube) Vinculados(getApplication()).buscar(id)?.let { Vinculados(getApplication()).guardar(it.copy(nombre = _ajustes.value.nombre)) }
+            _aviso.value = if (esNube) "Guardado en la nube: le llega al bicho apenas esté conectado." else "Guardado en el bicho."
         } catch (e: Exception) {
             _aviso.value = e.message
         } finally {
@@ -255,6 +276,77 @@ class BichoViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun cerrarAviso() { _aviso.value = null }
+
+    val firmwares = MutableStateFlow<List<com.sinteticalabs.app.datos.FirmwareNube>>(emptyList())
+    val progresoOta = MutableStateFlow<Float?>(null)
+    val mensajeOta = MutableStateFlow<String?>(null)
+
+    fun buscarFirmwares() = viewModelScope.launch {
+        val s = cuenta.actual()
+        val perfil = cliente?.estado?.value?.perfil.orEmpty()
+        if (!s.activa || perfil.isEmpty()) { mensajeOta.value = "Entrá a tu cuenta para ver las versiones."; return@launch }
+        runCatching { firmwares.value = cuenta.api(s).firmwares(perfil) }.onFailure { mensajeOta.value = it.message }
+        if (firmwares.value.isEmpty()) mensajeOta.value = "No hay versiones para $perfil."
+    }
+
+    /** Baja el firmware firmado de la API y se lo manda al bicho por BLE. */
+    fun instalarPorBle(f: com.sinteticalabs.app.datos.FirmwareNube) = viewModelScope.launch {
+        val c = cliente ?: return@launch
+        val api = cuenta.api(cuenta.actual())
+        try {
+            progresoOta.value = 0f
+            mensajeOta.value = "Bajando ${f.version}…"
+            val man = api.manifiesto(f.id)
+            val bin = api.binario(f.id)
+            mensajeOta.value = "Mandándolo al bicho (no lo alejes)…"
+            c.instalarFirmware(man, bin) { progresoOta.value = it }
+            mensajeOta.value = "Listo: reinicia con la ${f.version}. Si no anda bien, vuelve solo a la anterior."
+        } catch (e: Exception) {
+            mensajeOta.value = e.message ?: "No pude actualizarlo."
+        } finally {
+            progresoOta.value = null
+        }
+    }
+
+    /** El WiFi, por BLE. */
+    fun configurarRed(ssid: String, clave: String) = viewModelScope.launch {
+        ocupadoNube.value = true
+        _nube.value = runCatching { cliente?.configurarRed(ssid, clave); "Listo: se conecta a \"$ssid\"." }
+            .getOrElse { it.message ?: "No pude." }
+        ocupadoNube.value = false
+    }
+
+    fun olvidarRed() = viewModelScope.launch {
+        _nube.value = runCatching { cliente?.olvidarRed(); "Se olvidó del WiFi y de la nube." }.getOrElse { it.message }
+    }
+
+    /**
+     * Suma el bicho a la cuenta: la API da credenciales nuevas, se las pasamos
+     * por BLE y, cuando el bicho se conecta con ellas, queda en la cuenta.
+     */
+    fun sumarACuenta() = viewModelScope.launch {
+        val c = cliente ?: return@launch
+        ocupadoNube.value = true
+        try {
+            val s = cuenta.actual()
+            if (!s.activa) throw IllegalStateException("Primero entrá a tu cuenta.")
+            val api = cuenta.api(s)
+            val e = c.estado.value
+            if (e?.redConfigurada != true) throw IllegalStateException("Primero pasale el WiFi.")
+            _nube.value = "Pidiendo la clave a la nube…"
+            val cred = api.reclamar(idBicho, e.perfil)
+            c.configurarNube(cred.url, cred.usuario, cred.clave)
+            _nube.value = "Esperando que se conecte (${cred.url})…"
+            _nube.value = if (api.esperarReclamo(idBicho)) "Listo: está en tu cuenta. Desde la web o desde otro celu lo cambiás estés donde estés."
+            else "No se conectó todavía: revisá el WiFi y que el servidor (${cred.url}) se vea desde la red del bicho."
+        } catch (e: ErrorApi) {
+            _nube.value = e.message + if (e.detalle.isNotEmpty()) ": ${e.detalle}" else ""
+        } catch (e: Exception) {
+            _nube.value = e.message ?: "No pude."
+        } finally {
+            ocupadoNube.value = false
+        }
+    }
 
     override fun onCleared() { cliente?.cerrar() }
 }
@@ -309,7 +401,7 @@ private fun Contenido(vm: BichoViewModel, alVolver: () -> Unit) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             TextButton(onClick = alVolver) { Text("← BICHOS", style = Tipos.boton, color = p.tintaSuave) }
-            Etiqueta(if (vm.esDemo) "Bicho virtual" else "Conectado")
+            Etiqueta(if (vm.esDemo) "Bicho virtual" else if (vm.esNube) "Por la nube" else "Conectado")
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             val serie = estado?.serie.orEmpty()
@@ -324,6 +416,10 @@ private fun Contenido(vm: BichoViewModel, alVolver: () -> Unit) {
             FilaDato("Batería", estado?.bateria?.let { "$it%" } ?: "sin batería")
             FilaDato("Estado", if (estado?.dormido == true) "durmiendo" else "despierto")
         }
+
+        if (!vm.esDemo && !vm.esNube) SeccionNube(vm, estado)
+        if (!vm.esDemo && !vm.esNube) SeccionFirmware(vm, estado)
+        if (vm.esNube && estado?.nube != true) Aviso("El bicho no está conectado ahora: lo que cambies le llega cuando vuelva.")
 
         Seccion("Caras") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -487,5 +583,63 @@ private fun SeccionLista(vm: BichoViewModel, a: Ajustes, expresiones: List<Strin
             }
         } else if (a.lista.size < 16) BotonSecundario("Agregar", { agregando = true })
         Deslizador("Rotar sola", a.rotar.toFloat(), 0f..60f, if (a.rotar == 0) "no" else "cada ${a.rotar} min") { vm.editar(a.copy(rotar = it.toInt())) }
+    }
+}
+
+@Composable
+private fun SeccionNube(vm: BichoViewModel, estado: Estado?) {
+    val p = LocalPaleta.current
+    val sesion by vm.sesion.collectAsState(initial = null)
+    val mensaje by vm.nube.collectAsState()
+    val ocupado by vm.ocupadoNube.collectAsState()
+    var ssid by remember { mutableStateOf("") }
+    var clave by remember { mutableStateOf("") }
+    Seccion("WiFi y nube") {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            FilaDato("WiFi", when {
+                estado?.wifi == true -> "conectado"
+                estado?.redConfigurada == true -> "configurado, sin conexión"
+                else -> "sin configurar"
+            })
+            FilaDato("Nube", if (estado?.nube == true) "conectado" else "sin conectar")
+            OutlinedTextField(value = ssid, onValueChange = { if (it.toByteArray().size <= 32) ssid = it }, label = { Etiqueta("Red") },
+                singleLine = true, textStyle = Tipos.cuerpo, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = clave, onValueChange = { if (it.toByteArray().size <= 64) clave = it }, label = { Etiqueta("Clave") },
+                singleLine = true, textStyle = Tipos.cuerpo, modifier = Modifier.fillMaxWidth(),
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation())
+            BotonSecundario("Pasarle el WiFi", { vm.configurarRed(ssid, clave) }, Modifier.fillMaxWidth(), habilitado = ssid.isNotBlank() && !ocupado)
+            if (sesion?.activa == true) {
+                BotonPrimario("Sumar a mi cuenta", { vm.sumarACuenta() }, Modifier.fillMaxWidth(), habilitado = !ocupado && estado?.redConfigurada == true)
+            } else {
+                Text("Entrá a tu cuenta (en el inicio) para sumarlo y manejarlo desde lejos.", style = Tipos.cuerpo, color = p.tintaSuave)
+            }
+            if (estado?.redConfigurada == true) TextButton(onClick = { vm.olvidarRed() }) { Text("OLVIDAR WIFI Y NUBE", style = Tipos.boton, color = p.tintaSuave) }
+            mensaje?.let { Aviso(it) }
+        }
+    }
+}
+
+@Composable
+private fun SeccionFirmware(vm: BichoViewModel, estado: Estado?) {
+    val p = LocalPaleta.current
+    val lista by vm.firmwares.collectAsState()
+    val progreso by vm.progresoOta.collectAsState()
+    val mensaje by vm.mensajeOta.collectAsState()
+    Seccion("Firmware") {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            FilaDato("Versión", estado?.version?.ifEmpty { "—" } ?: "—")
+            FilaDato("Perfil", estado?.perfil?.ifEmpty { "—" } ?: "—")
+            if (lista.isEmpty()) BotonSecundario("Buscar versiones", { vm.buscarFirmwares() }, Modifier.fillMaxWidth(), habilitado = progreso == null)
+            for (f in lista) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Text("${f.version} · ${f.tamano / 1024} KB", style = Tipos.dato, color = p.tinta)
+                    TextButton(onClick = { vm.instalarPorBle(f) }, enabled = progreso == null && f.version != estado?.version) {
+                        Text(if (f.version == estado?.version) "INSTALADA" else "INSTALAR", style = Tipos.boton, color = p.naranjaProfundo)
+                    }
+                }
+            }
+            progreso?.let { LinearProgressIndicator(progress = { it }, modifier = Modifier.fillMaxWidth(), color = p.naranja) }
+            mensaje?.let { Aviso(it) }
+        }
     }
 }

@@ -8,7 +8,11 @@ enum Ruta: Hashable {
     case escanear
     case vinculando(DatosQr)
     case bicho(String)
+    case cuenta
 }
+
+/// "nube:<id>" = un bicho de la cuenta, lejos: por la API en vez de BLE.
+let PREFIJO_NUBE = "nube:"
 
 @main
 struct SinteticaApp: App {
@@ -22,10 +26,16 @@ struct SinteticaApp: App {
                         case .escanear: Escanear(ruta: $ruta)
                         case let .vinculando(qr): Vinculando(qr: qr, ruta: $ruta)
                         case let .bicho(id): BichoVista(id: id, ruta: $ruta)
+                        case .cuenta: CuentaVista(ruta: $ruta)
                         }
                     }
             }
             .tint(Color.naranja)
+            .onOpenURL { url in
+                Task {
+                    if await entrarConLink(url) != nil { ruta = [.cuenta] }
+                }
+            }
         }
     }
 }

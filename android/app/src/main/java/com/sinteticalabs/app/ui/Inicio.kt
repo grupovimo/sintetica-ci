@@ -19,10 +19,20 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.sinteticalabs.app.datos.BichoNube
 import com.sinteticalabs.app.datos.Vinculado
 
 @Composable
-fun PantallaInicio(bichos: List<Vinculado>, alElegir: (String) -> Unit, alVincular: () -> Unit, alProbar: (broche: Boolean) -> Unit) {
+fun PantallaInicio(
+    bichos: List<Vinculado>,
+    alElegir: (String) -> Unit,
+    alVincular: () -> Unit,
+    alProbar: (broche: Boolean) -> Unit,
+    enLaNube: List<BichoNube> = emptyList(),
+    conCuenta: Boolean = false,
+    alCuenta: () -> Unit = {},
+    alElegirNube: (String) -> Unit = {},
+) {
     val p = LocalPaleta.current
     Surface(color = p.papel, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.safeDrawingPadding().padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -34,6 +44,21 @@ fun PantallaInicio(bichos: List<Vinculado>, alElegir: (String) -> Unit, alVincul
                 Text("Prendé tu bicho: en la pantalla va a aparecer un QR. Escanealo para vincularlo con este celu.", style = Tipos.cuerpo, color = p.tintaSuave)
             }
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val lejos = enLaNube.filter { n -> bichos.none { it.id == n.id } }
+                if (lejos.isNotEmpty()) item { Etiqueta("En tu cuenta (por la nube)") }
+                items(lejos, key = { "nube-" + it.id }) { b ->
+                    Surface(
+                        color = p.papelAlto, shape = RoundedCornerShape(24.dp), border = BorderStroke(1.dp, p.linea),
+                        modifier = Modifier.fillMaxWidth().clickable { alElegirNube(b.id) },
+                    ) {
+                        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(if (b.conectado) "CONECTADO" else "DESCONECTADO", style = Tipos.serie, color = if (b.conectado) p.naranjaProfundo else p.tintaSuave)
+                            Text(b.nombre, style = Tipos.titulo, color = p.tinta)
+                            Text("${b.id} · ${b.perfil}${if (b.virtual) " · virtual" else ""}", style = Tipos.dato, color = p.tintaSuave)
+                        }
+                    }
+                }
+                if (lejos.isNotEmpty() && bichos.isNotEmpty()) item { Etiqueta("Cerca (por BLE)") }
                 items(bichos, key = { it.id }) { b ->
                     Surface(
                         color = p.papelAlto, shape = RoundedCornerShape(24.dp), border = BorderStroke(1.dp, p.linea),
@@ -48,6 +73,7 @@ fun PantallaInicio(bichos: List<Vinculado>, alElegir: (String) -> Unit, alVincul
                 }
             }
             BotonPrimario("Vincular un bicho", alVincular)
+            BotonSecundario(if (conCuenta) "Tu cuenta" else "Entrar a tu cuenta", alCuenta, Modifier.fillMaxWidth())
             androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BotonSecundario("Probar sin bicho", { alProbar(false) }, Modifier.weight(1f))
                 BotonSecundario("Probar el broche", { alProbar(true) }, Modifier.weight(1f))

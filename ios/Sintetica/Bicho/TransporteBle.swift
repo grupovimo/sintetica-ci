@@ -145,9 +145,9 @@ final class TransporteBle: NSObject, Transporte, CBPeripheralDelegate {
         guard let servicio = periferico.services?.first(where: { $0.uuid == Uuids.servicio }) else { throw ErrorBle.noEsUnBicho }
         _ = try await operacion { periferico.discoverCharacteristics(Car.allCases.map(\.uuid), for: servicio) }
         for c in servicio.characteristics ?? [] { if let car = Car(uuid: c.uuid) { caracteristicas[car] = c } }
-        for car in [Car.config, .comando, .estado, .imagen] {
-            // Imagen es de la v1.2: un firmware viejo no la tiene.
-            guard let c = caracteristicas[car] else { if car == .imagen { continue }; throw ErrorBle.noEsUnBicho }
+        for car in [Car.config, .comando, .estado, .imagen, .ota] {
+            // Imagen es de la v1.2 y OTA de la v1.3: un firmware viejo no las tiene.
+            guard let c = caracteristicas[car] else { if car == .imagen || car == .ota { continue }; throw ErrorBle.noEsUnBicho }
             _ = try await operacion { periferico.setNotifyValue(true, for: c) }
         }
     }

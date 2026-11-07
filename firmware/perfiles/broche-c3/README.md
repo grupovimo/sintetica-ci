@@ -46,12 +46,22 @@ Por el monitor serie: `serie 001` graba el número de unidad.
 ## Memoria
 
 Sin PSRAM, la pantalla se dibuja de a franjas de 40 filas (19 KB). La RAM
-estática usada es el 68% (223 KB de 327 KB); quedan unos 100 KB para BLE y
-LittleFS. La flash tiene 1,9 MB para el programa y 2 MB para imágenes
+estática usada es el 60% (196 KB de 327 KB); quedan unos 130 KB para BLE y
+LittleFS. La flash tiene dos particiones de 1,25 MB para el programa (para la
+OTA con vuelta atrás; el firmware ocupa unos 720 KB) y 1,4 MB para imágenes
 (`particiones.csv`).
+
+## Actualizar
+
+El broche no tiene WiFi: la OTA llega por BLE desde la app (Firmware → Buscar
+versiones → Instalar). El firmware verifica la firma antes de aceptar,
+reinicia con la versión nueva a prueba y, si no anda 20 s, vuelve solo a la
+anterior. Cambiar la tabla de particiones (la de antes tenía una sola app)
+obliga a grabarlo una vez por USB: `pio run -e broche-c3 -t erase -t upload`.
 
 ## Falta verificar con la placa armada
 
+- [ ] Una OTA por BLE de punta a punta (y la vuelta atrás con un firmware roto).
 - [ ] Rotación e inversión de colores del GC9A01 (`invert = true`).
 - [ ] Que el pulsador despierte del sueño profundo.
 - [ ] Consumo dormido < 0,3 mA (sacarle a la SuperMini el LED rojo de encendido).

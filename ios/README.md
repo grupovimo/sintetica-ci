@@ -32,4 +32,18 @@ open Sintetica.xcodeproj
 - [ ] Con la placa: vincular, cerrar la app, volver a entrar (se autentica solo).
 - [ ] Mantener el botón del bicho 5 s, vincular un segundo celu.
 
+## La cuenta y la nube (etapa 4)
+
+Con el compose levantado en la Mac (ver `docs/local.md`):
+
+- [ ] **Entrar a tu cuenta**: servidor `http://<IP de la Mac>:8080`, tu email,
+  y el código del mail (en Mailpit) o el link abierto en el iPhone
+  (`sintetica://entrar?t=…`). La primera vez iOS pregunta por la red local.
+- [ ] En un bicho vinculado: **WiFi y nube** → pasarle el WiFi → **Sumar a mi
+  cuenta**. Aparece en la web.
+- [ ] En el inicio, **En tu cuenta**: abrir un bicho lejos (por la nube),
+  cambiarle algo y verlo en el bicho.
+- [ ] **Firmware** → **Buscar versiones** → **Instalar** (por BLE, con un
+  firmware subido en la web para su perfil).
+
 Si algo no compila, mandame el error tal cual lo muestra Xcode.

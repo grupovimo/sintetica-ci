@@ -45,7 +45,7 @@ class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) 
     suspend fun actualizarEstado(): Estado = leerEstado(transporte.leerEstado()).also { _estado.value = it }
 
     /** Escribe y espera la respuesta a esa misma operación. */
-    private suspend fun pedir(car: Car, datos: ByteArray, opEsperado: Int = datos[0].toInt() and 0x7F): Respuesta.Resultado =
+    private suspend fun pedir(car: Car, datos: ByteArray, opEsperado: Int = datos[0].toInt() and 0x7F, plazo: Long = 5_000): Respuesta.Resultado =
         coroutineScope {
             val espera = async(start = CoroutineStart.UNDISPATCHED) {
                 transporte.notificaciones
@@ -53,7 +53,7 @@ class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) 
                     .first { it.op == opEsperado }
             }
             transporte.escribir(car, datos)
-            withTimeout(5_000) { espera.await() }
+            withTimeout(plazo) { espera.await() }
         }
 
     private suspend fun exigir(car: Car, datos: ByteArray): Respuesta.Resultado {
@@ -78,6 +78,13 @@ class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) 
     suspend fun cambiarNombre(nombre: String) { exigir(Car.COMANDO, Comando.nombre(nombre)); actualizarEstado() }
     suspend fun evento(nombre: String) { exigir(Car.COMANDO, Comando.evento(nombre)) }
     suspend fun desvincular() { exigir(Car.COMANDO, Comando.desvincular()) }
+    suspend fun reproducir(animacion: String?) { exigir(Car.COMANDO, Comando.reproducir(animacion ?: "")); actualizarEstado() }
+
+    /** El WiFi del bicho (solo por BLE). */
+    suspend fun configurarRed(ssid: String, clave: String) { exigir(Car.COMANDO, Comando.red(ssid, clave)); actualizarEstado() }
+    /** Las credenciales de la nube que dio la API al sumarlo a la cuenta (solo por BLE). */
+    suspend fun configurarNube(url: String, usuario: String, clave: String) { exigir(Car.COMANDO, Comando.nube(url, usuario, clave)) }
+    suspend fun olvidarRed() { exigir(Car.COMANDO, Comando.olvidarRed()); actualizarEstado() }
 
     /** Pide la configuración completa (JSON). */
     suspend fun pedirConfig(): String = coroutineScope {
@@ -139,6 +146,41 @@ class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) 
         val b = withTimeout(5_000) { espera.await() }
         if (b[1].toInt() != 0) throw ErrorBicho((leerRespuesta(b) as Respuesta.Resultado).mensaje)
         leerListaImagenes(b)
+    }
+
+    /**
+     * Instala un firmware firmado por BLE (el manifiesto lo da la API). El bicho
+     * verifica la firma antes de aceptar, borra la otra partición (unos
+     * segundos), recibe los bloques, verifica el SHA-256 y reinicia.
+     */
+    suspend fun instalarFirmware(manifiesto: ByteArray, binario: ByteArray, alProgreso: (Float) -> Unit = {}) {
+        val ini = pedir(Car.OTA, byteArrayOf(Op.OTA_INICIO.toByte()) + manifiesto, plazo = 60_000)
+        if (!ini.ok) throw ErrorBicho("El bicho no aceptó el firmware: ${ini.detalle.ifEmpty { ini.mensaje }}")
+        coroutineScope {
+            // Si un bloque falla, el bicho avisa con [0xB1][código] y aborta.
+            val falla = async(start = CoroutineStart.UNDISPATCHED) {
+                transporte.notificaciones
+                    .mapNotNull { (c, b) -> if (c == Car.OTA) leerRespuesta(b) as? Respuesta.Resultado else null }
+                    .first { it.op == Op.OTA_BLOQUE && !it.ok }
+            }
+            val porBloque = 175
+            var off = 0
+            var n = 0
+            while (off < binario.size) {
+                if (falla.isCompleted) throw ErrorBicho("Se cortó la actualización: ${falla.await().mensaje}")
+                val fin = minOf(binario.size, off + porBloque)
+                val b = byteArrayOf(Op.OTA_BLOQUE.toByte(), (off and 0xFF).toByte(), (off shr 8 and 0xFF).toByte(),
+                    (off shr 16 and 0xFF).toByte(), (off shr 24 and 0xFF).toByte()) + binario.copyOfRange(off, fin)
+                transporte.escribir(Car.OTA, b)
+                off = fin
+                // Cada tanto, una lectura: espera a que lo anterior haya salido (sin respuesta, se encolan).
+                if (++n % 16 == 0) transporte.leerEstado()
+                alProgreso(off.toFloat() / binario.size)
+            }
+            falla.cancel()
+        }
+        val fin = pedir(Car.OTA, byteArrayOf(Op.OTA_FIN.toByte()), plazo = 60_000)
+        if (!fin.ok) throw ErrorBicho("El bicho no instaló el firmware: ${fin.detalle.ifEmpty { fin.mensaje }}")
     }
 
     fun cerrar() = transporte.cerrar()

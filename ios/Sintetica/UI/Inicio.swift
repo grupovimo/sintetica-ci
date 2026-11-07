@@ -4,6 +4,8 @@ import SwiftUI
 struct Inicio: View {
     @Binding var ruta: [Ruta]
     private var vinculados = Vinculados.compartidos
+    private var cuenta = Cuenta.compartida
+    @State private var enLaNube: [BichoNube] = []
 
     init(ruta: Binding<[Ruta]>) { _ruta = ruta }
 
@@ -18,7 +20,23 @@ struct Inicio: View {
                     .font(Tipos.cuerpo).foregroundStyle(Color.tintaSuave)
             }
             ScrollView {
-                VStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 12) {
+                    let lejos = enLaNube.filter { n in !vinculados.todos.contains { $0.id == n.id } }
+                    if !lejos.isEmpty { Etiqueta("En tu cuenta (por la nube)") }
+                    ForEach(lejos) { b in
+                        Button { ruta.append(.bicho(PREFIJO_NUBE + b.id)) } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(b.conectado ? "CONECTADO" : "DESCONECTADO").font(Tipos.serie)
+                                    .foregroundStyle(b.conectado ? Color.naranjaProfundo : Color.tintaSuave)
+                                Text(b.nombre).font(Tipos.titulo).foregroundStyle(Color.tinta)
+                                Text("\(b.id) · \(b.perfil)\(b.virtual ? " · virtual" : "")").font(Tipos.dato).foregroundStyle(Color.tintaSuave)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading).padding(20)
+                            .background(Color.papelAlto, in: RoundedRectangle(cornerRadius: 24))
+                            .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.linea, lineWidth: 1))
+                        }
+                    }
+                    if !lejos.isEmpty && !vinculados.todos.isEmpty { Etiqueta("Cerca (por BLE)") }
                     ForEach(vinculados.todos) { b in
                         Button { ruta.append(.bicho(b.id)) } label: {
                             VStack(alignment: .leading, spacing: 4) {
@@ -34,6 +52,7 @@ struct Inicio: View {
                 }
             }
             BotonPrimario(texto: "Vincular un bicho") { ruta.append(.escanear) }
+            BotonSecundario(texto: cuenta.activa ? "Tu cuenta" : "Entrar a tu cuenta") { ruta.append(.cuenta) }
             HStack(spacing: 8) {
                 BotonSecundario(texto: "Probar sin bicho") { ruta.append(.bicho(ID_DEMO)) }
                 BotonSecundario(texto: "Probar el broche") { ruta.append(.bicho(ID_DEMO_BROCHE)) }
@@ -42,5 +61,9 @@ struct Inicio: View {
         .padding(24)
         .background(Color.papel.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .task(id: cuenta.activa) {
+            guard cuenta.activa else { enLaNube = []; return }
+            do { enLaNube = try await cuenta.api.bichos() } catch let e as ErrorApi where e.estado == 401 { cuenta.salir() } catch {}
+        }
     }
 }

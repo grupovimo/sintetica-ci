@@ -1,5 +1,6 @@
 package com.sinteticalabs.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,6 +16,9 @@ import androidx.navigation.compose.rememberNavController
 import com.sinteticalabs.app.datos.Vinculados
 import com.sinteticalabs.app.protocolo.DatosQr
 import com.sinteticalabs.app.ui.BichoViewModel
+import com.sinteticalabs.app.ui.CuentaViewModel
+import com.sinteticalabs.app.ui.PREFIJO_NUBE
+import com.sinteticalabs.app.ui.PantallaCuenta
 import com.sinteticalabs.app.ui.ID_DEMO
 import com.sinteticalabs.app.ui.ID_DEMO_BROCHE
 import com.sinteticalabs.app.ui.PantallaBicho
@@ -24,28 +28,56 @@ import com.sinteticalabs.app.ui.PantallaVinculando
 import com.sinteticalabs.app.ui.TemaSintetica
 
 class MainActivity : ComponentActivity() {
+    /** El token del link mágico, si la app se abrió con sintetica://entrar?t=… */
+    private val linkMagico = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { TemaSintetica { App() } }
+        leerLink(intent)
+        setContent { TemaSintetica { App(linkMagico) } }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        leerLink(intent)
+    }
+
+    private fun leerLink(i: Intent?) {
+        val d = i?.data ?: return
+        if (d.scheme == "sintetica" && d.host == "entrar") linkMagico.value = d.getQueryParameter("t")
     }
 }
 
 @androidx.compose.runtime.Composable
-private fun App() {
+private fun App(linkMagico: kotlinx.coroutines.flow.MutableStateFlow<String?>) {
     val nav = rememberNavController()
     val contexto = LocalContext.current
     val vinculados = remember { Vinculados(contexto) }
     val bichos by vinculados.todos.collectAsState(initial = emptyList())
+    val cuenta: CuentaViewModel = viewModel()
+    val sesion by cuenta.sesion.collectAsState()
+    val enLaNube by cuenta.bichos.collectAsState()
+    val link by linkMagico.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(link) {
+        link?.let { cuenta.entrarConLink(it); linkMagico.value = null; nav.navigate("cuenta") }
+    }
+    androidx.compose.runtime.LaunchedEffect(sesion?.activa) { if (sesion?.activa == true) cuenta.cargarBichos() }
     NavHost(nav, startDestination = "inicio") {
         composable("inicio") {
+            androidx.compose.runtime.LaunchedEffect(Unit) { cuenta.cargarBichos() }
             PantallaInicio(
                 bichos,
                 alElegir = { nav.navigate("bicho/$it") },
                 alVincular = { nav.navigate("escanear") },
                 alProbar = { broche -> nav.navigate("bicho/" + if (broche) ID_DEMO_BROCHE else ID_DEMO) },
+                enLaNube = enLaNube,
+                conCuenta = sesion?.activa == true,
+                alCuenta = { nav.navigate("cuenta") },
+                alElegirNube = { nav.navigate("bicho/$PREFIJO_NUBE$it") },
             )
         }
+        composable("cuenta") { PantallaCuenta(cuenta, alVolver = { nav.popBackStack("inicio", false) }) }
         composable("escanear") {
             PantallaEscanear(
                 alLeer = { qr -> nav.navigate("vinculando/${qr.id}/${qr.codigo}") { popUpTo("inicio") } },

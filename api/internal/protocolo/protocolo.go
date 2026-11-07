@@ -322,6 +322,8 @@ type Estado struct {
 	Perfil         string   `json:"perfil"`
 	CrcConfig      uint32   `json:"crcConfig"`
 	Encendido      uint32   `json:"encendido"` // segundos desde que arrancó
+	// Los bytes tal cual (las apps lejos del bicho los decodifican como por BLE).
+	Crudo []byte `json:"crudo,omitempty"`
 }
 
 // LeerEstado decodifica el estado (versiones 1 a 4).
@@ -390,6 +392,7 @@ func LeerEstado(b []byte) (Estado, error) {
 	f := b[4]
 	e.Dormido, e.Fija, e.Emparejando, e.Autenticado = f&1 != 0, f&2 != 0, f&4 != 0, f&8 != 0
 	e.Wifi, e.Nube, e.RedConfigurada, e.Actualizando = f&16 != 0, f&32 != 0, f&64 != 0, f&128 != 0
+	e.Crudo = append([]byte(nil), b...)
 	return e, nil
 }
 

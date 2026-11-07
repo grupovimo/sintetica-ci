@@ -126,9 +126,9 @@ class TransporteBle(private val contexto: Context, private val dispositivo: Blue
         withTimeout(15_000) { conectado.await() }
         val g = gatt!!
         operacion<Int> { g.requestMtu(185) }
-        for (c in listOf(Car.CONFIG, Car.COMANDO, Car.ESTADO, Car.IMAGEN)) {
-            // Imagen es de la v1.2: un firmware viejo no la tiene.
-            val car = caracteristicas[c] ?: if (c == Car.IMAGEN) continue else throw ErrorBle("Al bicho le falta la característica ${c.name}.")
+        for (c in listOf(Car.CONFIG, Car.COMANDO, Car.ESTADO, Car.IMAGEN, Car.OTA)) {
+            // Imagen es de la v1.2 y OTA de la v1.3: un firmware viejo no las tiene.
+            val car = caracteristicas[c] ?: if (c == Car.IMAGEN || c == Car.OTA) continue else throw ErrorBle("Al bicho le falta la característica ${c.name}.")
             g.setCharacteristicNotification(car, true)
             val d = car.getDescriptor(Uuids.CCCD) ?: continue
             operacion<Int> {
@@ -142,7 +142,8 @@ class TransporteBle(private val contexto: Context, private val dispositivo: Blue
         val g = gatt ?: throw ErrorBle("No hay conexión.")
         val c = caracteristicas[car] ?: throw ErrorBle("Al bicho le falta la característica ${car.name}.")
         // Los bloques de config e imagen van sin respuesta (mucho más rápido); el resto, con.
-        val bloque = (car == Car.CONFIG && datos[0].toInt() == Op.CONFIG_BLOQUE) || (car == Car.IMAGEN && datos[0].toInt() == Op.IMG_BLOQUE)
+        val bloque = (car == Car.CONFIG && datos[0].toInt() == Op.CONFIG_BLOQUE) || (car == Car.IMAGEN && datos[0].toInt() == Op.IMG_BLOQUE) ||
+            (car == Car.OTA && datos[0].toInt() == Op.OTA_BLOQUE)
         val tipo = if (bloque) BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE else BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         val status = operacion<Int> {
             if (Build.VERSION.SDK_INT >= 33) g.writeCharacteristic(c, datos, tipo) == BluetoothGatt.GATT_SUCCESS

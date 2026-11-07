@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- En local, la API corre en la Mac por HTTP (http://192.168.x.x:8080). En
+     producción va por HTTPS y esto se saca. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

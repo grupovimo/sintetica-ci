@@ -24,6 +24,11 @@ final class ModeloBicho {
     /// El núcleo guarda al anfitrión con una referencia débil: el modelo lo mantiene vivo.
     @ObservationIgnored private let anfitrionVistaPrevia = AnfitrionEnMemoria()
     var esDemo: Bool { id.hasPrefix(ID_DEMO) }
+    var esNube: Bool { id.hasPrefix(PREFIJO_NUBE) }
+    private var idBicho: String { esNube ? String(id.dropFirst(PREFIJO_NUBE.count)) : id }
+    /// Cómo va lo de la nube (WiFi, sumar a la cuenta).
+    var nube: String?
+    var ocupadoNube = false
 
     init(id: String) { self.id = id }
 
@@ -37,6 +42,14 @@ final class ModeloBicho {
                 c = ClienteBicho(TransporteVirtual(broche: id == ID_DEMO_BROCHE))
                 try await c.conectar()
                 pantalla = c.estado?.pantalla ?? pantalla
+            } else if esNube {
+                guard Cuenta.compartida.activa else { throw ErrorBicho.rechazo("Entrá a tu cuenta para ver los bichos lejos.") }
+                c = ClienteBicho(TransporteNube(api: Cuenta.compartida.api, id: idBicho))
+                try await c.conectar()
+                pantalla = c.estado?.pantalla ?? pantalla
+                Nucleo.iniciar(ancho: pantalla.ancho * 2, alto: pantalla.alto * 2, identificador: idBicho,
+                               anfitrion: anfitrionVistaPrevia, redonda: pantalla.redonda)
+                Nucleo.vistaPrevia()
             } else {
                 guard let v = Vinculados.compartidos.buscar(id) else { throw ErrorBicho.rechazo("Este bicho no está vinculado.") }
                 let p = try await Central.compartida.buscar(id: id)
@@ -139,11 +152,11 @@ final class ModeloBicho {
             let nueva = EditorConfig.escribir(configTexto, ajustes)
             try await c.mandarConfig(nueva)
             configTexto = nueva
-            if !esDemo, var v = Vinculados.compartidos.buscar(id) {
+            if !esDemo, !esNube, var v = Vinculados.compartidos.buscar(id) {
                 v.nombre = ajustes.nombre
                 Vinculados.compartidos.guardar(v)
             }
-            aviso = "Guardado en el bicho."
+            aviso = esNube ? "Guardado en la nube: le llega al bicho apenas esté conectado." : "Guardado en el bicho."
         } catch {
             aviso = error.localizedDescription
         }
@@ -166,6 +179,71 @@ final class ModeloBicho {
     func cerrar() {
         espejo?.cancel()
         cliente?.cerrar()
+    }
+
+    var firmwares: [FirmwareNube] = []
+    var progresoOta: Double?
+    var mensajeOta: String?
+
+    func buscarFirmwares() async {
+        let perfil = cliente?.estado?.perfil ?? ""
+        guard Cuenta.compartida.activa, !perfil.isEmpty else { mensajeOta = "Entrá a tu cuenta para ver las versiones."; return }
+        do { firmwares = try await Cuenta.compartida.api.firmwares(perfil: perfil) } catch { mensajeOta = error.localizedDescription }
+        if firmwares.isEmpty { mensajeOta = "No hay versiones para \(perfil)." }
+    }
+
+    /// Baja el firmware firmado de la API y se lo manda al bicho por BLE.
+    func instalarPorBle(_ f: FirmwareNube) async {
+        guard let c = cliente else { return }
+        progresoOta = 0
+        defer { progresoOta = nil }
+        do {
+            let api = Cuenta.compartida.api
+            mensajeOta = "Bajando \(f.version)…"
+            let man = try await api.manifiesto(f.id)
+            let bin = try await api.binario(f.id)
+            mensajeOta = "Mandándolo al bicho (no lo alejes)…"
+            try await c.instalarFirmware(manifiesto: man, binario: bin) { [weak self] v in self?.progresoOta = v }
+            mensajeOta = "Listo: reinicia con la \(f.version). Si no anda bien, vuelve solo a la anterior."
+        } catch {
+            mensajeOta = error.localizedDescription
+        }
+    }
+
+    /// El WiFi, por BLE.
+    func configurarRed(_ ssid: String, clave: String) async {
+        ocupadoNube = true
+        defer { ocupadoNube = false }
+        do {
+            try await cliente?.configurarRed(ssid, clave: clave)
+            nube = "Listo: se conecta a \"\(ssid)\"."
+        } catch { nube = error.localizedDescription }
+    }
+
+    func olvidarRed() async {
+        do { try await cliente?.olvidarRed(); nube = "Se olvidó del WiFi y de la nube." } catch { nube = error.localizedDescription }
+    }
+
+    /// Suma el bicho a la cuenta: la API da credenciales nuevas, se las pasamos
+    /// por BLE y, cuando el bicho se conecta con ellas, queda en la cuenta.
+    func sumarACuenta() async {
+        guard let c = cliente else { return }
+        ocupadoNube = true
+        defer { ocupadoNube = false }
+        do {
+            let cuenta = Cuenta.compartida
+            guard cuenta.activa else { throw ErrorBicho.rechazo("Primero entrá a tu cuenta.") }
+            guard let e = c.estado, e.redConfigurada else { throw ErrorBicho.rechazo("Primero pasale el WiFi.") }
+            nube = "Pidiendo la clave a la nube…"
+            let cred = try await cuenta.api.reclamar(idBicho, perfil: e.perfil)
+            try await c.configurarNube(url: cred.url, usuario: cred.usuario, clave: cred.clave)
+            nube = "Esperando que se conecte (\(cred.url))…"
+            nube = try await cuenta.api.esperarReclamo(idBicho)
+                ? "Listo: está en tu cuenta. Desde la web o desde otro celu lo cambiás estés donde estés."
+                : "No se conectó todavía: revisá el WiFi y que el servidor (\(cred.url)) se vea desde la red del bicho."
+        } catch {
+            nube = error.localizedDescription
+        }
     }
 }
 
@@ -253,6 +331,11 @@ struct BichoVista: View {
                     FilaDato(etiqueta: "Estado", valor: (e?.dormido ?? false) ? "durmiendo" : "despierto")
                 }
 
+                if !modelo.esDemo && !modelo.esNube { SeccionNube(modelo: modelo) }
+                if !modelo.esDemo && !modelo.esNube { SeccionFirmware(modelo: modelo) }
+                if modelo.esNube && modelo.cliente?.estado?.nube != true {
+                    Aviso(texto: "El bicho no está conectado ahora: lo que cambies le llega cuando vuelva.")
+                }
                 Seccion(titulo: "Caras") {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], alignment: .leading, spacing: 8) {
                         Chip(texto: "Automático", elegido: e?.fija == false) { Task { await modelo.fijarExpresion(nil) } }
@@ -462,6 +545,67 @@ private struct SeccionLista: View {
             }
             Deslizador(etiqueta: "Rotar sola", valor: Double(a.rotar), rango: 0 ... 60,
                        texto: { $0 < 0.5 ? "no" : "cada \(Int($0.rounded())) min" }) { var b = a; b.rotar = Int($0.rounded()); modelo.editar(b) }
+        }
+    }
+}
+
+@MainActor
+private struct SeccionNube: View {
+    let modelo: ModeloBicho
+    @State private var ssid = ""
+    @State private var clave = ""
+
+    var body: some View {
+        let e = modelo.cliente?.estado
+        Seccion(titulo: "WiFi y nube") {
+            VStack(alignment: .leading, spacing: 12) {
+                FilaDato(etiqueta: "WiFi", valor: e?.wifi == true ? "conectado" : e?.redConfigurada == true ? "configurado, sin conexión" : "sin configurar")
+                FilaDato(etiqueta: "Nube", valor: e?.nube == true ? "conectado" : "sin conectar")
+                TextField("Red", text: $ssid).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .font(Tipos.cuerpo).textFieldStyle(.roundedBorder)
+                SecureField("Clave", text: $clave).font(Tipos.cuerpo).textFieldStyle(.roundedBorder)
+                BotonSecundario(texto: "Pasarle el WiFi") { Task { await modelo.configurarRed(ssid, clave: clave) } }
+                    .disabled(ssid.trimmingCharacters(in: .whitespaces).isEmpty || ssid.utf8.count > 32 || clave.utf8.count > 64 || modelo.ocupadoNube)
+                if Cuenta.compartida.activa {
+                    BotonPrimario(texto: "Sumar a mi cuenta") { Task { await modelo.sumarACuenta() } }
+                        .disabled(modelo.ocupadoNube || e?.redConfigurada != true)
+                } else {
+                    Text("Entrá a tu cuenta (en el inicio) para sumarlo y manejarlo desde lejos.").font(Tipos.cuerpo).foregroundStyle(Color.tintaSuave)
+                }
+                if e?.redConfigurada == true {
+                    Button("OLVIDAR WIFI Y NUBE") { Task { await modelo.olvidarRed() } }.font(Tipos.boton).foregroundStyle(Color.tintaSuave)
+                }
+                if let n = modelo.nube { Aviso(texto: n) }
+            }
+        }
+    }
+}
+
+@MainActor
+private struct SeccionFirmware: View {
+    let modelo: ModeloBicho
+
+    var body: some View {
+        let e = modelo.cliente?.estado
+        Seccion(titulo: "Firmware") {
+            VStack(alignment: .leading, spacing: 12) {
+                FilaDato(etiqueta: "Versión", valor: (e?.version).flatMap { $0.isEmpty ? nil : $0 } ?? "—")
+                FilaDato(etiqueta: "Perfil", valor: (e?.perfil).flatMap { $0.isEmpty ? nil : $0 } ?? "—")
+                if modelo.firmwares.isEmpty {
+                    BotonSecundario(texto: "Buscar versiones") { Task { await modelo.buscarFirmwares() } }.disabled(modelo.progresoOta != nil)
+                }
+                ForEach(modelo.firmwares) { f in
+                    HStack {
+                        Text("\(f.version) · \(f.tamano / 1024) KB").font(Tipos.dato).foregroundStyle(Color.tinta)
+                        Spacer()
+                        Button(f.version == e?.version ? "INSTALADA" : "INSTALAR") { Task { await modelo.instalarPorBle(f) } }
+                            .font(Tipos.boton).foregroundStyle(Color.naranjaProfundo)
+                            .disabled(modelo.progresoOta != nil || f.version == e?.version)
+                    }
+                }
+                if let p = modelo.progresoOta { ProgressView(value: p).tint(Color.naranja) }
+                if let m = modelo.mensajeOta { Aviso(texto: m) }
+            }
         }
     }
 }
