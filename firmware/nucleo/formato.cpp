@@ -319,14 +319,14 @@ ResultadoConfig cargarBase(Config& c) {
   return {};
 }
 
-ResultadoConfig aplicarConfig(Config& destino, const char* texto, size_t n) {
+namespace {
+// Aplica la config de usuario sobre `c` (que es memoria de trabajo: si falla,
+// queda a medio aplicar y el que llama la descarta).
+ResultadoConfig aplicarSobre(Config& c, const char* texto, size_t n) {
   if (n > MAX_CONFIG_BYTES) return error(ErrorConfig::Demasiadas, "config: más de 8 KB");
   Json j;
   if (j.parsear(texto, n, g_tokens, MAX_TOKENS_JSON) <= 0 || j.tipo(0) != TipoJson::Objeto)
     return error(ErrorConfig::JsonInvalido, "config: JSON inválido");
-
-  Config& c = g_copia;
-  c = destino;
 
   float version = 0;
   if (!numeroEn(j, 0, "version", 1, 1, &version)) return error(ErrorConfig::Version, "config: version debe ser 1");
@@ -432,9 +432,22 @@ ResultadoConfig aplicarConfig(Config& destino, const char* texto, size_t n) {
     }
     if (!ok) return error(ErrorConfig::Campo, "modo desconocido");
   }
-
-  destino = c;
   return {};
+}
+}  // namespace
+
+ResultadoConfig aplicarConfig(Config& destino, const char* texto, size_t n) {
+  g_copia = destino;
+  ResultadoConfig r = aplicarSobre(g_copia, texto, n);
+  if (r.ok()) destino = g_copia;
+  return r;
+}
+
+ResultadoConfig cargarConfig(Config& destino, const char* texto, size_t n) {
+  ResultadoConfig r = cargarBase(g_copia);
+  if (r.ok()) r = aplicarSobre(g_copia, texto, n);
+  if (r.ok()) destino = g_copia;
+  return r;
 }
 
 }  // namespace sintetica

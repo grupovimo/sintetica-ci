@@ -147,6 +147,10 @@ ResultadoConfig aplicarExpresion(Config& c, const char* json, size_t largo);
 // como estaba (se trabaja sobre una copia temporal).
 ResultadoConfig aplicarConfig(Config& c, const char* json, size_t largo);
 
+// La base más una configuración de usuario, de cero. Si falla, `destino`
+// queda como estaba. Usa la misma memoria de trabajo que aplicarConfig.
+ResultadoConfig cargarConfig(Config& destino, const char* json, size_t largo);
+
 // Interpreta "#RRGGBB" o un token de la paleta. Devuelve false si no lo conoce.
 bool interpretarColor(const char* s, uint32_t* rgb, bool* acento);
 

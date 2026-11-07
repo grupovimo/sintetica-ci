@@ -7,8 +7,8 @@
 
 namespace sintetica {
 
-constexpr float PI = 3.14159265358979f;
-constexpr float DOS_PI = 6.28318530717959f;
+constexpr float MEDIA_VUELTA = 3.14159265358979f;
+constexpr float VUELTA = 6.28318530717959f;
 
 inline float absf(float x) { return x < 0 ? -x : x; }
 inline float minf(float a, float b) { return a < b ? a : b; }
@@ -23,13 +23,13 @@ inline float techo(float x) { return __builtin_ceilf(x); }
 
 // Seno con reducción de rango y polinomio de Taylor hasta x^9 (error < 1e-5).
 inline float seno(float x) {
-  x = x - DOS_PI * piso((x + PI) / DOS_PI);  // a [-π, π)
-  if (x > PI / 2) x = PI - x;
-  if (x < -PI / 2) x = -PI - x;
+  x = x - VUELTA * piso((x + MEDIA_VUELTA) / VUELTA);  // a [-π, π)
+  if (x > MEDIA_VUELTA / 2) x = MEDIA_VUELTA - x;
+  if (x < -MEDIA_VUELTA / 2) x = -MEDIA_VUELTA - x;
   const float x2 = x * x;
   return x * (1.0f - x2 / 6.0f * (1.0f - x2 / 20.0f * (1.0f - x2 / 42.0f * (1.0f - x2 / 72.0f))));
 }
-inline float coseno(float x) { return seno(x + PI / 2); }
+inline float coseno(float x) { return seno(x + MEDIA_VUELTA / 2); }
 
 // Curva ease-in-out cúbica, la que pide el manual para el parpadeo.
 inline float suave(float t) {

@@ -6,7 +6,11 @@ namespace {
 constexpr int SUBFILAS = 8;  // muestras verticales por píxel al rellenar polígonos
 
 float g_fila[MAX_ANCHO + 1];
-uint8_t g_mascara[MAX_ANCHO * MAX_ALTO];
+// Máscara para combinar los segmentos de un trazo (cobertura máxima, sin
+// dibujar dos veces las uniones). Alcanza para trazos de hasta 160 × 160 px;
+// uno más grande se dibuja segmento por segmento.
+constexpr int LADO_MASCARA = 160;
+uint8_t g_mascara[LADO_MASCARA * LADO_MASCARA];
 
 // Distancia con signo a un rectángulo redondeado centrado en el origen.
 float distanciaPildora(float px, float py, float mw, float mh, float r) {
@@ -141,29 +145,44 @@ void Lienzo::poligono(const Punto* p, int n, uint32_t rgb) {
 void Lienzo::trazo(const Punto* p, int n, float grosor, uint32_t rgb) {
   if (n < 1 || grosor <= 0) return;
   const float radio = grosor / 2;
-  int bx0 = ancho_, by0 = alto_, bx1 = 0, by1 = 0;
-  // Acumular la cobertura máxima de cada segmento en la máscara, para que las
-  // uniones no se dibujen dos veces.
-  for (int i = 0; i < (n == 1 ? 1 : n - 1); i++) {
+  const int segmentos = n == 1 ? 1 : n - 1;
+  float minX = p[0].x, maxX = p[0].x, minY = p[0].y, maxY = p[0].y;
+  for (int i = 1; i < n; i++) {
+    minX = minf(minX, p[i].x), maxX = maxf(maxX, p[i].x);
+    minY = minf(minY, p[i].y), maxY = maxf(maxY, p[i].y);
+  }
+  const int bx0 = maxi(0, static_cast<int>(piso(minX - radio - 1)));
+  const int bx1 = mini(ancho_, static_cast<int>(techo(maxX + radio + 1)));
+  const int by0 = maxi(0, static_cast<int>(piso(minY - radio - 1)));
+  const int by1 = mini(alto_, static_cast<int>(techo(maxY + radio + 1)));
+  if (bx0 >= bx1 || by0 >= by1) return;
+  const bool conMascara = bx1 - bx0 <= LADO_MASCARA && by1 - by0 <= LADO_MASCARA;
+  const int mw = bx1 - bx0;
+
+  for (int i = 0; i < segmentos; i++) {
     Punto a = p[i], b = n == 1 ? p[i] : p[i + 1];
-    int x0 = maxi(0, static_cast<int>(piso(minf(a.x, b.x) - radio - 1)));
-    int x1 = mini(ancho_, static_cast<int>(techo(maxf(a.x, b.x) + radio + 1)));
-    int y0 = maxi(0, static_cast<int>(piso(minf(a.y, b.y) - radio - 1)));
-    int y1 = mini(alto_, static_cast<int>(techo(maxf(a.y, b.y) + radio + 1)));
-    bx0 = mini(bx0, x0), by0 = mini(by0, y0), bx1 = maxi(bx1, x1), by1 = maxi(by1, y1);
+    int x0 = maxi(bx0, static_cast<int>(piso(minf(a.x, b.x) - radio - 1)));
+    int x1 = mini(bx1, static_cast<int>(techo(maxf(a.x, b.x) + radio + 1)));
+    int y0 = maxi(by0, static_cast<int>(piso(minf(a.y, b.y) - radio - 1)));
+    int y1 = mini(by1, static_cast<int>(techo(maxf(a.y, b.y) + radio + 1)));
     for (int y = y0; y < y1; y++) {
       for (int x = x0; x < x1; x++) {
         float d = distanciaSegmento(x + 0.5f, y + 0.5f, a, b);
         float cob = limitar(radio + 0.5f - d, 0, 1);
+        if (!conMascara) {
+          mezclarPixel(x, y, cob, rgb);
+          continue;
+        }
         uint8_t v = static_cast<uint8_t>(cob * 255 + 0.5f);
-        uint8_t& m = g_mascara[y * ancho_ + x];
+        uint8_t& m = g_mascara[(y - by0) * mw + (x - bx0)];
         if (v > m) m = v;
       }
     }
   }
+  if (!conMascara) return;
   for (int y = by0; y < by1; y++) {
     for (int x = bx0; x < bx1; x++) {
-      uint8_t& m = g_mascara[y * ancho_ + x];
+      uint8_t& m = g_mascara[(y - by0) * mw + (x - bx0)];
       if (m) {
         mezclarPixel(x, y, m / 255.0f, rgb);
         m = 0;

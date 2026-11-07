@@ -9,7 +9,6 @@ constexpr const char* CLAVE_AJUSTES = "ajustes";
 // Memoria grande, fuera de la pila.
 char g_textoConfig[MAX_CONFIG_BYTES + 1];
 size_t g_largoConfig = 0;
-Config g_nueva;
 
 const char CONFIG_VACIA[] = "{\"version\":1}";
 }  // namespace
@@ -232,12 +231,10 @@ void Sistema::bleEscribir(uint8_t car, const uint8_t* d, size_t n) {
       case ConfigFin: {
         Codigo c = receptor_.fin();
         if (c != Ok) return responder(car, op, c);
-        cargarBase(g_nueva);
-        ResultadoConfig r = aplicarConfig(g_nueva, receptor_.texto(), receptor_.largo());
+        ResultadoConfig r = cargarConfig(config_, receptor_.texto(), receptor_.largo());
         if (!r.ok()) {
           return responder(car, op, r.error == ErrorConfig::JsonInvalido ? JsonInvalido : ConfigInvalida, r.detalle);
         }
-        config_ = g_nueva;
         g_largoConfig = receptor_.largo();
         copiarBytes(g_textoConfig, receptor_.texto(), g_largoConfig);
         g_textoConfig[g_largoConfig] = 0;

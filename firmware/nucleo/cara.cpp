@@ -74,7 +74,7 @@ void dibujarForma(Lienzo& l, const Forma& f, const Transformacion& t, const Esta
       g_muestras[n++] = t.aPixel(x1, arriba + f.der);
       constexpr int PASOS = 24;
       for (int i = 0; i <= PASOS; i++) {
-        float a = PI * i / PASOS;  // 0 = derecha, π/2 = abajo, π = izquierda
+        float a = MEDIA_VUELTA * i / PASOS;  // 0 = derecha, π/2 = abajo, π = izquierda
         g_muestras[n++] = t.aPixel(f.x + r * coseno(a), abajo - r + r * seno(a));
       }
       l.poligono(g_muestras, n, color);

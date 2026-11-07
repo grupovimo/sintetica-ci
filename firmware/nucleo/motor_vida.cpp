@@ -172,7 +172,7 @@ void MotorVida::tick(uint32_t ahora, const Contexto& ctx) {
   // Respiración: los ojos "respiran" apenas; dormido, más lento y más hondo.
   const float periodo = dormido_ ? tiempos::RESPIRACION_MS * 1.6f : static_cast<float>(tiempos::RESPIRACION_MS);
   const float fase = static_cast<float>((ahora - inicio_) % static_cast<uint32_t>(periodo)) / periodo;
-  estado_.respiracion = seno(fase * DOS_PI) * (dormido_ ? 1.6f : 1.0f);
+  estado_.respiracion = seno(fase * VUELTA) * (dormido_ ? 1.6f : 1.0f);
 
   // Barras de audio de "escuchando": se mueven solas hasta que haya micrófono.
   for (int i = 0; i < 8; i++) {
