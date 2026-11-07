@@ -9,11 +9,25 @@ sintetica_hal g_hal;
 Sistema g_sistema;
 uint16_t g_pixeles[640 * 640];
 int g_ancho = 0, g_alto = 0;
+
+// Las imágenes de la vista previa, en memoria ("img0" a "img7").
+uint8_t g_imagenes[MAX_IMAGENES][protocolo::MAX_IMAGEN_BYTES];
+uint32_t g_largos[MAX_IMAGENES];
+
+int espacioDe(const char* clave) {
+  return (clave[0] == 'i' && clave[1] == 'm' && clave[2] == 'g' && clave[3] >= '0' && clave[3] < '0' + MAX_IMAGENES && !clave[4])
+             ? clave[3] - '0'
+             : -1;
+}
 }  // namespace
 
 extern "C" {
 
 void sintetica_iniciar(const sintetica_hal* hal, int ancho, int alto) {
+  sintetica_iniciar_perfil(hal, ancho, alto, 0, 0);
+}
+
+void sintetica_iniciar_perfil(const sintetica_hal* hal, int ancho, int alto, int redonda, int botonBroche) {
   g_hal = hal ? *hal : sintetica_hal{};
   g_ancho = mini(maxi(ancho, 16), MAX_ANCHO);
   g_alto = mini(maxi(alto, 16), MAX_ALTO);
@@ -33,7 +47,30 @@ void sintetica_iniciar(const sintetica_hal* hal, int ancho, int alto) {
   h.registrar = [](const char* m) {
     if (g_hal.registrar) g_hal.registrar(g_hal.contexto, m);
   };
-  g_sistema.iniciar(h, g_pixeles, g_ancho, g_alto);
+  h.escribirTrozo = [](const char* c, uint32_t off, const uint8_t* d, size_t n) {
+    const int e = espacioDe(c);
+    if (e < 0 || (off != 0 && off != g_largos[e]) || off + n > protocolo::MAX_IMAGEN_BYTES) return false;
+    copiarBytes(g_imagenes[e] + off, d, n);
+    g_largos[e] = off + static_cast<uint32_t>(n);
+    return true;
+  };
+  h.leerTrozo = [](const char* c, uint32_t off, uint8_t* d, size_t n) {
+    const int e = espacioDe(c);
+    if (e < 0 || !g_largos[e]) return -1;
+    if (off >= g_largos[e]) return 0;
+    const uint32_t m = mini(static_cast<int>(n), static_cast<int>(g_largos[e] - off));
+    copiarBytes(d, g_imagenes[e] + off, m);
+    return static_cast<int>(m);
+  };
+  h.borrar = [](const char* c) {
+    const int e = espacioDe(c);
+    if (e >= 0) g_largos[e] = 0;
+    return true;
+  };
+  Perfil p;
+  p.ancho = g_ancho, p.alto = g_alto, p.redonda = redonda != 0;
+  p.boton = botonBroche ? Perfil::Boton::Broche : Perfil::Boton::Mascota;
+  g_sistema.iniciar(h, g_pixeles, p);
 }
 
 void sintetica_vista_previa(void) { g_sistema.modoVistaPrevia(); }
@@ -70,5 +107,6 @@ const char* sintetica_expresion_visible(void) {
   return g_sistema.config().expresiones[g_sistema.motor().expresionVisible()].nombre;
 }
 const char* sintetica_qr(void) { return g_sistema.contenidoQr(); }
+int sintetica_imagen_visible(void) { return g_sistema.imagenVisible(); }
 const char* sintetica_version(void) { return VERSION_SINTETICAOS; }
 }

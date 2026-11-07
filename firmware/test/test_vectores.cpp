@@ -74,7 +74,9 @@ PRUEBA("vectores: los comandos los entiende el núcleo") {
     int c = g_j.elemento(arr, k);
     std::string nombre = texto(g_j.buscar(c, "nombre"));
     auto b = deHex(texto(g_j.buscar(c, "hex")));
-    if (nombre == "vincular" || nombre == "autenticar" || nombre == "desvincular" || nombre == "pedir config") continue;
+    if (nombre == "vincular" || nombre == "autenticar" || nombre == "desvincular" || nombre == "pedir config" ||
+        nombre.rfind("imagen", 0) == 0)
+      continue;
     g_notis.clear();
     sintetica_ble_escribir(protocolo::CarComando, b.data(), b.size());
     VERIFICAR(!g_notis.empty() && g_notis.back()[1] == protocolo::Ok);
@@ -120,6 +122,9 @@ PRUEBA("vectores: el estado se codifica igual") {
     std::string ex = texto(g_j.buscar(c, "expresion")), no = texto(g_j.buscar(c, "nombre")),
                 se = texto(g_j.buscar(c, "serie")), id = texto(g_j.buscar(c, "id"));
     p.expresion = ex.c_str(), p.nombre = no.c_str(), p.serie = se.c_str(), p.id = id.c_str();
+    p.ancho = static_cast<uint16_t>(g_j.numero(g_j.buscar(c, "ancho"), 0));
+    p.alto = static_cast<uint16_t>(g_j.numero(g_j.buscar(c, "alto"), 0));
+    p.redonda = g_j.booleano(g_j.buscar(c, "redonda"), false);
     uint8_t b[96];
     size_t n = protocolo::codificarEstado(p, b, sizeof b);
     VERIFICAR(aHex(b, n) == texto(g_j.buscar(e, "hex")));

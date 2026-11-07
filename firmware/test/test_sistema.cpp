@@ -172,7 +172,7 @@ PRUEBA("protocolo: comando de expresión y nombre, y sobreviven a un reinicio") 
 
   uint8_t est[64];
   size_t n = g_s.estadoBle(est, sizeof est);
-  VERIFICAR(n > 6 && est[0] == 2 && (est[4] & 2));
+  VERIFICAR(n > 6 && est[0] == 3 && (est[4] & 2));
   VERIFICAR(std::string(reinterpret_cast<char*>(est + 6), est[5]) == "enamorado");
 
   escribir(CarComando, bytes({CmdExpresion}));  // vacío = automático

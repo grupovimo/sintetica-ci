@@ -36,8 +36,11 @@ typedef struct sintetica_hal {
   const char* identificador; /* 12 caracteres hexadecimales; NULL = "000000000000" */
 } sintetica_hal;
 
-/* Arranca el núcleo. ancho ≤ 640, alto ≤ 640. Cualquier función de la tabla puede ser NULL. */
+/* Arranca el núcleo. ancho ≤ 640, alto ≤ 640. Cualquier función de la tabla puede ser NULL.
+ * Las imágenes (protocolo Imagen) se guardan en memoria, dentro de la API. */
 void sintetica_iniciar(const sintetica_hal* hal, int ancho, int alto);
+/* Igual, para una pantalla redonda (el broche) o con su pulsador (boton_broche = 1). */
+void sintetica_iniciar_perfil(const sintetica_hal* hal, int ancho, int alto, int redonda, int boton_broche);
 void sintetica_vista_previa(void);
 
 void sintetica_tick(void);
@@ -59,6 +62,8 @@ int sintetica_cantidad_expresiones(void);
 const char* sintetica_nombre_expresion(int indice);
 const char* sintetica_expresion_visible(void);
 const char* sintetica_qr(void);
+/* La imagen que se ve (-1 = una cara). */
+int sintetica_imagen_visible(void);
 const char* sintetica_version(void);
 
 #ifdef __cplusplus

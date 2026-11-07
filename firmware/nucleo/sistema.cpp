@@ -10,6 +10,14 @@ constexpr const char* CLAVE_AJUSTES = "ajustes";
 constexpr const char* CLAVE_SERIE = "serie";
 constexpr const char* CLAVE_CODIGO = "codigo";
 constexpr const char* CLAVE_CLAVES = "claves";
+constexpr const char* CLAVE_IMAGENES = "imagenes";
+
+void claveImagen(char* destino, int espacio) {
+  copiarTexto(destino, 6, "img0");
+  destino[3] = static_cast<char>('0' + espacio);
+}
+
+uint16_t g_filaImagen[MAX_ANCHO];
 constexpr uint32_t QR_POR_BOTON_MS = 120000;  // el QR del botón dura 2 min
 constexpr uint8_t FALLOS_MAXIMOS = 5;
 constexpr uint32_t BLOQUEO_MS = 30000;
@@ -63,6 +71,12 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
   const uint32_t ahora = hal_.ahoraMs();
   motor_.iniciar(&config_, hal_.semilla ? hal_.semilla() : ahora, ahora);
   leerAjustes();
+  leerImagenes();
+  azar_.sembrar(hal_.semilla ? hal_.semilla() : ahora);
+  subiendo_ = -1;
+  mostrandoImagen_ = -1;
+  imagenSucia_ = true;
+  proximaVueltaCara_ = vueltaCaraHasta_ = 0;
   ultimaRotacion_ = ahora;
   aplicarLista(ahora);
   log("SintéticaOS listo");
@@ -219,6 +233,159 @@ void Sistema::evento(Evento e) {
   }
 }
 
+void Sistema::leerImagenes() {
+  for (auto& m : imagenes_) m = MetaImagen();
+  uint8_t b[MAX_IMAGENES * 8];
+  const int n = hal_.leer ? hal_.leer(CLAVE_IMAGENES, b, sizeof b) : -1;
+  if (n != static_cast<int>(sizeof b)) return;
+  for (int i = 0; i < MAX_IMAGENES; i++) {
+    imagenes_[i].largo = protocolo::leer32(b + i * 8);
+    imagenes_[i].crc = protocolo::leer32(b + i * 8 + 4);
+  }
+}
+
+void Sistema::guardarImagenes() {
+  if (!hal_.guardar) return;
+  uint8_t b[MAX_IMAGENES * 8];
+  for (int i = 0; i < MAX_IMAGENES; i++) {
+    protocolo::escribir32(b + i * 8, imagenes_[i].largo);
+    protocolo::escribir32(b + i * 8 + 4, imagenes_[i].crc);
+  }
+  hal_.guardar(CLAVE_IMAGENES, b, sizeof b);
+}
+
+int Sistema::leerParaQoi(void* contexto, uint32_t desplazamiento, uint8_t* destino, size_t n) {
+  auto* s = static_cast<Sistema*>(contexto);
+  if (!s->hal_.leerTrozo) return -1;
+  char clave[6];
+  claveImagen(clave, s->imagenLeyendo_);
+  return s->hal_.leerTrozo(clave, desplazamiento, destino, n);
+}
+
+// Decodifica la imagen en la franja actual del lienzo. false si no se puede leer.
+bool Sistema::dibujarImagen(int espacio) {
+  const int y0 = lienzo_.franja();
+  if (y0 == 0) {
+    imagenLeyendo_ = espacio;
+    if (!qoi_.empezar(leerParaQoi, this) || qoi_.ancho() != static_cast<uint32_t>(lienzo_.ancho()) ||
+        qoi_.alto() != static_cast<uint32_t>(lienzo_.alto()))
+      return false;
+  }
+  for (int y = y0; y < y0 + lienzo_.filasFranja(); y++) {
+    if (!qoi_.siguienteFila(g_filaImagen)) return false;
+    lienzo_.fila(y, g_filaImagen);
+  }
+  return true;
+}
+
+// La imagen que corresponde mostrar ahora, o -1 si va una cara.
+int Sistema::imagenParaMostrar(uint32_t ahora) {
+  if (apagado_ || emparejando_ || motor_.expresionFija() >= 0 || largoLista() == 0) return -1;
+  const ElementoLista e = elementoLista(posLista_);
+  if (e.tipo != ElementoLista::Tipo::Imagen || imagenes_[e.indice].largo == 0 || subiendo_ == e.indice) return -1;
+  // Cada tanto vuelve la cara un par de segundos: nunca una imagen quieta del todo.
+  if (proximaVueltaCara_ == 0)
+    proximaVueltaCara_ = ahora + azar_.entre(tiemposImagen::VUELTA_MIN_MS, tiemposImagen::VUELTA_MAX_MS);
+  if (static_cast<int32_t>(ahora - proximaVueltaCara_) >= 0) {
+    vueltaCaraHasta_ = ahora + tiemposImagen::VUELTA_DURA_MS;
+    proximaVueltaCara_ = vueltaCaraHasta_ + azar_.entre(tiemposImagen::VUELTA_MIN_MS, tiemposImagen::VUELTA_MAX_MS);
+  }
+  if (static_cast<int32_t>(ahora - vueltaCaraHasta_) < 0) return -1;
+  return e.indice;
+}
+
+void Sistema::bleImagen(uint8_t op, const uint8_t* d, size_t n) {
+  using namespace protocolo;
+  const uint8_t car = CarImagen;
+  char clave[6];
+  switch (op) {
+    case ImgInicio: {
+      if (n != 10 || d[1] >= MAX_IMAGENES) return responder(car, op, Malformado);
+      const uint32_t largo = leer32(d + 2);
+      if (largo < 22 || largo > MAX_IMAGEN_BYTES) return responder(car, op, MuyGrande);
+      subiendo_ = d[1];
+      subidaLargo_ = largo;
+      subidaCrc_ = leer32(d + 6);
+      subidaRecibido_ = 0;
+      subidaCrcAcum_ = 0;
+      imagenes_[subiendo_] = MetaImagen();
+      guardarImagenes();
+      imagenSucia_ = true;
+      return responder(car, op, Ok);
+    }
+    case ImgBloque: {
+      if (subiendo_ < 0) return responder(car, op, SinInicio);
+      if (n < 5) return responder(car, op, Malformado);
+      const uint32_t off = leer32(d + 1);
+      const size_t m = n - 5;
+      claveImagen(clave, subiendo_);
+      if (off != subidaRecibido_ || subidaRecibido_ + m > subidaLargo_ || !hal_.escribirTrozo ||
+          !hal_.escribirTrozo(clave, off, d + 5, m)) {
+        if (hal_.borrar) hal_.borrar(clave);
+        subiendo_ = -1;
+        return responder(car, op, off != subidaRecibido_ ? FueraDeOrden : MuyGrande);
+      }
+      subidaCrcAcum_ = crc32(d + 5, m, subidaCrcAcum_);
+      subidaRecibido_ += static_cast<uint32_t>(m);
+      return;  // los bloques buenos no se confirman uno por uno
+    }
+    case ImgFin: {
+      if (subiendo_ < 0) return responder(car, op, SinInicio);
+      const int espacio = subiendo_;
+      subiendo_ = -1;
+      claveImagen(clave, espacio);
+      if (subidaRecibido_ != subidaLargo_ || subidaCrcAcum_ != subidaCrc_) {
+        if (hal_.borrar) hal_.borrar(clave);
+        return responder(car, op, subidaRecibido_ != subidaLargo_ ? FueraDeOrden : CrcDistinto);
+      }
+      uint8_t cab[14];
+      uint32_t w = 0, h = 0;
+      const bool cabeceraOk = hal_.leerTrozo && hal_.leerTrozo(clave, 0, cab, sizeof cab) == 14 &&
+                              DecodificadorQoi::leerCabecera(cab, sizeof cab, &w, &h);
+      if (!cabeceraOk || w != static_cast<uint32_t>(perfil_.ancho) || h != static_cast<uint32_t>(perfil_.alto)) {
+        if (hal_.borrar) hal_.borrar(clave);
+        return responder(car, op, ImagenInvalida, "tiene que ser un QOI del tamaño de la pantalla");
+      }
+      imagenes_[espacio].largo = subidaLargo_;
+      imagenes_[espacio].crc = subidaCrc_;
+      guardarImagenes();
+      imagenSucia_ = true;
+      log("imagen guardada");
+      return responder(car, op, Ok);
+    }
+    case ImgBorrar: {
+      if (n != 2 || d[1] >= MAX_IMAGENES) return responder(car, op, Malformado);
+      claveImagen(clave, d[1]);
+      if (hal_.borrar) hal_.borrar(clave);
+      imagenes_[d[1]] = MetaImagen();
+      guardarImagenes();
+      imagenSucia_ = true;
+      return responder(car, op, Ok);
+    }
+    case ImgListar: {
+      if (!hal_.notificar) return;
+      uint8_t b[3 + MAX_IMAGENES * 9];
+      size_t i = 3;
+      uint8_t mascara = 0;
+      for (int k = 0; k < MAX_IMAGENES; k++) {
+        if (!imagenes_[k].largo) continue;
+        mascara |= static_cast<uint8_t>(1u << k);
+        b[i++] = static_cast<uint8_t>(k);
+        escribir32(b + i, imagenes_[k].largo);
+        escribir32(b + i + 4, imagenes_[k].crc);
+        i += 8;
+      }
+      b[0] = op | Respuesta;
+      b[1] = Ok;
+      b[2] = mascara;
+      hal_.notificar(car, b, i);
+      return;
+    }
+    default:
+      return responder(car, op, Malformado);
+  }
+}
+
 int Sistema::largoLista() const {
   // Sin lista propia, el broche recorre las caras; la mascota no tiene lista.
   if (config_.nLista > 0) return config_.nLista;
@@ -349,14 +516,30 @@ void Sistema::tick() {
     emparejando_ = false;
 
   if (vistaPrevia_) emparejando_ = false;
+  const int imagen = imagenParaMostrar(ahora);
+  if (imagen >= 0 && imagen == mostrandoImagen_ && !imagenSucia_) {
+    // La imagen ya está en la pantalla: no hace falta redibujarla.
+    notificarEstadoSiCambio();
+    return;
+  }
+  mostrandoImagen_ = imagen;
+  imagenSucia_ = false;
+  bool imagenOk = imagen >= 0;
   // De a una franja: en placas sin PSRAM no entra la pantalla entera.
   for (int y0 = 0; y0 < lienzo_.alto(); y0 += lienzo_.filasPorFranja()) {
     lienzo_.empezarFranja(y0);
-    dibujarPantalla(ahora);
+    if (imagenOk) imagenOk = dibujarImagen(imagen);
+    if (!imagenOk) dibujarPantalla(ahora);
     if (hal_.presentarFranja) hal_.presentarFranja(lienzo_.pixeles(), lienzo_.ancho(), y0, lienzo_.filasFranja());
   }
   if (!hal_.presentarFranja && hal_.presentar && lienzo_.filasPorFranja() >= lienzo_.alto())
     hal_.presentar(lienzo_.pixeles(), lienzo_.ancho(), lienzo_.alto());
+  if (imagen >= 0 && !imagenOk) {
+    // No se pudo leer: se marca vacía para no intentarlo en cada cuadro.
+    imagenes_[imagen] = MetaImagen();
+    mostrandoImagen_ = -1;
+    log("no pude leer la imagen; la saco");
+  }
   notificarEstadoSiCambio();
 }
 
@@ -374,6 +557,9 @@ size_t Sistema::estadoBle(uint8_t* salida, size_t cap) const {
   p.nombre = nombre();
   p.serie = serie_;
   p.id = id_;
+  p.ancho = static_cast<uint16_t>(perfil_.ancho);
+  p.alto = static_cast<uint16_t>(perfil_.alto);
+  p.redonda = perfil_.redonda;
   return protocolo::codificarEstado(p, salida, cap);
 }
 
@@ -556,6 +742,7 @@ void Sistema::bleEscribir(uint8_t car, const uint8_t* d, size_t n) {
     }
   }
 
+  if (car == CarImagen) return bleImagen(op, d, n);
   if (car == CarOta) return responder(car, op, NoImplementado);
 }
 

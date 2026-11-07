@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "nota": "Generado por shared/protocolo/generar_vectores.mjs. No editar a mano. Bytes en hex separados por espacios.",
   "comandos": [
     {
@@ -40,8 +40,116 @@
     {
       "nombre": "pedir config",
       "hex": "04"
+    },
+    {
+      "nombre": "imagen borrar 3",
+      "hex": "23 03"
+    },
+    {
+      "nombre": "imagen listar",
+      "hex": "24"
     }
   ],
+  "qoi": {
+    "ancho": 12,
+    "alto": 7,
+    "rgb565": [
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      62083,
+      322,
+      2402,
+      6531,
+      8611,
+      10723,
+      12803,
+      14883,
+      16963,
+      19075,
+      21155,
+      25284,
+      27364,
+      2372,
+      4452,
+      6532,
+      8612,
+      10724,
+      12804,
+      14884,
+      19013,
+      21125,
+      23205,
+      25285,
+      27365,
+      2373,
+      4453,
+      6533,
+      8613,
+      12774,
+      3660,
+      16934,
+      19014,
+      21126,
+      23206,
+      25286,
+      27366,
+      2374,
+      6503,
+      8583,
+      10663,
+      12775,
+      14855,
+      16935,
+      19015,
+      21127,
+      25256,
+      27336,
+      29416,
+      62083,
+      6504,
+      8584,
+      62083,
+      12776,
+      14856,
+      62083,
+      21065,
+      23177,
+      62083,
+      27337,
+      29417
+    ],
+    "hex": "71 6f 69 66 00 00 00 0c 00 00 00 07 03 00 fe f5 50 1a d6 fe 06 28 16 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 fe 09 28 21 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 fe 0c 28 2c a5 c4 a5 c4 a5 c4 a5 c4 fe 0c c8 63 fe 42 46 32 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 fe 0f 28 37 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 fe f5 50 1a fe 1b 2d 43 a5 c4 1a fe 36 3c 46 a5 c4 1a fe 51 4b 49 a5 c4 1a fe 6c 5a 4c a5 c4 00 00 00 00 00 00 00 01",
+    "escrituras": [
+      "20 02 a6 00 00 00 de df 44 3b",
+      "21 00 00 00 00 71 6f 69 66 00 00 00 0c 00 00 00 07 03 00 fe f5 50 1a d6 fe 06 28 16 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4",
+      "21 23 00 00 00 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 fe 09 28 21 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5",
+      "21 46 00 00 00 c4 fe 0c 28 2c a5 c4 a5 c4 a5 c4 a5 c4 fe 0c c8 63 fe 42 46 32 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 fe 0f 28 37",
+      "21 69 00 00 00 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 a5 c4 fe f5 50 1a fe 1b 2d 43 a5 c4 1a fe 36",
+      "21 8c 00 00 00 3c 46 a5 c4 1a fe 51 4b 49 a5 c4 1a fe 6c 5a 4c a5 c4 00 00 00 00 00 00 00 01",
+      "22"
+    ]
+  },
   "config": {
     "json": "{\"version\":1,\"nombre\":\"Toto\",\"cara\":{\"ojos\":\"pastilla\",\"color\":\"#FF6A33\",\"tamano\":1},\"personalidad\":{\"energia\":0.6,\"timidez\":0.3,\"sueno\":\"23:30-08:00\"},\"expresiones\":{\"contento\":{\"formas\":[{\"forma\":\"arco\",\"puntos\":[[-0.4,0.1125],[-0.3125,-0.175],[-0.2125,0.1125]],\"trazo\":0.1},{\"forma\":\"arco\",\"puntos\":[[0.2125,0.1125],[0.3125,-0.175],[0.4,0.1125]],\"trazo\":0.1}]}},\"reglas\":[{\"si\":\"sacudida\",\"entonces\":[\"expresion:mareado\",\"sonido:boing\"]},{\"si\":\"bateria<15\",\"entonces\":[\"expresion:bateria-baja\"]}],\"modo\":\"mascota\"}",
     "tamanoBloque": 64,
@@ -72,9 +180,12 @@
         "expresion": "neutral",
         "nombre": "bicho",
         "serie": "",
-        "id": "A1B2C3D4E5F6"
+        "id": "A1B2C3D4E5F6",
+        "ancho": 320,
+        "alto": 172,
+        "redonda": false
       },
-      "hex": "02 ff 14 00 04 07 6e 65 75 74 72 61 6c 05 62 69 63 68 6f 00 0c 41 31 42 32 43 33 44 34 45 35 46 36"
+      "hex": "03 ff 14 00 04 07 6e 65 75 74 72 61 6c 05 62 69 63 68 6f 00 0c 41 31 42 32 43 33 44 34 45 35 46 36 40 01 ac 00 00"
     },
     {
       "campos": {
@@ -88,9 +199,12 @@
         "expresion": "dormido",
         "nombre": "Ñandú",
         "serie": "001",
-        "id": "00AABBCCDDEE"
+        "id": "00AABBCCDDEE",
+        "ancho": 240,
+        "alto": 240,
+        "redonda": true
       },
-      "hex": "02 57 dd 01 0b 07 64 6f 72 6d 69 64 6f 07 c3 91 61 6e 64 c3 ba 03 30 30 31 0c 30 30 41 41 42 42 43 43 44 44 45 45"
+      "hex": "03 57 dd 01 0b 07 64 6f 72 6d 69 64 6f 07 c3 91 61 6e 64 c3 ba 03 30 30 31 0c 30 30 41 41 42 42 43 43 44 44 45 45 f0 00 f0 00 01"
     }
   ],
   "respuestas": [

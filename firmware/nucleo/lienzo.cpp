@@ -196,6 +196,11 @@ void Lienzo::trazo(const Punto* p, int n, float grosor, uint32_t rgb) {
   }
 }
 
+void Lienzo::fila(int y, const uint16_t* rgb565) {
+  if (y < yIni() || y >= yFin()) return;
+  copiarBytes(px_ + (y - y0_) * ancho_, rgb565, sizeof(uint16_t) * static_cast<size_t>(ancho_));
+}
+
 void Lienzo::rectangulo(int x, int y, int w, int h, uint32_t rgb) {
   const uint16_t c = a565(rgb);
   for (int j = maxi(yIni(), y); j < mini(yFin(), y + h); j++)

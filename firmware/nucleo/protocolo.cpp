@@ -43,7 +43,7 @@ Codigo Receptor::fin() {
 
 size_t codificarEstado(const EstadoPublico& e, uint8_t* s, size_t cap) {
   const size_t ne = largo(e.expresion), nn = largo(e.nombre), ns = largo(e.serie), ni = largo(e.id);
-  const size_t total = 5 + 1 + ne + 1 + nn + 1 + ns + 1 + ni;
+  const size_t total = 5 + 1 + ne + 1 + nn + 1 + ns + 1 + ni + 5;
   if (cap < total || ne > 255 || nn > 255 || ns > 255 || ni > 255) return 0;
   size_t i = 0;
   s[i++] = VERSION_ESTADO;
@@ -64,6 +64,9 @@ size_t codificarEstado(const EstadoPublico& e, uint8_t* s, size_t cap) {
   s[i++] = static_cast<uint8_t>(ni);
   copiarBytes(s + i, e.id, ni);
   i += ni;
+  s[i++] = static_cast<uint8_t>(e.ancho), s[i++] = static_cast<uint8_t>(e.ancho >> 8);
+  s[i++] = static_cast<uint8_t>(e.alto), s[i++] = static_cast<uint8_t>(e.alto >> 8);
+  s[i++] = e.redonda ? 1 : 0;
   return i;
 }
 

@@ -8,21 +8,23 @@ export const UUID = {
   comando: '5157e71c-a000-4b1c-8a5e-000000000003',
   estado: '5157e71c-a000-4b1c-8a5e-000000000004',
   ota: '5157e71c-a000-4b1c-8a5e-000000000005',
+  imagen: '5157e71c-a000-4b1c-8a5e-000000000006',
 };
 
-export const Car = { config: 1, comando: 2, estado: 3, ota: 4 };
+export const Car = { config: 1, comando: 2, estado: 3, ota: 4, imagen: 5 };
 
 export const Op = {
   configInicio: 0x01, configBloque: 0x02, configFin: 0x03, configPedir: 0x04,
   cmdExpresion: 0x10, cmdNombre: 0x11, cmdEvento: 0x12,
   cmdVincular: 0x13, cmdAutenticar: 0x14, cmdDesvincular: 0x15,
+  imgInicio: 0x20, imgBloque: 0x21, imgFin: 0x22, imgBorrar: 0x23, imgListar: 0x24,
   respuesta: 0x80, configTrozo: 0x84, configCierre: 0x85,
 };
 
 export const Codigo = {
   0: 'ok', 1: 'muy grande', 2: 'fuera de orden', 3: 'CRC distinto', 4: 'JSON inválido',
   5: 'config inválida', 6: 'sin inicio', 7: 'no existe', 8: 'malformado', 9: 'no autorizado',
-  10: 'no está mostrando el QR', 255: 'no implementado',
+  10: 'no está mostrando el QR', 11: 'imagen inválida', 255: 'no implementado',
 };
 
 export const Eventos = ['tacto', 'doble-toque', 'levantado', 'sacudida', 'boca-abajo', 'vinculado', 'app-abierta', 'despertado'];
@@ -84,6 +86,29 @@ export function escriturasDeConfig(config, tamanoBloque = 180) {
 
 export const pedirConfig = () => Uint8Array.from([Op.configPedir]);
 
+// Una imagen QOI (del tamaño de la pantalla) partida en las escrituras de la característica Imagen.
+export function escriturasDeImagen(espacio, qoi, tamanoBloque = 180) {
+  const escrituras = [Uint8Array.from([Op.imgInicio, espacio, ...u32(qoi.length), ...u32(crc32(qoi))])];
+  const porBloque = tamanoBloque - 5;
+  for (let off = 0; off < qoi.length; off += porBloque) {
+    escrituras.push(Uint8Array.from([Op.imgBloque, ...u32(off), ...qoi.subarray(off, off + porBloque)]));
+  }
+  escrituras.push(Uint8Array.from([Op.imgFin]));
+  return escrituras;
+}
+
+export const imagen = {
+  borrar: (espacio) => Uint8Array.from([Op.imgBorrar, espacio]),
+  listar: () => Uint8Array.from([Op.imgListar]),
+};
+
+// La respuesta a imagen.listar(): los espacios ocupados.
+export function leerListaImagenes(b) {
+  const espacios = [];
+  for (let i = 3; i + 9 <= b.length; i += 9) espacios.push({ espacio: b[i], largo: leerU32(b, i + 1), crc: leerU32(b, i + 5) });
+  return { mascara: b[2], espacios };
+}
+
 // El QR del bicho: "SINTETICA:V1/<id de 12>/<código de 6>".
 export function leerQr(texto) {
   const m = /^SINTETICA:V1\/([0-9A-F]{12})\/([2-9A-HJKMNP-Z]{6})$/.exec(texto.trim());
@@ -124,13 +149,16 @@ export class ArmadorDeConfig {
 }
 
 export function leerEstado(b) {
-  if (b[0] !== 1 && b[0] !== 2) throw new Error(`versión de estado desconocida: ${b[0]}`);
+  if (b[0] < 1 || b[0] > 3) throw new Error(`versión de estado desconocida: ${b[0]}`);
   let i = 5;
   const campo = () => { const n = b[i]; const s = lector.decode(b.subarray(i + 1, i + 1 + n)); i += 1 + n; return s; };
   const expresion = campo();
   const nombre = campo();
   const serie = b[0] >= 2 ? campo() : '';
   const id = b[0] >= 2 ? campo() : '';
+  const pantalla = b[0] >= 3
+    ? { ancho: b[i] | (b[i + 1] << 8), alto: b[i + 2] | (b[i + 3] << 8), redonda: b[i + 4] === 1 }
+    : { ancho: 320, alto: 172, redonda: false };
   return {
     bateria: b[1] === 255 ? null : b[1],
     humor: (b[2] << 24 >> 24) / 100,
@@ -143,5 +171,6 @@ export function leerEstado(b) {
     nombre,
     serie,
     id,
+    pantalla,
   };
 }

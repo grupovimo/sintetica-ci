@@ -10,6 +10,7 @@
 #include "lienzo.h"
 #include "motor_vida.h"
 #include "protocolo.h"
+#include "qoi.h"
 
 namespace sintetica {
 
@@ -24,6 +25,12 @@ struct Perfil {
   // Broche: toque = lo siguiente de la lista, mantener 2 s = dormir, 8 s = QR.
   enum class Boton : uint8_t { Mascota, Broche } boton = Boton::Mascota;
 };
+
+namespace tiemposImagen {
+constexpr uint32_t VUELTA_MIN_MS = 60000;   // mientras se ve una imagen, cada 1 a 3 min
+constexpr uint32_t VUELTA_MAX_MS = 180000;  // vuelve la cara
+constexpr uint32_t VUELTA_DURA_MS = 2500;   // durante un par de segundos
+}  // namespace tiemposImagen
 
 namespace tiemposBroche {
 constexpr uint32_t TOQUE_MS = 600;
@@ -80,6 +87,10 @@ class Sistema {
   bool quiereDormir() const { return apagado_; }
   void dormir();
   const Perfil& perfil() const { return perfil_; }
+  // Imágenes guardadas: largo 0 = espacio vacío.
+  uint32_t largoImagen(int espacio) const { return (espacio >= 0 && espacio < MAX_IMAGENES) ? imagenes_[espacio].largo : 0; }
+  // La imagen que se ve ahora (-1 = una cara).
+  int imagenVisible() const { return mostrandoImagen_; }
 
   // Vista previa de las apps: nunca muestra el QR y confía en quien escribe.
   void modoVistaPrevia() {
@@ -104,6 +115,12 @@ class Sistema {
   int largoLista() const;
   ElementoLista elementoLista(int i) const;
   void botonBroche(bool apretado, uint32_t ahora);
+  void bleImagen(uint8_t op, const uint8_t* d, size_t n);
+  void leerImagenes();
+  void guardarImagenes();
+  int imagenParaMostrar(uint32_t ahora);
+  bool dibujarImagen(int espacio);
+  static int leerParaQoi(void* contexto, uint32_t desplazamiento, uint8_t* destino, size_t n);
   bool bloqueado(uint32_t ahora) const;
   void falla(uint32_t ahora);
   void log(const char* m) {
@@ -142,6 +159,19 @@ class Sistema {
   bool ignorarSoltar_ = false;
   bool qrPorBoton_ = false;
   uint32_t botonDesde_ = 0;
+
+  // Imágenes.
+  struct MetaImagen {
+    uint32_t largo = 0, crc = 0;
+  } imagenes_[MAX_IMAGENES];
+  int subiendo_ = -1;  // espacio que se está recibiendo
+  uint32_t subidaLargo_ = 0, subidaCrc_ = 0, subidaRecibido_ = 0, subidaCrcAcum_ = 0;
+  int mostrandoImagen_ = -1;
+  bool imagenSucia_ = true;
+  int imagenLeyendo_ = -1;
+  uint32_t proximaVueltaCara_ = 0, vueltaCaraHasta_ = 0;
+  Azar azar_;
+  DecodificadorQoi qoi_;
 
   uint8_t ultimoEstado_[96] = {};
   size_t largoUltimoEstado_ = 0;

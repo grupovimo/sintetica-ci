@@ -27,6 +27,12 @@ struct Hal {
   // Almacenamiento persistente por clave (NVS, localStorage, memoria).
   bool (*guardar)(const char* clave, const uint8_t* datos, size_t n) = nullptr;
   int (*leer)(const char* clave, uint8_t* datos, size_t cap) = nullptr;  // -1 si no está
+  // Archivos grandes (imágenes), por partes. escribirTrozo con desplazamiento 0
+  // empieza el archivo de cero. leerTrozo devuelve los bytes leídos (0 al
+  // final) o -1 si no está.
+  bool (*escribirTrozo)(const char* clave, uint32_t desplazamiento, const uint8_t* datos, size_t n) = nullptr;
+  int (*leerTrozo)(const char* clave, uint32_t desplazamiento, uint8_t* datos, size_t n) = nullptr;
+  bool (*borrar)(const char* clave) = nullptr;
   // Notificación BLE en una característica (protocolo::Caracteristica).
   void (*notificar)(uint8_t caracteristica, const uint8_t* datos, size_t n) = nullptr;
   // Salidas opcionales.

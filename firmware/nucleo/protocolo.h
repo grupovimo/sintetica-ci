@@ -14,8 +14,12 @@ constexpr const char* UUID_CONFIG = "5157e71c-a000-4b1c-8a5e-000000000002";
 constexpr const char* UUID_COMANDO = "5157e71c-a000-4b1c-8a5e-000000000003";
 constexpr const char* UUID_ESTADO = "5157e71c-a000-4b1c-8a5e-000000000004";
 constexpr const char* UUID_OTA = "5157e71c-a000-4b1c-8a5e-000000000005";
+constexpr const char* UUID_IMAGEN = "5157e71c-a000-4b1c-8a5e-000000000006";
 
-enum Caracteristica : uint8_t { CarConfig = 1, CarComando = 2, CarEstado = 3, CarOta = 4 };
+enum Caracteristica : uint8_t { CarConfig = 1, CarComando = 2, CarEstado = 3, CarOta = 4, CarImagen = 5 };
+
+// Una foto de 240 × 240 en QOI ocupa entre 80 y 130 KB; el peor caso (ruido) llega a 230 KB.
+constexpr uint32_t MAX_IMAGEN_BYTES = 240 * 1024;
 
 // Operaciones (primer byte de cada escritura).
 enum Op : uint8_t {
@@ -31,6 +35,12 @@ enum Op : uint8_t {
   CmdVincular = 0x13,    // código del QR (6 bytes) → responde con una clave de 16 bytes
   CmdAutenticar = 0x14,  // clave de 16 bytes (en cada conexión nueva)
   CmdDesvincular = 0x15, // olvida todas las claves y vuelve a mostrar el QR
+  // Imagen
+  ImgInicio = 0x20,      // u8 espacio (0-7), u32 largo, u32 crc32
+  ImgBloque = 0x21,      // u32 desplazamiento, datos
+  ImgFin = 0x22,         // (nada)
+  ImgBorrar = 0x23,      // u8 espacio
+  ImgListar = 0x24,      // → [0xA4][0][máscara u8] + por espacio ocupado [espacio][u32 largo][u32 crc]
   // Respuestas (notificación): op | 0x80, código, [detalle]
   Respuesta = 0x80,
   ConfigTrozo = 0x84,    // u32 desplazamiento, datos (respuesta a ConfigPedir)
@@ -49,6 +59,7 @@ enum Codigo : uint8_t {
   Malformado = 8,
   NoAutorizado = 9,      // falta vincular o autenticar, o el código/clave no coincide
   NoEmparejando = 10,    // para vincular, el bicho tiene que estar mostrando el QR
+  ImagenInvalida = 11,   // no es un QOI del tamaño de la pantalla
   NoImplementado = 0xFF,
 };
 
@@ -94,9 +105,12 @@ struct EstadoPublico {
   const char* nombre = "";
   const char* serie = "";
   const char* id = "";
+  uint16_t ancho = 0, alto = 0;
+  bool redonda = false;
 };
-constexpr uint8_t VERSION_ESTADO = 2;
-// [versión=2][batería][humor][modo][flags][n][expresión][n][nombre][n][serie][n][id]
+constexpr uint8_t VERSION_ESTADO = 3;
+// [versión=3][batería][humor][modo][flags][n][expresión][n][nombre][n][serie][n][id]
+// [u16 ancho][u16 alto][forma: 0 rectangular, 1 redonda]
 // flags: bit 0 dormido, 1 expresión fija, 2 mostrando el QR, 3 esta conexión autenticada
 size_t codificarEstado(const EstadoPublico& e, uint8_t* salida, size_t cap);
 
