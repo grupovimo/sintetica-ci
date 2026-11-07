@@ -8,7 +8,12 @@ Criterio: menos del 0,6% de los píxeles con una diferencia mayor a 48 (de 255)
 en algún canal. Las diferencias normales son el antialias del borde y la
 cuantización a RGB565 de la pantalla.
 
-Uso: comparar.py <ruta a render_caras> [--diferencias carpeta]
+También las instantáneas redondas (240 × 240, el broche): el manual no tiene
+versión redonda, así que la referencia es nuestro propio render, revisado a ojo
+una vez y guardado en ./redondas. Si se cambia el diseño a propósito, se
+regeneran con: render_caras --redonda <carpeta> y se copian como PNG.
+
+Uso: comparar.py <ruta a render_caras> [--redonda] [--diferencias carpeta]
 """
 import pathlib
 import subprocess
@@ -40,15 +45,16 @@ def main():
     if "--diferencias" in sys.argv:
         carpeta_dif = pathlib.Path(sys.argv[sys.argv.index("--diferencias") + 1])
         carpeta_dif.mkdir(parents=True, exist_ok=True)
+    redonda = "--redonda" in sys.argv
     with tempfile.TemporaryDirectory() as tmp:
-        subprocess.run([render, tmp], check=True, stdout=subprocess.DEVNULL)
+        subprocess.run([render, "--redonda", tmp] if redonda else [render, tmp], check=True, stdout=subprocess.DEVNULL)
         malas = 0
-        for ref in sorted((AQUI / "referencia").glob("*.png")):
+        for ref in sorted((AQUI / ("redondas" if redonda else "referencia")).glob("*.png")):
             nuestro = pathlib.Path(tmp) / (ref.stem + ".ppm")
             a = np.asarray(Image.open(ref).convert("RGB"), dtype=np.int16)
             b = np.asarray(Image.open(nuestro).convert("RGB"), dtype=np.int16)
             dif = np.abs(a - b).max(axis=2)
-            if ref.stem == "emparejamiento":
+            if ref.stem == "emparejamiento" and not redonda:
                 dif = np.abs(desenfocar(a) - desenfocar(b)).max(axis=2)
                 mascara = np.ones(dif.shape, dtype=bool)
                 mascara[28:142, 28:142] = False  # el interior del QR

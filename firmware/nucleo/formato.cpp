@@ -420,6 +420,33 @@ ResultadoConfig aplicarSobre(Config& c, const char* texto, size_t n) {
     c.nReglas = static_cast<uint8_t>(total);
   }
 
+  int lista = j.buscar(0, "lista");
+  if (lista >= 0) {
+    if (j.tipo(lista) != TipoJson::Arreglo || j.cantidad(lista) > MAX_LISTA)
+      return error(ErrorConfig::Campo, "lista: hasta 16 elementos");
+    c.nLista = 0;
+    for (int i = 0; i < j.cantidad(lista); i++) {
+      char t[40];
+      if (j.texto(j.elemento(lista, i), t, sizeof t) <= 0) return error(ErrorConfig::Campo, "lista: cada elemento es un texto");
+      ElementoLista& el = c.lista[c.nLista];
+      if (t[0] == 'c' && t[1] == 'a' && t[2] == 'r' && t[3] == 'a' && t[4] == ':') {
+        int idx = c.indiceExpresion(t + 5);
+        if (idx < 0) return error(ErrorConfig::Campo, "lista: una cara que no existe");
+        el.tipo = ElementoLista::Tipo::Cara;
+        el.indice = static_cast<uint8_t>(idx);
+      } else if (iguales(t, "imagen:", 7) && t[7] >= '0' && t[7] < '0' + MAX_IMAGENES && t[8] == 0) {
+        el.tipo = ElementoLista::Tipo::Imagen;
+        el.indice = static_cast<uint8_t>(t[7] - '0');
+      } else {
+        return error(ErrorConfig::Campo, "lista: usá cara:<nombre> o imagen:<0-7>");
+      }
+      c.nLista++;
+    }
+  }
+  float rotar = c.rotarMinutos;
+  if (!numeroOpcional(j, 0, "rotar", 0, 1440, &rotar)) return error(ErrorConfig::Campo, "rotar: minutos, de 0 a 1440");
+  c.rotarMinutos = static_cast<uint16_t>(rotar);
+
   int modo = j.buscar(0, "modo");
   if (modo >= 0) {
     static const char* const modos[] = {"mascota", "reloj", "pomodoro", "clima", "notificaciones"};

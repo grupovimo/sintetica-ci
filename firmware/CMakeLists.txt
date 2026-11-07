@@ -33,5 +33,7 @@ add_test(NAME caras_embebidas COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/herram
 add_test(NAME vectores_generados COMMAND node ${CMAKE_CURRENT_SOURCE_DIR}/../shared/protocolo/generar_vectores.mjs --verificar)
 add_test(NAME fuentes_generadas COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/herramientas/generar_fuentes.py --verificar)
 add_test(NAME qr_legible COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/test/oro/leer_qr.py $<TARGET_FILE:render_caras>)
+add_test(NAME caras_redondas
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/test/oro/comparar.py $<TARGET_FILE:render_caras> --redonda)
 add_test(NAME caras_de_oro
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/test/oro/comparar.py $<TARGET_FILE:render_caras>)

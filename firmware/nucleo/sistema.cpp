@@ -23,15 +23,21 @@ size_t g_largoConfig = 0;
 const char CONFIG_VACIA[] = "{\"version\":1}";
 }  // namespace
 
-void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, int ancho, int alto) {
+void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
   hal_ = hal;
+  perfil_ = perfil;
+  vistaPrevia_ = false;
+  apagado_ = false;
+  botonApretado_ = false;
+  ignorarSoltar_ = false;
+  posLista_ = 0;
   largoUltimoEstado_ = 0;  // que se notifique el estado del arranque
   receptor_.reiniciar();
   autenticado_ = false;
   fallos_ = 0;
   leerIdentidad();
-  lienzo_.iniciar(pixeles, ancho, alto);
-  vista_ = Vista::para(ancho, alto);
+  lienzo_.iniciar(pixeles, perfil.ancho, perfil.alto, perfil.filasFranja);
+  vista_ = Vista::para(perfil.ancho, perfil.alto, perfil.redonda);
 
   ResultadoConfig r = cargarBase(config_);
   if (!r.ok()) log(r.detalle);
@@ -57,6 +63,8 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, int ancho, int alto) {
   const uint32_t ahora = hal_.ahoraMs();
   motor_.iniciar(&config_, hal_.semilla ? hal_.semilla() : ahora, ahora);
   leerAjustes();
+  ultimaRotacion_ = ahora;
+  aplicarLista(ahora);
   log("SintéticaOS listo");
 }
 
@@ -125,8 +133,8 @@ void Sistema::leerAjustes() {
   fijaGuardada_[0] = 0;
   uint8_t b[64];
   int n = hal_.leer ? hal_.leer(CLAVE_AJUSTES, b, sizeof b) : -1;
-  // [versión=1][n][nombre][n][expresión fija]
-  if (n < 3 || b[0] != 1) return;
+  // [versión=2][n][nombre][n][expresión fija][posición en la lista] (la v1 no tenía la posición)
+  if (n < 3 || (b[0] != 1 && b[0] != 2)) return;
   size_t i = 1;
   size_t nn = b[i++];
   if (i + nn >= static_cast<size_t>(n)) return;
@@ -135,14 +143,16 @@ void Sistema::leerAjustes() {
   size_t ne = b[i++];
   if (i + ne > static_cast<size_t>(n)) return;
   copiarTexto(fijaGuardada_, sizeof fijaGuardada_, reinterpret_cast<const char*>(b + i), ne);
+  i += ne;
   motor_.fijar(config_.indiceExpresion(fijaGuardada_));
+  if (b[0] == 2 && i < static_cast<size_t>(n)) posLista_ = b[i];
 }
 
 void Sistema::guardarAjustes() {
   if (!hal_.guardar) return;
   uint8_t b[64];
   size_t i = 0;
-  b[i++] = 1;
+  b[i++] = 2;
   size_t nn = largo(nombre_), ne = largo(fijaGuardada_);
   b[i++] = static_cast<uint8_t>(nn);
   copiarBytes(b + i, nombre_, nn);
@@ -150,6 +160,7 @@ void Sistema::guardarAjustes() {
   b[i++] = static_cast<uint8_t>(ne);
   copiarBytes(b + i, fijaGuardada_, ne);
   i += ne;
+  b[i++] = posLista_;
   hal_.guardar(CLAVE_AJUSTES, b, i);
 }
 
@@ -208,6 +219,106 @@ void Sistema::evento(Evento e) {
   }
 }
 
+int Sistema::largoLista() const {
+  // Sin lista propia, el broche recorre las caras; la mascota no tiene lista.
+  if (config_.nLista > 0) return config_.nLista;
+  return perfil_.boton == Perfil::Boton::Broche ? config_.nExpresiones : 0;
+}
+
+ElementoLista Sistema::elementoLista(int i) const {
+  if (config_.nLista > 0) return config_.lista[i % config_.nLista];
+  ElementoLista e;
+  e.indice = static_cast<uint8_t>(i % config_.nExpresiones);
+  return e;
+}
+
+void Sistema::aplicarLista(uint32_t ahora) {
+  const int n = largoLista();
+  if (n == 0) {
+    motor_.base(-1);
+    return;
+  }
+  if (posLista_ >= n) posLista_ = 0;
+  const ElementoLista e = elementoLista(posLista_);
+  // Las imágenes se dibujan aparte; mientras tanto la cara de base es la neutral.
+  motor_.base(e.tipo == ElementoLista::Tipo::Cara ? e.indice : -1);
+  (void)ahora;
+}
+
+void Sistema::siguiente() {
+  const int n = largoLista();
+  if (n == 0) return;
+  posLista_ = static_cast<uint8_t>((posLista_ + 1) % n);
+  ultimaRotacion_ = hal_.ahoraMs();
+  aplicarLista(ultimaRotacion_);
+  guardarAjustes();
+}
+
+void Sistema::dormir() {
+  apagado_ = true;
+  guardarAjustes();
+  log("a dormir");
+}
+
+void Sistema::tacto(bool apretado) {
+  const uint32_t ahora = hal_.ahoraMs();
+  if (perfil_.boton == Perfil::Boton::Mascota) {
+    gestos_.tacto(apretado, ahora);
+    return;
+  }
+  botonBroche(apretado, ahora);
+}
+
+void Sistema::botonBroche(bool apretado, uint32_t ahora) {
+  if (apretado == botonApretado_) return;
+  botonApretado_ = apretado;
+  if (apretado) {
+    botonDesde_ = ahora;
+    qrPorBoton_ = false;
+    // Dormido, un toque lo despierta (en la placa, arranca de nuevo).
+    ignorarSoltar_ = apagado_;
+    if (apagado_) {
+      apagado_ = false;
+      motor_.interaccion(ahora);
+      log("despierto");
+    }
+    return;
+  }
+  if (ignorarSoltar_) {
+    ignorarSoltar_ = false;
+    return;
+  }
+  const uint32_t dur = ahora - botonDesde_;
+  if (qrPorBoton_) return;
+  if (dur < tiemposBroche::TOQUE_MS) {
+    motor_.interaccion(ahora);
+    siguiente();
+  } else if (dur >= tiemposBroche::DORMIR_MS) {
+    dormir();
+  }
+}
+
+void Sistema::dibujarPantalla(uint32_t ahora) {
+  (void)ahora;
+  if (apagado_) {
+    lienzo_.limpiar(0x000000);
+    return;
+  }
+  if (emparejando_) {
+    dibujarEmparejamiento(lienzo_, serie_, qr_, "ESPERANDO VÍNCULO", perfil_.redonda);
+    return;
+  }
+  lienzo_.limpiar(paleta::PANTALLA);
+  int visible = motor_.expresionVisible();
+  // Manteniendo el botón del broche para dormirlo: muestra que se va a dormir.
+  if (perfil_.boton == Perfil::Boton::Broche && botonApretado_ && !ignorarSoltar_ &&
+      ahora - botonDesde_ >= tiemposBroche::DORMIR_MS) {
+    const int d = config_.indiceExpresion("dormido");
+    if (d >= 0) visible = d;
+  }
+  dibujarExpresion(lienzo_, vista_, config_.expresiones[visible], motor_.estado());
+}
+
 void Sistema::tick() {
   const uint32_t ahora = hal_.ahoraMs();
   gestos_.tick(ahora);
@@ -219,22 +330,33 @@ void Sistema::tick() {
   ctx.expresionEstado = expresionDeEstado();
   motor_.tick(ahora, ctx);
 
-  // Mantener el botón 5 s muestra el QR para vincular otro celu.
-  if (gestos_.sacarMantenido()) {
+  // Mantener el botón (5 s la mascota, 8 s el broche) muestra el QR para vincular otro celu.
+  bool qr = gestos_.sacarMantenido();
+  if (perfil_.boton == Perfil::Boton::Broche && botonApretado_ && !ignorarSoltar_ && !qrPorBoton_ &&
+      ahora - botonDesde_ >= tiemposBroche::QR_MS) {
+    qrPorBoton_ = true;
+    qr = true;
+  }
+  if (qr) {
     emparejando_ = true;
     emparejarHasta_ = ahora + QR_POR_BOTON_MS;
   }
+  // La lista rota sola cada tantos minutos.
+  if (config_.rotarMinutos && largoLista() > 1 &&
+      ahora - ultimaRotacion_ >= static_cast<uint32_t>(config_.rotarMinutos) * 60000u)
+    siguiente();
   if (emparejando_ && emparejarHasta_ && nClaves_ > 0 && static_cast<int32_t>(ahora - emparejarHasta_) >= 0)
     emparejando_ = false;
 
   if (vistaPrevia_) emparejando_ = false;
-  if (emparejando_) {
-    dibujarEmparejamiento(lienzo_, serie_, qr_, "ESPERANDO VÍNCULO");
-  } else {
-    lienzo_.limpiar(paleta::PANTALLA);
-    dibujarExpresion(lienzo_, vista_, config_.expresiones[motor_.expresionVisible()], motor_.estado());
+  // De a una franja: en placas sin PSRAM no entra la pantalla entera.
+  for (int y0 = 0; y0 < lienzo_.alto(); y0 += lienzo_.filasPorFranja()) {
+    lienzo_.empezarFranja(y0);
+    dibujarPantalla(ahora);
+    if (hal_.presentarFranja) hal_.presentarFranja(lienzo_.pixeles(), lienzo_.ancho(), y0, lienzo_.filasFranja());
   }
-  if (hal_.presentar) hal_.presentar(lienzo_.pixeles(), lienzo_.ancho(), lienzo_.alto());
+  if (!hal_.presentarFranja && hal_.presentar && lienzo_.filasPorFranja() >= lienzo_.alto())
+    hal_.presentar(lienzo_.pixeles(), lienzo_.ancho(), lienzo_.alto());
   notificarEstadoSiCambio();
 }
 
@@ -384,6 +506,7 @@ void Sistema::bleEscribir(uint8_t car, const uint8_t* d, size_t n) {
         guardarAjustes();
         motor_.iniciar(&config_, hal_.semilla ? hal_.semilla() : hal_.ahoraMs(), hal_.ahoraMs());
         motor_.fijar(fija);
+        aplicarLista(hal_.ahoraMs());
         log("config nueva aplicada");
         return responder(car, op, Ok);
       }

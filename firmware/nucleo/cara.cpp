@@ -12,12 +12,13 @@ Punto g_muestras[MAX_MUESTRAS];
 struct Transformacion {
   float ax = 1, bx = 0, ay = 1, by = 0;
   Vista v;
+  float e = 0;  // la escala que usa esta forma: la de los ojos o la de los indicadores
   Punto aPixel(float x, float y) const {
-    return {v.origenX + v.escala * (ax * x + bx), v.origenY + v.escala * (ay * y + by)};
+    return {v.origenX + e * (ax * x + bx), v.origenY + e * (ay * y + by)};
   }
   Punto aPixel(Punto p) const { return aPixel(p.x, p.y); }
-  float anchoPx(float w) const { return w * ax * v.escala; }
-  float altoPx(float h) const { return h * ay * v.escala; }
+  float anchoPx(float w) const { return w * ax * e; }
+  float altoPx(float h) const { return h * ay * e; }
 };
 
 // Corazón del manual: dos cúbicas (offsets en px de la pantalla de referencia
@@ -53,9 +54,9 @@ void dibujarForma(Lienzo& l, const Forma& f, const Transformacion& t, const Esta
       if (f.audio >= 0) h = f.h * (0.35f + 0.65f * limitar(e.audio[f.audio], 0, 1));
       Punto c = t.aPixel(x, f.y);
       float wp = t.anchoPx(w), hp = t.altoPx(h);
-      float r = f.r < 0 ? minf(wp, hp) / 2 : minf(f.r * t.ax * t.v.escala, minf(wp, hp) / 2);
+      float r = f.r < 0 ? minf(wp, hp) / 2 : minf(f.r * t.ax * t.e, minf(wp, hp) / 2);
       if (f.relleno) l.pildora(c.x, c.y, wp, hp, r, color);
-      else l.pildoraContorno(c.x, c.y, wp, hp, r, f.trazo * t.v.escala, color);
+      else l.pildoraContorno(c.x, c.y, wp, hp, r, f.trazo * t.e, color);
       break;
     }
     case TipoForma::Circulo: {
@@ -98,7 +99,7 @@ void dibujarForma(Lienzo& l, const Forma& f, const Transformacion& t, const Esta
       constexpr int PASOS = 24;
       for (int i = 0; i <= PASOS; i++)
         g_muestras[i] = t.aPixel(cuadratica(f.puntos[0], f.puntos[1], f.puntos[2], static_cast<float>(i) / PASOS));
-      l.trazo(g_muestras, PASOS + 1, f.trazo * t.v.escala, color);
+      l.trazo(g_muestras, PASOS + 1, f.trazo * t.e, color);
       break;
     }
     case TipoForma::Espiral: {
@@ -109,7 +110,7 @@ void dibujarForma(Lienzo& l, const Forma& f, const Transformacion& t, const Esta
         float r = f.r0 + f.paso * a;
         g_muestras[n++] = t.aPixel(f.x + r * coseno(a), f.y + r * seno(a));
       }
-      l.trazo(g_muestras, n, f.trazo * t.v.escala, color);
+      l.trazo(g_muestras, n, f.trazo * t.e, color);
       break;
     }
     case TipoForma::Poligono: {
@@ -193,10 +194,12 @@ void dibujarExpresion(Lienzo& l, const Vista& v, const Expresion& e, const Estad
 
   Transformacion fija;
   fija.v = v;
+  fija.e = v.escalaFijos;
   Transformacion ojo[2];
   for (int g = 0; g < 2; g++) {
     Transformacion& t = ojo[g];
     t.v = v;
+    t.e = v.escala;
     if (!grupos[g].usado) continue;
     const float cx = (grupos[g].x0 + grupos[g].x1) / 2;
     const float cy = (grupos[g].y0 + grupos[g].y1) / 2;
@@ -212,10 +215,35 @@ void dibujarExpresion(Lienzo& l, const Vista& v, const Expresion& e, const Estad
     t.by = cy - cy * ky + estado.miradaY;
   }
 
-  for (int i = 0; i < e.nFormas; i++) {
+  // Los indicadores van en grupos (las formas fijas seguidas: la batería, los
+  // puntos, las barras, la zZ). Cada grupo conserva su tamaño a la escala de
+  // los ojos y solo su posición usa la escala de los indicadores: en la
+  // pantalla redonda se acercan al centro sin achicarse. En la rectangular las
+  // dos escalas son iguales y no cambia nada.
+  for (int i = 0; i < e.nFormas;) {
     const Forma& f = e.formas[i];
-    dibujarForma(l, f, grupoDe[i] < 0 ? fija : ojo[grupoDe[i]], estado);
+    if (grupoDe[i] >= 0 || f.tipo == TipoForma::Franjas) {
+      dibujarForma(l, f, grupoDe[i] < 0 ? fija : ojo[grupoDe[i]], estado);
+      i++;
+      continue;
+    }
+    int fin = i;
+    float x0 = 9, y0 = 9, x1 = -9, y1 = -9;
+    while (fin < e.nFormas && grupoDe[fin] < 0 && e.formas[fin].tipo != TipoForma::Franjas) {
+      float a = 0, b = 0, c = 0, d = 0;
+      cajaDeForma(e.formas[fin], &a, &b, &c, &d);
+      x0 = minf(x0, a), y0 = minf(y0, b), x1 = maxf(x1, c), y1 = maxf(y1, d);
+      fin++;
+    }
+    Transformacion t;
+    t.v = v;
+    t.e = v.escala;
+    const float k = v.escalaFijos / v.escala - 1;
+    t.bx = k * (x0 + x1) / 2;
+    t.by = k * (y0 + y1) / 2;
+    for (; i < fin; i++) dibujarForma(l, e.formas[i], t, estado);
   }
+  (void)fija;
 }
 
 }  // namespace sintetica

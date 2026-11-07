@@ -21,12 +21,20 @@ inline uint32_t de565(uint16_t c) {
 
 class Lienzo {
  public:
-  // `pixeles` debe tener ancho*alto elementos; lo da quien llama (en la placa,
-  // memoria con DMA; en el simulador, memoria del módulo WebAssembly).
-  void iniciar(uint16_t* pixeles, int ancho, int alto);
+  // `pixeles` debe tener ancho × filasFranja elementos; lo da quien llama (en
+  // la placa, memoria con DMA; en el simulador, memoria del módulo WebAssembly).
+  // filasFranja = 0: la pantalla entera de una vez. Con menos filas, se dibuja
+  // por franjas (empezarFranja) para que entre en placas sin PSRAM.
+  void iniciar(uint16_t* pixeles, int ancho, int alto, int filasFranja = 0);
+  // Todas las operaciones usan coordenadas de pantalla y se recortan a la franja.
+  void empezarFranja(int y0);
 
   int ancho() const { return ancho_; }
-  int alto() const { return alto_; }
+  int alto() const { return alto_; }  // alto de la pantalla entera
+  int franja() const { return y0_; }
+  int filasFranja() const { return mini(filas_, alto_ - y0_); }
+  int filasPorFranja() const { return filas_; }
+  // Los píxeles de la franja actual (filasFranja() filas).
   uint16_t* pixeles() { return px_; }
   const uint16_t* pixeles() const { return px_; }
 
@@ -49,9 +57,11 @@ class Lienzo {
 
  private:
   void mezclarPixel(int x, int y, float cobertura, uint32_t rgb);
+  int yIni() const { return y0_; }
+  int yFin() const { return mini(alto_, y0_ + filas_); }
 
   uint16_t* px_ = nullptr;
-  int ancho_ = 0, alto_ = 0;
+  int ancho_ = 0, alto_ = 0, filas_ = 0, y0_ = 0;
 };
 
 }  // namespace sintetica

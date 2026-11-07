@@ -70,6 +70,10 @@ int MotorVida::elegirObjetivo(uint32_t ahora, const Contexto& ctx) {
     reaccion_ = -1;
   }
   if (ctx.expresionEstado >= 0) return ctx.expresionEstado;
+  if (base_ >= 0) {
+    dormido_ = false;
+    return base_;
+  }
 
   const uint32_t quieto = ahora - ultimaInteraccion_;
   const bool despiertoPorToque = static_cast<int32_t>(ahora - despiertoHasta_) < 0;

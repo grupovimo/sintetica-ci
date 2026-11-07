@@ -30,20 +30,25 @@ float distanciaSegmento(float px, float py, Punto a, Punto b) {
 }
 }  // namespace
 
-void Lienzo::iniciar(uint16_t* pixeles, int ancho, int alto) {
+void Lienzo::iniciar(uint16_t* pixeles, int ancho, int alto, int filasFranja) {
   px_ = pixeles;
   ancho_ = mini(ancho, MAX_ANCHO);
   alto_ = mini(alto, MAX_ALTO);
+  filas_ = filasFranja > 0 ? mini(filasFranja, alto_) : alto_;
+  y0_ = 0;
 }
+
+void Lienzo::empezarFranja(int y0) { y0_ = maxi(0, mini(y0, alto_ - 1)); }
 
 void Lienzo::limpiar(uint32_t rgb) {
   const uint16_t c = a565(rgb);
-  for (int i = 0; i < ancho_ * alto_; i++) px_[i] = c;
+  const int n = ancho_ * filasFranja();
+  for (int i = 0; i < n; i++) px_[i] = c;
 }
 
 void Lienzo::mezclarPixel(int x, int y, float cobertura, uint32_t rgb) {
-  if (cobertura <= 0.002f) return;
-  uint16_t& d = px_[y * ancho_ + x];
+  if (cobertura <= 0.002f || x < 0 || x >= ancho_ || y < yIni() || y >= yFin()) return;
+  uint16_t& d = px_[(y - y0_) * ancho_ + x];
   if (cobertura >= 0.998f) {
     d = a565(rgb);
     return;
@@ -62,7 +67,7 @@ void Lienzo::pildora(float cx, float cy, float w, float h, float r, uint32_t rgb
   const float mw = w / 2, mh = h / 2;
   r = limitar(r, 0, minf(mw, mh));
   int x0 = maxi(0, static_cast<int>(piso(cx - mw - 1))), x1 = mini(ancho_, static_cast<int>(techo(cx + mw + 1)));
-  int y0 = maxi(0, static_cast<int>(piso(cy - mh - 1))), y1 = mini(alto_, static_cast<int>(techo(cy + mh + 1)));
+  int y0 = maxi(yIni(), static_cast<int>(piso(cy - mh - 1))), y1 = mini(yFin(), static_cast<int>(techo(cy + mh + 1)));
   for (int y = y0; y < y1; y++) {
     for (int x = x0; x < x1; x++) {
       float d = distanciaPildora(x + 0.5f - cx, y + 0.5f - cy, mw, mh, r);
@@ -80,7 +85,7 @@ void Lienzo::pildoraContorno(float cx, float cy, float w, float h, float r, floa
   const float mw = w / 2, mh = h / 2;
   r = limitar(r, 0, minf(mw, mh));
   int x0 = maxi(0, static_cast<int>(piso(cx - mw - 1))), x1 = mini(ancho_, static_cast<int>(techo(cx + mw + 1)));
-  int y0 = maxi(0, static_cast<int>(piso(cy - mh - 1))), y1 = mini(alto_, static_cast<int>(techo(cy + mh + 1)));
+  int y0 = maxi(yIni(), static_cast<int>(piso(cy - mh - 1))), y1 = mini(yFin(), static_cast<int>(techo(cy + mh + 1)));
   for (int y = y0; y < y1; y++) {
     for (int x = x0; x < x1; x++) {
       float d = distanciaPildora(x + 0.5f - cx, y + 0.5f - cy, mw, mh, r);
@@ -99,7 +104,7 @@ void Lienzo::poligono(const Punto* p, int n, uint32_t rgb) {
     minY = minf(minY, p[i].y), maxY = maxf(maxY, p[i].y);
   }
   int x0 = maxi(0, static_cast<int>(piso(minX))), x1 = mini(ancho_, static_cast<int>(techo(maxX)) + 1);
-  int y0 = maxi(0, static_cast<int>(piso(minY))), y1 = mini(alto_, static_cast<int>(techo(maxY)) + 1);
+  int y0 = maxi(yIni(), static_cast<int>(piso(minY))), y1 = mini(yFin(), static_cast<int>(techo(maxY)) + 1);
   if (x0 >= x1 || y0 >= y1) return;
 
   constexpr int MAX_CRUCES = 64;
@@ -153,8 +158,8 @@ void Lienzo::trazo(const Punto* p, int n, float grosor, uint32_t rgb) {
   }
   const int bx0 = maxi(0, static_cast<int>(piso(minX - radio - 1)));
   const int bx1 = mini(ancho_, static_cast<int>(techo(maxX + radio + 1)));
-  const int by0 = maxi(0, static_cast<int>(piso(minY - radio - 1)));
-  const int by1 = mini(alto_, static_cast<int>(techo(maxY + radio + 1)));
+  const int by0 = maxi(yIni(), static_cast<int>(piso(minY - radio - 1)));
+  const int by1 = mini(yFin(), static_cast<int>(techo(maxY + radio + 1)));
   if (bx0 >= bx1 || by0 >= by1) return;
   const bool conMascara = bx1 - bx0 <= LADO_MASCARA && by1 - by0 <= LADO_MASCARA;
   const int mw = bx1 - bx0;
@@ -193,16 +198,16 @@ void Lienzo::trazo(const Punto* p, int n, float grosor, uint32_t rgb) {
 
 void Lienzo::rectangulo(int x, int y, int w, int h, uint32_t rgb) {
   const uint16_t c = a565(rgb);
-  for (int j = maxi(0, y); j < mini(alto_, y + h); j++)
-    for (int i = maxi(0, x); i < mini(ancho_, x + w); i++) px_[j * ancho_ + i] = c;
+  for (int j = maxi(yIni(), y); j < mini(yFin(), y + h); j++)
+    for (int i = maxi(0, x); i < mini(ancho_, x + w); i++) px_[(j - y0_) * ancho_ + i] = c;
 }
 
 void Lienzo::correrFilas(int y0, int y1, int dx, uint32_t fondo) {
-  y0 = maxi(0, y0), y1 = mini(alto_, y1);
+  y0 = maxi(yIni(), y0), y1 = mini(yFin(), y1);
   if (dx == 0 || y0 >= y1) return;
   const uint16_t f = a565(fondo);
   for (int y = y0; y < y1; y++) {
-    uint16_t* fila = px_ + y * ancho_;
+    uint16_t* fila = px_ + (y - y0_) * ancho_;
     if (dx > 0) {
       for (int x = ancho_ - 1; x >= 0; x--) fila[x] = x - dx >= 0 ? fila[x - dx] : f;
     } else {

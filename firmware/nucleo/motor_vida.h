@@ -38,6 +38,10 @@ class MotorVida {
   void interaccion(uint32_t ahora);
   // Deja una expresión fija (-1 vuelve al comportamiento automático).
   void fijar(int expresion);
+  // La expresión de base (la que eligió el dueño en la lista): reemplaza a la
+  // neutral, no se duerme sola, y las reacciones siguen funcionando. -1 = ninguna.
+  void base(int expresion) { base_ = (expresion >= 0 && expresion < config_->nExpresiones) ? expresion : -1; }
+  int base() const { return base_; }
 
   int expresionVisible() const { return actual_; }
   int expresionFija() const { return fija_; }
@@ -66,6 +70,7 @@ class MotorVida {
   int destino_ = -1;          // expresión a la que se está pasando
   uint32_t inicioTransicion_ = 0;
   int fija_ = -1;
+  int base_ = -1;
   int reaccion_ = -1;
   uint32_t reaccionHasta_ = 0;
 

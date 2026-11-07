@@ -17,6 +17,8 @@ constexpr int MAX_ACCIONES = 4;
 constexpr int LARGO_NOMBRE = 25;  // 24 bytes + terminador
 constexpr int MAX_TOKENS_JSON = 1200;
 constexpr size_t MAX_CONFIG_BYTES = 8192;
+constexpr int MAX_LISTA = 16;
+constexpr int MAX_IMAGENES = 8;
 
 // Paleta de la marca, tema Pantalla (manual de marca, tokens.json).
 namespace paleta {
@@ -102,6 +104,13 @@ struct Regla {
 
 enum class Modo : uint8_t { Mascota, Reloj, Pomodoro, Clima, Notificaciones };
 
+// Lo que se muestra, en orden: un toque pasa al siguiente (en el broche) y la
+// lista puede rotar sola.
+struct ElementoLista {
+  enum class Tipo : uint8_t { Cara, Imagen } tipo = Tipo::Cara;
+  uint8_t indice = 0;  // expresión o espacio de imagen (0-7)
+};
+
 struct Config {
   int version = 1;
   char nombre[LARGO_NOMBRE] = {};
@@ -117,6 +126,9 @@ struct Config {
   Expresion expresiones[MAX_EXPRESIONES];
   uint8_t nReglas = 0;
   Regla reglas[MAX_REGLAS];
+  uint8_t nLista = 0;
+  ElementoLista lista[MAX_LISTA];
+  uint16_t rotarMinutos = 0;  // 0 = no rota sola
 
   int indiceExpresion(const char* nombre) const;
 };

@@ -11,6 +11,9 @@ namespace sintetica {
 // entre en un QR versión 2 (25 × 25 módulos).
 constexpr const char* PREFIJO_QR = "SINTETICA:V1/";
 
-void dibujarEmparejamiento(Lienzo& l, const char* serie, const char* contenidoQr, const char* estado);
+// Rectangular: la del manual (320 × 172). Redonda (broche, 240 × 240): el QR
+// centrado, la unidad arriba y "Escaneame" abajo, todo dentro del círculo.
+void dibujarEmparejamiento(Lienzo& l, const char* serie, const char* contenidoQr, const char* estado,
+                           bool redonda = false);
 
 }  // namespace sintetica

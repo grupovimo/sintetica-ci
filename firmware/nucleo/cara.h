@@ -10,14 +10,20 @@ namespace sintetica {
 
 // Cómo se pasa de coordenadas normalizadas a píxeles en una pantalla.
 struct Vista {
-  float escala;    // píxeles por unidad normalizada (media pantalla de ancho = 1)
-  float origenX;   // píxel del centro (0, 0)
+  float escala;       // píxeles por unidad normalizada, para los ojos
+  float origenX;      // píxel del centro (0, 0)
   float origenY;
+  float escalaFijos;  // para los indicadores (zZ, batería, puntos, barras)
+  bool redonda;
 
-  // La pantalla de referencia del manual (320 × 172) y cualquier otra con el
-  // mismo ancho por unidad: escala = ancho / 2.
-  static Vista para(int ancho, int alto) {
-    return {ancho / 2.0f, ancho / 2.0f, alto / 2.0f};
+  // Rectangular (la de referencia del manual, 320 × 172, y cualquier otra):
+  // escala = ancho / 2. Redonda (el broche, 240 × 240): los ojos un 50% más
+  // grandes para llenar el círculo, y los indicadores más chicos para que
+  // queden adentro.
+  static Vista para(int ancho, int alto, bool redonda = false) {
+    const float base = ancho / 2.0f;
+    if (!redonda) return {base, base, alto / 2.0f, base, false};
+    return {base * 1.5f, base, alto / 2.0f, base * 0.8f, true};
   }
 };
 

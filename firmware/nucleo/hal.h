@@ -15,8 +15,11 @@ struct Hal {
   const char* (*identificador)() = nullptr;
   // Una semilla para el azar (ruido del ADC, RNG de hardware, etc.).
   uint32_t (*semilla)() = nullptr;
-  // Muestra el framebuffer RGB565 completo.
+  // Muestra el framebuffer RGB565 completo (cuando se dibuja de una vez).
   void (*presentar)(const uint16_t* pixeles, int ancho, int alto) = nullptr;
+  // Muestra una franja: `filas` filas a partir de la fila y0 de la pantalla.
+  // Si está, se usa en vez de presentar (también con una sola franja).
+  void (*presentarFranja)(const uint16_t* pixeles, int ancho, int y0, int filas) = nullptr;
   // Minuto del día (0-1439) o -1 si no se sabe la hora.
   int (*minutoDelDia)() = nullptr;
   // Batería 0-100, o -1 si no hay o no se sabe.
