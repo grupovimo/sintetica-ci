@@ -1,8 +1,9 @@
-// Protocolo BLE de SintéticaOS (versión 1). Documentado en docs/protocolo-ble.md.
+// Protocolo de SintéticaOS (v1.3), por BLE y por la nube. Documentado en docs/protocolo-ble.md.
 // Lo mismo viaja por BLE en la placa y por el panel del simulador.
 #pragma once
 
 #include "formato.h"
+#include "hal.h"
 #include "mate.h"
 
 namespace sintetica {
@@ -38,16 +39,30 @@ enum Op : uint8_t {
   CmdVincular = 0x13,    // código del QR (6 bytes) → responde con una clave de 16 bytes
   CmdAutenticar = 0x14,  // clave de 16 bytes (en cada conexión nueva)
   CmdDesvincular = 0x15, // olvida todas las claves y vuelve a mostrar el QR
+  CmdRed = 0x16,         // [n][ssid][n][clave]: el WiFi (v1.3)
+  CmdNube = 0x17,        // [n][url mqtt][n][usuario][n][clave]: la cuenta en la nube (v1.3)
+  CmdOlvidarRed = 0x18,  // olvida el WiFi y la nube (v1.3)
+  CmdReproducir = 0x19,  // nombre de una animación; vacío = parar (v1.3)
   // Imagen
   ImgInicio = 0x20,      // u8 espacio (0-7), u32 largo, u32 crc32
   ImgBloque = 0x21,      // u32 desplazamiento, datos
   ImgFin = 0x22,         // (nada)
   ImgBorrar = 0x23,      // u8 espacio
   ImgListar = 0x24,      // → [0xA4][0][máscara u8] + por espacio ocupado [espacio][u32 largo][u32 crc]
+  ImgPedir = 0x25,       // u8 espacio → [0xA5][0], varios 0xA7 y un 0xA8 (v1.3)
+  // OTA (v1.3)
+  OtaInicio = 0x30,      // manifiesto → después, bloques
+  OtaBloque = 0x31,      // u32 desplazamiento, datos
+  OtaFin = 0x32,         // verifica el SHA-256 e instala; reinicia
+  OtaDescargar = 0x33,   // manifiesto + [u16 n][url]: la baja él solo por WiFi
+  OtaProgreso = 0x34,    // (solo notificación) [0xB4][código][porcentaje]
+  OtaCancelar = 0x35,
   // Respuestas (notificación): op | 0x80, código, [detalle]
   Respuesta = 0x80,
   ConfigTrozo = 0x84,    // u32 desplazamiento, datos (respuesta a ConfigPedir)
   ConfigCierre = 0x85,   // u32 largo, u32 crc32 (fin de ConfigPedir)
+  ImgTrozo = 0xA7,       // u32 desplazamiento, datos (respuesta a ImgPedir)
+  ImgCierre = 0xA8,      // u8 espacio, u32 largo, u32 crc32
 };
 
 enum Codigo : uint8_t {
@@ -63,6 +78,12 @@ enum Codigo : uint8_t {
   NoAutorizado = 9,      // falta vincular o autenticar, o el código/clave no coincide
   NoEmparejando = 10,    // para vincular, el bicho tiene que estar mostrando el QR
   ImagenInvalida = 11,   // no es un QOI del tamaño de la pantalla
+  FirmaInvalida = 12,    // la firma del firmware no es de Sintética Labs
+  HashDistinto = 13,     // lo que llegó no es lo que se firmó
+  PerfilDistinto = 14,   // es el firmware de otra placa
+  SinRed = 15,           // para descargar hace falta WiFi
+  Ocupado = 16,          // ya hay una actualización en curso
+  FalloOta = 17,         // no se pudo escribir o bajar (el detalle dice por qué)
   NoImplementado = 0xFF,
 };
 
@@ -88,12 +109,28 @@ class Receptor {
   const char* texto() const { return reinterpret_cast<const char*>(buf_); }
   size_t largo() const { return recibido_; }
   void reiniciar() { activo_ = false, recibido_ = 0; }
+  bool activo() const { return activo_; }
+  // El buffer, prestado mientras no hay una transferencia (para leer la config
+  // guardada sin otra copia en RAM). Entra MAX_CONFIG_BYTES + 1.
+  char* prestar() { return activo_ ? nullptr : reinterpret_cast<char*>(buf_); }
 
  private:
   uint8_t buf_[MAX_CONFIG_BYTES + 1];
   uint32_t esperado_ = 0, crc_ = 0, recibido_ = 0;
   bool activo_ = false;
 };
+
+// Lee un manifiesto: [u32 tamaño][32 sha256][64 firma][n][versión][n][perfil].
+// Devuelve los bytes que ocupó (0 si está mal).
+size_t leerManifiesto(const uint8_t* d, size_t n, ManifiestoOta* m);
+size_t escribirManifiesto(const ManifiestoOta& m, uint8_t* salida, size_t cap);
+// El texto que se firma:
+// "SINTETICA-OTA-V1\n<perfil>\n<versión>\n<tamaño>\n<sha256 en hex minúscula>\n".
+size_t mensajeOta(const ManifiestoOta& m, char* salida, size_t cap);
+
+// Texto con largo adelante (u8), como en los comandos de red y nube.
+// Devuelve los bytes que ocupó o 0 si no entra.
+size_t leerTextoCorto(const uint8_t* d, size_t n, char* destino, size_t cap);
 
 // El estado público que se lee o se notifica.
 struct EstadoPublico {
@@ -110,11 +147,20 @@ struct EstadoPublico {
   const char* id = "";
   uint16_t ancho = 0, alto = 0;
   bool redonda = false;
+  bool wifi = false;          // conectado al WiFi
+  bool nube = false;          // conectado a la nube
+  bool redConfigurada = false;
+  bool actualizando = false;  // instalando una OTA
+  const char* version = "";   // del firmware
+  const char* perfil = "";
+  uint32_t crcConfig = 0;     // CRC-32 de la config guardada (0 = la de fábrica)
 };
-constexpr uint8_t VERSION_ESTADO = 3;
-// [versión=3][batería][humor][modo][flags][n][expresión][n][nombre][n][serie][n][id]
-// [u16 ancho][u16 alto][forma: 0 rectangular, 1 redonda]
-// flags: bit 0 dormido, 1 expresión fija, 2 mostrando el QR, 3 esta conexión autenticada
+constexpr uint8_t VERSION_ESTADO = 4;
+// [versión=4][batería][humor][modo][flags][n][expresión][n][nombre][n][serie][n][id]
+// [u16 ancho][u16 alto][forma: 0 rectangular, 1 redonda][n][versión][n][perfil][u32 crc config]
+// flags: bit 0 dormido, 1 expresión fija, 2 mostrando el QR, 3 esta conexión autenticada,
+// 4 WiFi conectado, 5 nube conectada, 6 WiFi configurado, 7 actualizando
+constexpr size_t MAX_ESTADO = 160;
 size_t codificarEstado(const EstadoPublico& e, uint8_t* salida, size_t cap);
 
 }  // namespace protocolo

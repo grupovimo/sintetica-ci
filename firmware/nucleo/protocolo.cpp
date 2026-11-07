@@ -43,15 +43,17 @@ Codigo Receptor::fin() {
 
 size_t codificarEstado(const EstadoPublico& e, uint8_t* s, size_t cap) {
   const size_t ne = largo(e.expresion), nn = largo(e.nombre), ns = largo(e.serie), ni = largo(e.id);
-  const size_t total = 5 + 1 + ne + 1 + nn + 1 + ns + 1 + ni + 5;
-  if (cap < total || ne > 255 || nn > 255 || ns > 255 || ni > 255) return 0;
+  const size_t nv = largo(e.version), np = largo(e.perfil);
+  const size_t total = 5 + 1 + ne + 1 + nn + 1 + ns + 1 + ni + 5 + 1 + nv + 1 + np + 4;
+  if (cap < total || ne > 255 || nn > 255 || ns > 255 || ni > 255 || nv > 255 || np > 255) return 0;
   size_t i = 0;
   s[i++] = VERSION_ESTADO;
   s[i++] = e.bateria;
   s[i++] = static_cast<uint8_t>(e.humor);
   s[i++] = e.modo;
   s[i++] = static_cast<uint8_t>((e.dormido ? 1 : 0) | (e.fija ? 2 : 0) | (e.emparejando ? 4 : 0) |
-                                (e.autenticado ? 8 : 0));
+                                (e.autenticado ? 8 : 0) | (e.wifi ? 16 : 0) | (e.nube ? 32 : 0) |
+                                (e.redConfigurada ? 64 : 0) | (e.actualizando ? 128 : 0));
   s[i++] = static_cast<uint8_t>(ne);
   copiarBytes(s + i, e.expresion, ne);
   i += ne;
@@ -67,6 +69,79 @@ size_t codificarEstado(const EstadoPublico& e, uint8_t* s, size_t cap) {
   s[i++] = static_cast<uint8_t>(e.ancho), s[i++] = static_cast<uint8_t>(e.ancho >> 8);
   s[i++] = static_cast<uint8_t>(e.alto), s[i++] = static_cast<uint8_t>(e.alto >> 8);
   s[i++] = e.redonda ? 1 : 0;
+  s[i++] = static_cast<uint8_t>(nv);
+  copiarBytes(s + i, e.version, nv);
+  i += nv;
+  s[i++] = static_cast<uint8_t>(np);
+  copiarBytes(s + i, e.perfil, np);
+  i += np;
+  escribir32(s + i, e.crcConfig);
+  return i + 4;
+}
+
+size_t leerTextoCorto(const uint8_t* d, size_t n, char* destino, size_t cap) {
+  if (n < 1 || static_cast<size_t>(d[0]) + 1 > n || d[0] >= cap) return 0;
+  copiarTexto(destino, cap, reinterpret_cast<const char*>(d + 1), d[0]);
+  // Sin terminadores en el medio.
+  for (size_t i = 0; i < d[0]; i++)
+    if (d[1 + i] == 0) return 0;
+  return 1 + d[0];
+}
+
+size_t leerManifiesto(const uint8_t* d, size_t n, ManifiestoOta* m) {
+  if (n < 4 + 32 + 64 + 2) return 0;
+  *m = ManifiestoOta();
+  m->tamano = leer32(d);
+  copiarBytes(m->sha256, d + 4, 32);
+  copiarBytes(m->firma, d + 36, 64);
+  size_t i = 100;
+  size_t k = leerTextoCorto(d + i, n - i, m->version, sizeof m->version);
+  if (!k || !m->version[0]) return 0;
+  i += k;
+  k = leerTextoCorto(d + i, n - i, m->perfil, sizeof m->perfil);
+  if (!k || !m->perfil[0]) return 0;
+  return i + k;
+}
+
+size_t escribirManifiesto(const ManifiestoOta& m, uint8_t* s, size_t cap) {
+  const size_t nv = largo(m.version), np = largo(m.perfil);
+  if (cap < 100 + 2 + nv + np) return 0;
+  escribir32(s, m.tamano);
+  copiarBytes(s + 4, m.sha256, 32);
+  copiarBytes(s + 36, m.firma, 64);
+  size_t i = 100;
+  s[i++] = static_cast<uint8_t>(nv);
+  copiarBytes(s + i, m.version, nv);
+  i += nv;
+  s[i++] = static_cast<uint8_t>(np);
+  copiarBytes(s + i, m.perfil, np);
+  return i + np;
+}
+
+size_t mensajeOta(const ManifiestoOta& m, char* s, size_t cap) {
+  char num[12];
+  int nd = 0;
+  uint32_t v = m.tamano;
+  do {
+    num[nd++] = static_cast<char>('0' + v % 10);
+    v /= 10;
+  } while (v);
+  const size_t total = 17 + largo(m.perfil) + 1 + largo(m.version) + 1 + static_cast<size_t>(nd) + 1 + 64 + 1;
+  if (cap < total + 1) return 0;
+  size_t i = copiarTexto(s, cap, "SINTETICA-OTA-V1\n");
+  i += copiarTexto(s + i, cap - i, m.perfil);
+  s[i++] = '\n';
+  i += copiarTexto(s + i, cap - i, m.version);
+  s[i++] = '\n';
+  while (nd) s[i++] = num[--nd];
+  s[i++] = '\n';
+  static const char HEX[] = "0123456789abcdef";
+  for (int k = 0; k < 32; k++) {
+    s[i++] = HEX[m.sha256[k] >> 4];
+    s[i++] = HEX[m.sha256[k] & 15];
+  }
+  s[i++] = '\n';
+  s[i] = 0;
   return i;
 }
 

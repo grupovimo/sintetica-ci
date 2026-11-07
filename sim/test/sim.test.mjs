@@ -49,7 +49,7 @@ test('arranca con las 16 caras y en neutral', async () => {
   assert.equal(sim.expresionVisible(), 'neutral');
   assert.equal(cuadros(), 10);
   assert.equal(sim.emparejando(), true);
-  assert.equal(sim.version(), '0.1.0');
+  assert.equal(sim.version(), '0.2.0');
 });
 
 test('M0: parpadea al azar cada 3 a 7 s', async () => {
@@ -220,4 +220,20 @@ test('M4: subir una imagen, ponerla en la lista y verla', async () => {
   const rechazo = leerRespuesta(notis.filter((n) => n.c === Car.imagen).at(-1).b);
   assert.equal(rechazo.mensaje, 'imagen inválida');
   assert.equal(rechazo.detalle, 'tiene que ser un QOI del tamaño de la pantalla');
+});
+
+test('E4: animaciones con claves desde la config de ejemplo', async () => {
+  const { sim, notis, correr } = await nuevo();
+  const ejemplo = fs.readFileSync(path.join(aqui, '../../shared/formato/config-ejemplo.json'), 'utf8');
+  for (const e of escriturasDeConfig(JSON.stringify(JSON.parse(ejemplo)))) sim.bleEscribir(Car.config, e);
+  assert.ok(leerRespuesta(notis.at(-1).b).ok);
+  assert.deepEqual(sim.animaciones(), ['saludo']);
+  sim.bleEscribir(Car.comando, comando.reproducir('saludo'));
+  correr(200);
+  assert.equal(sim.expresionVisible(), 'animacion:saludo');
+  const estado = leerEstado(sim.bleLeerEstado());
+  assert.equal(estado.expresion, 'animacion:saludo');
+  assert.equal(estado.perfil, 'sim');
+  correr(1400);  // no repite: vuelve sola
+  assert.notEqual(sim.expresionVisible(), 'animacion:saludo');
 });

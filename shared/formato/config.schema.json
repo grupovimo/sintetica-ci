@@ -70,6 +70,17 @@
         "$ref": "#/$defs/expresion"
       }
     },
+    "animaciones": {
+      "type": "object",
+      "description": "Animaciones por nombre: cada pista es una forma que se mueve, escala, gira y cambia de color y opacidad con claves en el tiempo. Se usan en la lista (animacion:<nombre>), en las reglas y con el comando Reproducir.",
+      "maxProperties": 6,
+      "propertyNames": {
+        "$ref": "#/$defs/nombreExpresion"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/animacion"
+      }
+    },
     "reglas": {
       "type": "array",
       "maxItems": 24,
@@ -92,7 +103,7 @@
             "maxItems": 4,
             "items": {
               "type": "string",
-              "pattern": "^(expresion|sonido|led):[a-z0-9#-]+$"
+              "pattern": "^(expresion|sonido|led|animacion):[a-z0-9#-]+$"
             }
           }
         }
@@ -113,7 +124,7 @@
       "description": "Lo que se muestra, en orden: un toque en el broche pasa al siguiente. Sin lista, el broche recorre las caras y la mascota se maneja sola.",
       "items": {
         "type": "string",
-        "pattern": "^(cara:[a-z][a-z0-9-]{0,23}|imagen:[0-7])$"
+        "pattern": "^(cara:[a-z][a-z0-9-]{0,23}|animacion:[a-z][a-z0-9-]{0,23}|imagen:[0-7])$"
       }
     },
     "rotar": {
@@ -507,6 +518,125 @@
           "unevaluatedProperties": false
         }
       ]
+    },
+    "animacion": {
+      "type": "object",
+      "required": [
+        "duracion",
+        "pistas"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "duracion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60000,
+          "description": "En milisegundos."
+        },
+        "repetir": {
+          "type": "boolean",
+          "description": "Con el comando Reproducir, repite hasta que la paren. En la lista siempre se repite; por una regla, una vez."
+        },
+        "sobre": {
+          "$ref": "#/$defs/nombreExpresion",
+          "description": "Una expresión que se dibuja abajo, viva (parpadea y mira)."
+        },
+        "pistas": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/pista"
+          }
+        }
+      }
+    },
+    "pista": {
+      "type": "object",
+      "required": [
+        "forma",
+        "claves"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "forma": {
+          "$ref": "#/$defs/forma",
+          "description": "Cualquier forma menos franjas."
+        },
+        "centro": {
+          "$ref": "#/$defs/punto",
+          "description": "El centro de la escala y el giro; si no está, el de la forma."
+        },
+        "claves": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/clave"
+          }
+        }
+      }
+    },
+    "clave": {
+      "type": "object",
+      "required": [
+        "t"
+      ],
+      "additionalProperties": false,
+      "description": "Cómo está la forma en el instante t. Entre dos claves se interpola con la curva de la primera.",
+      "properties": {
+        "t": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000,
+          "description": "Milisegundos desde el comienzo, en orden y dentro de la duración."
+        },
+        "x": {
+          "type": "number",
+          "minimum": -4,
+          "maximum": 4,
+          "default": 0
+        },
+        "y": {
+          "type": "number",
+          "minimum": -4,
+          "maximum": 4,
+          "default": 0
+        },
+        "escala": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 8,
+          "default": 1
+        },
+        "rotacion": {
+          "type": "number",
+          "minimum": -3600,
+          "maximum": 3600,
+          "default": 0,
+          "description": "Grados, en sentido horario."
+        },
+        "opacidad": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1
+        },
+        "color": {
+          "$ref": "#/$defs/color"
+        },
+        "curva": {
+          "enum": [
+            "lineal",
+            "suave",
+            "entrada",
+            "salida",
+            "rebote",
+            "paso"
+          ],
+          "default": "suave"
+        }
+      }
     }
   }
 }

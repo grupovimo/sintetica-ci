@@ -1,5 +1,5 @@
 // Genera shared/protocolo/vectores.json: los bytes de cada operación del
-// protocolo BLE v1.1. Los arma el codificador de referencia en JS
+// protocolo v1.3. Los arma el codificador de referencia en JS
 // (sim/web/protocolo.js); el núcleo C++ los reproduce en sus tests
 // (firmware/test/test_vectores.cpp) y las apps de Kotlin y Swift los usan para
 // comprobar sus propios codificadores. Así las cuatro implementaciones no se
@@ -10,7 +10,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { comando, crc32, escriturasDeConfig, escriturasDeImagen, imagen, pedirConfig } from '../../sim/web/protocolo.js';
+import crypto from 'node:crypto';
+
+import { comando, crc32, escriturasDeConfig, escriturasDeImagen, imagen, manifiestoOta, mensajeOta, ota, pedirConfig } from '../../sim/web/protocolo.js';
 import { codificarQoi } from '../../sim/web/qoi.js';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
@@ -22,10 +24,12 @@ const ejemplo = JSON.stringify(JSON.parse(fs.readFileSync(path.join(aqui, '../fo
 
 function estado(c) {
   const campo = (s) => { const b = utf8(s); return [b.length, ...b]; };
-  const flags = (c.dormido ? 1 : 0) | (c.fija ? 2 : 0) | (c.emparejando ? 4 : 0) | (c.autenticado ? 8 : 0);
-  return hex([3, c.bateria ?? 255, Math.round(c.humor * 100) & 0xff, c.modo, flags,
+  const flags = (c.dormido ? 1 : 0) | (c.fija ? 2 : 0) | (c.emparejando ? 4 : 0) | (c.autenticado ? 8 : 0) |
+    (c.wifi ? 16 : 0) | (c.nube ? 32 : 0) | (c.redConfigurada ? 64 : 0) | (c.actualizando ? 128 : 0);
+  return hex([4, c.bateria ?? 255, Math.round(c.humor * 100) & 0xff, c.modo, flags,
     ...campo(c.expresion), ...campo(c.nombre), ...campo(c.serie), ...campo(c.id),
-    c.ancho & 255, c.ancho >> 8, c.alto & 255, c.alto >> 8, c.redonda ? 1 : 0]);
+    c.ancho & 255, c.ancho >> 8, c.alto & 255, c.alto >> 8, c.redonda ? 1 : 0,
+    ...campo(c.version), ...campo(c.perfil), ...[0, 8, 16, 24].map((k) => (c.crcConfig >>> k) & 255)]);
 }
 
 // Una imagen chica que usa todas las operaciones de QOI: rachas, índice,
@@ -47,8 +51,30 @@ function imagenDePrueba(ancho, alto) {
 const rgbaPrueba = imagenDePrueba(12, 7);
 const qoiPrueba = codificarQoi(rgbaPrueba, 12, 7);
 
+// OTA: un manifiesto firmado con una clave de prueba fija (la firma ECDSA
+// lleva azar, así que se guarda una sola vez en firma-prueba.json y se reusa).
+const binarioPrueba = Uint8Array.from({ length: 1000 }, (_, i) => (i * 7 + 3) & 255);
+const shaPrueba = new Uint8Array(crypto.createHash('sha256').update(binarioPrueba).digest());
+const archivoFirma = path.join(aqui, 'firma-prueba.json');
+let firmaPrueba;
+if (fs.existsSync(archivoFirma)) {
+  firmaPrueba = JSON.parse(fs.readFileSync(archivoFirma, 'utf8'));
+} else {
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256' });
+  const m = { tamano: binarioPrueba.length, sha256: shaPrueba, version: '0.2.1', perfil: 'dev-147b' };
+  const firma = crypto.sign('sha256', Buffer.from(mensajeOta(m)), { key: privateKey, dsaEncoding: 'ieee-p1363' });
+  firmaPrueba = {
+    nota: 'Clave de PRUEBA para los vectores. No sirve para firmar firmware.',
+    publica: publicKey.export({ type: 'spki', format: 'pem' }),
+    firma: hex(firma),
+  };
+  fs.writeFileSync(archivoFirma, JSON.stringify(firmaPrueba, null, 2) + '\n');
+}
+const desdeHex = (h) => Uint8Array.from(h.split(' ').map((x) => parseInt(x, 16)));
+const manifiestoPrueba = { tamano: binarioPrueba.length, sha256: shaPrueba, firma: desdeHex(firmaPrueba.firma), version: '0.2.1', perfil: 'dev-147b' };
+
 const vectores = {
-  version: '1.2',
+  version: '1.3',
   nota: 'Generado por shared/protocolo/generar_vectores.mjs. No editar a mano. Bytes en hex separados por espacios.',
   comandos: [
     { nombre: 'expresion enamorado', hex: hex(comando.expresion('enamorado')) },
@@ -62,7 +88,29 @@ const vectores = {
     { nombre: 'pedir config', hex: hex(pedirConfig()) },
     { nombre: 'imagen borrar 3', hex: hex(imagen.borrar(3)) },
     { nombre: 'imagen listar', hex: hex(imagen.listar()) },
+    { nombre: 'imagen pedir 5', hex: hex(imagen.pedir(5)) },
+    { nombre: 'red', ssid: 'Casa Ñandú', clave: 'secreta123', hex: hex(comando.red('Casa Ñandú', 'secreta123')) },
+    { nombre: 'red abierta', ssid: 'Bar', clave: '', hex: hex(comando.red('Bar', '')) },
+    { nombre: 'nube', url: 'mqtt://192.168.1.10:1883', usuario: 'A1B2C3D4E5F6', clave: 'k3y', hex: hex(comando.nube('mqtt://192.168.1.10:1883', 'A1B2C3D4E5F6', 'k3y')) },
+    { nombre: 'olvidar red', hex: hex(comando.olvidarRed()) },
+    { nombre: 'reproducir saludo', hex: hex(comando.reproducir('saludo')) },
+    { nombre: 'reproducir parar', hex: hex(comando.reproducir('')) },
+    { nombre: 'ota cancelar', hex: hex(ota.cancelar()) },
   ],
+  ota: {
+    binario: hex(binarioPrueba),
+    sha256: hex(shaPrueba),
+    version: manifiestoPrueba.version,
+    perfil: manifiestoPrueba.perfil,
+    mensaje: mensajeOta(manifiestoPrueba),
+    publica: firmaPrueba.publica,
+    firma: firmaPrueba.firma,
+    manifiesto: hex(manifiestoOta(manifiestoPrueba)),
+    url: 'http://192.168.1.10:8080/v1/firmware/7/binario?t=abc',
+    descargar: hex(ota.descargar(manifiestoPrueba, 'http://192.168.1.10:8080/v1/firmware/7/binario?t=abc')),
+    tamanoBloque: 200,
+    escrituras: ota.escrituras(manifiestoPrueba, binarioPrueba, 200).map(hex),
+  },
   qoi: {
     ancho: 12,
     alto: 7,
@@ -85,12 +133,12 @@ const vectores = {
   },
   estados: [
     {
-      campos: { bateria: null, humor: 0.2, modo: 'mascota', dormido: false, fija: false, emparejando: true, autenticado: false, expresion: 'neutral', nombre: 'bicho', serie: '', id: 'A1B2C3D4E5F6', ancho: 320, alto: 172, redonda: false },
+      campos: { bateria: null, humor: 0.2, modo: 'mascota', dormido: false, fija: false, emparejando: true, autenticado: false, wifi: false, nube: false, redConfigurada: false, actualizando: false, expresion: 'neutral', nombre: 'bicho', serie: '', id: 'A1B2C3D4E5F6', ancho: 320, alto: 172, redonda: false, version: '0.2.0', perfil: 'dev-147b', crcConfig: 0 },
     },
     {
-      campos: { bateria: 87, humor: -0.35, modo: 'reloj', dormido: true, fija: true, emparejando: false, autenticado: true, expresion: 'dormido', nombre: 'Ñandú', serie: '001', id: '00AABBCCDDEE', ancho: 240, alto: 240, redonda: true },
+      campos: { bateria: 87, humor: -0.35, modo: 'reloj', dormido: true, fija: true, emparejando: false, autenticado: true, wifi: true, nube: true, redConfigurada: true, actualizando: true, expresion: 'animacion:saludo', nombre: 'Ñandú', serie: '001', id: '00AABBCCDDEE', ancho: 240, alto: 240, redonda: true, version: '0.2.0', perfil: 'broche-c3', crcConfig: 0xcbf43926 },
     },
-  ].map((e) => ({ ...e, hex: estado({ ...e.campos, modo: ['mascota', 'reloj', 'pomodoro', 'clima', 'notificaciones'].indexOf(e.campos.modo) }) })),
+  ].map((e) => ({ campos: { ...e.campos, crcConfigHex: e.campos.crcConfig.toString(16).padStart(8, '0') }, hex: estado({ ...e.campos, modo: ['mascota', 'reloj', 'pomodoro', 'clima', 'notificaciones'].indexOf(e.campos.modo) }) })),
   respuestas: [
     { hex: '90 00', op: 0x10, ok: true, codigo: 0, detalle: '' },
     { hex: hex([0x91, 9, ...utf8('vinculá o autenticá primero')]), op: 0x11, ok: false, codigo: 9, detalle: 'vinculá o autenticá primero' },

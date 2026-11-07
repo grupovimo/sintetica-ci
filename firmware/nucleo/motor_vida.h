@@ -44,6 +44,7 @@ class MotorVida {
   int base() const { return base_; }
 
   int expresionVisible() const { return actual_; }
+  bool reaccionando(uint32_t ahora) const { return reaccion_ >= 0 && static_cast<int32_t>(ahora - reaccionHasta_) < 0; }
   int expresionFija() const { return fija_; }
   bool dormido() const { return dormido_; }
   float humor() const { return humor_; }

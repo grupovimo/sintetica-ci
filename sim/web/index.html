@@ -191,6 +191,16 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--linea);
         <p class="nota">Elegir una la deja fija por BLE (comando 0x10), y se guarda: sobrevive a reiniciar el bicho.</p>
       </section>
 
+      <section aria-labelledby="t-animaciones">
+        <div class="fila" style="justify-content: space-between">
+          <h2 id="t-animaciones">Animaciones</h2>
+          <button id="b-parar">Parar</button>
+        </div>
+        <div class="caras" id="animaciones"></div>
+        <p class="nota" id="sin-animaciones">La config no trae animaciones: mandá la de ejemplo (abajo, en BLE) y aparece "saludo".</p>
+        <p class="nota">Reproducir es el comando 0x19. También se usan en la lista (<code>animacion:saludo</code>) y en las reglas.</p>
+      </section>
+
       <section aria-labelledby="t-imagenes">
         <h2 id="t-imagenes">Imágenes</h2>
         <p class="nota">Hasta 8. La página recorta la imagen a la forma de la pantalla, la codifica en QOI y la manda por la característica Imagen.</p>

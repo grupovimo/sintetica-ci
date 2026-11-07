@@ -170,9 +170,9 @@ PRUEBA("protocolo: comando de expresión y nombre, y sobreviven a un reinicio") 
   VERIFICAR(expresionActual() == "enamorado");
   VERIFICAR(std::string(g_s.nombre()) == "Toto");
 
-  uint8_t est[64];
+  uint8_t est[160];
   size_t n = g_s.estadoBle(est, sizeof est);
-  VERIFICAR(n > 6 && est[0] == 3 && (est[4] & 2));
+  VERIFICAR(n > 6 && est[0] == 4 && (est[4] & 2));
   VERIFICAR(std::string(reinterpret_cast<char*>(est + 6), est[5]) == "enamorado");
 
   escribir(CarComando, bytes({CmdExpresion}));  // vacío = automático
@@ -245,9 +245,9 @@ PRUEBA("protocolo: errores de config no rompen nada") {
   // Sin inicio.
   escribir(CarConfig, bytes({ConfigFin}));
   VERIFICAR(g_notis.back().second[1] == SinInicio);
-  // OTA todavía no.
-  escribir(CarOta, bytes({1}));
-  VERIFICAR(g_notis.back().second[1] == NoImplementado);
+  // OTA sin manifiesto.
+  escribir(CarOta, bytes({OtaInicio, 1}));
+  VERIFICAR(g_notis.back().second[1] == Malformado);
   VERIFICAR(std::string(g_s.nombre()) == "bicho");
   VERIFICAR(g_flash.find("config") == g_flash.end());
 }

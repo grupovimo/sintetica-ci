@@ -11,7 +11,6 @@ const char* const NOMBRES_EVENTO[] = {"tacto",    "doble-toque", "levantado",   
 
 // Memoria de trabajo compartida (no reentrante: el núcleo corre en un solo hilo).
 TokenJson g_tokens[MAX_TOKENS_JSON];
-Config g_copia;
 
 ResultadoConfig error(ErrorConfig e, const char* detalle) {
   ResultadoConfig r;
@@ -217,8 +216,96 @@ bool leerAccion(const char* s, Accion* a) {
   if (iguales(tipo, "expresion")) a->tipo = Accion::Tipo::Expresion;
   else if (iguales(tipo, "sonido")) a->tipo = Accion::Tipo::Sonido;
   else if (iguales(tipo, "led")) a->tipo = Accion::Tipo::Led;
+  else if (iguales(tipo, "animacion")) a->tipo = Accion::Tipo::Animacion;
   else return false;
   return copiarTexto(a->argumento, sizeof a->argumento, dos + 1) > 0;
+}
+
+// Una animación: {"duracion", "repetir", "sobre", "pistas": [{"forma", "centro", "claves"}]}.
+ResultadoConfig leerAnimacion(const Json& j, int obj, const Config& c, Animacion* a) {
+  const auto MAL = [](const char* d) { return error(ErrorConfig::Campo, d); };
+  if (!j.valido(obj) || j.tipo(obj) != TipoJson::Objeto) return MAL("animacion: no es un objeto");
+  float dur = 0;
+  if (!numeroEn(j, obj, "duracion", 1, MAX_DURACION_MS, &dur)) return MAL("animacion: duracion en ms, de 1 a 60000");
+  a->duracion = static_cast<uint16_t>(dur);
+  a->repetir = j.booleano(j.buscar(obj, "repetir"), false);
+  a->sobre = -1;
+  int sobre = j.buscar(obj, "sobre");
+  if (sobre >= 0) {
+    char n[LARGO_NOMBRE];
+    if (j.texto(sobre, n, sizeof n) <= 0) return MAL("animacion: sobre es el nombre de una expresión");
+    const int idx = c.indiceExpresion(n);
+    if (idx < 0) return MAL("animacion: sobre una expresión que no existe");
+    a->sobre = static_cast<int8_t>(idx);
+  }
+  int pistas = j.buscar(obj, "pistas");
+  if (!j.valido(pistas) || j.tipo(pistas) != TipoJson::Arreglo || j.cantidad(pistas) < 1)
+    return MAL("animacion: falta \"pistas\"");
+  if (j.cantidad(pistas) > MAX_PISTAS) return error(ErrorConfig::Demasiadas, "animacion: más de 6 pistas");
+  a->nPistas = 0;
+  for (int k = 0; k < j.cantidad(pistas); k++) {
+    const int po = j.elemento(pistas, k);
+    if (!j.valido(po) || j.tipo(po) != TipoJson::Objeto) return MAL("pista: no es un objeto");
+    Pista& p = a->pistas[k];
+    p = Pista();
+    ResultadoConfig r = leerForma(j, j.buscar(po, "forma"), &p.forma);
+    if (!r.ok()) return r;
+    if (p.forma.tipo == TipoForma::Franjas) return error(ErrorConfig::Forma, "pista: las franjas no se animan");
+    int centro = j.buscar(po, "centro");
+    if (centro >= 0) {
+      Punto q;
+      if (!leerPunto(j, centro, &q)) return MAL("pista: centro es [x, y]");
+      p.hayCentro = true, p.cx = q.x, p.cy = q.y;
+    }
+    int claves = j.buscar(po, "claves");
+    if (!j.valido(claves) || j.tipo(claves) != TipoJson::Arreglo || j.cantidad(claves) < 1 ||
+        j.cantidad(claves) > MAX_CLAVES)
+      return error(ErrorConfig::Demasiadas, "pista: de 1 a 8 claves");
+    float anterior = -1;
+    for (int m = 0; m < j.cantidad(claves); m++) {
+      const int co = j.elemento(claves, m);
+      if (!j.valido(co) || j.tipo(co) != TipoJson::Objeto) return MAL("clave: no es un objeto");
+      Clave& cl = p.claves[m];
+      cl = Clave();
+      float t = 0;
+      if (!numeroEn(j, co, "t", 0, dur, &t)) return MAL("clave: t en ms, dentro de la duracion");
+      if (t < anterior) return MAL("clave: los t van en orden");
+      anterior = t;
+      cl.t = static_cast<uint16_t>(t);
+      if (!numeroOpcional(j, co, "x", -4, 4, &cl.x) || !numeroOpcional(j, co, "y", -4, 4, &cl.y) ||
+          !numeroOpcional(j, co, "escala", 0, 8, &cl.escala) ||
+          !numeroOpcional(j, co, "rotacion", -3600, 3600, &cl.rotacion) ||
+          !numeroOpcional(j, co, "opacidad", 0, 1, &cl.opacidad))
+        return MAL("clave: x, y, escala, rotacion u opacidad fuera de rango");
+      int col = j.buscar(co, "color");
+      if (col >= 0) {
+        char t2[LARGO_NOMBRE];
+        bool acento;
+        if (j.texto(col, t2, sizeof t2) < 0 || !interpretarColor(t2, &cl.color, &acento))
+          return MAL("clave: color desconocido");
+        cl.hayColor = true;
+      }
+      int cur = j.buscar(co, "curva");
+      if (cur >= 0) {
+        char t3[16];
+        if (j.texto(cur, t3, sizeof t3) < 0 || !curvaPorNombre(t3, &cl.curva))
+          return MAL("clave: curva lineal, suave, entrada, salida, rebote o paso");
+      }
+      p.nClaves++;
+    }
+    a->nPistas++;
+  }
+  return {};
+}
+
+ResultadoConfig guardarAnimacion(Config& c, const Animacion& a) {
+  int i = c.indiceAnimacion(a.nombre);
+  if (i < 0) {
+    if (c.nAnimaciones >= MAX_ANIMACIONES) return error(ErrorConfig::Demasiadas, "más de 6 animaciones");
+    i = c.nAnimaciones++;
+  }
+  c.animaciones[i] = a;
+  return {};
 }
 
 void reglaBase(Config& c, const char* si, const char* expresion) {
@@ -245,6 +332,81 @@ bool eventoPorNombre(const char* nombre, Evento* salida) {
     }
   }
   return false;
+}
+
+int Config::indiceAnimacion(const char* n) const {
+  for (int i = 0; i < nAnimaciones; i++)
+    if (iguales(animaciones[i].nombre, n)) return i;
+  return -1;
+}
+
+bool curvaPorNombre(const char* n, Curva* c) {
+  static const char* const nombres[] = {"lineal", "suave", "entrada", "salida", "rebote", "paso"};
+  for (int i = 0; i < 6; i++) {
+    if (iguales(n, nombres[i])) {
+      *c = static_cast<Curva>(i);
+      return true;
+    }
+  }
+  return false;
+}
+
+float aplicarCurva(Curva c, float t) {
+  t = limitar(t, 0, 1);
+  switch (c) {
+    case Curva::Lineal: return t;
+    case Curva::Suave: return suave(t);
+    case Curva::Entrada: return t * t * t;
+    case Curva::Salida: {
+      const float u = 1 - t;
+      return 1 - u * u * u;
+    }
+    case Curva::Rebote: {
+      // "Back out": se pasa un poco y vuelve.
+      constexpr float K = 1.70158f;
+      const float u = t - 1;
+      return 1 + (K + 1) * u * u * u + K * u * u;
+    }
+    case Curva::Paso: return t < 1 ? 0.0f : 1.0f;
+  }
+  return t;
+}
+
+Cuadro cuadroDePista(const Pista& p, uint32_t t) {
+  Cuadro q;
+  if (p.nClaves == 0) return q;
+  const Clave* a = &p.claves[0];
+  const Clave* b = a;
+  float k = 0;
+  if (t <= p.claves[0].t) {
+    b = a;
+  } else if (t >= p.claves[p.nClaves - 1].t) {
+    a = b = &p.claves[p.nClaves - 1];
+  } else {
+    for (int i = 0; i + 1 < p.nClaves; i++) {
+      if (t >= p.claves[i].t && t < p.claves[i + 1].t) {
+        a = &p.claves[i], b = &p.claves[i + 1];
+        const float largoTramo = static_cast<float>(b->t - a->t);
+        k = largoTramo > 0 ? aplicarCurva(a->curva, (t - a->t) / largoTramo) : 1.0f;
+        break;
+      }
+    }
+  }
+  q.x = mezclar(a->x, b->x, k);
+  q.y = mezclar(a->y, b->y, k);
+  q.escala = mezclar(a->escala, b->escala, k);
+  q.rotacion = mezclar(a->rotacion, b->rotacion, k);
+  q.opacidad = limitar(mezclar(a->opacidad, b->opacidad, k), 0, 1);
+  if (a->hayColor || b->hayColor) {
+    const uint32_t ca = a->hayColor ? a->color : b->color, cb = b->hayColor ? b->color : a->color;
+    auto canal = [&](int sh) {
+      const float va = static_cast<float>((ca >> sh) & 0xFF), vb = static_cast<float>((cb >> sh) & 0xFF);
+      return static_cast<uint32_t>(limitar(mezclar(va, vb, limitar(k, 0, 1)), 0, 255) + 0.5f) << sh;
+    };
+    q.hayColor = true;
+    q.color = canal(16) | canal(8) | canal(0);
+  }
+  return q;
 }
 
 int Config::indiceExpresion(const char* n) const {
@@ -323,7 +485,7 @@ namespace {
 // Aplica la config de usuario sobre `c` (que es memoria de trabajo: si falla,
 // queda a medio aplicar y el que llama la descarta).
 ResultadoConfig aplicarSobre(Config& c, const char* texto, size_t n) {
-  if (n > MAX_CONFIG_BYTES) return error(ErrorConfig::Demasiadas, "config: más de 8 KB");
+  if (n > MAX_CONFIG_BYTES) return error(ErrorConfig::Demasiadas, "config: más de 16 KB");
   Json j;
   if (j.parsear(texto, n, g_tokens, MAX_TOKENS_JSON) <= 0 || j.tipo(0) != TipoJson::Objeto)
     return error(ErrorConfig::JsonInvalido, "config: JSON inválido");
@@ -385,6 +547,23 @@ ResultadoConfig aplicarSobre(Config& c, const char* texto, size_t n) {
     }
   }
 
+  int ans = j.buscar(0, "animaciones");
+  if (ans >= 0) {
+    if (j.tipo(ans) != TipoJson::Objeto) return error(ErrorConfig::Campo, "animaciones: no es un objeto");
+    static Animacion a;
+    int k = ans + 1;
+    for (int i = 0; i < j.cantidad(ans); i++) {
+      a = Animacion();
+      if (j.texto(k, a.nombre, sizeof a.nombre) < 0 || !nombreValido(a.nombre))
+        return error(ErrorConfig::Campo, "animaciones: nombre inválido");
+      ResultadoConfig r = leerAnimacion(j, k + 1, c, &a);
+      if (!r.ok()) return r;
+      r = guardarAnimacion(c, a);
+      if (!r.ok()) return r;
+      k = j.saltar(k + 1);
+    }
+  }
+
   int reg = j.buscar(0, "reglas");
   if (reg >= 0) {
     if (j.tipo(reg) != TipoJson::Arreglo) return error(ErrorConfig::Regla, "reglas: no es un arreglo");
@@ -410,6 +589,9 @@ ResultadoConfig aplicarSobre(Config& c, const char* texto, size_t n) {
         if (regla.entonces[a].tipo == Accion::Tipo::Expresion &&
             c.indiceExpresion(regla.entonces[a].argumento) < 0)
           return error(ErrorConfig::Regla, "regla: expresión que no existe");
+        if (regla.entonces[a].tipo == Accion::Tipo::Animacion &&
+            c.indiceAnimacion(regla.entonces[a].argumento) < 0)
+          return error(ErrorConfig::Regla, "regla: animación que no existe");
         regla.nAcciones++;
       }
     }
@@ -434,11 +616,16 @@ ResultadoConfig aplicarSobre(Config& c, const char* texto, size_t n) {
         if (idx < 0) return error(ErrorConfig::Campo, "lista: una cara que no existe");
         el.tipo = ElementoLista::Tipo::Cara;
         el.indice = static_cast<uint8_t>(idx);
+      } else if (iguales(t, "animacion:", 10) && t[10]) {
+        int idx = c.indiceAnimacion(t + 10);
+        if (idx < 0) return error(ErrorConfig::Campo, "lista: una animación que no existe");
+        el.tipo = ElementoLista::Tipo::Animacion;
+        el.indice = static_cast<uint8_t>(idx);
       } else if (iguales(t, "imagen:", 7) && t[7] >= '0' && t[7] < '0' + MAX_IMAGENES && t[8] == 0) {
         el.tipo = ElementoLista::Tipo::Imagen;
         el.indice = static_cast<uint8_t>(t[7] - '0');
       } else {
-        return error(ErrorConfig::Campo, "lista: usá cara:<nombre> o imagen:<0-7>");
+        return error(ErrorConfig::Campo, "lista: usá cara:<nombre>, animacion:<nombre> o imagen:<0-7>");
       }
       c.nLista++;
     }
@@ -463,17 +650,24 @@ ResultadoConfig aplicarSobre(Config& c, const char* texto, size_t n) {
 }
 }  // namespace
 
+#ifdef SINTETICA_HERRAMIENTAS
 ResultadoConfig aplicarConfig(Config& destino, const char* texto, size_t n) {
+  static Config g_copia;  // 64 KB: solo en la PC
   g_copia = destino;
   ResultadoConfig r = aplicarSobre(g_copia, texto, n);
   if (r.ok()) destino = g_copia;
   return r;
 }
+#endif
 
 ResultadoConfig cargarConfig(Config& destino, const char* texto, size_t n) {
-  ResultadoConfig r = cargarBase(g_copia);
-  if (r.ok()) r = aplicarSobre(g_copia, texto, n);
-  if (r.ok()) destino = g_copia;
+  ResultadoConfig r = cargarBase(destino);
+  if (r.ok()) r = aplicarSobre(destino, texto, n);
+  if (!r.ok()) {
+    const ResultadoConfig mal = r;
+    cargarBase(destino);
+    return mal;
+  }
   return r;
 }
 

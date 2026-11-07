@@ -256,10 +256,13 @@ PRUEBA("imagen: errores (sin autenticar, CRC, tamaño, orden, espacio)") {
   VERIFICAR(g_notis.back()[1] == NoAutorizado);
 }
 
-PRUEBA("imagen: el estado v3 trae el tamaño y la forma de la pantalla") {
+PRUEBA("imagen: el estado trae el tamaño y la forma de la pantalla") {
   arrancar();
-  uint8_t b[96];
+  uint8_t b[160];
   size_t n = g_s.estadoBle(b, sizeof b);
-  VERIFICAR(b[0] == 3);
-  VERIFICAR(b[n - 5] == 240 && b[n - 4] == 0 && b[n - 3] == 240 && b[n - 2] == 0 && b[n - 1] == 1);
+  VERIFICAR(b[0] == 4);
+  // Después de la pantalla: [n][versión][n][perfil][u32 crc].
+  size_t i = 5;
+  for (int k = 0; k < 4; k++) i += 1 + b[i];
+  VERIFICAR(i + 5 < n && b[i] == 240 && b[i + 1] == 0 && b[i + 2] == 240 && b[i + 3] == 0 && b[i + 4] == 1);
 }

@@ -3,7 +3,7 @@ package com.sinteticalabs.app.protocolo
 import java.util.UUID
 
 /**
- * Protocolo BLE de SintéticaOS v1.1, del lado de la app. Es la misma lógica que
+ * Protocolo de SintéticaOS v1.3 (BLE y nube), del lado de la app. Es la misma lógica que
  * sim/web/protocolo.js; los tests usan shared/protocolo/vectores.json para que
  * las implementaciones no se desincronicen. Ver docs/protocolo-ble.md.
  */
@@ -37,14 +37,27 @@ object Op {
     const val VINCULAR = 0x13
     const val AUTENTICAR = 0x14
     const val DESVINCULAR = 0x15
+    const val RED = 0x16
+    const val NUBE = 0x17
+    const val OLVIDAR_RED = 0x18
+    const val REPRODUCIR = 0x19
     const val IMG_INICIO = 0x20
     const val IMG_BLOQUE = 0x21
     const val IMG_FIN = 0x22
     const val IMG_BORRAR = 0x23
     const val IMG_LISTAR = 0x24
+    const val IMG_PEDIR = 0x25
+    const val OTA_INICIO = 0x30
+    const val OTA_BLOQUE = 0x31
+    const val OTA_FIN = 0x32
+    const val OTA_DESCARGAR = 0x33
+    const val OTA_PROGRESO = 0x34
+    const val OTA_CANCELAR = 0x35
     const val RESPUESTA = 0x80
     const val CONFIG_TROZO = 0x84
     const val CONFIG_CIERRE = 0x85
+    const val IMG_TROZO = 0xA7
+    const val IMG_CIERRE = 0xA8
 }
 
 val EVENTOS = listOf("tacto", "doble-toque", "levantado", "sacudida", "boca-abajo", "vinculado", "app-abierta", "despertado")
@@ -53,8 +66,19 @@ val MODOS = listOf("mascota", "reloj", "pomodoro", "clima", "notificaciones")
 private val MENSAJES = mapOf(
     0 to "ok", 1 to "muy grande", 2 to "fuera de orden", 3 to "CRC distinto", 4 to "JSON inválido",
     5 to "config inválida", 6 to "sin inicio", 7 to "no existe", 8 to "malformado", 9 to "no autorizado",
-    10 to "no está mostrando el QR", 11 to "imagen inválida", 255 to "no implementado",
+    10 to "no está mostrando el QR", 11 to "imagen inválida", 12 to "firma inválida", 13 to "hash distinto",
+    14 to "firmware de otra placa", 15 to "sin WiFi", 16 to "ocupado", 17 to "falló la actualización",
+    255 to "no implementado",
 )
+
+private fun u16(v: Int) = byteArrayOf((v and 0xFF).toByte(), (v shr 8 and 0xFF).toByte())
+
+/** Texto con su largo adelante (u8). */
+private fun corto(s: String, max: Int): ByteArray {
+    val b = s.toByteArray()
+    require(b.size <= max) { "\"${s.take(20)}\" es muy largo (máximo $max bytes)" }
+    return byteArrayOf(b.size.toByte()) + b
+}
 
 private fun u32(v: Long) = byteArrayOf((v and 0xFF).toByte(), (v shr 8 and 0xFF).toByte(), (v shr 16 and 0xFF).toByte(), (v shr 24 and 0xFF).toByte())
 
@@ -81,6 +105,11 @@ object Comando {
     fun vincular(codigo: String) = byteArrayOf(Op.VINCULAR.toByte()) + codigo.toByteArray()
     fun autenticar(clave: ByteArray) = byteArrayOf(Op.AUTENTICAR.toByte()) + clave
     fun desvincular() = byteArrayOf(Op.DESVINCULAR.toByte())
+    fun red(ssid: String, clave: String = "") = byteArrayOf(Op.RED.toByte()) + corto(ssid, 32) + corto(clave, 64)
+    fun nube(url: String, usuario: String, clave: String) =
+        byteArrayOf(Op.NUBE.toByte()) + corto(url, 160) + corto(usuario, 64) + corto(clave, 128)
+    fun olvidarRed() = byteArrayOf(Op.OLVIDAR_RED.toByte())
+    fun reproducir(animacion: String = "") = byteArrayOf(Op.REPRODUCIR.toByte()) + animacion.toByteArray()
     fun pedirConfig() = byteArrayOf(Op.CONFIG_PEDIR.toByte())
 }
 
@@ -101,6 +130,47 @@ fun escriturasDeImagen(espacio: Int, qoi: ByteArray, tamanoBloque: Int = 180): L
 object Imagen {
     fun borrar(espacio: Int) = byteArrayOf(Op.IMG_BORRAR.toByte(), espacio.toByte())
     fun listar() = byteArrayOf(Op.IMG_LISTAR.toByte())
+    fun pedir(espacio: Int) = byteArrayOf(Op.IMG_PEDIR.toByte(), espacio.toByte())
+}
+
+/** Una actualización firmada: lo que manda la API (ver docs/protocolo-ble.md, "OTA"). */
+data class Manifiesto(val tamano: Long, val sha256: ByteArray, val firma: ByteArray, val version: String, val perfil: String) {
+    fun bytes(): ByteArray {
+        require(sha256.size == 32 && firma.size == 64) { "sha256 de 32 bytes y firma de 64" }
+        return u32(tamano) + sha256 + firma + corto(version, 23) + corto(perfil, 23)
+    }
+}
+
+object Ota {
+    fun descargar(m: Manifiesto, url: String): ByteArray {
+        val u = url.toByteArray()
+        return byteArrayOf(Op.OTA_DESCARGAR.toByte()) + m.bytes() + u16(u.size) + u
+    }
+    fun cancelar() = byteArrayOf(Op.OTA_CANCELAR.toByte())
+    /** Por BLE: el manifiesto, los bloques del binario y el fin. */
+    fun escrituras(m: Manifiesto, binario: ByteArray, tamanoBloque: Int = 180): List<ByteArray> {
+        val porBloque = tamanoBloque - 5
+        val salida = mutableListOf(byteArrayOf(Op.OTA_INICIO.toByte()) + m.bytes())
+        var off = 0
+        while (off < binario.size) {
+            val fin = minOf(binario.size, off + porBloque)
+            salida += byteArrayOf(Op.OTA_BLOQUE.toByte()) + u32(off.toLong()) + binario.copyOfRange(off, fin)
+            off = fin
+        }
+        salida += byteArrayOf(Op.OTA_FIN.toByte())
+        return salida
+    }
+}
+
+data class ProgresoOta(val codigo: Int, val porcentaje: Int, val detalle: String) {
+    val ok get() = codigo == 0
+    val mensaje get() = MENSAJES[codigo] ?: "código $codigo"
+}
+
+/** La notificación [0xB4][código][porcentaje][detalle], o null si no es eso. */
+fun leerProgresoOta(b: ByteArray): ProgresoOta? {
+    if (b.size < 3 || (b[0].toInt() and 0xFF) != (Op.OTA_PROGRESO or Op.RESPUESTA)) return null
+    return ProgresoOta(b[1].toInt() and 0xFF, b[2].toInt() and 0xFF, if (b.size > 3) String(b, 3, b.size - 3) else "")
 }
 
 data class EspacioImagen(val espacio: Int, val largo: Long, val crc: Long)
@@ -184,11 +254,18 @@ data class Estado(
     val nombre: String,
     val serie: String,
     val id: String,
+    val wifi: Boolean = false,
+    val nube: Boolean = false,
+    val redConfigurada: Boolean = false,
+    val actualizando: Boolean = false,
+    val version: String = "",
+    val perfil: String = "",
+    val crcConfig: Long = 0,
 )
 
 fun leerEstado(b: ByteArray): Estado {
     val version = b[0].toInt()
-    require(version in 1..3) { "versión de estado desconocida: $version" }
+    require(version in 1..4) { "versión de estado desconocida: $version" }
     var i = 5
     fun campo(): String {
         val n = b[i].toInt() and 0xFF
@@ -206,6 +283,10 @@ fun leerEstado(b: ByteArray): Estado {
         (b[i + 2].toInt() and 0xFF) or ((b[i + 3].toInt() and 0xFF) shl 8),
         b[i + 4].toInt() == 1,
     ) else Pantalla(320, 172, false)
+    if (version >= 3) i += 5
+    val firmware = if (version >= 4) campo() else ""
+    val perfil = if (version >= 4) campo() else ""
+    val crcConfig = if (version >= 4) leerU32(b, i) else 0L
     return Estado(
         pantalla = pantalla,
         bateria = (b[1].toInt() and 0xFF).takeIf { it != 255 },
@@ -216,6 +297,11 @@ fun leerEstado(b: ByteArray): Estado {
         emparejando = flags and 4 != 0,
         autenticado = flags and 8 != 0,
         expresion = expresion, nombre = nombre, serie = serie, id = id,
+        wifi = flags and 16 != 0,
+        nube = flags and 32 != 0,
+        redConfigurada = flags and 64 != 0,
+        actualizando = flags and 128 != 0,
+        version = firmware, perfil = perfil, crcConfig = crcConfig,
     )
 }
 

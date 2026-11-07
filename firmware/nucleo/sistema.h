@@ -14,7 +14,7 @@
 
 namespace sintetica {
 
-constexpr const char* VERSION_SINTETICAOS = "0.1.0";
+constexpr const char* VERSION_SINTETICAOS = "0.2.0";
 
 // Cómo es la placa: la pantalla y qué hace su pulsador.
 struct Perfil {
@@ -24,6 +24,10 @@ struct Perfil {
   // Mascota (1.47B): toque = caricia, doble toque, mantener 5 s = QR.
   // Broche: toque = lo siguiente de la lista, mantener 2 s = dormir, 8 s = QR.
   enum class Boton : uint8_t { Mascota, Broche } boton = Boton::Mascota;
+  // Lo que va en el estado y en los manifiestos de OTA: una OTA solo se
+  // acepta si es de este mismo perfil.
+  const char* nombre = "sim";
+  const char* version = VERSION_SINTETICAOS;
 };
 
 namespace tiemposImagen {
@@ -59,8 +63,26 @@ class Sistema {
   void bleConexion(bool conectado);
   // Una escritura en una característica BLE.
   void bleEscribir(uint8_t caracteristica, const uint8_t* datos, size_t n);
+  // Lo mismo que llega por la nube (MQTT bicho/{id}/cmd: [característica][datos]).
+  // La nube ya está autenticada por el broker; no puede cambiar el WiFi ni la nube.
+  void nubeEscribir(uint8_t caracteristica, const uint8_t* datos, size_t n);
   // Lo que devuelve una lectura de la característica de estado.
   size_t estadoBle(uint8_t* salida, size_t cap) const;
+
+  // WiFi y nube (v1.3). El perfil lee las credenciales guardadas y avisa cómo
+  // está conectado.
+  bool red(char* ssid, size_t capSsid, char* clave, size_t capClave) const;
+  bool nube(char* url, size_t capUrl, char* usuario, size_t capUsuario, char* clave, size_t capClave) const;
+  void conexiones(bool wifi, bool nube);
+  bool wifiConectado() const { return wifi_; }
+  bool nubeConectada() const { return nube_; }
+  // El perfil avisa cómo va una OTA (código protocolo::Codigo, 0-100 %).
+  void otaProgreso(uint8_t codigo, uint8_t porcentaje, const char* detalle = nullptr);
+  bool actualizando() const { return ota_ != Ota::Ninguna; }
+  uint32_t crcConfig() const { return crcConfig_; }
+  // Reproduce una animación de la config (-1 para). unaVez: si no, repite.
+  void reproducir(int animacion, bool unaVez);
+  int animacionVisible() const { return animVisible_; }
 
   const Config& config() const { return config_; }
   const MotorVida& motor() const { return motor_; }
@@ -116,6 +138,17 @@ class Sistema {
   ElementoLista elementoLista(int i) const;
   void botonBroche(bool apretado, uint32_t ahora);
   void bleImagen(uint8_t op, const uint8_t* d, size_t n);
+  void procesar(uint8_t car, const uint8_t* d, size_t n);
+  void comandoRed(uint8_t op, const uint8_t* d, size_t n);
+  void ota(uint8_t op, const uint8_t* d, size_t n);
+  void enviarImagen(int espacio);
+  // Manda por donde llegó el pedido (BLE o nube).
+  void enviar(uint8_t car, const uint8_t* b, size_t n);
+  size_t tamanoTrozo() const;
+  void elegirAnimacion(uint32_t ahora);
+  void leerRed();
+  void cargarGuardada();
+  size_t leerGuardada(char* buf) const;
   void leerImagenes();
   void guardarImagenes();
   int imagenParaMostrar(uint32_t ahora);
@@ -173,7 +206,23 @@ class Sistema {
   Azar azar_;
   DecodificadorQoi qoi_;
 
-  uint8_t ultimoEstado_[96] = {};
+  // Por dónde llegó lo que se está atendiendo.
+  enum class Canal : uint8_t { Ble, Nube } canal_ = Canal::Ble;
+  bool wifi_ = false, nube_ = false, redConfigurada_ = false;
+  enum class Ota : uint8_t { Ninguna, Subida, Descarga } ota_ = Ota::Ninguna;
+  uint32_t otaTamano_ = 0, otaRecibido_ = 0;
+  uint8_t otaPorcentaje_ = 0;
+  uint32_t crcConfig_ = 0;
+
+  // Animaciones: la pedida (por comando o regla) gana sobre la de la lista.
+  int animPedida_ = -1;
+  bool animUnaVez_ = false;
+  uint32_t animDesde_ = 0, animListaDesde_ = 0;
+  int animVisible_ = -1;
+  uint32_t animT_ = 0;
+  char visible_[LARGO_NOMBRE + 12] = {};
+
+  uint8_t ultimoEstado_[protocolo::MAX_ESTADO] = {};
   size_t largoUltimoEstado_ = 0;
 };
 

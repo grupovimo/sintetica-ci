@@ -15,5 +15,5 @@ for f in firmware/nucleo/*.cpp firmware/perfiles/sim/sim.cpp; do
 done
 # shellcheck disable=SC2086
 wasm-ld --no-entry --export=__wasm_call_ctors --export-memory -z stack-size=262144 \
-  --initial-memory=4194304 $OBJS -o sim/dist/sinteticaos.wasm
+  --initial-memory=8388608 $OBJS -o sim/dist/sinteticaos.wasm
 echo "sim/dist/sinteticaos.wasm ($(wc -c < sim/dist/sinteticaos.wasm) bytes)"

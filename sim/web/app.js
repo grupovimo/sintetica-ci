@@ -25,6 +25,7 @@ let ocupados = 0;           // máscara de espacios con imagen
 const NOMBRES_CAR = { 1: 'config', 2: 'comando', 3: 'estado', 4: 'ota', 5: 'imagen' };
 const NOMBRES_OP = {
   0x10: 'expresión', 0x11: 'nombre', 0x12: 'evento', 0x13: 'vincular', 0x14: 'autenticar', 0x15: 'desvincular',
+  0x16: 'WiFi', 0x17: 'nube', 0x18: 'olvidar red', 0x19: 'reproducir', 0x25: 'pedir imagen',
   0x01: 'inicio', 0x02: 'bloque', 0x03: 'fin', 0x04: 'pedir',
   0x20: 'inicio', 0x21: 'bloque', 0x22: 'fin', 0x23: 'borrar', 0x24: 'listar',
 };
@@ -85,6 +86,7 @@ function alNotificar(car, b) {
     } catch (e) { anotar(`← config  ${e.message}`, 'mal'); }
     return;
   }
+  if (car === Car.config && r.op === 0x03 && r.ok) armarAnimaciones();
   if (r.clave) { guardarClave(r.clave); anotar('· este celu quedó vinculado: guardé la clave'); }
   if (r.op === 0x15 && r.ok) guardarClave(null);
   const op = NOMBRES_OP[r.op] ?? `0x${r.op.toString(16)}`;
@@ -100,6 +102,7 @@ function mostrarEstado(e) {
   $('placa-serie').textContent = `${e.serie ? 'Unidad #' + e.serie : 'Sin número'} · ${e.nombre} · SintéticaOS ${sim?.version() ?? ''}`;
   $('b-vincular').disabled = !e.emparejando;
   $('b-auto').setAttribute('aria-pressed', String(!e.fija));
+  for (const b of $('animaciones').children) b.setAttribute('aria-pressed', String(e.expresion === 'animacion:' + b.dataset.nombre));
   for (const b of $('caras').children) b.setAttribute('aria-pressed', String(e.fija && b.dataset.nombre === e.expresion));
 }
 
@@ -183,6 +186,20 @@ function armarCaras() {
   }
 }
 
+function armarAnimaciones() {
+  const caja = $('animaciones');
+  caja.replaceChildren();
+  const nombres = sim.animaciones();
+  $('sin-animaciones').hidden = nombres.length > 0;
+  for (const nombre of nombres) {
+    const b = document.createElement('button');
+    b.textContent = nombre;
+    b.dataset.nombre = nombre;
+    b.addEventListener('click', () => escribir(Car.comando, comando.reproducir(nombre)));
+    caja.append(b);
+  }
+}
+
 async function cargarWasm() {
   if (globalThis.SINTETICA_WASM_B64) return Uint8Array.from(atob(globalThis.SINTETICA_WASM_B64), (c) => c.charCodeAt(0));
   const r = await fetch('../dist/sinteticaos.wasm');
@@ -220,6 +237,7 @@ async function arrancar() {
     alLed: (rgb) => { $('led').style.background = `#${rgb.toString(16).padStart(6, '0')}`; },
   });
   armarCaras();
+  armarAnimaciones();
   sim.bleConexion(true);
   const clave = claveGuardada();
   if (clave && !sim.emparejando()) escribir(Car.comando, comando.autenticar(clave), '(clave guardada de este celu)');
@@ -276,6 +294,7 @@ function enlazar() {
     $('v-bateria').textContent = bateria < 0 ? 'sin batería' : `${bateria}%`;
   });
   $('b-auto').addEventListener('click', () => escribir(Car.comando, comando.expresion('')));
+  $('b-parar').addEventListener('click', () => escribir(Car.comando, comando.reproducir('')));
   $('b-nombre').addEventListener('click', () => {
     const n = $('i-nombre').value.trim();
     if (n) escribir(Car.comando, comando.nombre(n));

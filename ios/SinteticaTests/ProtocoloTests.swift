@@ -26,6 +26,26 @@ final class ProtocoloTests: XCTestCase {
         XCTAssertEqual(hex(Comando.pedirConfig()), esperado("pedir config"))
         XCTAssertEqual(hex(ComandoImagen.borrar(3)), esperado("imagen borrar 3"))
         XCTAssertEqual(hex(ComandoImagen.listar()), esperado("imagen listar"))
+        XCTAssertEqual(hex(ComandoImagen.pedir(5)), esperado("imagen pedir 5"))
+        XCTAssertEqual(hex(Comando.red(c["red"]!["ssid"] as! String, clave: c["red"]!["clave"] as! String)), esperado("red"))
+        XCTAssertEqual(hex(Comando.red("Bar")), esperado("red abierta"))
+        let n = c["nube"]!
+        XCTAssertEqual(hex(Comando.nube(url: n["url"] as! String, usuario: n["usuario"] as! String, clave: n["clave"] as! String)), esperado("nube"))
+        XCTAssertEqual(hex(Comando.olvidarRed()), esperado("olvidar red"))
+        XCTAssertEqual(hex(Comando.reproducir("saludo")), esperado("reproducir saludo"))
+        XCTAssertEqual(hex(Comando.reproducir()), esperado("reproducir parar"))
+        XCTAssertEqual(hex(ComandoOta.cancelar()), esperado("ota cancelar"))
+    }
+
+    func testOta() {
+        let o = v["ota"] as! [String: Any]
+        let bin = deHex(o["binario"] as! String)
+        let m = Manifiesto(tamano: UInt32(bin.count), sha256: deHex(o["sha256"] as! String), firma: deHex(o["firma"] as! String),
+                           version: o["version"] as! String, perfil: o["perfil"] as! String)
+        XCTAssertEqual(hex(m.bytes), o["manifiesto"] as? String)
+        XCTAssertEqual(hex(ComandoOta.descargar(m, url: o["url"] as! String)), o["descargar"] as? String)
+        XCTAssertEqual(ComandoOta.escrituras(m, bin, tamanoBloque: o["tamanoBloque"] as! Int).map(hex), o["escrituras"] as? [String])
+        XCTAssertEqual(leerProgresoOta([0xB4, 0, 40])?.porcentaje, 40)
     }
 
     func testConfigEnBloques() {
@@ -52,6 +72,13 @@ final class ProtocoloTests: XCTestCase {
             XCTAssertEqual(est.pantalla.ancho, c["ancho"] as? Int)
             XCTAssertEqual(est.pantalla.alto, c["alto"] as? Int)
             XCTAssertEqual(est.pantalla.redonda, c["redonda"] as? Bool)
+            XCTAssertEqual(est.wifi, c["wifi"] as? Bool)
+            XCTAssertEqual(est.nube, c["nube"] as? Bool)
+            XCTAssertEqual(est.redConfigurada, c["redConfigurada"] as? Bool)
+            XCTAssertEqual(est.actualizando, c["actualizando"] as? Bool)
+            XCTAssertEqual(est.version, c["version"] as? String)
+            XCTAssertEqual(est.perfil, c["perfil"] as? String)
+            XCTAssertEqual(est.crcConfig, UInt32(c["crcConfigHex"] as! String, radix: 16))
         }
     }
 

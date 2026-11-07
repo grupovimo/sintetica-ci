@@ -39,6 +39,8 @@ class Lienzo {
   const uint16_t* pixeles() const { return px_; }
 
   void limpiar(uint32_t rgb);
+  // Opacidad de lo que se dibuja con antialias de acá en adelante (0 a 1).
+  void opacidad(float a) { alfa_ = limitar(a, 0, 1); }
 
   // Rectángulo redondeado relleno, en píxeles (centro, tamaño y radio).
   void pildora(float cx, float cy, float w, float h, float r, uint32_t rgb);
@@ -64,6 +66,7 @@ class Lienzo {
 
   uint16_t* px_ = nullptr;
   int ancho_ = 0, alto_ = 0, filas_ = 0, y0_ = 0;
+  float alfa_ = 1;
 };
 
 }  // namespace sintetica

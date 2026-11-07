@@ -1,9 +1,12 @@
-# Protocolo BLE de SintéticaOS (v1.2)
+# Protocolo de SintéticaOS (v1.3)
 
 Un servicio GATT propio. Todos los enteros van en little-endian. La
 implementación de referencia es `firmware/nucleo/protocolo.*` y
 `firmware/nucleo/sistema.cpp`; el panel del simulador manda exactamente estos
-mismos bytes.
+mismos bytes. Los mismos marcos viajan también por la nube (MQTT, ver "Nube").
+
+Los bytes de cada operación están en `shared/protocolo/vectores.json`: el
+núcleo C++, el JS de referencia, Kotlin y Swift se prueban contra ese archivo.
 
 ## Servicio y características
 
@@ -13,7 +16,7 @@ mismos bytes.
 | Config | `5157e71c-a000-4b1c-8a5e-000000000002` | write, write without response, notify |
 | Comando | `5157e71c-a000-4b1c-8a5e-000000000003` | write, notify |
 | Estado | `5157e71c-a000-4b1c-8a5e-000000000004` | read, notify |
-| OTA | `5157e71c-a000-4b1c-8a5e-000000000005` | write, notify (reservada, todavía no implementada) |
+| OTA | `5157e71c-a000-4b1c-8a5e-000000000005` | write, write without response, notify (v1.3) |
 | Imagen | `5157e71c-a000-4b1c-8a5e-000000000006` | write, write without response, notify (v1.2) |
 
 El nombre BLE del bicho es el que eligió el dueño. El anuncio lleva, además del
@@ -50,7 +53,7 @@ característica: `[op | 0x80][código][detalle opcional en UTF-8]`.
 | Código | Significado |
 | --- | --- |
 | `0x00` | Ok |
-| `0x01` | Muy grande (más de 8 KB) |
+| `0x01` | Muy grande (la config, más de 16 KB) |
 | `0x02` | Fuera de orden (un bloque con un desplazamiento inesperado; aborta la transferencia) |
 | `0x03` | CRC distinto |
 | `0x04` | JSON inválido (el detalle dice por qué) |
@@ -61,6 +64,12 @@ característica: `[op | 0x80][código][detalle opcional en UTF-8]`.
 | `0x09` | No autorizado (falta vincular o autenticar, o el código o la clave no coinciden) |
 | `0x0A` | No está mostrando el QR (mantené el botón 5 s; en el broche, 8 s) |
 | `0x0B` | Imagen inválida (no es un QOI del tamaño de la pantalla) |
+| `0x0C` | Firma inválida (el firmware no lo firmó Sintética Labs) |
+| `0x0D` | Hash distinto (lo que llegó no es lo que se firmó) |
+| `0x0E` | Perfil distinto (es el firmware de otra placa) |
+| `0x0F` | Sin WiFi (para descargar hace falta red) |
+| `0x10` | Ocupado (ya hay una actualización o una transferencia en curso) |
+| `0x11` | Falló la actualización (el detalle dice por qué) |
 | `0xFF` | No implementado |
 
 ## Config
@@ -98,6 +107,7 @@ a la forma de la pantalla (en el broche, redonda: lo de afuera del círculo en
 | `0x22` Fin | — | Verifica largo, CRC y la cabecera QOI (tamaño de la pantalla). Responde. |
 | `0x23` Borrar | u8 espacio | Responde. |
 | `0x24` Listar | — | Responde `[0xA4][0x00][máscara de ocupados]` + por cada espacio ocupado `[espacio][u32 largo][u32 CRC-32]`. |
+| `0x25` Pedir | u8 espacio | Responde `[0xA5][0x00]` (o `[0xA5][0x07]` si está vacío), varios `[0xA7][u32 desplazamiento][bytes]` y `[0xA8][espacio][u32 largo][u32 CRC-32]` (v1.3). |
 
 Los bloques conviene mandarlos sin respuesta (write without response): es varias
 veces más rápido.
@@ -112,6 +122,10 @@ veces más rápido.
 | `0x13` Vincular | el código del QR (6 bytes) | Ver "Vínculo y autenticación". No pide autenticación. |
 | `0x14` Autenticar | la clave (16 bytes) | Autentica esta conexión. No pide autenticación. |
 | `0x15` Desvincular | — | Olvida todas las claves y vuelve a mostrar el QR. |
+| `0x16` WiFi | `[n][ssid][n][clave]` (ssid de 1 a 32 bytes, clave de 0 a 64) | Lo guarda y se conecta. Solo por BLE (v1.3). |
+| `0x17` Nube | `[n][url][n][usuario][n][clave]` (url `mqtt://` o `mqtts://`, hasta 160 bytes) | Las credenciales MQTT que da la API al sumar el bicho a una cuenta. Solo por BLE (v1.3). |
+| `0x18` Olvidar red | — | Olvida el WiFi y la nube (v1.3). |
+| `0x19` Reproducir | nombre de una animación (vacío = parar) | La reproduce; si la animación tiene `"repetir": true`, hasta que la paren (v1.3). |
 
 Eventos: `0` tacto, `1` doble toque, `2` levantado, `3` sacudida, `4` boca abajo,
 `5` vinculado, `6` app abierta, `7` despertado.
@@ -121,16 +135,76 @@ Eventos: `0` tacto, `1` doble toque, `2` levantado, `3` sacudida, `4` boca abajo
 Lectura o notificación (se notifica cuando cambia algo que no sea el humor):
 
 ```
-[versión = 3][batería u8, 255 = no se sabe][humor i8, -100..100][modo u8]
-[flags u8: bit 0 dormido, 1 expresión fija, 2 mostrando el QR, 3 esta conexión autenticada]
+[versión = 4][batería u8, 255 = no se sabe][humor i8, -100..100][modo u8]
+[flags u8: bit 0 dormido, 1 expresión fija, 2 mostrando el QR, 3 esta conexión autenticada,
+           4 WiFi conectado, 5 nube conectada, 6 WiFi configurado, 7 actualizando]
 [n u8][expresión visible][n u8][nombre][n u8][número de unidad][n u8][id]
 [u16 ancho][u16 alto][forma u8: 0 rectangular, 1 redonda]
+[n u8][versión del firmware][n u8][perfil][u32 CRC-32 de la config guardada, 0 = la de fábrica]
 ```
 
-(Textos en UTF-8. La versión 2 no tenía la pantalla; la 1 tampoco el número
-de unidad, el id ni los bits 2 y 3.)
+(Textos en UTF-8. Mientras se ve una animación, la expresión visible es
+`animacion:<nombre>`. La versión 3 no tenía la red, el firmware ni el CRC; la
+2 tampoco la pantalla; la 1 tampoco el número de unidad, el id ni los bits 2 y
+3.)
 
 Modos: `0` mascota, `1` reloj, `2` pomodoro, `3` clima, `4` notificaciones.
+
+## OTA (v1.3)
+
+Las actualizaciones las firma la API con una clave ECDSA P-256 que solo tiene
+el servidor; el firmware trae la clave pública embebida y rechaza todo lo que
+no esté firmado con ella. El **manifiesto**:
+
+```
+[u32 tamaño][32 bytes SHA-256 del binario][64 bytes firma: r || s][n][versión][n][perfil]
+```
+
+La firma es sobre el SHA-256 de este texto (UTF-8, con `\n` al final de cada línea):
+
+```
+SINTETICA-OTA-V1
+<perfil>
+<versión>
+<tamaño en decimal>
+<SHA-256 en hex minúscula>
+```
+
+Así un binario firmado para el broche no se puede instalar en la 1.47B.
+
+| Op | Datos | Qué hace |
+| --- | --- | --- |
+| `0x30` Inicio | manifiesto | Verifica perfil, firma y tamaño y prepara la otra partición. Responde. |
+| `0x31` Bloque | u32 desplazamiento, bytes | Se escribe a la flash. Solo responde si hay error (y aborta). |
+| `0x32` Fin | — | Verifica el SHA-256, marca la partición nueva y responde; después reinicia. |
+| `0x33` Descargar | manifiesto, `[u16 n][url]` | Con WiFi: la baja él solo por HTTP(S), verifica e instala. Responde si arrancó. |
+| `0x35` Cancelar | — | Responde. |
+
+Mientras tanto notifica el progreso: `[0xB4][código][porcentaje][detalle]`. Un
+código distinto de 0 es que falló y terminó.
+
+Después de instalar, el firmware nuevo arranca "a prueba": si no llega a
+confirmarse (20 s andando y, si tiene WiFi configurado, conectado a la nube),
+el bootloader vuelve solo a la versión anterior.
+
+## Nube (v1.3)
+
+Con WiFi, el bicho se conecta al broker MQTT con las credenciales que le pasó
+la app (`0x17`): el usuario es su id y la clave es suya (la API la genera al
+sumarlo a una cuenta). Tópicos:
+
+| Tópico | Sentido | Contenido |
+| --- | --- | --- |
+| `bicho/{id}/cmd` | la API → el bicho | `[característica][marco]`: los mismos bytes que por BLE |
+| `bicho/{id}/resp` | el bicho → la API | `[característica][respuesta]` |
+| `bicho/{id}/state` | el bicho → la API (retenido) | el estado v4 |
+| `bicho/{id}/conexion` | el bicho → la API (retenido, con testamento) | `1` conectado, `0` desconectado |
+
+La característica es el número de `Car` del núcleo: 1 Config, 2 Comando,
+3 Estado, 4 OTA, 5 Imagen. Por la nube los trozos de config e imagen que manda
+el bicho son de hasta 1 KB. El broker solo deja a cada bicho publicar y
+suscribirse a sus propios tópicos; por la nube no se puede cambiar el WiFi ni
+la nube (`0x16`, `0x17`: responde `0x09`).
 
 ## Taller
 

@@ -11,6 +11,12 @@ constexpr const char* CLAVE_SERIE = "serie";
 constexpr const char* CLAVE_CODIGO = "codigo";
 constexpr const char* CLAVE_CLAVES = "claves";
 constexpr const char* CLAVE_IMAGENES = "imagenes";
+constexpr const char* CLAVE_RED = "red";
+constexpr const char* CLAVE_NUBE = "nube";
+
+// Por la nube los trozos pueden ser más grandes que por BLE.
+constexpr size_t TROZO_NUBE = 1024;
+uint8_t g_trozo[TROZO_NUBE + 16];
 
 void claveImagen(char* destino, int espacio) {
   copiarTexto(destino, 6, "img0");
@@ -24,11 +30,12 @@ constexpr uint32_t BLOQUEO_MS = 30000;
 // Sin letras ni números que se confundan (0/O, 1/I/L).
 const char ALFABETO_CODIGO[] = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
-// Memoria grande, fuera de la pila.
-char g_textoConfig[MAX_CONFIG_BYTES + 1];
-size_t g_largoConfig = 0;
 
 const char CONFIG_VACIA[] = "{\"version\":1}";
+
+bool esUrlNube(const char* u) {
+  return iguales(u, "mqtt://", 7) || iguales(u, "mqtts://", 8);
+}
 }  // namespace
 
 void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
@@ -51,22 +58,13 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
   if (!r.ok()) log(r.detalle);
 
   // Configuración guardada.
-  g_largoConfig = 0;
-  int n = hal_.leer ? hal_.leer(CLAVE_CONFIG, reinterpret_cast<uint8_t*>(g_textoConfig), MAX_CONFIG_BYTES) : -1;
-  if (n > 0) {
-    ResultadoConfig rc = aplicarConfig(config_, g_textoConfig, static_cast<size_t>(n));
-    if (rc.ok()) {
-      g_largoConfig = static_cast<size_t>(n);
-    } else {
-      log("config guardada inválida; uso la base");
-      log(rc.detalle);
-    }
-  }
-  if (g_largoConfig == 0) {
-    copiarTexto(g_textoConfig, sizeof g_textoConfig, CONFIG_VACIA);
-    g_largoConfig = largo(CONFIG_VACIA);
-  }
-  g_textoConfig[g_largoConfig] = 0;
+  cargarGuardada();
+
+  canal_ = Canal::Ble;
+  wifi_ = nube_ = false;
+  ota_ = Ota::Ninguna;
+  animPedida_ = animVisible_ = -1;
+  leerRed();
 
   const uint32_t ahora = hal_.ahoraMs();
   motor_.iniciar(&config_, hal_.semilla ? hal_.semilla() : ahora, ahora);
@@ -80,6 +78,31 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
   ultimaRotacion_ = ahora;
   aplicarLista(ahora);
   log("SintéticaOS listo");
+}
+
+size_t Sistema::leerGuardada(char* buf) const {
+  const int n = hal_.leer ? hal_.leer(CLAVE_CONFIG, reinterpret_cast<uint8_t*>(buf), MAX_CONFIG_BYTES) : -1;
+  if (n <= 0) return 0;
+  buf[n] = 0;
+  return static_cast<size_t>(n);
+}
+
+void Sistema::cargarGuardada() {
+  // El texto no queda en RAM: se lee de la flash cuando hace falta.
+  char* buf = receptor_.prestar();
+  const size_t n = buf ? leerGuardada(buf) : 0;
+  crcConfig_ = 0;
+  if (n == 0) {
+    cargarBase(config_);
+    return;
+  }
+  ResultadoConfig r = cargarConfig(config_, buf, n);
+  if (!r.ok()) {
+    log("config guardada inválida; uso la base");
+    log(r.detalle);
+    return;
+  }
+  crcConfig_ = protocolo::crc32(reinterpret_cast<const uint8_t*>(buf), n);
 }
 
 void Sistema::leerIdentidad() {
@@ -209,6 +232,9 @@ void Sistema::aplicarAcciones(const Regla& r) {
       case Accion::Tipo::Sonido:
         if (hal_.sonido) hal_.sonido(acc.argumento);
         break;
+      case Accion::Tipo::Animacion:
+        reproducir(config_.indiceAnimacion(acc.argumento), true);
+        break;
       case Accion::Tipo::Led: {
         uint32_t rgb;
         bool acento;
@@ -280,7 +306,7 @@ bool Sistema::dibujarImagen(int espacio) {
 
 // La imagen que corresponde mostrar ahora, o -1 si va una cara.
 int Sistema::imagenParaMostrar(uint32_t ahora) {
-  if (apagado_ || emparejando_ || motor_.expresionFija() >= 0 || largoLista() == 0) return -1;
+  if (apagado_ || emparejando_ || motor_.expresionFija() >= 0 || animPedida_ >= 0 || largoLista() == 0) return -1;
   const ElementoLista e = elementoLista(posLista_);
   if (e.tipo != ElementoLista::Tipo::Imagen || imagenes_[e.indice].largo == 0 || subiendo_ == e.indice) return -1;
   // Cada tanto vuelve la cara un par de segundos: nunca una imagen quieta del todo.
@@ -363,7 +389,6 @@ void Sistema::bleImagen(uint8_t op, const uint8_t* d, size_t n) {
       return responder(car, op, Ok);
     }
     case ImgListar: {
-      if (!hal_.notificar) return;
       uint8_t b[3 + MAX_IMAGENES * 9];
       size_t i = 3;
       uint8_t mascara = 0;
@@ -378,8 +403,13 @@ void Sistema::bleImagen(uint8_t op, const uint8_t* d, size_t n) {
       b[0] = op | Respuesta;
       b[1] = Ok;
       b[2] = mascara;
-      hal_.notificar(car, b, i);
+      enviar(car, b, i);
       return;
+    }
+    case ImgPedir: {
+      if (n != 2 || d[1] >= MAX_IMAGENES) return responder(car, op, Malformado);
+      if (!imagenes_[d[1]].largo) return responder(car, op, NoExiste);
+      return enviarImagen(d[1]);
     }
     default:
       return responder(car, op, Malformado);
@@ -407,9 +437,10 @@ void Sistema::aplicarLista(uint32_t ahora) {
   }
   if (posLista_ >= n) posLista_ = 0;
   const ElementoLista e = elementoLista(posLista_);
-  // Las imágenes se dibujan aparte; mientras tanto la cara de base es la neutral.
+  // Las imágenes y las animaciones se dibujan aparte; mientras tanto la cara de
+  // base es la neutral.
   motor_.base(e.tipo == ElementoLista::Tipo::Cara ? e.indice : -1);
-  (void)ahora;
+  animListaDesde_ = ahora;
 }
 
 void Sistema::siguiente() {
@@ -476,6 +507,12 @@ void Sistema::dibujarPantalla(uint32_t ahora) {
     return;
   }
   lienzo_.limpiar(paleta::PANTALLA);
+  if (animVisible_ >= 0) {
+    const Animacion& a = config_.animaciones[animVisible_];
+    if (a.sobre >= 0) dibujarExpresion(lienzo_, vista_, config_.expresiones[a.sobre], motor_.estado());
+    dibujarAnimacion(lienzo_, vista_, a, animT_, motor_.estado());
+    return;
+  }
   int visible = motor_.expresionVisible();
   // Manteniendo el botón del broche para dormirlo: muestra que se va a dormir.
   if (perfil_.boton == Perfil::Boton::Broche && botonApretado_ && !ignorarSoltar_ &&
@@ -516,6 +553,7 @@ void Sistema::tick() {
     emparejando_ = false;
 
   if (vistaPrevia_) emparejando_ = false;
+  elegirAnimacion(ahora);
   const int imagen = imagenParaMostrar(ahora);
   if (imagen >= 0 && imagen == mostrandoImagen_ && !imagenSucia_) {
     // La imagen ya está en la pantalla: no hace falta redibujarla.
@@ -553,19 +591,26 @@ size_t Sistema::estadoBle(uint8_t* salida, size_t cap) const {
   p.fija = motor_.expresionFija() >= 0;
   p.emparejando = emparejando_;
   p.autenticado = autenticado_;
-  p.expresion = config_.expresiones[motor_.expresionVisible()].nombre;
+  p.expresion = animVisible_ >= 0 ? visible_ : config_.expresiones[motor_.expresionVisible()].nombre;
   p.nombre = nombre();
   p.serie = serie_;
   p.id = id_;
   p.ancho = static_cast<uint16_t>(perfil_.ancho);
   p.alto = static_cast<uint16_t>(perfil_.alto);
   p.redonda = perfil_.redonda;
+  p.wifi = wifi_;
+  p.nube = nube_;
+  p.redConfigurada = redConfigurada_;
+  p.actualizando = ota_ != Ota::Ninguna;
+  p.version = perfil_.version ? perfil_.version : "";
+  p.perfil = perfil_.nombre ? perfil_.nombre : "";
+  p.crcConfig = crcConfig_;
   return protocolo::codificarEstado(p, salida, cap);
 }
 
 void Sistema::notificarEstadoSiCambio() {
-  if (!hal_.notificar) return;
-  uint8_t b[96];
+  if (!hal_.notificar && !hal_.notificarNube) return;
+  uint8_t b[protocolo::MAX_ESTADO];
   size_t n = estadoBle(b, sizeof b);
   // El humor cambia de a poco: no notificar por eso solo.
   bool igual = n == largoUltimoEstado_;
@@ -573,11 +618,23 @@ void Sistema::notificarEstadoSiCambio() {
   if (igual) return;
   copiarBytes(ultimoEstado_, b, n);
   largoUltimoEstado_ = n;
-  hal_.notificar(protocolo::CarEstado, b, n);
+  if (hal_.notificar) hal_.notificar(protocolo::CarEstado, b, n);
+  if (hal_.notificarNube) hal_.notificarNube(protocolo::CarEstado, b, n);
+}
+
+void Sistema::enviar(uint8_t car, const uint8_t* b, size_t n) {
+  if (canal_ == Canal::Nube) {
+    if (hal_.notificarNube) hal_.notificarNube(car, b, n);
+  } else if (hal_.notificar) {
+    hal_.notificar(car, b, n);
+  }
+}
+
+size_t Sistema::tamanoTrozo() const {
+  return canal_ == Canal::Nube ? TROZO_NUBE : protocolo::MAX_NOTIFICACION - 9;
 }
 
 void Sistema::responder(uint8_t car, uint8_t op, protocolo::Codigo c, const char* detalle) {
-  if (!hal_.notificar) return;
   uint8_t b[protocolo::MAX_NOTIFICACION];
   size_t i = 0;
   b[i++] = static_cast<uint8_t>(op | protocolo::Respuesta);
@@ -588,31 +645,289 @@ void Sistema::responder(uint8_t car, uint8_t op, protocolo::Codigo c, const char
     copiarBytes(b + i, detalle, n);
     i += n;
   }
-  hal_.notificar(car, b, i);
+  enviar(car, b, i);
 }
 
 void Sistema::enviarConfig() {
-  if (!hal_.notificar) return;
-  uint8_t b[protocolo::MAX_NOTIFICACION];
-  const size_t porTrozo = protocolo::MAX_NOTIFICACION - 5;
-  for (size_t off = 0; off < g_largoConfig; off += porTrozo) {
-    size_t n = g_largoConfig - off < porTrozo ? g_largoConfig - off : porTrozo;
+  char* texto = receptor_.prestar();
+  if (!texto) return responder(protocolo::CarConfig, protocolo::ConfigPedir, protocolo::Ocupado, "hay una config llegando");
+  size_t total = leerGuardada(texto);
+  if (total == 0) total = copiarTexto(texto, MAX_CONFIG_BYTES + 1, CONFIG_VACIA);
+  uint8_t* b = g_trozo;
+  const size_t porTrozo = canal_ == Canal::Nube ? TROZO_NUBE : protocolo::MAX_NOTIFICACION - 5;
+  for (size_t off = 0; off < total; off += porTrozo) {
+    size_t n = total - off < porTrozo ? total - off : porTrozo;
     b[0] = protocolo::ConfigTrozo;
     protocolo::escribir32(b + 1, static_cast<uint32_t>(off));
-    copiarBytes(b + 5, g_textoConfig + off, n);
-    hal_.notificar(protocolo::CarConfig, b, 5 + n);
+    copiarBytes(b + 5, texto + off, n);
+    enviar(protocolo::CarConfig, b, 5 + n);
   }
   b[0] = protocolo::ConfigCierre;
-  protocolo::escribir32(b + 1, static_cast<uint32_t>(g_largoConfig));
-  protocolo::escribir32(b + 5, protocolo::crc32(reinterpret_cast<const uint8_t*>(g_textoConfig), g_largoConfig));
-  hal_.notificar(protocolo::CarConfig, b, 9);
+  protocolo::escribir32(b + 1, static_cast<uint32_t>(total));
+  protocolo::escribir32(b + 5, protocolo::crc32(reinterpret_cast<const uint8_t*>(texto), total));
+  enviar(protocolo::CarConfig, b, 9);
+}
+
+void Sistema::enviarImagen(int espacio) {
+  using namespace protocolo;
+  char clave[6];
+  claveImagen(clave, espacio);
+  const uint8_t ok[2] = {static_cast<uint8_t>(ImgPedir | Respuesta), Ok};
+  enviar(CarImagen, ok, 2);
+  const size_t porTrozo = canal_ == Canal::Nube ? TROZO_NUBE : MAX_NOTIFICACION - 5;
+  uint32_t off = 0, crc = 0;
+  while (off < imagenes_[espacio].largo && hal_.leerTrozo) {
+    const int m = hal_.leerTrozo(clave, off, g_trozo + 5, porTrozo);
+    if (m <= 0) break;
+    g_trozo[0] = ImgTrozo;
+    escribir32(g_trozo + 1, off);
+    enviar(CarImagen, g_trozo, 5 + static_cast<size_t>(m));
+    crc = crc32(g_trozo + 5, static_cast<size_t>(m), crc);
+    off += static_cast<uint32_t>(m);
+  }
+  g_trozo[0] = ImgCierre;
+  g_trozo[1] = static_cast<uint8_t>(espacio);
+  escribir32(g_trozo + 2, off);
+  escribir32(g_trozo + 6, crc);
+  enviar(CarImagen, g_trozo, 10);
+}
+
+void Sistema::leerRed() {
+  char ssid[33], clave[65];
+  redConfigurada_ = red(ssid, sizeof ssid, clave, sizeof clave);
+}
+
+bool Sistema::red(char* ssid, size_t cs, char* clave, size_t cc) const {
+  uint8_t b[2 + 32 + 64];
+  const int n = hal_.leer ? hal_.leer(CLAVE_RED, b, sizeof b) : -1;
+  if (n < 2) return false;
+  size_t k = protocolo::leerTextoCorto(b, static_cast<size_t>(n), ssid, cs);
+  if (!k || !ssid[0]) return false;
+  return protocolo::leerTextoCorto(b + k, static_cast<size_t>(n) - k, clave, cc) > 0;
+}
+
+bool Sistema::nube(char* url, size_t cu, char* usuario, size_t cus, char* clave, size_t cc) const {
+  uint8_t b[3 + 160 + 64 + 128];
+  const int n = hal_.leer ? hal_.leer(CLAVE_NUBE, b, sizeof b) : -1;
+  if (n < 3) return false;
+  size_t i = protocolo::leerTextoCorto(b, static_cast<size_t>(n), url, cu);
+  if (!i || !esUrlNube(url)) return false;
+  size_t k = protocolo::leerTextoCorto(b + i, static_cast<size_t>(n) - i, usuario, cus);
+  if (!k || !usuario[0]) return false;
+  i += k;
+  return protocolo::leerTextoCorto(b + i, static_cast<size_t>(n) - i, clave, cc) > 0;
+}
+
+void Sistema::conexiones(bool wifi, bool nube) {
+  if (wifi != wifi_ || nube != nube_) log(nube ? "conectado a la nube" : wifi ? "conectado al WiFi" : "sin red");
+  wifi_ = wifi;
+  nube_ = nube;
+}
+
+void Sistema::comandoRed(uint8_t op, const uint8_t* d, size_t n) {
+  using namespace protocolo;
+  const uint8_t car = CarComando;
+  switch (op) {
+    case CmdRed: {
+      char ssid[33], clave[65];
+      size_t i = leerTextoCorto(d + 1, n - 1, ssid, sizeof ssid);
+      size_t k = i ? leerTextoCorto(d + 1 + i, n - 1 - i, clave, sizeof clave) : 0;
+      if (!i || !k || !ssid[0] || 1 + i + k != n) return responder(car, op, Malformado, "ssid de 1 a 32 bytes, clave de 0 a 64");
+      if (!hal_.guardar || !hal_.guardar(CLAVE_RED, d + 1, n - 1)) return responder(car, op, FalloOta, "no pude guardar");
+      leerRed();
+      responder(car, op, Ok);
+      log("WiFi nuevo");
+      break;
+    }
+    case CmdNube: {
+      char url[161], usuario[65], clave[129];
+      size_t i = leerTextoCorto(d + 1, n - 1, url, sizeof url);
+      size_t k = i ? leerTextoCorto(d + 1 + i, n - 1 - i, usuario, sizeof usuario) : 0;
+      size_t m = k ? leerTextoCorto(d + 1 + i + k, n - 1 - i - k, clave, sizeof clave) : 0;
+      if (!i || !k || !m || 1 + i + k + m != n || !esUrlNube(url) || !usuario[0] || !clave[0])
+        return responder(car, op, Malformado, "url mqtt:// o mqtts://, usuario y clave");
+      if (!hal_.guardar || !hal_.guardar(CLAVE_NUBE, d + 1, n - 1)) return responder(car, op, FalloOta, "no pude guardar");
+      responder(car, op, Ok);
+      log("nube nueva");
+      break;
+    }
+    case CmdOlvidarRed: {
+      const uint8_t vacio[1] = {0};
+      if (hal_.guardar) {
+        hal_.guardar(CLAVE_RED, vacio, 1);
+        hal_.guardar(CLAVE_NUBE, vacio, 1);
+      }
+      leerRed();
+      responder(car, op, Ok);
+      log("me olvidé del WiFi y de la nube");
+      break;
+    }
+    default:
+      return;
+  }
+  if (hal_.redCambio) hal_.redCambio();
+}
+
+void Sistema::ota(uint8_t op, const uint8_t* d, size_t n) {
+  using namespace protocolo;
+  const uint8_t car = CarOta;
+  switch (op) {
+    case OtaInicio:
+    case OtaDescargar: {
+      if (ota_ != Ota::Ninguna) return responder(car, op, Ocupado);
+      ManifiestoOta m;
+      const size_t k = leerManifiesto(d + 1, n - 1, &m);
+      if (!k) return responder(car, op, Malformado);
+      if (!iguales(m.perfil, perfil_.nombre ? perfil_.nombre : "")) return responder(car, op, PerfilDistinto, perfil_.nombre);
+      if (op == OtaInicio) {
+        if (1 + k != n) return responder(car, op, Malformado);
+        if (!hal_.otaEmpezar || !hal_.otaEscribir || !hal_.otaTerminar) return responder(car, op, NoImplementado);
+        const Codigo c = static_cast<Codigo>(hal_.otaEmpezar(m));
+        if (c == Ok) {
+          ota_ = Ota::Subida;
+          otaTamano_ = m.tamano;
+          otaRecibido_ = 0;
+          otaPorcentaje_ = 0;
+          log("OTA: recibiendo");
+        }
+        return responder(car, op, c);
+      }
+      // Descargar: [manifiesto][u16 n][url]
+      if (1 + k + 2 > n) return responder(car, op, Malformado);
+      const size_t nu = static_cast<size_t>(d[1 + k]) | static_cast<size_t>(d[2 + k]) << 8;
+      char url[256];
+      if (nu == 0 || nu >= sizeof url || 1 + k + 2 + nu != n) return responder(car, op, Malformado);
+      copiarTexto(url, sizeof url, reinterpret_cast<const char*>(d + 3 + k), nu);
+      if (!hal_.otaDescargar) return responder(car, op, NoImplementado);
+      if (!wifi_) return responder(car, op, SinRed);
+      const Codigo c = static_cast<Codigo>(hal_.otaDescargar(m, url));
+      if (c == Ok) {
+        ota_ = Ota::Descarga;
+        otaPorcentaje_ = 0;
+        log("OTA: descargando");
+      }
+      return responder(car, op, c);
+    }
+    case OtaBloque: {
+      if (ota_ != Ota::Subida) return responder(car, op, SinInicio);
+      if (n < 5) return responder(car, op, Malformado);
+      const uint32_t off = leer32(d + 1);
+      const size_t m = n - 5;
+      Codigo c = off != otaRecibido_ ? FueraDeOrden : otaRecibido_ + m > otaTamano_ ? MuyGrande : Ok;
+      if (c == Ok) c = static_cast<Codigo>(hal_.otaEscribir(off, d + 5, m));
+      if (c != Ok) {
+        if (hal_.otaCancelar) hal_.otaCancelar();
+        ota_ = Ota::Ninguna;
+        return responder(car, op, c);
+      }
+      otaRecibido_ += static_cast<uint32_t>(m);
+      const uint8_t pct = static_cast<uint8_t>(static_cast<uint64_t>(otaRecibido_) * 99u / (otaTamano_ ? otaTamano_ : 1));
+      if (pct != otaPorcentaje_) {
+        otaPorcentaje_ = pct;
+        const uint8_t b[3] = {static_cast<uint8_t>(OtaProgreso | Respuesta), Ok, pct};
+        enviar(car, b, 3);
+      }
+      return;
+    }
+    case OtaFin: {
+      if (ota_ != Ota::Subida) return responder(car, op, SinInicio);
+      ota_ = Ota::Ninguna;
+      if (otaRecibido_ != otaTamano_) {
+        if (hal_.otaCancelar) hal_.otaCancelar();
+        return responder(car, op, FueraDeOrden);
+      }
+      const Codigo c = static_cast<Codigo>(hal_.otaTerminar());
+      log(c == Ok ? "OTA: lista, reinicio" : "OTA: rechazada");
+      return responder(car, op, c);
+    }
+    case OtaCancelar: {
+      if (ota_ != Ota::Ninguna && hal_.otaCancelar) hal_.otaCancelar();
+      ota_ = Ota::Ninguna;
+      return responder(car, op, Ok);
+    }
+    default:
+      return responder(car, op, Malformado);
+  }
+}
+
+void Sistema::otaProgreso(uint8_t codigo, uint8_t porcentaje, const char* detalle) {
+  using namespace protocolo;
+  uint8_t b[MAX_NOTIFICACION];
+  size_t i = 0;
+  b[i++] = static_cast<uint8_t>(OtaProgreso | Respuesta);
+  b[i++] = codigo;
+  b[i++] = porcentaje;
+  if (detalle) {
+    size_t m = largo(detalle);
+    if (m > sizeof b - i) m = sizeof b - i;
+    copiarBytes(b + i, detalle, m);
+    i += m;
+  }
+  if (codigo != Ok || porcentaje >= 100) ota_ = Ota::Ninguna;
+  otaPorcentaje_ = porcentaje;
+  if (hal_.notificar) hal_.notificar(CarOta, b, i);
+  if (hal_.notificarNube) hal_.notificarNube(CarOta, b, i);
+}
+
+void Sistema::reproducir(int animacion, bool unaVez) {
+  if (animacion < 0 || animacion >= config_.nAnimaciones) {
+    animPedida_ = -1;
+    return;
+  }
+  animPedida_ = animacion;
+  animUnaVez_ = unaVez;
+  animDesde_ = hal_.ahoraMs();
+}
+
+void Sistema::elegirAnimacion(uint32_t ahora) {
+  animVisible_ = -1;
+  if (apagado_ || emparejando_) return;
+  if (animPedida_ >= 0 && animPedida_ < config_.nAnimaciones) {
+    const Animacion& a = config_.animaciones[animPedida_];
+    const uint32_t pasado = ahora - animDesde_;
+    if (animUnaVez_ && pasado >= a.duracion) {
+      animPedida_ = -1;
+    } else {
+      animVisible_ = animPedida_;
+      animT_ = animUnaVez_ ? pasado : pasado % (a.duracion ? a.duracion : 1);
+    }
+  }
+  if (animVisible_ < 0 && motor_.expresionFija() < 0 && !motor_.dormido() && !motor_.reaccionando(ahora) &&
+      largoLista() > 0) {
+    const ElementoLista e = elementoLista(posLista_);
+    if (e.tipo == ElementoLista::Tipo::Animacion && e.indice < config_.nAnimaciones) {
+      const Animacion& a = config_.animaciones[e.indice];
+      animVisible_ = e.indice;
+      // En la lista se repite siempre.
+      animT_ = (ahora - animListaDesde_) % (a.duracion ? a.duracion : 1);
+    }
+  }
+  if (animVisible_ >= 0) {
+    const size_t k = copiarTexto(visible_, sizeof visible_, "animacion:");
+    copiarTexto(visible_ + k, sizeof visible_ - k, config_.animaciones[animVisible_].nombre);
+  }
 }
 
 void Sistema::bleEscribir(uint8_t car, const uint8_t* d, size_t n) {
+  canal_ = Canal::Ble;
+  procesar(car, d, n);
+}
+
+void Sistema::nubeEscribir(uint8_t car, const uint8_t* d, size_t n) {
+  canal_ = Canal::Nube;
+  procesar(car, d, n);
+  canal_ = Canal::Ble;
+}
+
+void Sistema::procesar(uint8_t car, const uint8_t* d, size_t n) {
   using namespace protocolo;
   if (n < 1) return;
   const uint8_t op = d[0];
   const uint32_t ahora = hal_.ahoraMs();
+
+  if (canal_ == Canal::Nube && car == CarComando &&
+      (op == CmdVincular || op == CmdAutenticar || op == CmdRed || op == CmdNube))
+    return responder(car, op, NoAutorizado, "eso solo se hace por BLE");
 
   // Vincular y autenticar son lo único que se puede hacer sin estar autenticado.
   if (car == CarComando && op == CmdVincular) {
@@ -638,7 +953,7 @@ void Sistema::bleEscribir(uint8_t car, const uint8_t* d, size_t n) {
     emparejando_ = false;
     uint8_t r[18] = {static_cast<uint8_t>(op | Respuesta), Ok};
     copiarBytes(r + 2, clave, 16);
-    if (hal_.notificar) hal_.notificar(car, r, sizeof r);
+    enviar(car, r, sizeof r);
     evento(Evento::Vinculado);
     log("celu vinculado");
     return;
@@ -659,7 +974,7 @@ void Sistema::bleEscribir(uint8_t car, const uint8_t* d, size_t n) {
     autenticado_ = true;
     return responder(car, op, Ok);
   }
-  if (!autenticado_) return responder(car, op, NoAutorizado, "vinculá o autenticá primero");
+  if (canal_ != Canal::Nube && !autenticado_) return responder(car, op, NoAutorizado, "vinculá o autenticá primero");
 
   if (car == CarConfig) {
     switch (op) {
@@ -679,12 +994,15 @@ void Sistema::bleEscribir(uint8_t car, const uint8_t* d, size_t n) {
         if (c != Ok) return responder(car, op, c);
         ResultadoConfig r = cargarConfig(config_, receptor_.texto(), receptor_.largo());
         if (!r.ok()) {
+          // config_ quedó con la base: se vuelve a la que estaba guardada.
+          receptor_.reiniciar();
+          cargarGuardada();
           return responder(car, op, r.error == ErrorConfig::JsonInvalido ? JsonInvalido : ConfigInvalida, r.detalle);
         }
-        g_largoConfig = receptor_.largo();
-        copiarBytes(g_textoConfig, receptor_.texto(), g_largoConfig);
-        g_textoConfig[g_largoConfig] = 0;
-        if (hal_.guardar) hal_.guardar(CLAVE_CONFIG, reinterpret_cast<const uint8_t*>(g_textoConfig), g_largoConfig);
+        crcConfig_ = crc32(reinterpret_cast<const uint8_t*>(receptor_.texto()), receptor_.largo());
+        animPedida_ = animVisible_ = -1;
+        if (hal_.guardar) hal_.guardar(CLAVE_CONFIG, reinterpret_cast<const uint8_t*>(receptor_.texto()), receptor_.largo());
+        receptor_.reiniciar();
         // Un nombre nuevo en la config gana sobre el puesto por comando.
         nombre_[0] = 0;
         const int fija = config_.indiceExpresion(fijaGuardada_);
@@ -737,13 +1055,30 @@ void Sistema::bleEscribir(uint8_t car, const uint8_t* d, size_t n) {
         evento(static_cast<Evento>(d[1]));
         return responder(car, op, Ok);
       }
+      case CmdRed:
+      case CmdNube:
+      case CmdOlvidarRed:
+        return comandoRed(op, d, n);
+      case CmdReproducir: {
+        if (n == 1) {
+          reproducir(-1, false);
+          return responder(car, op, Ok);
+        }
+        char nombre[LARGO_NOMBRE];
+        if (n - 1 >= LARGO_NOMBRE) return responder(car, op, NoExiste);
+        copiarTexto(nombre, sizeof nombre, reinterpret_cast<const char*>(d + 1), n - 1);
+        const int idx = config_.indiceAnimacion(nombre);
+        if (idx < 0) return responder(car, op, NoExiste);
+        reproducir(idx, !config_.animaciones[idx].repetir);
+        return responder(car, op, Ok);
+      }
       default:
         return responder(car, op, Malformado);
     }
   }
 
   if (car == CarImagen) return bleImagen(op, d, n);
-  if (car == CarOta) return responder(car, op, NoImplementado);
+  if (car == CarOta) return ota(op, d, n);
 }
 
 }  // namespace sintetica

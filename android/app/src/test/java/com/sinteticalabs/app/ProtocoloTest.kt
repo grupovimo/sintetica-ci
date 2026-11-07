@@ -4,6 +4,9 @@ import com.sinteticalabs.app.protocolo.ArmadorDeConfig
 import com.sinteticalabs.app.protocolo.Comando
 import com.sinteticalabs.app.protocolo.Respuesta
 import com.sinteticalabs.app.protocolo.Imagen
+import com.sinteticalabs.app.protocolo.Manifiesto
+import com.sinteticalabs.app.protocolo.Ota
+import com.sinteticalabs.app.protocolo.leerProgresoOta
 import com.sinteticalabs.app.protocolo.Qoi
 import com.sinteticalabs.app.protocolo.crc32
 import com.sinteticalabs.app.protocolo.escriturasDeImagen
@@ -48,6 +51,30 @@ class ProtocoloTest {
         assertEquals(s(porNombre["pedir config"]!!, "hex"), hex(Comando.pedirConfig()))
         assertEquals(s(porNombre["imagen borrar 3"]!!, "hex"), hex(Imagen.borrar(3)))
         assertEquals(s(porNombre["imagen listar"]!!, "hex"), hex(Imagen.listar()))
+        assertEquals(s(porNombre["imagen pedir 5"]!!, "hex"), hex(Imagen.pedir(5)))
+        val red = porNombre["red"]!!
+        assertEquals(s(red, "hex"), hex(Comando.red(s(red, "ssid"), s(red, "clave"))))
+        assertEquals(s(porNombre["red abierta"]!!, "hex"), hex(Comando.red("Bar")))
+        val nube = porNombre["nube"]!!
+        assertEquals(s(nube, "hex"), hex(Comando.nube(s(nube, "url"), s(nube, "usuario"), s(nube, "clave"))))
+        assertEquals(s(porNombre["olvidar red"]!!, "hex"), hex(Comando.olvidarRed()))
+        assertEquals(s(porNombre["reproducir saludo"]!!, "hex"), hex(Comando.reproducir("saludo")))
+        assertEquals(s(porNombre["reproducir parar"]!!, "hex"), hex(Comando.reproducir()))
+        assertEquals(s(porNombre["ota cancelar"]!!, "hex"), hex(Ota.cancelar()))
+    }
+
+    @Test fun ota() {
+        val o = v["ota"]!!.jsonObject
+        val bin = deHex(s(o, "binario"))
+        val m = Manifiesto(bin.size.toLong(), deHex(s(o, "sha256")), deHex(s(o, "firma")), s(o, "version"), s(o, "perfil"))
+        assertEquals(s(o, "manifiesto"), hex(m.bytes()))
+        assertEquals(s(o, "descargar"), hex(Ota.descargar(m, s(o, "url"))))
+        val esperadas = o["escrituras"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertEquals(esperadas, Ota.escrituras(m, bin, o["tamanoBloque"]!!.jsonPrimitive.int).map(::hex))
+        assertEquals(s(o, "sha256"), hex(java.security.MessageDigest.getInstance("SHA-256").digest(bin)))
+        val p = leerProgresoOta(byteArrayOf(0xB4.toByte(), 0, 40))!!
+        assertEquals(40, p.porcentaje)
+        assertEquals(true, p.ok)
     }
 
     @Test fun configEnBloques() {
@@ -74,6 +101,13 @@ class ProtocoloTest {
             assertEquals(c["ancho"]!!.jsonPrimitive.int, est.pantalla.ancho)
             assertEquals(c["alto"]!!.jsonPrimitive.int, est.pantalla.alto)
             assertEquals(c["redonda"]!!.jsonPrimitive.boolean, est.pantalla.redonda)
+            assertEquals(c["wifi"]!!.jsonPrimitive.boolean, est.wifi)
+            assertEquals(c["nube"]!!.jsonPrimitive.boolean, est.nube)
+            assertEquals(c["redConfigurada"]!!.jsonPrimitive.boolean, est.redConfigurada)
+            assertEquals(c["actualizando"]!!.jsonPrimitive.boolean, est.actualizando)
+            assertEquals(s(c, "version"), est.version)
+            assertEquals(s(c, "perfil"), est.perfil)
+            assertEquals(s(c, "crcConfigHex").toLong(16), est.crcConfig)
         }
     }
 

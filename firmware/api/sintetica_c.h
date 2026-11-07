@@ -23,6 +23,15 @@
 extern "C" {
 #endif
 
+/* Una actualización firmada (ver docs/protocolo-ble.md, "OTA"). */
+typedef struct sintetica_manifiesto {
+  uint32_t tamano;
+  uint8_t sha256[32];
+  uint8_t firma[64]; /* ECDSA P-256, r || s */
+  char version[24];
+  char perfil[24];
+} sintetica_manifiesto;
+
 typedef struct sintetica_hal {
   void* contexto; /* se pasa tal cual a cada función */
   uint32_t (*ahora_ms)(void* contexto);
@@ -34,6 +43,16 @@ typedef struct sintetica_hal {
   void (*notificar)(void* contexto, int caracteristica, const uint8_t* datos, size_t n);
   void (*registrar)(void* contexto, const char* mensaje);
   const char* identificador; /* 12 caracteres hexadecimales; NULL = "000000000000" */
+  /* v1.3: nube y OTA (todo opcional). */
+  void (*notificar_nube)(void* contexto, int caracteristica, const uint8_t* datos, size_t n);
+  void (*red_cambio)(void* contexto);
+  int (*ota_empezar)(void* contexto, const sintetica_manifiesto* m);  /* devuelven un código del protocolo */
+  int (*ota_escribir)(void* contexto, uint32_t desplazamiento, const uint8_t* datos, size_t n);
+  int (*ota_terminar)(void* contexto);
+  int (*ota_descargar)(void* contexto, const sintetica_manifiesto* m, const char* url);
+  void (*ota_cancelar)(void* contexto);
+  const char* perfil;  /* "dev-147b", "broche-c3", "virtual"…; NULL = "sim" */
+  const char* version; /* del firmware; NULL = la del núcleo */
 } sintetica_hal;
 
 /* Arranca el núcleo. ancho ≤ 640, alto ≤ 640. Cualquier función de la tabla puede ser NULL.
@@ -58,8 +77,25 @@ void sintetica_ble_conexion(int conectado);
 void sintetica_ble_escribir(int caracteristica, const uint8_t* datos, size_t n);
 size_t sintetica_ble_estado(uint8_t* salida, size_t cap);
 
+/* Lo que llega por la nube (MQTT): [característica][datos] ya separados. */
+void sintetica_nube_escribir(int caracteristica, const uint8_t* datos, size_t n);
+void sintetica_conexiones(int wifi, int nube);
+/* Las credenciales guardadas; 1 si hay. */
+int sintetica_red(char* ssid, size_t cap_ssid, char* clave, size_t cap_clave);
+int sintetica_nube(char* url, size_t cap_url, char* usuario, size_t cap_usuario, char* clave, size_t cap_clave);
+void sintetica_ota_progreso(int codigo, int porcentaje, const char* detalle);
+uint32_t sintetica_crc_config(void);
+/* El texto que se firma para una OTA. Devuelve el largo (0 si no entra). */
+size_t sintetica_mensaje_ota(const sintetica_manifiesto* m, char* salida, size_t cap);
+
+/* Valida una config de usuario (sin tocar la instancia). 0 = válida; si no,
+ * el código de error y el detalle en `detalle`. No hace falta haber llamado a
+ * sintetica_iniciar. */
+int sintetica_validar_config(const char* json, size_t n, char* detalle, size_t cap);
+
 int sintetica_cantidad_expresiones(void);
 const char* sintetica_nombre_expresion(int indice);
+/* La expresión visible, o "animacion:<nombre>" mientras se ve una animación. */
 const char* sintetica_expresion_visible(void);
 const char* sintetica_qr(void);
 /* La imagen que se ve (-1 = una cara). */

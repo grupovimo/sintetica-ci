@@ -1,4 +1,4 @@
-// Protocolo BLE de SintéticaOS v1, del lado de quien controla el bicho (app,
+// Protocolo de SintéticaOS v1.3 (BLE y nube), del lado de quien controla el bicho (app,
 // web, simulador). Ver docs/protocolo-ble.md. Sin dependencias: sirve en el
 // navegador y en Node.
 
@@ -17,14 +17,18 @@ export const Op = {
   configInicio: 0x01, configBloque: 0x02, configFin: 0x03, configPedir: 0x04,
   cmdExpresion: 0x10, cmdNombre: 0x11, cmdEvento: 0x12,
   cmdVincular: 0x13, cmdAutenticar: 0x14, cmdDesvincular: 0x15,
-  imgInicio: 0x20, imgBloque: 0x21, imgFin: 0x22, imgBorrar: 0x23, imgListar: 0x24,
-  respuesta: 0x80, configTrozo: 0x84, configCierre: 0x85,
+  cmdRed: 0x16, cmdNube: 0x17, cmdOlvidarRed: 0x18, cmdReproducir: 0x19,
+  imgInicio: 0x20, imgBloque: 0x21, imgFin: 0x22, imgBorrar: 0x23, imgListar: 0x24, imgPedir: 0x25,
+  otaInicio: 0x30, otaBloque: 0x31, otaFin: 0x32, otaDescargar: 0x33, otaProgreso: 0x34, otaCancelar: 0x35,
+  respuesta: 0x80, configTrozo: 0x84, configCierre: 0x85, imgTrozo: 0xa7, imgCierre: 0xa8,
 };
 
 export const Codigo = {
   0: 'ok', 1: 'muy grande', 2: 'fuera de orden', 3: 'CRC distinto', 4: 'JSON inválido',
   5: 'config inválida', 6: 'sin inicio', 7: 'no existe', 8: 'malformado', 9: 'no autorizado',
-  10: 'no está mostrando el QR', 11: 'imagen inválida', 255: 'no implementado',
+  10: 'no está mostrando el QR', 11: 'imagen inválida', 12: 'firma inválida', 13: 'hash distinto',
+  14: 'firmware de otra placa', 15: 'sin WiFi', 16: 'ocupado', 17: 'falló la actualización',
+  255: 'no implementado',
 };
 
 export const Eventos = ['tacto', 'doble-toque', 'levantado', 'sacudida', 'boca-abajo', 'vinculado', 'app-abierta', 'despertado'];
@@ -49,6 +53,17 @@ export function crc32(bytes) {
   return (c ^ 0xffffffff) >>> 0;
 }
 
+function u16(v) {
+  return [v & 0xff, (v >>> 8) & 0xff];
+}
+
+// Texto con su largo adelante (u8).
+function corto(s, max = 255) {
+  const b = texto.encode(s);
+  if (b.length > max) throw new Error(`"${s.slice(0, 20)}…" es muy largo (máximo ${max} bytes)`);
+  return [b.length, ...b];
+}
+
 function u32(v) {
   return [v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff];
 }
@@ -64,6 +79,10 @@ export const comando = {
   vincular: (codigo) => Uint8Array.from([Op.cmdVincular, ...texto.encode(codigo)]),
   autenticar: (clave) => Uint8Array.from([Op.cmdAutenticar, ...clave]),
   desvincular: () => Uint8Array.from([Op.cmdDesvincular]),
+  red: (ssid, clave = '') => Uint8Array.from([Op.cmdRed, ...corto(ssid, 32), ...corto(clave, 64)]),
+  nube: (url, usuario, clave) => Uint8Array.from([Op.cmdNube, ...corto(url, 160), ...corto(usuario, 64), ...corto(clave, 128)]),
+  olvidarRed: () => Uint8Array.from([Op.cmdOlvidarRed]),
+  reproducir: (animacion = '') => Uint8Array.from([Op.cmdReproducir, ...texto.encode(animacion)]),
   evento: (nombreOIndice) => {
     const i = typeof nombreOIndice === 'number' ? nombreOIndice : Eventos.indexOf(nombreOIndice);
     if (i < 0) throw new Error(`evento desconocido: ${nombreOIndice}`);
@@ -100,7 +119,59 @@ export function escriturasDeImagen(espacio, qoi, tamanoBloque = 180) {
 export const imagen = {
   borrar: (espacio) => Uint8Array.from([Op.imgBorrar, espacio]),
   listar: () => Uint8Array.from([Op.imgListar]),
+  pedir: (espacio) => Uint8Array.from([Op.imgPedir, espacio]),
 };
+
+// Arma la imagen que el bicho manda en trozos después de imagen.pedir().
+export class ArmadorDeImagen {
+  constructor() { this.partes = []; }
+  // Devuelve { espacio, qoi } al llegar el cierre; null mientras tanto.
+  agregar(b) {
+    if (b[0] === Op.imgTrozo) { this.partes.push({ desplazamiento: leerU32(b, 1), datos: b.slice(5) }); return null; }
+    if (b[0] !== Op.imgCierre) return null;
+    const largo = leerU32(b, 2);
+    const qoi = new Uint8Array(largo);
+    for (const p of this.partes) qoi.set(p.datos, p.desplazamiento);
+    this.partes = [];
+    if (crc32(qoi) !== leerU32(b, 6)) throw new Error('la imagen llegó con otro CRC');
+    return { espacio: b[1], qoi };
+  }
+}
+
+// OTA. El manifiesto: { tamano, sha256 (32 bytes), firma (64 bytes: r || s), version, perfil }.
+export function manifiestoOta(m) {
+  if (m.sha256.length !== 32 || m.firma.length !== 64) throw new Error('sha256 de 32 bytes y firma de 64');
+  return [...u32(m.tamano), ...m.sha256, ...m.firma, ...corto(m.version, 23), ...corto(m.perfil, 23)];
+}
+
+// El texto que se firma (ECDSA P-256 sobre su SHA-256).
+export function mensajeOta(m) {
+  const hex = Array.from(m.sha256, (x) => x.toString(16).padStart(2, '0')).join('');
+  return `SINTETICA-OTA-V1\n${m.perfil}\n${m.version}\n${m.tamano}\n${hex}\n`;
+}
+
+export const ota = {
+  descargar: (m, url) => {
+    const u = texto.encode(url);
+    return Uint8Array.from([Op.otaDescargar, ...manifiestoOta(m), ...u16(u.length), ...u]);
+  },
+  cancelar: () => Uint8Array.from([Op.otaCancelar]),
+  // Por BLE: el manifiesto, los bloques del binario y el fin.
+  escrituras: (m, binario, tamanoBloque = 180) => {
+    const escrituras = [Uint8Array.from([Op.otaInicio, ...manifiestoOta(m)])];
+    const porBloque = tamanoBloque - 5;
+    for (let off = 0; off < binario.length; off += porBloque) {
+      escrituras.push(Uint8Array.from([Op.otaBloque, ...u32(off), ...binario.subarray(off, off + porBloque)]));
+    }
+    escrituras.push(Uint8Array.from([Op.otaFin]));
+    return escrituras;
+  },
+};
+
+// La notificación de progreso de una OTA: [0xB4][código][porcentaje][detalle].
+export function leerProgresoOta(b) {
+  return { codigo: b[1], ok: b[1] === 0, porcentaje: b[2], mensaje: Codigo[b[1]] ?? `código ${b[1]}`, detalle: b.length > 3 ? lector.decode(b.subarray(3)) : '' };
+}
 
 // La respuesta a imagen.listar(): los espacios ocupados.
 export function leerListaImagenes(b) {
@@ -149,7 +220,7 @@ export class ArmadorDeConfig {
 }
 
 export function leerEstado(b) {
-  if (b[0] < 1 || b[0] > 3) throw new Error(`versión de estado desconocida: ${b[0]}`);
+  if (b[0] < 1 || b[0] > 4) throw new Error(`versión de estado desconocida: ${b[0]}`);
   let i = 5;
   const campo = () => { const n = b[i]; const s = lector.decode(b.subarray(i + 1, i + 1 + n)); i += 1 + n; return s; };
   const expresion = campo();
@@ -159,6 +230,10 @@ export function leerEstado(b) {
   const pantalla = b[0] >= 3
     ? { ancho: b[i] | (b[i + 1] << 8), alto: b[i + 2] | (b[i + 3] << 8), redonda: b[i + 4] === 1 }
     : { ancho: 320, alto: 172, redonda: false };
+  if (b[0] >= 3) i += 5;
+  const version = b[0] >= 4 ? campo() : '';
+  const perfil = b[0] >= 4 ? campo() : '';
+  const crcConfig = b[0] >= 4 ? leerU32(b, i) : 0;
   return {
     bateria: b[1] === 255 ? null : b[1],
     humor: (b[2] << 24 >> 24) / 100,
@@ -167,6 +242,13 @@ export function leerEstado(b) {
     fija: !!(b[4] & 2),
     emparejando: !!(b[4] & 4),
     autenticado: !!(b[4] & 8),
+    wifi: !!(b[4] & 16),
+    nube: !!(b[4] & 32),
+    redConfigurada: !!(b[4] & 64),
+    actualizando: !!(b[4] & 128),
+    version,
+    perfil,
+    crcConfig,
     expresion,
     nombre,
     serie,

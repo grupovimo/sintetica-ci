@@ -1,0 +1,5 @@
+{
+  "nota": "Clave de PRUEBA para los vectores. No sirve para firmar firmware.",
+  "publica": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAER5DNOnz2QS/PiWi+cSNCPyYbzffw\nWPHi2xW+LhWyz1I2/tbt37glmjTL2vwndsxArn1nkYBP5cszqyBjMsLfqQ==\n-----END PUBLIC KEY-----\n",
+  "firma": "ba 76 3f 14 9d 17 f9 13 40 72 53 6d 2d 86 5a c1 da 59 e7 2a 20 2d b2 55 fe 09 58 93 79 08 7e 85 0c a9 a9 cd 9f 77 c6 92 e4 3b 37 ff 4e b0 a9 3f 44 6c 04 a6 3e 66 62 71 7f 7e 0f c5 68 7a 6e 8c"
+}

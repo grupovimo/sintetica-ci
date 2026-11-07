@@ -10,6 +10,8 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
 add_compile_options(-Wall -Wextra -Wno-missing-field-initializers)
+# Los tests leen shared/protocolo/vectores.json, más grande que una config.
+add_compile_definitions(SINTETICA_JSON_GRANDE SINTETICA_HERRAMIENTAS)
 
 file(GLOB NUCLEO_FUENTES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/nucleo/*.cpp)
 add_library(nucleo STATIC ${NUCLEO_FUENTES})

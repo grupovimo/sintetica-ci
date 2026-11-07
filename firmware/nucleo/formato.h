@@ -15,10 +15,14 @@ constexpr int MAX_EXPRESIONES = 24;
 constexpr int MAX_REGLAS = 24;
 constexpr int MAX_ACCIONES = 4;
 constexpr int LARGO_NOMBRE = 25;  // 24 bytes + terminador
-constexpr int MAX_TOKENS_JSON = 1200;
-constexpr size_t MAX_CONFIG_BYTES = 8192;
+constexpr int MAX_TOKENS_JSON = 2400;
+constexpr size_t MAX_CONFIG_BYTES = 16384;
 constexpr int MAX_LISTA = 16;
 constexpr int MAX_IMAGENES = 8;
+constexpr int MAX_ANIMACIONES = 6;
+constexpr int MAX_PISTAS = 6;
+constexpr int MAX_CLAVES = 8;
+constexpr uint32_t MAX_DURACION_MS = 60000;
 
 // Paleta de la marca, tema Pantalla (manual de marca, tokens.json).
 namespace paleta {
@@ -91,8 +95,50 @@ struct Condicion {
   float valor = 0;
 };
 
+// Animaciones: cada pista es una forma que se mueve, escala, gira y cambia de
+// color y opacidad con claves en el tiempo (keyframes) y una curva por tramo.
+enum class Curva : uint8_t { Lineal, Suave, Entrada, Salida, Rebote, Paso };
+float aplicarCurva(Curva c, float t);
+bool curvaPorNombre(const char* nombre, Curva* salida);
+
+struct Clave {
+  uint16_t t = 0;                 // ms desde el comienzo
+  Curva curva = Curva::Suave;     // cómo se va de esta clave a la siguiente
+  bool hayColor = false;
+  float x = 0, y = 0;             // corrimiento, en unidades normalizadas
+  float escala = 1;
+  float rotacion = 0;             // grados, en sentido horario
+  float opacidad = 1;
+  uint32_t color = 0;
+};
+
+struct Pista {
+  Forma forma;
+  bool hayCentro = false;  // centro de la escala y el giro; si no, el de la forma
+  float cx = 0, cy = 0;
+  uint8_t nClaves = 0;
+  Clave claves[MAX_CLAVES];
+};
+
+struct Animacion {
+  char nombre[LARGO_NOMBRE] = {};
+  uint16_t duracion = 1000;
+  bool repetir = false;
+  int8_t sobre = -1;  // expresión que se dibuja abajo, viva (-1 = ninguna)
+  uint8_t nPistas = 0;
+  Pista pistas[MAX_PISTAS];
+};
+
+// Cómo queda una pista en el instante t.
+struct Cuadro {
+  float x = 0, y = 0, escala = 1, rotacion = 0, opacidad = 1;
+  bool hayColor = false;
+  uint32_t color = 0;
+};
+Cuadro cuadroDePista(const Pista& p, uint32_t t);
+
 struct Accion {
-  enum class Tipo : uint8_t { Expresion, Sonido, Led } tipo = Tipo::Expresion;
+  enum class Tipo : uint8_t { Expresion, Sonido, Led, Animacion } tipo = Tipo::Expresion;
   char argumento[LARGO_NOMBRE] = {};
 };
 
@@ -107,8 +153,8 @@ enum class Modo : uint8_t { Mascota, Reloj, Pomodoro, Clima, Notificaciones };
 // Lo que se muestra, en orden: un toque pasa al siguiente (en el broche) y la
 // lista puede rotar sola.
 struct ElementoLista {
-  enum class Tipo : uint8_t { Cara, Imagen } tipo = Tipo::Cara;
-  uint8_t indice = 0;  // expresión o espacio de imagen (0-7)
+  enum class Tipo : uint8_t { Cara, Imagen, Animacion } tipo = Tipo::Cara;
+  uint8_t indice = 0;  // expresión, espacio de imagen (0-7) o animación
 };
 
 struct Config {
@@ -129,8 +175,11 @@ struct Config {
   uint8_t nLista = 0;
   ElementoLista lista[MAX_LISTA];
   uint16_t rotarMinutos = 0;  // 0 = no rota sola
+  uint8_t nAnimaciones = 0;
+  Animacion animaciones[MAX_ANIMACIONES];
 
   int indiceExpresion(const char* nombre) const;
+  int indiceAnimacion(const char* nombre) const;
 };
 
 enum class ErrorConfig : uint8_t {
@@ -155,12 +204,16 @@ ResultadoConfig cargarBase(Config& c);
 // Aplica una expresión suelta (un archivo de shared/formato/caras).
 ResultadoConfig aplicarExpresion(Config& c, const char* json, size_t largo);
 
-// Aplica una configuración de usuario encima de la base. Si falla, `c` queda
-// como estaba (se trabaja sobre una copia temporal).
+// Aplica una configuración de usuario encima de la que hay. Si falla, `c` queda
+// como estaba (trabaja sobre una copia: es para las herramientas y los tests;
+// el firmware no la usa, así esa copia no ocupa RAM en la placa).
+#ifdef SINTETICA_HERRAMIENTAS
 ResultadoConfig aplicarConfig(Config& c, const char* json, size_t largo);
+#endif
 
-// La base más una configuración de usuario, de cero. Si falla, `destino`
-// queda como estaba. Usa la misma memoria de trabajo que aplicarConfig.
+// La base más una configuración de usuario, de cero, sin copias. Si falla,
+// `destino` queda con la base (quien llama vuelve a cargar la anterior si la
+// quiere: el sistema la lee de la flash).
 ResultadoConfig cargarConfig(Config& destino, const char* json, size_t largo);
 
 // Interpreta "#RRGGBB" o un token de la paleta. Devuelve false si no lo conoce.

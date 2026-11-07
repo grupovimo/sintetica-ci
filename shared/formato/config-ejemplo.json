@@ -11,7 +11,25 @@
       ]
     }
   },
+  "animaciones": {
+    "saludo": {
+      "duracion": 1400,
+      "sobre": "contento",
+      "pistas": [
+        {
+          "forma": { "forma": "corazon", "x": 0, "y": -0.36, "tamano": 0.5 },
+          "claves": [
+            { "t": 0, "y": 0.1, "escala": 0.3, "opacidad": 0, "curva": "rebote" },
+            { "t": 500, "escala": 1, "opacidad": 1 },
+            { "t": 1100, "opacidad": 1, "curva": "entrada" },
+            { "t": 1400, "y": -0.1, "opacidad": 0 }
+          ]
+        }
+      ]
+    }
+  },
   "reglas": [
+    { "si": "doble-toque", "entonces": ["animacion:saludo"] },
     { "si": "sacudida", "entonces": ["expresion:mareado", "sonido:boing"] },
     { "si": "bateria<15", "entonces": ["expresion:bateria-baja"] }
   ],

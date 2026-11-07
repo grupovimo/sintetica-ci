@@ -7,6 +7,17 @@
 
 namespace sintetica {
 
+// Una actualización de firmware firmada (docs/protocolo-ble.md, "OTA"). El
+// perfil verifica la firma con la clave pública que trae embebida: ECDSA P-256
+// sobre SHA-256 de protocolo::mensajeOta(manifiesto).
+struct ManifiestoOta {
+  uint32_t tamano = 0;
+  uint8_t sha256[32] = {};
+  uint8_t firma[64] = {};  // r || s, 32 bytes cada uno, big-endian
+  char version[24] = {};
+  char perfil[24] = {};
+};
+
 struct Hal {
   // Milisegundos desde que arrancó (puede dar la vuelta; el núcleo lo tolera).
   uint32_t (*ahoraMs)() = nullptr;
@@ -35,6 +46,22 @@ struct Hal {
   bool (*borrar)(const char* clave) = nullptr;
   // Notificación BLE en una característica (protocolo::Caracteristica).
   void (*notificar)(uint8_t caracteristica, const uint8_t* datos, size_t n) = nullptr;
+  // Lo mismo por la nube (MQTT, bicho/{id}/resp y bicho/{id}/state): las
+  // respuestas a lo que llegó por la nube y el estado. nullptr = sin nube.
+  void (*notificarNube)(uint8_t caracteristica, const uint8_t* datos, size_t n) = nullptr;
+  // Cambiaron el WiFi o la nube guardados (Sistema::red, Sistema::nube): el
+  // perfil se reconecta.
+  void (*redCambio)() = nullptr;
+  // OTA. Devuelven un protocolo::Codigo. otaEmpezar verifica la firma, el
+  // perfil y el tamaño antes de aceptar bloques; otaTerminar verifica el
+  // SHA-256 y deja lista la partición nueva (el perfil reinicia solo, después
+  // de que se mande la respuesta). otaDescargar baja el binario por HTTP en
+  // segundo plano y avisa con Sistema::otaProgreso.
+  uint8_t (*otaEmpezar)(const ManifiestoOta& m) = nullptr;
+  uint8_t (*otaEscribir)(uint32_t desplazamiento, const uint8_t* datos, size_t n) = nullptr;
+  uint8_t (*otaTerminar)() = nullptr;
+  uint8_t (*otaDescargar)(const ManifiestoOta& m, const char* url) = nullptr;
+  void (*otaCancelar)() = nullptr;
   // Salidas opcionales.
   void (*sonido)(const char* nombre) = nullptr;
   void (*led)(uint32_t rgb) = nullptr;

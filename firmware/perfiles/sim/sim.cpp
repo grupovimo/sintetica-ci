@@ -51,6 +51,15 @@ void __cxa_pure_virtual() { __builtin_trap(); }
 }
 
 namespace {
+// El editor de la web: dibuja una expresión o un cuadro de una animación sin
+// el sistema, con una config propia y al tamaño que pida (hasta 640 × 480).
+uint16_t g_editorPx[640 * 480];
+Lienzo g_editorLienzo;
+Vista g_editorVista;
+Config g_editorConfig;
+char g_detalle[96];
+char g_visible[LARGO_NOMBRE + 12];
+
 // 1.47B: 320 × 172 de una vez. Broche: 240 × 240 en franjas de 40 filas, como en la placa.
 uint16_t g_pixeles[320 * 240];
 uint8_t g_intercambio[MAX_CONFIG_BYTES + 64];
@@ -121,4 +130,89 @@ __attribute__((export_name("sim_quiere_dormir"))) int sim_quiere_dormir() { retu
 __attribute__((export_name("sim_imagen_visible"))) int sim_imagen_visible() { return g_sistema.imagenVisible(); }
 __attribute__((export_name("sim_posicion_lista"))) int sim_posicion_lista() { return g_sistema.posicionLista(); }
 __attribute__((export_name("sim_version"))) const char* sim_version() { return VERSION_SINTETICAOS; }
+
+// Animaciones de la config (para el panel).
+__attribute__((export_name("sim_cantidad_animaciones"))) int sim_cantidad_animaciones() {
+  return g_sistema.config().nAnimaciones;
+}
+__attribute__((export_name("sim_nombre_animacion"))) const char* sim_nombre_animacion(int i) {
+  return (i >= 0 && i < g_sistema.config().nAnimaciones) ? g_sistema.config().animaciones[i].nombre : "";
+}
+// Lo que se ve: el nombre de la expresión o "animacion:<nombre>".
+__attribute__((export_name("sim_visible"))) const char* sim_visible() {
+  const int a = g_sistema.animacionVisible();
+  if (a < 0) return g_sistema.config().expresiones[g_sistema.motor().expresionVisible()].nombre;
+  const size_t k = copiarTexto(g_visible, sizeof g_visible, "animacion:");
+  copiarTexto(g_visible + k, sizeof g_visible - k, g_sistema.config().animaciones[a].nombre);
+  return g_visible;
+}
+// Lo que llega por la nube (el bicho virtual de la web lo usa para probar).
+__attribute__((export_name("sim_nube_escribir"))) void sim_nube_escribir(int car, int n) {
+  if (n > 0 && n <= static_cast<int>(sizeof g_intercambio)) g_sistema.nubeEscribir(static_cast<uint8_t>(car), g_intercambio, n);
+}
+__attribute__((export_name("sim_crc_config"))) uint32_t sim_crc_config() { return g_sistema.crcConfig(); }
+
+// --- Editor ---
+// Valida la config que está en el intercambio (n bytes). 0 = válida; si no, el
+// código de error (ErrorConfig) y el detalle en sim_detalle().
+__attribute__((export_name("sim_validar"))) int sim_validar(int n) {
+  static Config c;
+  if (n <= 0 || n > static_cast<int>(MAX_CONFIG_BYTES)) {
+    copiarTexto(g_detalle, sizeof g_detalle, "config: más de 16 KB");
+    return static_cast<int>(ErrorConfig::Demasiadas);
+  }
+  ResultadoConfig r = cargarConfig(c, reinterpret_cast<const char*>(g_intercambio), static_cast<size_t>(n));
+  copiarTexto(g_detalle, sizeof g_detalle, r.detalle ? r.detalle : "");
+  return static_cast<int>(r.error);
+}
+__attribute__((export_name("sim_detalle"))) const char* sim_detalle() { return g_detalle; }
+
+// El tamaño del lienzo del editor (por ejemplo, 640 × 344 para la 1.47B al doble).
+__attribute__((export_name("sim_editor_iniciar"))) void sim_editor_iniciar(int ancho, int alto, int redonda) {
+  ancho = mini(maxi(ancho, 16), 640);
+  alto = mini(maxi(alto, 16), 480);
+  g_editorLienzo.iniciar(g_editorPx, ancho, alto);
+  g_editorVista = Vista::para(ancho, alto, redonda != 0);
+}
+// Carga la config del editor (como sim_validar). Si falla, queda la anterior.
+__attribute__((export_name("sim_editor_config"))) int sim_editor_config(int n) {
+  if (n <= 0 || n > static_cast<int>(MAX_CONFIG_BYTES)) return static_cast<int>(ErrorConfig::Demasiadas);
+  static Config nueva;
+  ResultadoConfig r = cargarConfig(nueva, reinterpret_cast<const char*>(g_intercambio), static_cast<size_t>(n));
+  copiarTexto(g_detalle, sizeof g_detalle, r.detalle ? r.detalle : "");
+  if (r.ok()) g_editorConfig = nueva;
+  return static_cast<int>(r.error);
+}
+// Índices por nombre (el nombre va en el intercambio, terminado en 0).
+__attribute__((export_name("sim_editor_indice_expresion"))) int sim_editor_indice_expresion() {
+  return g_editorConfig.indiceExpresion(reinterpret_cast<const char*>(g_intercambio));
+}
+__attribute__((export_name("sim_editor_indice_animacion"))) int sim_editor_indice_animacion() {
+  return g_editorConfig.indiceAnimacion(reinterpret_cast<const char*>(g_intercambio));
+}
+__attribute__((export_name("sim_editor_duracion"))) int sim_editor_duracion(int i) {
+  return (i >= 0 && i < g_editorConfig.nAnimaciones) ? g_editorConfig.animaciones[i].duracion : 0;
+}
+// Dibuja la expresión i con un parpadeo (cierre 0-1) y una mirada.
+__attribute__((export_name("sim_editor_expresion"))) void sim_editor_expresion(int i, float cierre, float mx, float my) {
+  g_editorLienzo.limpiar(paleta::PANTALLA);
+  if (i < 0 || i >= g_editorConfig.nExpresiones) return;
+  EstadoCara e;
+  e.cierre = cierre, e.miradaX = mx, e.miradaY = my;
+  e.tamano = g_editorConfig.tamano;
+  e.hayColorOjos = g_editorConfig.hayColorOjos, e.colorOjos = g_editorConfig.colorOjos;
+  dibujarExpresion(g_editorLienzo, g_editorVista, g_editorConfig.expresiones[i], e);
+}
+// Dibuja el cuadro t (ms) de la animación i, con su expresión de abajo.
+__attribute__((export_name("sim_editor_animacion"))) void sim_editor_animacion(int i, int t) {
+  g_editorLienzo.limpiar(paleta::PANTALLA);
+  if (i < 0 || i >= g_editorConfig.nAnimaciones) return;
+  const Animacion& a = g_editorConfig.animaciones[i];
+  EstadoCara e;
+  e.tamano = g_editorConfig.tamano;
+  e.hayColorOjos = g_editorConfig.hayColorOjos, e.colorOjos = g_editorConfig.colorOjos;
+  if (a.sobre >= 0) dibujarExpresion(g_editorLienzo, g_editorVista, g_editorConfig.expresiones[a.sobre], e);
+  dibujarAnimacion(g_editorLienzo, g_editorVista, a, t < 0 ? 0u : static_cast<uint32_t>(t), e);
+}
+__attribute__((export_name("sim_editor_pixeles"))) const uint16_t* sim_editor_pixeles() { return g_editorPx; }
 }

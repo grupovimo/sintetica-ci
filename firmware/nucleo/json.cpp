@@ -28,13 +28,14 @@ int Json::nuevo(TipoJson t, int ini) {
   TokenJson& k = toks_[n_];
   k.tipo = t;
   k.hijos = 0;
-  k.ini = ini;
-  k.fin = ini;
-  k.siguiente = n_ + 1;
+  k.ini = static_cast<PosJson>(ini);
+  k.fin = static_cast<PosJson>(ini);
+  k.siguiente = static_cast<PosJson>(n_ + 1);
   return n_++;
 }
 
 int Json::parsear(const char* texto, size_t largo, TokenJson* tokens, int maxTokens) {
+  if (largo > static_cast<size_t>(MAX_TEXTO_JSON)) return static_cast<int>(ErrorJson::SinLugar);
   s_ = texto;
   largo_ = static_cast<int32_t>(largo);
   pos_ = 0;
@@ -102,8 +103,8 @@ int Json::valor(int profundidad) {
         return SINTAXIS;
       }
     }
-    toks_[yo].fin = pos_;
-    toks_[yo].siguiente = n_;
+    toks_[yo].fin = static_cast<PosJson>(pos_);
+    toks_[yo].siguiente = static_cast<PosJson>(n_);
     return yo;
   }
 
@@ -130,7 +131,7 @@ int Json::valor(int profundidad) {
       pos_++;
     }
     if (pos_ >= largo_) return SINTAXIS;
-    toks_[yo].fin = pos_;
+    toks_[yo].fin = static_cast<PosJson>(pos_);
     pos_++;
     return yo;
   }
@@ -152,7 +153,7 @@ int Json::valor(int profundidad) {
       if (pos_ >= largo_ || !esDigito(s_[pos_])) return SINTAXIS;
       while (pos_ < largo_ && esDigito(s_[pos_])) pos_++;
     }
-    toks_[yo].fin = pos_;
+    toks_[yo].fin = static_cast<PosJson>(pos_);
     return yo;
   }
 
@@ -171,7 +172,7 @@ int Json::valor(int profundidad) {
         int yo = nuevo(lit.t, pos_);
         if (yo < 0) return yo;
         pos_ += static_cast<int32_t>(n);
-        toks_[yo].fin = pos_;
+        toks_[yo].fin = static_cast<PosJson>(pos_);
         return yo;
       }
     }

@@ -47,6 +47,7 @@ void Lienzo::limpiar(uint32_t rgb) {
 }
 
 void Lienzo::mezclarPixel(int x, int y, float cobertura, uint32_t rgb) {
+  cobertura *= alfa_;
   if (cobertura <= 0.002f || x < 0 || x >= ancho_ || y < yIni() || y >= yFin()) return;
   uint16_t& d = px_[(y - y0_) * ancho_ + x];
   if (cobertura >= 0.998f) {

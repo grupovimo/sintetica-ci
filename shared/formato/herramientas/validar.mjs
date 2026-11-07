@@ -27,6 +27,14 @@ revisar('config-ejemplo.json', validarConfig, JSON.parse(fs.readFileSync(path.jo
 for (const f of fs.readdirSync(path.join(formato, 'caras')).filter((f) => f.endsWith('.json')).sort()) {
   revisar(`caras/${f}`, validarExpresion, JSON.parse(fs.readFileSync(path.join(formato, 'caras', f), 'utf8')));
 }
+const validarAnimacion = ajv.compile({ $ref: 'https://sinteticalabs.com/schema/config/v1.json#/$defs/animacion' });
+const animaciones = {};
+for (const f of fs.readdirSync(path.join(formato, 'animaciones')).filter((f) => f.endsWith('.json')).sort()) {
+  const { nombre, ...a } = JSON.parse(fs.readFileSync(path.join(formato, 'animaciones', f), 'utf8'));
+  revisar(`animaciones/${f}`, validarAnimacion, a);
+  animaciones[nombre] = a;
+}
+revisar('config con las animaciones de ejemplo', validarConfig, { version: 1, animaciones });
 // Una config con todas las caras base como expresiones propias también es válida.
 const todas = { version: 1, expresiones: {} };
 for (const f of fs.readdirSync(path.join(formato, 'caras')).filter((f) => f.endsWith('.json'))) {

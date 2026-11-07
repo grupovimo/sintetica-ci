@@ -1,6 +1,7 @@
 // Los vectores compartidos (shared/protocolo/vectores.json) contra el núcleo:
 // lo que codifican la app y el simulador es lo que entiende el bicho.
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -15,11 +16,12 @@ using namespace sintetica;
 
 namespace {
 std::string g_texto;
-TokenJson g_toks[4000];
+TokenJson g_toks[12000];
 Json g_j;
 std::vector<std::vector<uint8_t>> g_notis;
 std::vector<int> g_cars;
 uint32_t g_t = 0;
+std::map<std::string, std::vector<uint8_t>> g_guardado;
 
 bool cargar() {
   if (!g_texto.empty()) return true;
@@ -27,11 +29,11 @@ bool cargar() {
   std::stringstream s;
   s << f.rdbuf();
   g_texto = s.str();
-  return g_j.parsear(g_texto.data(), g_texto.size(), g_toks, 4000) > 0;
+  return g_j.parsear(g_texto.data(), g_texto.size(), g_toks, 12000) > 0;
 }
 
 std::string texto(int i) {
-  char b[9000];
+  static char b[20000];
   return g_j.texto(i, b, sizeof b) >= 0 ? std::string(b) : std::string();
 }
 
@@ -59,6 +61,17 @@ void bichoNuevo() {
     g_notis.emplace_back(d, d + n);
   };
   h.identificador = "A1B2C3D4E5F6";
+  h.guardar = [](void*, const char* k, const uint8_t* d, size_t n) {
+    g_guardado[k].assign(d, d + n);
+    return 1;
+  };
+  h.leer = [](void*, const char* k, uint8_t* d, size_t cap) {
+    auto it = g_guardado.find(k);
+    if (it == g_guardado.end() || it->second.size() > cap) return -1;
+    std::copy(it->second.begin(), it->second.end(), d);
+    return static_cast<int>(it->second.size());
+  };
+  g_guardado.clear();
   sintetica_iniciar(&h, 320, 172);
   sintetica_vista_previa();
   g_notis.clear();
@@ -75,7 +88,7 @@ PRUEBA("vectores: los comandos los entiende el núcleo") {
     std::string nombre = texto(g_j.buscar(c, "nombre"));
     auto b = deHex(texto(g_j.buscar(c, "hex")));
     if (nombre == "vincular" || nombre == "autenticar" || nombre == "desvincular" || nombre == "pedir config" ||
-        nombre.rfind("imagen", 0) == 0)
+        nombre.rfind("imagen", 0) == 0 || nombre.rfind("ota", 0) == 0 || nombre == "reproducir saludo")
       continue;
     g_notis.clear();
     sintetica_ble_escribir(protocolo::CarComando, b.data(), b.size());
@@ -83,7 +96,7 @@ PRUEBA("vectores: los comandos los entiende el núcleo") {
     if (g_notis.empty() || g_notis.back()[1] != protocolo::Ok) std::printf("    comando: %s\n", nombre.c_str());
   }
   // El nombre con tilde llegó entero.
-  uint8_t est[96];
+  uint8_t est[160];
   size_t n = sintetica_ble_estado(est, sizeof est);
   VERIFICAR(std::string(reinterpret_cast<char*>(est), n).find("\xc3\x91" "and\xc3\xba") != std::string::npos);
 }
@@ -125,10 +138,63 @@ PRUEBA("vectores: el estado se codifica igual") {
     p.ancho = static_cast<uint16_t>(g_j.numero(g_j.buscar(c, "ancho"), 0));
     p.alto = static_cast<uint16_t>(g_j.numero(g_j.buscar(c, "alto"), 0));
     p.redonda = g_j.booleano(g_j.buscar(c, "redonda"), false);
-    uint8_t b[96];
+    p.wifi = g_j.booleano(g_j.buscar(c, "wifi"), false);
+    p.nube = g_j.booleano(g_j.buscar(c, "nube"), false);
+    p.redConfigurada = g_j.booleano(g_j.buscar(c, "redConfigurada"), false);
+    p.actualizando = g_j.booleano(g_j.buscar(c, "actualizando"), false);
+    std::string ve = texto(g_j.buscar(c, "version")), pe = texto(g_j.buscar(c, "perfil"));
+    p.version = ve.c_str(), p.perfil = pe.c_str();
+    p.crcConfig = static_cast<uint32_t>(std::stoul(texto(g_j.buscar(c, "crcConfigHex")), nullptr, 16));
+    uint8_t b[160];
     size_t n = protocolo::codificarEstado(p, b, sizeof b);
     VERIFICAR(aHex(b, n) == texto(g_j.buscar(e, "hex")));
   }
+}
+
+PRUEBA("vectores: WiFi y nube se guardan y se leen") {
+  VERIFICAR(cargar());
+  bichoNuevo();
+  int arr = g_j.buscar(0, "comandos");
+  for (int k = 0; k < g_j.cantidad(arr); k++) {
+    int c = g_j.elemento(arr, k);
+    std::string nombre = texto(g_j.buscar(c, "nombre"));
+    if (nombre != "red" && nombre != "nube") continue;
+    auto b = deHex(texto(g_j.buscar(c, "hex")));
+    sintetica_ble_escribir(protocolo::CarComando, b.data(), b.size());
+    if (nombre == "red") {
+      char ssid[33], clave[65];
+      VERIFICAR(sintetica_red(ssid, sizeof ssid, clave, sizeof clave) == 1);
+      VERIFICAR(std::string(ssid) == texto(g_j.buscar(c, "ssid")) && std::string(clave) == texto(g_j.buscar(c, "clave")));
+    } else {
+      char url[161], usuario[65], clave[129];
+      VERIFICAR(sintetica_nube(url, sizeof url, usuario, sizeof usuario, clave, sizeof clave) == 1);
+      VERIFICAR(std::string(url) == texto(g_j.buscar(c, "url")) && std::string(usuario) == texto(g_j.buscar(c, "usuario")) &&
+                std::string(clave) == texto(g_j.buscar(c, "clave")));
+    }
+  }
+  uint8_t est[160];
+  size_t n = sintetica_ble_estado(est, sizeof est);
+  VERIFICAR(n > 5 && (est[4] & 64));  // WiFi configurado
+  uint8_t olvidar[] = {protocolo::CmdOlvidarRed};
+  sintetica_ble_escribir(protocolo::CarComando, olvidar, 1);
+  char a[161], b[65], c[129];
+  VERIFICAR(sintetica_red(a, sizeof a, b, sizeof b) == 0 && sintetica_nube(a, sizeof a, b, sizeof b, c, sizeof c) == 0);
+}
+
+PRUEBA("vectores: OTA, el manifiesto y el texto que se firma") {
+  VERIFICAR(cargar());
+  int o = g_j.buscar(0, "ota");
+  auto man = deHex(texto(g_j.buscar(o, "manifiesto")));
+  ManifiestoOta m;
+  VERIFICAR(protocolo::leerManifiesto(man.data(), man.size(), &m) == man.size());
+  VERIFICAR(std::string(m.version) == texto(g_j.buscar(o, "version")) && std::string(m.perfil) == texto(g_j.buscar(o, "perfil")));
+  VERIFICAR(aHex(m.sha256, 32) == texto(g_j.buscar(o, "sha256")));
+  VERIFICAR(aHex(m.firma, 64) == texto(g_j.buscar(o, "firma")));
+  char msg[200];
+  size_t n = protocolo::mensajeOta(m, msg, sizeof msg);
+  VERIFICAR(n > 0 && std::string(msg, n) == texto(g_j.buscar(o, "mensaje")));
+  uint8_t otra[200];
+  VERIFICAR(protocolo::escribirManifiesto(m, otra, sizeof otra) == man.size() && aHex(otra, man.size()) == aHex(man.data(), man.size()));
 }
 
 PRUEBA("vectores: crc32") {

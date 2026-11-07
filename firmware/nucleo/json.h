@@ -8,11 +8,21 @@ namespace sintetica {
 
 enum class TipoJson : uint8_t { Objeto, Arreglo, Texto, Numero, Verdadero, Falso, Nulo };
 
+// Posiciones de 16 bits (textos de hasta 64 KB): cada token ocupa 10 bytes. Los
+// tests de la PC leen archivos más grandes y compilan con SINTETICA_JSON_GRANDE.
+#ifdef SINTETICA_JSON_GRANDE
+using PosJson = int32_t;
+constexpr int32_t MAX_TEXTO_JSON = 0x7FFFFFFF;
+#else
+using PosJson = uint16_t;
+constexpr int32_t MAX_TEXTO_JSON = 0xFFFF;
+#endif
+
 struct TokenJson {
   TipoJson tipo;
   uint16_t hijos;      // objeto: pares clave/valor; arreglo: elementos
-  int32_t ini, fin;    // rango en el texto (texto: sin las comillas)
-  int32_t siguiente;   // índice del primer token después de este subárbol
+  PosJson ini, fin;    // rango en el texto (texto: sin las comillas)
+  PosJson siguiente;   // índice del primer token después de este subárbol
 };
 
 enum class ErrorJson : int8_t {

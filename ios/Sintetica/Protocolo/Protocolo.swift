@@ -36,8 +36,13 @@ enum Op {
     static let configInicio: UInt8 = 0x01, configBloque: UInt8 = 0x02, configFin: UInt8 = 0x03, configPedir: UInt8 = 0x04
     static let expresion: UInt8 = 0x10, nombre: UInt8 = 0x11, evento: UInt8 = 0x12
     static let vincular: UInt8 = 0x13, autenticar: UInt8 = 0x14, desvincular: UInt8 = 0x15
+    static let red: UInt8 = 0x16, nube: UInt8 = 0x17, olvidarRed: UInt8 = 0x18, reproducir: UInt8 = 0x19
     static let imgInicio: UInt8 = 0x20, imgBloque: UInt8 = 0x21, imgFin: UInt8 = 0x22, imgBorrar: UInt8 = 0x23, imgListar: UInt8 = 0x24
+    static let imgPedir: UInt8 = 0x25
+    static let otaInicio: UInt8 = 0x30, otaBloque: UInt8 = 0x31, otaFin: UInt8 = 0x32, otaDescargar: UInt8 = 0x33
+    static let otaProgreso: UInt8 = 0x34, otaCancelar: UInt8 = 0x35
     static let respuesta: UInt8 = 0x80, configTrozo: UInt8 = 0x84, configCierre: UInt8 = 0x85
+    static let imgTrozo: UInt8 = 0xA7, imgCierre: UInt8 = 0xA8
 }
 
 let EVENTOS = ["tacto", "doble-toque", "levantado", "sacudida", "boca-abajo", "vinculado", "app-abierta", "despertado"]
@@ -46,8 +51,18 @@ let MODOS = ["mascota", "reloj", "pomodoro", "clima", "notificaciones"]
 private let MENSAJES: [Int: String] = [
     0: "ok", 1: "muy grande", 2: "fuera de orden", 3: "CRC distinto", 4: "JSON inválido", 5: "config inválida",
     6: "sin inicio", 7: "no existe", 8: "malformado", 9: "no autorizado", 10: "no está mostrando el QR", 11: "imagen inválida",
-    255: "no implementado",
+    12: "firma inválida", 13: "hash distinto", 14: "firmware de otra placa", 15: "sin WiFi", 16: "ocupado",
+    17: "falló la actualización", 255: "no implementado",
 ]
+
+private func u16(_ v: Int) -> [UInt8] { [UInt8(v & 0xFF), UInt8(v >> 8 & 0xFF)] }
+
+/// Texto con su largo adelante (u8). Lo recorta si pasa del máximo (las pantallas ya lo limitan).
+private func corto(_ s: String, _ max: Int) -> [UInt8] {
+    var b = Array(s.utf8)
+    if b.count > max { b = Array(b.prefix(max)) }
+    return [UInt8(b.count)] + b
+}
 
 private func u32(_ v: UInt32) -> [UInt8] { [UInt8(v & 0xFF), UInt8(v >> 8 & 0xFF), UInt8(v >> 16 & 0xFF), UInt8(v >> 24 & 0xFF)] }
 
@@ -71,6 +86,12 @@ enum Comando {
     static func vincular(_ codigo: String) -> [UInt8] { [Op.vincular] + Array(codigo.utf8) }
     static func autenticar(_ clave: [UInt8]) -> [UInt8] { [Op.autenticar] + clave }
     static func desvincular() -> [UInt8] { [Op.desvincular] }
+    static func red(_ ssid: String, clave: String = "") -> [UInt8] { [Op.red] + corto(ssid, 32) + corto(clave, 64) }
+    static func nube(url: String, usuario: String, clave: String) -> [UInt8] {
+        [Op.nube] + corto(url, 160) + corto(usuario, 64) + corto(clave, 128)
+    }
+    static func olvidarRed() -> [UInt8] { [Op.olvidarRed] }
+    static func reproducir(_ animacion: String = "") -> [UInt8] { [Op.reproducir] + Array(animacion.utf8) }
     static func pedirConfig() -> [UInt8] { [Op.configPedir] }
 }
 
@@ -91,6 +112,7 @@ func escriturasDeImagen(_ espacio: Int, _ qoi: [UInt8], tamanoBloque: Int = 180)
 enum ComandoImagen {
     static func borrar(_ espacio: Int) -> [UInt8] { [Op.imgBorrar, UInt8(espacio)] }
     static func listar() -> [UInt8] { [Op.imgListar] }
+    static func pedir(_ espacio: Int) -> [UInt8] { [Op.imgPedir, UInt8(espacio)] }
 }
 
 struct EspacioImagen: Equatable, Sendable { let espacio: Int; let largo: UInt32; let crc: UInt32 }
@@ -171,6 +193,49 @@ struct ArmadorDeConfig {
     }
 }
 
+/// Una actualización firmada: lo que manda la API (ver docs/protocolo-ble.md, "OTA").
+struct Manifiesto: Equatable, Sendable {
+    var tamano: UInt32
+    var sha256: [UInt8]
+    var firma: [UInt8]
+    var version: String
+    var perfil: String
+    var bytes: [UInt8] { u32(tamano) + sha256 + firma + corto(version, 23) + corto(perfil, 23) }
+}
+
+enum ComandoOta {
+    static func descargar(_ m: Manifiesto, url: String) -> [UInt8] {
+        let u = Array(url.utf8)
+        return [Op.otaDescargar] + m.bytes + u16(u.count) + u
+    }
+    static func cancelar() -> [UInt8] { [Op.otaCancelar] }
+    /// Por BLE: el manifiesto, los bloques del binario y el fin.
+    static func escrituras(_ m: Manifiesto, _ binario: [UInt8], tamanoBloque: Int = 180) -> [[UInt8]] {
+        let porBloque = tamanoBloque - 5
+        var salida: [[UInt8]] = [[Op.otaInicio] + m.bytes]
+        var off = 0
+        while off < binario.count {
+            let fin = min(binario.count, off + porBloque)
+            salida.append([Op.otaBloque] + u32(UInt32(off)) + Array(binario[off ..< fin]))
+            off = fin
+        }
+        salida.append([Op.otaFin])
+        return salida
+    }
+}
+
+struct ProgresoOta: Equatable, Sendable {
+    let codigo: UInt8, porcentaje: Int, detalle: String
+    var ok: Bool { codigo == 0 }
+    var mensaje: String { MENSAJES[Int(codigo)] ?? "código \(codigo)" }
+}
+
+/// La notificación [0xB4][código][porcentaje][detalle], o nil si no es eso.
+func leerProgresoOta(_ b: [UInt8]) -> ProgresoOta? {
+    guard b.count >= 3, b[0] == Op.otaProgreso | Op.respuesta else { return nil }
+    return ProgresoOta(codigo: b[1], porcentaje: Int(b[2]), detalle: b.count > 3 ? String(decoding: b[3...], as: UTF8.self) : "")
+}
+
 struct Pantalla: Equatable, Sendable {
     var ancho = 320, alto = 172
     var redonda = false
@@ -183,10 +248,13 @@ struct Estado: Equatable, Sendable {
     var modo: String
     var dormido, fija, emparejando, autenticado: Bool
     var expresion, nombre, serie, id: String
+    var wifi = false, nube = false, redConfigurada = false, actualizando = false
+    var version = "", perfil = ""
+    var crcConfig: UInt32 = 0
 }
 
 func leerEstado(_ b: [UInt8]) throws -> Estado {
-    guard let v = b.first, (1 ... 3).contains(v) else { throw ErrorProtocolo.estadoDesconocido(b.first ?? 0) }
+    guard let v = b.first, (1 ... 4).contains(v) else { throw ErrorProtocolo.estadoDesconocido(b.first ?? 0) }
     var i = 5
     func campo() -> String {
         let n = Int(b[i])
@@ -201,12 +269,18 @@ func leerEstado(_ b: [UInt8]) throws -> Estado {
     let pantalla = b[0] >= 3
         ? Pantalla(ancho: Int(b[i]) | Int(b[i + 1]) << 8, alto: Int(b[i + 2]) | Int(b[i + 3]) << 8, redonda: b[i + 4] == 1)
         : Pantalla()
+    if b[0] >= 3 { i += 5 }
+    let firmware = b[0] >= 4 ? campo() : ""
+    let perfil = b[0] >= 4 ? campo() : ""
+    let crcConfig = b[0] >= 4 ? leerU32(b, i) : 0
     return Estado(
         pantalla: pantalla,
         bateria: b[1] == 255 ? nil : Int(b[1]), humor: Float(Int8(bitPattern: b[2])) / 100,
         modo: Int(b[3]) < MODOS.count ? MODOS[Int(b[3])] : "?",
         dormido: flags & 1 != 0, fija: flags & 2 != 0, emparejando: flags & 4 != 0, autenticado: flags & 8 != 0,
-        expresion: expresion, nombre: nombre, serie: serie, id: id
+        expresion: expresion, nombre: nombre, serie: serie, id: id,
+        wifi: flags & 16 != 0, nube: flags & 32 != 0, redConfigurada: flags & 64 != 0, actualizando: flags & 128 != 0,
+        version: firmware, perfil: perfil, crcConfig: crcConfig
     )
 }
 

@@ -105,7 +105,8 @@ export async function crearSimulador(opciones) {
       x.sim_fijar_serie(p);
     },
     expresiones: () => Array.from({ length: x.sim_cantidad_expresiones() }, (_, i) => cadena(x.sim_nombre_expresion(i))),
-    expresionVisible: () => cadena(x.sim_nombre_expresion(x.sim_expresion_visible())),
+    expresionVisible: () => cadena(x.sim_visible()),
+    animaciones: () => Array.from({ length: x.sim_cantidad_animaciones() }, (_, i) => cadena(x.sim_nombre_animacion(i))),
     nombre: () => cadena(x.sim_nombre()),
     cierre: () => x.sim_cierre(),
     version: () => cadena(x.sim_version()),

@@ -45,6 +45,10 @@ constexpr float AMPLITUD_RESPIRACION = 0.015f;
 
 void dibujarExpresion(Lienzo& lienzo, const Vista& vista, const Expresion& e, const EstadoCara& estado);
 
+// Un cuadro de una animación, t en ms (se recorta a la duración). Usa la
+// escala de los ojos de la vista.
+void dibujarAnimacion(Lienzo& lienzo, const Vista& vista, const Animacion& a, uint32_t t, const EstadoCara& estado);
+
 // Caja de una forma en coordenadas normalizadas (para agrupar los ojos).
 void cajaDeForma(const Forma& f, float* x0, float* y0, float* x1, float* y1);
 

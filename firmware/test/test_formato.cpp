@@ -65,11 +65,13 @@ PRUEBA("formato: el ejemplo del doc se aplica") {
   VERIFICAR_CERCA(g_c.energia, 0.6, 1e-6);
   VERIFICAR(g_c.suenoDesde == 23 * 60 + 30 && g_c.suenoHasta == 8 * 60);
   // Las reglas propias van antes que las del manual.
-  VERIFICAR(g_c.nReglas == 11);
-  VERIFICAR(g_c.reglas[0].nAcciones == 2);
-  VERIFICAR(g_c.reglas[0].entonces[1].tipo == Accion::Tipo::Sonido);
-  VERIFICAR(g_c.reglas[1].si.tipo == Condicion::Tipo::Menor);
-  VERIFICAR_CERCA(g_c.reglas[1].si.valor, 15, 1e-6);
+  VERIFICAR(g_c.nReglas == 12);
+  VERIFICAR(g_c.reglas[0].entonces[0].tipo == Accion::Tipo::Animacion);
+  VERIFICAR(g_c.nAnimaciones == 1 && g_c.animaciones[0].sobre == g_c.indiceExpresion("contento"));
+  VERIFICAR(g_c.reglas[1].nAcciones == 2);
+  VERIFICAR(g_c.reglas[1].entonces[1].tipo == Accion::Tipo::Sonido);
+  VERIFICAR(g_c.reglas[2].si.tipo == Condicion::Tipo::Menor);
+  VERIFICAR_CERCA(g_c.reglas[2].si.valor, 15, 1e-6);
   // "contento" se reemplazó, no se duplicó.
   VERIFICAR(g_c.nExpresiones == 16);
 }

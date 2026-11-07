@@ -7,19 +7,44 @@ namespace {
 constexpr int MAX_MUESTRAS = 160;
 Punto g_muestras[MAX_MUESTRAS];
 
-// Una transformación por eje: x' = ax·x + bx, y' = ay·y + by (normalizado),
-// y después a píxeles con la vista.
+// Una transformación afín en coordenadas normalizadas,
+// x' = ax·x + kx·y + bx, y' = ky·x + ay·y + by, y después a píxeles con la
+// vista. Las caras solo escalan por eje (kx = ky = 0); las animaciones además
+// giran (y entonces la escala es pareja).
 struct Transformacion {
   float ax = 1, bx = 0, ay = 1, by = 0;
+  float kx = 0, ky = 0;
   Vista v;
   float e = 0;  // la escala que usa esta forma: la de los ojos o la de los indicadores
   Punto aPixel(float x, float y) const {
-    return {v.origenX + e * (ax * x + bx), v.origenY + e * (ay * y + by)};
+    return {v.origenX + e * (ax * x + kx * y + bx), v.origenY + e * (ky * x + ay * y + by)};
   }
   Punto aPixel(Punto p) const { return aPixel(p.x, p.y); }
   float anchoPx(float w) const { return w * ax * e; }
   float altoPx(float h) const { return h * ay * e; }
+  bool gira() const { return kx != 0 || ky != 0; }
+  float escalaPareja() const { return raiz(ax * ax + ky * ky); }
 };
+
+// El contorno de una píldora (rectángulo redondeado) como polígono, en
+// coordenadas normalizadas: para dibujarla girada.
+int contornoPildora(float cx, float cy, float w, float h, float r, Punto* p) {
+  constexpr int PASOS = 8;  // por esquina
+  const float mw = w / 2, mh = h / 2;
+  r = limitar(r, 0, minf(mw, mh));
+  const float esquinas[4][3] = {{mw - r, mh - r, 0},
+                                {-(mw - r), mh - r, MEDIA_VUELTA / 2},
+                                {-(mw - r), -(mh - r), MEDIA_VUELTA},
+                                {mw - r, -(mh - r), MEDIA_VUELTA * 1.5f}};
+  int n = 0;
+  for (const auto& q : esquinas) {
+    for (int i = 0; i <= PASOS; i++) {
+      const float a = q[2] + (MEDIA_VUELTA / 2) * i / PASOS;
+      p[n++] = {cx + q[0] + r * coseno(a), cy + q[1] + r * seno(a)};
+    }
+  }
+  return n;
+}
 
 // Corazón del manual: dos cúbicas (offsets en px de la pantalla de referencia
 // respecto del centro del ojo).
@@ -52,6 +77,22 @@ void dibujarForma(Lienzo& l, const Forma& f, const Transformacion& t, const Esta
         x = izq + w / 2;
       }
       if (f.audio >= 0) h = f.h * (0.35f + 0.65f * limitar(e.audio[f.audio], 0, 1));
+      if (t.gira()) {
+        const float r = f.r < 0 ? minf(w, h) / 2 : minf(f.r, minf(w, h) / 2);
+        if (f.relleno) {
+          int n = contornoPildora(x, f.y, w, h, r, g_muestras);
+          for (int i = 0; i < n; i++) g_muestras[i] = t.aPixel(g_muestras[i]);
+          l.poligono(g_muestras, n, color);
+        } else {
+          // El trazo va por dentro: el contorno se achica medio trazo.
+          const float m = f.trazo / 2;
+          int n = contornoPildora(x, f.y, maxf(w - f.trazo, 0), maxf(h - f.trazo, 0), maxf(r - m, 0), g_muestras);
+          for (int i = 0; i < n; i++) g_muestras[i] = t.aPixel(g_muestras[i]);
+          g_muestras[n] = g_muestras[0];
+          l.trazo(g_muestras, n + 1, f.trazo * t.e * t.escalaPareja(), color);
+        }
+        break;
+      }
       Punto c = t.aPixel(x, f.y);
       float wp = t.anchoPx(w), hp = t.altoPx(h);
       float r = f.r < 0 ? minf(wp, hp) / 2 : minf(f.r * t.ax * t.e, minf(wp, hp) / 2);
@@ -62,6 +103,7 @@ void dibujarForma(Lienzo& l, const Forma& f, const Transformacion& t, const Esta
     case TipoForma::Circulo: {
       Punto c = t.aPixel(f.x, f.y);
       float wp = t.anchoPx(2 * f.r), hp = t.altoPx(2 * f.r);
+      if (t.gira()) wp = hp = 2 * f.r * t.e * t.escalaPareja();
       l.pildora(c.x, c.y, wp, hp, minf(wp, hp) / 2, color);
       break;
     }
@@ -99,7 +141,7 @@ void dibujarForma(Lienzo& l, const Forma& f, const Transformacion& t, const Esta
       constexpr int PASOS = 24;
       for (int i = 0; i <= PASOS; i++)
         g_muestras[i] = t.aPixel(cuadratica(f.puntos[0], f.puntos[1], f.puntos[2], static_cast<float>(i) / PASOS));
-      l.trazo(g_muestras, PASOS + 1, f.trazo * t.e, color);
+      l.trazo(g_muestras, PASOS + 1, f.trazo * t.e * (t.gira() ? t.escalaPareja() : 1), color);
       break;
     }
     case TipoForma::Espiral: {
@@ -110,7 +152,7 @@ void dibujarForma(Lienzo& l, const Forma& f, const Transformacion& t, const Esta
         float r = f.r0 + f.paso * a;
         g_muestras[n++] = t.aPixel(f.x + r * coseno(a), f.y + r * seno(a));
       }
-      l.trazo(g_muestras, n, f.trazo * t.e, color);
+      l.trazo(g_muestras, n, f.trazo * t.e * (t.gira() ? t.escalaPareja() : 1), color);
       break;
     }
     case TipoForma::Poligono: {
@@ -244,6 +286,38 @@ void dibujarExpresion(Lienzo& l, const Vista& v, const Expresion& e, const Estad
     for (; i < fin; i++) dibujarForma(l, e.formas[i], t, estado);
   }
   (void)fija;
+}
+
+void dibujarAnimacion(Lienzo& l, const Vista& v, const Animacion& a, uint32_t t, const EstadoCara& estado) {
+  if (t > a.duracion) t = a.duracion;
+  for (int i = 0; i < a.nPistas; i++) {
+    const Pista& p = a.pistas[i];
+    const Cuadro q = cuadroDePista(p, t);
+    if (q.opacidad <= 0.002f || q.escala <= 0) continue;
+    float cx = p.cx, cy = p.cy;
+    if (!p.hayCentro) {
+      float x0, y0, x1, y1;
+      cajaDeForma(p.forma, &x0, &y0, &x1, &y1);
+      cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    }
+    // p' = c + R·(p − c)·s + (x, y). Los grados van en sentido horario (y crece hacia abajo).
+    const float rad = q.rotacion * (MEDIA_VUELTA / 180.0f);
+    const float co = coseno(rad) * q.escala, se = seno(rad) * q.escala;
+    Transformacion tr;
+    tr.v = v;
+    tr.e = v.escala;
+    tr.ax = co, tr.kx = -se, tr.ky = se, tr.ay = co;
+    tr.bx = cx - (co * cx - se * cy) + q.x;
+    tr.by = cy - (se * cx + co * cy) + q.y;
+    // Sin giro, la píldora se dibuja con su forma exacta.
+    if (absf(tr.kx) < 1e-6f && absf(tr.ky) < 1e-6f) tr.kx = tr.ky = 0;
+    if (tr.ax < 0 || tr.ay < 0) tr.kx = tr.kx == 0 ? 1e-6f : tr.kx;  // 180°: por el camino del polígono
+    Forma f = p.forma;
+    if (q.hayColor) f.color = q.color, f.acento = false;
+    l.opacidad(q.opacidad);
+    dibujarForma(l, f, tr, estado);
+    l.opacidad(1);
+  }
 }
 
 }  // namespace sintetica
