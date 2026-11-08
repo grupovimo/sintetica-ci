@@ -1,8 +1,12 @@
 # SintéticaOS en el VPS de Grupo Vimo
 
-Corre en `/opt/sintetica` (usuario `deploy`). Las imágenes las compila GitHub
-Actions (`.github/workflows/imagenes.yml`) y se bajan de GHCR. Lo compartido
-del VPS (Caddy, UFW, puertos, copias) está anotado en `/opt/VPS.md`.
+Corre en `/opt/sintetica` (usuario `deploy`). Las imágenes se arman en la Mac
+desde lo commiteado y se mandan por ssh, sin registro:
+**`sh herramientas/desplegar-nube.sh`** (copia de la base antes, levanta y
+verifica). Lo compartido del VPS (Caddy, UFW, puertos, copias) está anotado en
+`/opt/VPS.md`. Sin SMTP: se entra con el código por Telegram
+(`SMTP_SERVIDOR=ninguno`). Las reservas de la landing llegan por Telegram a
+`TELEGRAM_CHAT_RESERVAS`.
 
 | Qué | Dónde |
 | --- | --- |
@@ -10,7 +14,6 @@ del VPS (Caddy, UFW, puertos, copias) está anotado en `/opt/VPS.md`.
 | La API | https://api-sintetica.grupovimo.com.ar → 127.0.0.1:4400 |
 | MQTT (bichos) | mqtts://mqtt-sintetica.grupovimo.com.ar:8883 (sin Cloudflare): el broker está adentro de la API |
 | Mirar el MQTT (el superusuario `api`) | `mosquitto_sub -h mqtt-sintetica.grupovimo.com.ar -p 8883 --capath /etc/ssl/certs -u api -P <MQTT_CLAVE_API> -t 'bicho/#' -v` |
-| Los mails (hasta tener SMTP) | `ssh -N -L 8025:127.0.0.1:8025 deploy@187.41.102.190` → http://localhost:8025 |
 
 ## La carpeta
 

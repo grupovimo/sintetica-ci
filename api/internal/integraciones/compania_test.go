@@ -357,3 +357,26 @@ func TestPresenciaYHabitos(t *testing.T) {
 		}
 	}
 }
+
+func TestAvisarReserva(t *testing.T) {
+	a := abrirBase(t)
+	token := "123456:TOKEN-RESERVAS-" + azar(4)
+	falso := &telegramFalso{token: token}
+	srv := httptest.NewServer(falso)
+	defer srv.Close()
+	robots := &robotsFalsos{duenos: map[string]string{}, estados: map[string]protocolo.Estado{}}
+	sinChat := Nuevo(Opciones{TelegramToken: token, TelegramURL: srv.URL, TelegramEspera: 1}, a, robots, eventos.Nuevo(),
+		slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err := sinChat.AvisarReserva(context.Background(), "x"); err != nil {
+		t.Fatal(err)
+	}
+	i := Nuevo(Opciones{TelegramToken: token, TelegramURL: srv.URL, TelegramEspera: 1, ChatReservas: 4242}, a, robots, eventos.Nuevo(),
+		slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err := i.AvisarReserva(context.Background(), "🧡 <b>Reserva nueva</b>"); err != nil {
+		t.Fatal(err)
+	}
+	l := falso.esperar(t, 1)
+	if len(l) != 1 || l[0]["chat_id"] != float64(4242) || l[0]["parse_mode"] != "HTML" {
+		t.Fatalf("enviados: %v", l)
+	}
+}

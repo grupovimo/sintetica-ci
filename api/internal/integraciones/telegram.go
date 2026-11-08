@@ -137,6 +137,17 @@ func (i *Integraciones) MandarTelegram(ctx context.Context, usuario, texto strin
 	return i.tg.mandar(ctx, v.ChatID, texto, nil)
 }
 
+// AvisarReserva manda una reserva de la landing al chat de las reservas (HTML).
+// Sin Telegram o sin chat, no hace nada.
+func (i *Integraciones) AvisarReserva(ctx context.Context, html string) error {
+	if i.tg == nil || i.op.ChatReservas == 0 {
+		return nil
+	}
+	return i.tg.llamar(ctx, "sendMessage", map[string]any{
+		"chat_id": i.op.ChatReservas, "text": html, "parse_mode": "HTML", "disable_web_page_preview": true,
+	}, nil)
+}
+
 // escucharTelegram es el trabajador del bot: long polling con getUpdates (no
 // hace falta exponer nada para recibir), con backoff si algo falla.
 func (i *Integraciones) escucharTelegram(ctx context.Context) {

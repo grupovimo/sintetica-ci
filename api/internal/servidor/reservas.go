@@ -1,7 +1,9 @@
 package servidor
 
 import (
+	"context"
 	"errors"
+	"html"
 	"net/http"
 	"strconv"
 	"strings"
@@ -75,6 +77,22 @@ func (s *Servidor) reservar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("reserva nueva", "id", id, "pieza", res.Pieza, "color", res.Color)
+	// El aviso a Nahuel por Telegram (como hacía la landing sola); si falla, la
+	// reserva igual quedó guardada.
+	if s.integ != nil {
+		texto := "🧡 <b>Reserva nueva</b> · " + html.EscapeString(res.Pieza) + " " + html.EscapeString(res.Color) +
+			"\n<b>" + html.EscapeString(res.Nombre) + "</b>\n" + html.EscapeString(res.Contacto)
+		if res.Mensaje != "" {
+			texto += "\n\n" + html.EscapeString(res.Mensaje)
+		}
+		go func() {
+			ctx, cancelar := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancelar()
+			if err := s.integ.AvisarReserva(ctx, texto); err != nil {
+				s.log.Warn("reserva: no la pude avisar por Telegram", "id", id, "error", err)
+			}
+		}()
+	}
 	responder(w, http.StatusCreated, map[string]any{"ok": true})
 }
 

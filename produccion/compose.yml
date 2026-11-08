@@ -1,14 +1,15 @@
 # SintéticaOS en el VPS de Grupo Vimo (/opt/sintetica). Ver produccion/README.md.
 #
-# Las imágenes las compila GitHub Actions (.github/workflows/imagenes.yml) y
-# acá solo se bajan: docker compose pull && docker compose up -d
+# Las imágenes se arman desde lo commiteado y se mandan por ssh, sin registro
+# (sh herramientas/desplegar-nube.sh); se pueden bajar de GHCR cambiando
+# IMAGENES (por ejemplo ghcr.io/nawesan12/).
 #
 # Puertos (Docker se saltea UFW: todo en 127.0.0.1 salvo el 8883):
 #   3600 web  → sintetica.grupovimo.com.ar      (Caddy + Cloudflare)
 #   4400 API  → api-sintetica.grupovimo.com.ar  (Caddy + Cloudflare)
 #   8883 MQTT con TLS (el broker está adentro de la API) →
 #        mqtt-sintetica.grupovimo.com.ar (sin Cloudflare)
-#   8025 Mailpit: solo por túnel SSH
+# Sin SMTP: el código para entrar va por Telegram (SMTP_SERVIDOR=ninguno).
 name: sintetica
 
 x-api-entorno: &api-entorno
@@ -27,8 +28,8 @@ x-api-entorno: &api-entorno
   API_URL_PUBLICA: https://api-sintetica.grupovimo.com.ar
   API_URL_INTERNA: http://api:8080
   WEB_URL: https://sintetica.grupovimo.com.ar
-  # Sin SMTP de verdad hasta tener el dominio: los mails quedan en Mailpit.
-  SMTP_SERVIDOR: mailpit:1025
+  # Sin SMTP hasta tener el dominio: se entra con Telegram.
+  SMTP_SERVIDOR: ${SMTP_SERVIDOR:-ninguno}
   SMTP_DE: Sintética Labs <hola@sinteticalabs.com>
   CLAVE_FIRMA: /claves/ota-privada.pem
   SECRETO: ${SECRETO:?falta SECRETO}
@@ -38,6 +39,7 @@ x-api-entorno: &api-entorno
   # El bot de Telegram (sin token, las integraciones de Telegram quedan apagadas).
   TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
   TELEGRAM_BOT: ${TELEGRAM_BOT:-sinteticalabs_bot}
+  TELEGRAM_CHAT_RESERVAS: ${TELEGRAM_CHAT_RESERVAS:-}
   # Spotify y la charla con IA (v1.9; vacías = apagadas).
   SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
   SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
@@ -66,17 +68,8 @@ services:
     mem_limit: 256m
     restart: unless-stopped
 
-  mailpit:
-    image: axllent/mailpit:v1.21.8
-    environment:
-      MP_MAX_MESSAGES: 500
-    ports:
-      - "127.0.0.1:8025:8025"
-    mem_limit: 64m
-    restart: unless-stopped
-
   api:
-    image: ghcr.io/nawesan12/sintetica-api:${VERSION:?falta VERSION (un sha)}
+    image: ${IMAGENES:-}sintetica-api:${VERSION:?falta VERSION (un sha)}
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,7 +87,7 @@ services:
     restart: unless-stopped
 
   web:
-    image: ghcr.io/nawesan12/sintetica-web:${VERSION:?falta VERSION (un sha)}
+    image: ${IMAGENES:-}sintetica-web:${VERSION:?falta VERSION (un sha)}
     depends_on:
       api:
         condition: service_started

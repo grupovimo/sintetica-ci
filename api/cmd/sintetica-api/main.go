@@ -176,6 +176,7 @@ func correr(log *slog.Logger) error {
 	integ := integraciones.Nuevo(integraciones.Opciones{
 		TelegramToken: os.Getenv("TELEGRAM_TOKEN"),
 		TelegramBot:   env("TELEGRAM_BOT", "sinteticalabs_bot"),
+		ChatReservas:  idChat(os.Getenv("TELEGRAM_CHAT_RESERVAS")),
 		TelegramURL:   os.Getenv("TELEGRAM_API_URL"),
 		ClimaURL:      os.Getenv("CLIMA_API_URL"),
 		GeocodingURL:  os.Getenv("GEOCODING_API_URL"),
@@ -241,4 +242,10 @@ func correr(log *slog.Logger) error {
 	defer cancelar()
 	publico.Shutdown(apagar) //nolint:errcheck
 	return nil
+}
+
+// idChat: el id de un chat de Telegram de una variable de entorno (0 si está vacía o mal).
+func idChat(s string) int64 {
+	n, _ := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
+	return n
 }

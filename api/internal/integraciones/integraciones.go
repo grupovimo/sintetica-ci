@@ -37,8 +37,10 @@ type Robots interface {
 
 // Opciones salen del entorno (ver cmd/sintetica-api).
 type Opciones struct {
-	TelegramToken  string // sin token, todo lo de Telegram queda apagado
-	TelegramBot    string // el usuario del bot, sin "@" (sinteticalabs_bot)
+	TelegramToken string // sin token, todo lo de Telegram queda apagado
+	TelegramBot   string // el usuario del bot, sin "@" (sinteticalabs_bot)
+	// El chat (de Nahuel) al que llegan las reservas de la landing; 0, no se avisan.
+	ChatReservas   int64
 	TelegramURL    string // la API de Telegram (los tests ponen un servidor falso)
 	TelegramEspera int    // segundos de long polling (30)
 	// Desarrollo deja que los webhooks vayan a direcciones internas.
