@@ -19,6 +19,8 @@
   import Integraciones from '$lib/consola/modulos/Integraciones.svelte';
   import Voz from '$lib/consola/modulos/Voz.svelte';
   import Habla from '$lib/consola/modulos/Habla.svelte';
+  import Jugar from '$lib/consola/modulos/Jugar.svelte';
+  import Cuidado from '$lib/consola/modulos/Cuidado.svelte';
   import { api, ErrorApi } from '$lib/api';
   import { bytes, cortarBytes, MAX_TEXTO } from '$lib/formato';
   import Ajustes from '$lib/consola/modulos/Ajustes.svelte';
@@ -31,11 +33,13 @@
     { clave: 'cara', nombre: 'Cara', modulo: Cara },
     { clave: 'imagenes', nombre: 'Imágenes', modulo: Imagenes },
     { clave: 'dia', nombre: 'Su día', modulo: Dia },
+    { clave: 'cuidado', nombre: 'Cuidado', modulo: Cuidado },
     { clave: 'recordatorios', nombre: 'Recordatorios', modulo: Recordatorios },
     { clave: 'modos', nombre: 'Modos', modulo: Modos },
     { clave: 'reflejos', nombre: 'Reflejos', modulo: Reflejos },
     { clave: 'integraciones', nombre: 'Integraciones', modulo: Integraciones },
     { clave: 'habla', nombre: 'Habla', modulo: Habla },
+    { clave: 'jugar', nombre: 'Jugar', modulo: Jugar },
     { clave: 'voz', nombre: 'Voz', modulo: Voz, necesita: ['microfono', 'parlante'] as Capacidad[] },
     { clave: 'ajustes', nombre: 'Ajustes', modulo: Ajustes },
   ];
@@ -135,6 +139,7 @@
           <button class="tecla" disabled={!conectado} onclick={() => hacer({ evento: 'caricia' }, 'Le gustó')}>Acariciar</button>
           <button class="tecla" disabled={!conectado} onclick={() => hacer({ evento: 'nombre' }, 'Te escuchó')}>Llamarlo</button>
           <button class="tecla naranja" disabled={!conectado} onclick={() => hacer({ evento: 'muchos-toques' }, 'Se rió')}>Cosquillas</button>
+          <button class="tecla" disabled={!conectado} onclick={() => { elegir('jugar'); document.querySelector('.tablero')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>Jugar</button>
           {#if b.bicho.estado?.fija && !/^(recordatorio|pomodoro|reloj):/.test(b.bicho.estado.expresion)}<button class="tecla negra" disabled={!conectado} onclick={() => hacer({ expresion: '' }, 'Vuelve a ser él')}>Soltar la cara</button>{/if}
         </div>
         <form class="decir visor" onsubmit={(e) => { e.preventDefault(); decir(); }}>
