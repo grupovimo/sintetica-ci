@@ -8,7 +8,7 @@ import android.graphics.RectF
 import com.sinteticalabs.app.protocolo.Animacion
 import com.sinteticalabs.app.protocolo.Qoi
 
-/** Recorta y escala una imagen a la pantalla del bicho, y la codifica en QOI. */
+/** Recorta y escala una imagen a la pantalla del robot, y la codifica en QOI. */
 object PrepararImagen {
     private const val PANTALLA = 0xFF0B0A09.toInt()
 
@@ -44,15 +44,42 @@ object PrepararImagen {
      */
     fun gif(bytes: ByteArray, ancho: Int, alto: Int, redonda: Boolean): ByteArray {
         val g = Gif.decodificar(bytes)
-        var cuadros = g.cuadros.map { c ->
+        return empaquetar(g.cuadros.map { c ->
             val fuente = Bitmap.createBitmap(c.argb, g.ancho, g.alto, Bitmap.Config.ARGB_8888)
             Animacion.Cuadro(qoi(recortar(fuente, ancho, alto, redonda)), c.ms)
+        }, ancho, alto)
+    }
+
+    /**
+     * Un video corto: hasta 6 segundos desde el principio, a 12 cuadros por
+     * segundo como mucho y 64 cuadros en total (como la web).
+     */
+    fun video(contexto: android.content.Context, uri: android.net.Uri, ancho: Int, alto: Int, redonda: Boolean): ByteArray {
+        val r = android.media.MediaMetadataRetriever()
+        try {
+            r.setDataSource(contexto, uri)
+            val dura = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+            val tiempos = Video.tiempos(dura)
+            val cuadros = tiempos.mapIndexedNotNull { i, t ->
+                val f = r.getFrameAtTime(t * 1000, android.media.MediaMetadataRetriever.OPTION_CLOSEST) ?: return@mapIndexedNotNull null
+                val ms = ((tiempos.getOrNull(i + 1) ?: (t + Video.paso(dura))) - t).toInt()
+                Animacion.Cuadro(qoi(recortar(f, ancho, alto, redonda)), ms)
+            }
+            require(cuadros.isNotEmpty()) { "El video está vacío." }
+            return empaquetar(cuadros, ancho, alto)
+        } finally {
+            r.release()
         }
+    }
+
+    /** Los cuadros en una animación; si no entra en un espacio, se saltea uno de cada dos (el que queda dura lo de los dos). */
+    fun empaquetar(lista: List<Animacion.Cuadro>, ancho: Int, alto: Int): ByteArray {
+        var cuadros = lista
         if (cuadros.size == 1) return cuadros[0].qoi
         val limite = ancho * alto * 4 + 22
         var sani = Animacion.codificar(cuadros.take(Animacion.MAX_CUADROS), ancho, alto)
         while (cuadros.size > Animacion.MAX_CUADROS || sani.size > limite) {
-            require(cuadros.size > 2) { "El GIF es demasiado pesado para la pantalla: probá con uno más simple." }
+            require(cuadros.size > 2) { "Es demasiado pesado para la pantalla: probá con uno más simple." }
             cuadros = cuadros.chunked(2).map { par -> Animacion.Cuadro(par[0].qoi, par.sumOf { it.ms }) }
             sani = Animacion.codificar(cuadros.take(Animacion.MAX_CUADROS), ancho, alto)
         }

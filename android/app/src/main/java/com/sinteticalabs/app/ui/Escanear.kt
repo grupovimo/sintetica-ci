@@ -48,7 +48,7 @@ fun PantallaEscanear(alLeer: (DatosQr) -> Unit, alVolver: () -> Unit) {
     Surface(color = p.papel, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.safeDrawingPadding().padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Etiqueta("Vincular")
-            Text("Escaneá el QR de la pantalla del bicho.", style = Tipos.titulo, color = p.tinta)
+            Text("Escaneá el QR de su pantalla.", style = Tipos.titulo, color = p.tinta)
             Box(
                 Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(24.dp)).background(p.pantalla)
                     .border(1.dp, p.linea, RoundedCornerShape(24.dp)),
@@ -56,11 +56,11 @@ fun PantallaEscanear(alLeer: (DatosQr) -> Unit, alVolver: () -> Unit) {
             ) {
                 if (permiso) Camara { texto ->
                     val datos = leerQr(texto)
-                    if (datos != null) alLeer(datos) else aviso = "Ese QR no es de un bicho de Sintética Labs."
+                    if (datos != null) alLeer(datos) else aviso = "Ese QR no es de un robot."
                 } else Text("Para escanear hace falta la cámara.", style = Tipos.chico, color = p.tintaSuave, modifier = Modifier.padding(24.dp))
             }
             aviso?.let { Aviso(it) }
-            Text("¿No ves el QR? Si el bicho ya está vinculado con otro celu, mantené apretado el botón 5 segundos.", style = Tipos.chico, color = p.tintaSuave)
+            Text("¿Sin QR? Apretá su botón 5 s.", style = Tipos.chico, color = p.tintaSuave)
             BotonSecundario("Volver", alVolver, Modifier.fillMaxWidth())
         }
     }

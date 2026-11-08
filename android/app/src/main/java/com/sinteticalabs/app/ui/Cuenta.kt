@@ -112,11 +112,11 @@ fun PantallaCuenta(vm: CuentaViewModel, alVolver: () -> Unit) {
 
     Surface(color = p.papel, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            TextButton(onClick = alVolver) { Text("← INICIO", style = Tipos.boton, color = p.tintaSuave) }
+            TextButton(onClick = alVolver) { Text("←", style = Tipos.boton, color = p.tintaSuave) }
             Etiqueta("Tu cuenta")
             if (s.activa) {
                 Text(s.email.ifEmpty { "Adentro" }, style = Tipos.display, color = p.tinta)
-                Text("Desde acá y desde la web manejás tus bichos aunque estén lejos.", style = Tipos.cuerpo, color = p.tintaSuave)
+                Text("Tus robots, desde cualquier lado.", style = Tipos.cuerpo, color = p.tintaSuave)
                 FilaDato("Servidor", s.servidor)
                 BotonSecundario("Salir", { vm.salir() }, Modifier.fillMaxWidth(), habilitado = !ocupado)
             } else {

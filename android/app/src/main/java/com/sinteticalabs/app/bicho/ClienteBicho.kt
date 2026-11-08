@@ -30,6 +30,8 @@ class ErrorBicho(mensaje: String) : Exception(mensaje)
 class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) {
     private val _estado = MutableStateFlow<Estado?>(null)
     val estado: StateFlow<Estado?> = _estado
+    /** Todo lo que avisa el robot (los avisos solos llegan por Comando). */
+    val marcos get() = transporte.notificaciones
 
     init {
         alcance.launch {
@@ -67,7 +69,7 @@ class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) 
         val r = exigir(Car.COMANDO, Comando.vincular(codigo))
         mandarHora()
         actualizarEstado()
-        return r.clave ?: throw ErrorBicho("El bicho no mandó la clave.")
+        return r.clave ?: throw ErrorBicho("El robot no mandó la clave.")
     }
 
     suspend fun autenticar(clave: ByteArray) {
@@ -125,7 +127,7 @@ class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) 
             }
             for (e in escrituras) transporte.escribir(Car.CONFIG, e)
             val r = withTimeout(10_000) { fin.await() }
-            if (!r.ok) throw ErrorBicho("El bicho no aceptó la configuración: ${r.detalle.ifEmpty { r.mensaje }}")
+            if (!r.ok) throw ErrorBicho("El robot no aceptó la configuración: ${r.detalle.ifEmpty { r.mensaje }}")
         }
         actualizarEstado()
     }
@@ -144,7 +146,7 @@ class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) 
                 alProgreso((i + 1f) / escrituras.size)
             }
             val r = withTimeout(15_000) { fin.await() }
-            if (!r.ok) throw ErrorBicho("El bicho no aceptó la imagen: ${r.detalle.ifEmpty { r.mensaje }}")
+            if (!r.ok) throw ErrorBicho("El robot no aceptó la imagen: ${r.detalle.ifEmpty { r.mensaje }}")
         }
     }
 
@@ -167,7 +169,7 @@ class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) 
      */
     suspend fun instalarFirmware(manifiesto: ByteArray, binario: ByteArray, alProgreso: (Float) -> Unit = {}) {
         val ini = pedir(Car.OTA, byteArrayOf(Op.OTA_INICIO.toByte()) + manifiesto, plazo = 60_000)
-        if (!ini.ok) throw ErrorBicho("El bicho no aceptó el firmware: ${ini.detalle.ifEmpty { ini.mensaje }}")
+        if (!ini.ok) throw ErrorBicho("El robot no aceptó el firmware: ${ini.detalle.ifEmpty { ini.mensaje }}")
         coroutineScope {
             // Si un bloque falla, el bicho avisa con [0xB1][código] y aborta.
             val falla = async(start = CoroutineStart.UNDISPATCHED) {
@@ -192,7 +194,7 @@ class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) 
             falla.cancel()
         }
         val fin = pedir(Car.OTA, byteArrayOf(Op.OTA_FIN.toByte()), plazo = 60_000)
-        if (!fin.ok) throw ErrorBicho("El bicho no instaló el firmware: ${fin.detalle.ifEmpty { fin.mensaje }}")
+        if (!fin.ok) throw ErrorBicho("El robot no instaló el firmware: ${fin.detalle.ifEmpty { fin.mensaje }}")
     }
 
     fun cerrar() = transporte.cerrar()

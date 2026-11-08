@@ -1,6 +1,5 @@
 package com.sinteticalabs.app.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,38 +7,25 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
-/** El único botón naranja de cada pantalla (manual: un solo primario por pantalla). */
+/** El único botón naranja de cada pantalla: una tecla mecánica naranja. */
 @Composable
 fun BotonPrimario(texto: String, alTocar: () -> Unit, modifier: Modifier = Modifier, habilitado: Boolean = true) {
-    val p = LocalPaleta.current
-    Button(
-        onClick = alTocar, enabled = habilitado, modifier = modifier.fillMaxWidth().height(52.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = p.naranja, contentColor = p.sobreNaranja, disabledContainerColor = p.linea, disabledContentColor = p.tintaSuave),
-    ) { Text(texto.uppercase(), style = Tipos.boton) }
+    com.sinteticalabs.app.ui.consola.Tecla(texto, alTocar, modifier.fillMaxWidth(), acabado = com.sinteticalabs.app.ui.consola.Acabado.NARANJA, habilitada = habilitado)
 }
 
+/** Una tecla negra. */
 @Composable
-fun BotonSecundario(texto: String, alTocar: () -> Unit, modifier: Modifier = Modifier, habilitado: Boolean = true, contenido: PaddingValues = ButtonDefaults.ContentPadding) {
-    val p = LocalPaleta.current
-    OutlinedButton(
-        onClick = alTocar, enabled = habilitado, modifier = modifier, shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, p.linea), contentPadding = contenido,
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = p.tinta),
-    ) { Text(texto.uppercase(), style = Tipos.boton) }
+fun BotonSecundario(texto: String, alTocar: () -> Unit, modifier: Modifier = Modifier, habilitado: Boolean = true, @Suppress("UNUSED_PARAMETER") contenido: PaddingValues = PaddingValues()) {
+    com.sinteticalabs.app.ui.consola.Tecla(texto, alTocar, modifier, acabado = com.sinteticalabs.app.ui.consola.Acabado.NEGRA, habilitada = habilitado)
 }
 
 @Composable

@@ -1,0 +1,39 @@
+{
+  "version": 2,
+  "semilla": 48213,
+  "nombre": "Toto",
+  "personalidad": { "preset": "picaro", "energia": 0.6, "sociabilidad": 0.8, "timidez": 0.3, "malGenio": 0.2 },
+  "horario": { "despierta": "08:00", "duerme": "23:30" },
+  "dueno": { "nombre": "Nahuel", "cumple": "03-14" },
+  "cumple": "11-07",
+  "expresiones": {
+    "contento": { "ojo": { "w": 0.13, "h": 0.2, "smile": 0.85 }, "gy": 0.04, "movimiento": "rebote" },
+    "picaro": { "extiende": "guino", "blush": 0.6, "mcurve": 0.4, "particula": "chispa" }
+  },
+  "comportamientos": {
+    "bostezar": {
+      "cuando": "sueno>0.5",
+      "pasos": [
+        { "cara": "bostezo", "dura": 2.0 },
+        { "cara": "neutral", "parpadeo": "lento" }
+      ],
+      "enfriamiento": 180
+    },
+    "saludar-picaro": {
+      "tipo": "reaccion",
+      "pasos": [ { "cara": "picaro", "mirada": "frente", "dura": [1, 1.5] }, { "cara": "contento", "dura": 1.5 } ]
+    }
+  },
+  "reglas": [
+    { "si": "sacudida.fuerte", "entonces": ["reflejo:mareado", "estado.estres+0.4", "sonido:boing"] },
+    { "si": "nombre_escuchado", "entonces": ["comportamiento:saludar-picaro", "estado.animo+0.2"] }
+  ],
+  "limites_marca": { "color": "#FF6A33", "brillo_max": 0.9 },
+  "recordatorios": [
+    { "hora": "08:30", "dias": "LMXJV", "texto": "Tomar la pastilla", "expresion": "sorpresa", "sonido": true, "activo": true },
+    { "hora": "20:00", "texto": "Regar las plantas" }
+  ],
+  "voz": { "volumen": 0.7, "tipo": "media", "palabra": "Lucho", "conversar": false, "microfono": 0.6 },
+  "pomodoro": { "trabajo": 25, "descanso": 5 },
+  "protector": { "imagen": 0, "espera": 10 }
+}

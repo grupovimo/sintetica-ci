@@ -54,7 +54,7 @@ class ApiSintetica(private val servidor: String, private val token: String = "")
         return c
     }
 
-    private suspend fun pedir(ruta: String, metodo: String = "GET", cuerpo: JsonElement? = null, encabezados: Map<String, String> = emptyMap()): JsonObject =
+    suspend fun pedir(ruta: String, metodo: String = "GET", cuerpo: JsonElement? = null, encabezados: Map<String, String> = emptyMap()): JsonObject =
         withContext(Dispatchers.IO) {
             val c = abrir(ruta, metodo)
             try {
@@ -64,7 +64,7 @@ class ApiSintetica(private val servidor: String, private val token: String = "")
                     c.setRequestProperty("Content-Type", "application/json")
                     c.outputStream.use { it.write(cuerpo.toString().toByteArray()) }
                 }
-                val estado = try { c.responseCode } catch (e: Exception) { throw ErrorApi(0, "No me pude conectar con $servidor.") }
+                val estado = try { c.responseCode } catch (e: Exception) { throw ErrorApi(0, "Sin conexión con el servidor.") }
                 val texto = (if (estado < 400) c.inputStream else c.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
                 val obj = runCatching { json.parseToJsonElement(texto).jsonObject }.getOrNull() ?: JsonObject(emptyMap())
                 if (estado >= 400) {
@@ -103,7 +103,7 @@ class ApiSintetica(private val servidor: String, private val token: String = "")
         val apodo = this["apodo"]?.jsonPrimitive?.contentOrNull.orEmpty()
         return BichoNube(
             id = this["id"]!!.jsonPrimitive.content,
-            nombre = apodo.ifEmpty { est?.get("nombre")?.jsonPrimitive?.contentOrNull ?: "Bicho" },
+            nombre = apodo.ifEmpty { est?.get("nombre")?.jsonPrimitive?.contentOrNull ?: "Robot" },
             perfil = this["perfil"]?.jsonPrimitive?.contentOrNull.orEmpty(),
             conectado = this["conectado"]?.jsonPrimitive?.booleanOrNull ?: false,
             virtual = this["virtual"]?.jsonPrimitive?.booleanOrNull ?: false,
@@ -153,6 +153,52 @@ class ApiSintetica(private val servidor: String, private val token: String = "")
             c.disconnect()
         }
     }
+
+    /** Un pedido con el cuerpo tal cual (JSON crudo o binario). Devuelve los bytes de la respuesta. */
+    suspend fun crudo(ruta: String, metodo: String = "GET", cuerpo: ByteArray? = null, tipo: String = "application/json"): ByteArray =
+        withContext(Dispatchers.IO) {
+            val c = abrir(ruta, metodo)
+            try {
+                if (cuerpo != null) {
+                    c.doOutput = true
+                    c.setRequestProperty("Content-Type", tipo)
+                    c.outputStream.use { it.write(cuerpo) }
+                }
+                val estado = try { c.responseCode } catch (e: Exception) { throw ErrorApi(0, "Sin conexión con el servidor.") }
+                val bytes = (if (estado < 400) c.inputStream else c.errorStream)?.use { it.readBytes() } ?: ByteArray(0)
+                if (estado >= 400) {
+                    val obj = runCatching { json.parseToJsonElement(String(bytes)).jsonObject }.getOrNull() ?: JsonObject(emptyMap())
+                    throw ErrorApi(estado, obj["error"]?.jsonPrimitive?.contentOrNull ?: "Error $estado", obj["detalle"]?.jsonPrimitive?.contentOrNull.orEmpty())
+                }
+                bytes
+            } finally {
+                c.disconnect()
+            }
+        }
+
+    /**
+     * Los eventos en vivo de toda la cuenta (SSE /v1/eventos): estado, conexión,
+     * sincro, config, imágenes, OTA, marcos, automatizaciones, Telegram y MCP.
+     * La API manda un latido cada 20 s: si en 45 s no llega nada, se corta.
+     */
+    fun eventosCuenta(): Flow<com.sinteticalabs.app.consola.EventoCuenta> = kotlinx.coroutines.flow.flow {
+        val c = abrir("/v1/eventos", "GET")
+        c.readTimeout = 45_000
+        c.setRequestProperty("Accept", "text/event-stream")
+        try {
+            val estado = try { c.responseCode } catch (e: Exception) { throw ErrorApi(0, "Sin conexión con el servidor.") }
+            if (estado >= 400) throw ErrorApi(estado, "Error $estado")
+            val lector = com.sinteticalabs.app.consola.LectorSse()
+            BufferedReader(InputStreamReader(c.inputStream)).use { r ->
+                while (true) {
+                    val linea = r.readLine() ?: break
+                    lector.leer(linea)?.let { emit(it) }
+                }
+            }
+        } finally {
+            c.disconnect()
+        }
+    }.flowOn(Dispatchers.IO)
 
     /** Los eventos en vivo de un bicho (SSE). Se corta al cancelar. */
     fun eventos(id: String): Flow<EventoNube> = callbackFlow {

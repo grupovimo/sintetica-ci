@@ -59,7 +59,7 @@ class TransporteNube(private val api: ApiSintetica, private val id: String) : Tr
     }
 
     override suspend fun leerEstado(): ByteArray =
-        ultimoEstado ?: api.bicho(id).estadoCrudo?.also { ultimoEstado = it } ?: throw ErrorBicho("Todavía no sé cómo está el bicho.")
+        ultimoEstado ?: api.bicho(id).estadoCrudo?.also { ultimoEstado = it } ?: throw ErrorBicho("Todavía no sé cómo está.")
 
     override fun cerrar() {
         eventos?.cancel()

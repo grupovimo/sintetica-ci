@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Sintetica" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.Sintetica" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/papel</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
-    <color name="papel">#FBFAF7</color>
-    <color name="naranja">#F5501A</color>
+    <color name="papel">#16140F</color>
+    <color name="naranja">#FF6A33</color>
     <color name="pantalla">#0B0A09</color>
 </resources>

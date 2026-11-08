@@ -51,7 +51,7 @@ fun escanearBichos(contexto: Context): Flow<BichoCerca> = callbackFlow {
             val id = idDeAnuncio(byteArrayOf(0xFF.toByte(), 0xFF.toByte()) + datos) ?: return
             trySend(BichoCerca(id, r.scanRecord?.deviceName, r.device, r.rssi))
         }
-        override fun onScanFailed(errorCode: Int) { close(ErrorBle("No pude buscar bichos (error $errorCode).")) }
+        override fun onScanFailed(errorCode: Int) { close(ErrorBle("No pude buscar (error $errorCode).")) }
     }
     val filtro = ScanFilter.Builder().setServiceUuid(ParcelUuid(Uuids.SERVICIO)).build()
     val ajustes = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
@@ -64,7 +64,7 @@ suspend fun buscarBicho(contexto: Context, id: String, ms: Long = 20_000): Bicho
     try {
         withTimeout(ms) { escanearBichos(contexto).first { it.id == id } }
     } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-        throw ErrorBle("No encuentro el bicho. Acercalo al celu y fijate que esté prendido.")
+        throw ErrorBle("No lo encuentro: acercalo y prendelo.")
     }
 
 /**
@@ -84,14 +84,14 @@ class TransporteBle(private val contexto: Context, private val dispositivo: Blue
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, nuevo: Int) {
             if (nuevo == BluetoothProfile.STATE_CONNECTED) g.discoverServices()
             else if (nuevo == BluetoothProfile.STATE_DISCONNECTED) {
-                val e = ErrorBle("Se cortó la conexión con el bicho.")
+                val e = ErrorBle("Se cortó la conexión.")
                 conectado.completeExceptionally(e)
                 pendiente?.completeExceptionally(e)
             }
         }
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
             val s = g.getService(Uuids.SERVICIO)
-            if (s == null) { conectado.completeExceptionally(ErrorBle("Ese dispositivo no es un bicho.")); return }
+            if (s == null) { conectado.completeExceptionally(ErrorBle("Ese dispositivo no es un robot.")); return }
             Car.entries.forEach { c -> s.getCharacteristic(c.uuid)?.let { caracteristicas[c] = it } }
             conectado.complete(Unit)
         }
@@ -128,7 +128,7 @@ class TransporteBle(private val contexto: Context, private val dispositivo: Blue
         operacion<Int> { g.requestMtu(185) }
         for (c in listOf(Car.CONFIG, Car.COMANDO, Car.ESTADO, Car.IMAGEN, Car.OTA)) {
             // Imagen es de la v1.2 y OTA de la v1.3: un firmware viejo no las tiene.
-            val car = caracteristicas[c] ?: if (c == Car.IMAGEN || c == Car.OTA) continue else throw ErrorBle("Al bicho le falta la característica ${c.name}.")
+            val car = caracteristicas[c] ?: if (c == Car.IMAGEN || c == Car.OTA) continue else throw ErrorBle("Al robot le falta la característica ${c.name}.")
             g.setCharacteristicNotification(car, true)
             val d = car.getDescriptor(Uuids.CCCD) ?: continue
             operacion<Int> {
@@ -140,7 +140,7 @@ class TransporteBle(private val contexto: Context, private val dispositivo: Blue
 
     override suspend fun escribir(car: Car, datos: ByteArray) {
         val g = gatt ?: throw ErrorBle("No hay conexión.")
-        val c = caracteristicas[car] ?: throw ErrorBle("Al bicho le falta la característica ${car.name}.")
+        val c = caracteristicas[car] ?: throw ErrorBle("Al robot le falta la característica ${car.name}.")
         // Los bloques de config e imagen van sin respuesta (mucho más rápido); el resto, con.
         val bloque = (car == Car.CONFIG && datos[0].toInt() == Op.CONFIG_BLOQUE) || (car == Car.IMAGEN && datos[0].toInt() == Op.IMG_BLOQUE) ||
             (car == Car.OTA && datos[0].toInt() == Op.OTA_BLOQUE)
@@ -149,12 +149,12 @@ class TransporteBle(private val contexto: Context, private val dispositivo: Blue
             if (Build.VERSION.SDK_INT >= 33) g.writeCharacteristic(c, datos, tipo) == BluetoothGatt.GATT_SUCCESS
             else @Suppress("DEPRECATION") run { c.writeType = tipo; c.value = datos; g.writeCharacteristic(c) }
         }
-        if (status != BluetoothGatt.GATT_SUCCESS) throw ErrorBle("El bicho no aceptó la escritura (GATT $status).")
+        if (status != BluetoothGatt.GATT_SUCCESS) throw ErrorBle("El robot no aceptó la escritura (GATT $status).")
     }
 
     override suspend fun leerEstado(): ByteArray {
         val g = gatt ?: throw ErrorBle("No hay conexión.")
-        val c = caracteristicas[Car.ESTADO] ?: throw ErrorBle("Al bicho le falta la característica de estado.")
+        val c = caracteristicas[Car.ESTADO] ?: throw ErrorBle("Al robot le falta la característica de estado.")
         return operacion { g.readCharacteristic(c) }
     }
 

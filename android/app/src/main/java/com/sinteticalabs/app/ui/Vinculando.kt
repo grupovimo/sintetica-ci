@@ -33,7 +33,7 @@ fun PantallaVinculando(qr: DatosQr, alTerminar: (String) -> Unit, alVolver: () -
     val contexto = LocalContext.current
     val permiso = conPermisos(PERMISOS_BLE)
     val alcance = rememberCoroutineScope()
-    var paso by remember { mutableStateOf("Buscando el bicho…") }
+    var paso by remember { mutableStateOf("Buscando…") }
     var error by remember { mutableStateOf<String?>(null) }
     var intento by remember { mutableIntStateOf(0) }
 
@@ -42,7 +42,7 @@ fun PantallaVinculando(qr: DatosQr, alTerminar: (String) -> Unit, alVolver: () -
         error = null
         var cliente: ClienteBicho? = null
         try {
-            paso = "Buscando el bicho…"
+            paso = "Buscando…"
             val cerca = buscarBicho(contexto, qr.id)
             paso = "Conectando…"
             cliente = ClienteBicho(TransporteBle(contexto, cerca.dispositivo), alcance)
@@ -50,7 +50,7 @@ fun PantallaVinculando(qr: DatosQr, alTerminar: (String) -> Unit, alVolver: () -
             paso = "Vinculando…"
             val clave = cliente.vincular(qr.codigo)
             val e = cliente.estado.value
-            Vinculados(contexto).guardar(Vinculado(qr.id, e?.nombre ?: "bicho", e?.serie ?: "", clave))
+            Vinculados(contexto).guardar(Vinculado(qr.id, e?.nombre ?: "robot", e?.serie ?: "", clave))
             alTerminar(qr.id)
         } catch (e: Exception) {
             error = e.message ?: "Algo salió mal."
