@@ -22,6 +22,8 @@ object Nucleo {
         fun redCambio()
         /** Un sonido del núcleo por nombre ("despertador:3", "ronquido", "dado"…). */
         fun sonido(nombre: String)
+        /** La voz propia del núcleo: PCM de 16 kHz, de a bloques. */
+        fun audio(muestras: ShortArray)
     }
 
     /** Una sola vez por proceso: si GL recrea la superficie, el núcleo sigue igual. */
@@ -71,6 +73,12 @@ object Nucleo {
     /** El QR para vincular otro celu, un par de minutos. */
     /** El texto del globo que se ve, en UTF-8 (vacío si no hay). */
     external fun globo(): ByteArray
+    /** La charla sin IA (hilo de GL): "código\tintención\tacción\tfrase" en UTF-8. */
+    external fun charlar(texto: ByteArray): ByteArray
+    /** Un globo propio, sin expresión (0 ok). */
+    external fun decir(texto: ByteArray): Int
+    /** La voz propia del núcleo (balbuceo) prendida o apagada. */
+    external fun vozPropia(si: Boolean)
     external fun mostrarQr()
     /** Algo que mirar (la cara que ve), de -1 a 1; y hacia arriba. */
     external fun seguir(x: Float, y: Float)

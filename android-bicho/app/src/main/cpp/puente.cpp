@@ -19,7 +19,7 @@
 namespace {
 JNIEnv* g_env = nullptr;
 jobject g_anfitrion = nullptr;  // referencia global
-jmethodID g_guardar, g_leer, g_registrar, g_notificar, g_notificarNube, g_redCambio, g_sonido;
+jmethodID g_guardar, g_leer, g_registrar, g_notificar, g_notificarNube, g_redCambio, g_sonido, g_audio;
 char g_id[13] = "000000000000";
 std::string g_carpeta;  // archivos grandes (imágenes, sprites): <filesDir>/archivos
 
@@ -130,6 +130,15 @@ void sonido(void*, const char* nombre) {
   g_env->DeleteLocalRef(s);
 }
 
+// La voz propia: PCM de 16 kHz que manda sintetica_tick con un poco de adelanto.
+void audio(void*, const int16_t* m, size_t n) {
+  if (!g_anfitrion || !n) return;
+  jshortArray a = g_env->NewShortArray(static_cast<jsize>(n));
+  g_env->SetShortArrayRegion(a, 0, static_cast<jsize>(n), m);
+  g_env->CallVoidMethod(g_anfitrion, g_audio, a);
+  g_env->DeleteLocalRef(a);
+}
+
 void registrar(void*, const char* m) {
   __android_log_print(ANDROID_LOG_INFO, "SinteticaOS", "%s", m);
   if (!g_anfitrion) return;
@@ -155,6 +164,7 @@ void JNI(iniciarNativo)(JNIEnv* env, jobject, jint ancho, jint alto, jstring id,
   g_notificarNube = env->GetMethodID(k, "notificarNube", "(I[B)V");
   g_redCambio = env->GetMethodID(k, "redCambio", "()V");
   g_sonido = env->GetMethodID(k, "sonido", "(Ljava/lang/String;)V");
+  g_audio = env->GetMethodID(k, "audio", "([S)V");
   const char* cp = env->GetStringUTFChars(carpeta, nullptr);
   g_carpeta = cp;
   env->ReleaseStringUTFChars(carpeta, cp);
@@ -169,6 +179,7 @@ void JNI(iniciarNativo)(JNIEnv* env, jobject, jint ancho, jint alto, jstring id,
   h.bateria = bateria;
   h.cargando = cargando;
   h.sonido = sonido;
+  h.audio = audio;
   h.guardar = guardar;
   h.leer = leer;
   h.registrar = registrar;
@@ -340,6 +351,34 @@ jbyteArray JNI(globo)(JNIEnv* env, jobject) {
   jbyteArray a = env->NewByteArray(n);
   env->SetByteArrayRegion(a, 0, n, reinterpret_cast<const jbyte*>(t));
   return a;
+}
+// La charla sin IA: "código\tintención\tacción\tfrase" en UTF-8 (código 1 entendió, 0 no, < 0 error).
+jbyteArray JNI(charlar)(JNIEnv* env, jobject, jbyteArray texto) {
+  std::string r = "-9\t\t\t";
+  if (g_listo) {
+    g_env = env;
+    const jsize n = env->GetArrayLength(texto);
+    std::string t(static_cast<size_t>(n), '\0');
+    env->GetByteArrayRegion(texto, 0, n, reinterpret_cast<jbyte*>(&t[0]));
+    sintetica_charla c{};
+    const int codigo = sintetica_charlar(t.data(), t.size(), &c);
+    r = std::to_string(codigo) + "\t" + c.intencion + "\t" + c.accion_nombre + "\t" + c.frase;
+  }
+  jbyteArray a = env->NewByteArray(static_cast<jsize>(r.size()));
+  env->SetByteArrayRegion(a, 0, static_cast<jsize>(r.size()), reinterpret_cast<const jbyte*>(r.data()));
+  return a;
+}
+// Un globo propio (la frase de "no entendí" sin nube).
+jint JNI(decir)(JNIEnv* env, jobject, jbyteArray texto) {
+  if (!g_listo) return -1;
+  g_env = env;
+  const jsize n = env->GetArrayLength(texto);
+  std::string t(static_cast<size_t>(n), '\0');
+  env->GetByteArrayRegion(texto, 0, n, reinterpret_cast<jbyte*>(&t[0]));
+  return sintetica_decir(t.c_str(), nullptr);
+}
+void JNI(vozPropia)(JNIEnv*, jobject, jboolean si) {
+  if (g_listo) sintetica_voz_propia(si ? 1 : 0);
 }
 void JNI(mostrarQr)(JNIEnv*, jobject) {
   if (g_listo) sintetica_mostrar_qr();

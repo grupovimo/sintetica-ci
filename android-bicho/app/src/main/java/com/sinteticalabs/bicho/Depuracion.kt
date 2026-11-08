@@ -14,6 +14,8 @@ import android.util.Log
  *   adb shell am broadcast -a sintetica.EVENT --es tipo depuracion          (muestra u oculta los datos)
  *   adb shell am broadcast -a sintetica.EVENT --es tipo comando --es hex 4202  (un comando del protocolo, como de la nube)
  *   adb shell am broadcast -a sintetica.EVENT --es tipo silencio --ez si true  (calla la voz; el despertador suena igual)
+ *   adb shell am broadcast -a sintetica.EVENT --es tipo charlar --es texto "qué hora es"  (la charla sin IA, sin hablarle)
+ *   adb shell am broadcast -a sintetica.EVENT --es tipo voz-propia --ez si true  (el balbuceo del núcleo en vez del TTS)
  *   adb shell am broadcast -a sintetica.EVENT --es tipo duenio --es wifi aa:bb:.. --es bt 11:22:..  (el celu del dueño)
  */
 class Depuracion(
@@ -28,10 +30,15 @@ class Depuracion(
         val tipo = intent.getStringExtra("tipo") ?: return
         if (tipo == "depuracion") return alternar()
         if (tipo == "silencio") return Voz.silenciar(contexto, intent.getBooleanExtra("si", true))
+        if (tipo == "voz-propia") return Voz.ponerPropia(contexto, intent.getBooleanExtra("si", true))
         if (tipo == "duenio") return presencia.configurar(intent.getStringExtra("wifi"), intent.getStringExtra("bt"))
         vista.queueEvent {
             val ok = when (tipo) {
                 "vincular" -> Nucleo.vincularSolo()
+                "charlar" -> true.also {
+                    val r = Charla.Respuesta.leer(Nucleo.charlar(intent.getStringExtra("texto").orEmpty().toByteArray()))
+                    Log.i("Bicho", "adb: charlar → ${r?.codigo} ${r?.intencion} ${r?.accion} \"${r?.frase}\"")
+                }
                 "comando" -> true.also {
                     val hex = intent.getStringExtra("hex").orEmpty()
                     Nucleo.nubeEscribir(2, ByteArray(hex.length / 2) { hex.substring(it * 2, it * 2 + 2).toInt(16).toByte() })

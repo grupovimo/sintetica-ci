@@ -64,7 +64,13 @@ class Bicho : Activity() {
         depuracion = Depuracion(vista, presencia) { datos.alternar() }
         registerReceiver(depuracion, IntentFilter(Depuracion.ACCION))
         sentidos = Sentidos(this, vista, lienzo)
-        charla = Charla(this, voz, { c -> vista.queueEvent { Nucleo.nubeEscribir(2, c) } }, red::publicar) { red.enLinea }
+        charla = Charla(this, voz, { c -> vista.queueEvent { Nucleo.nubeEscribir(2, c) } }, red::publicar, { red.enLinea }) { texto ->
+            // La charla sin IA corre en el núcleo (hilo de GL): se espera su respuesta, que tarda unos ms.
+            val r = java.util.concurrent.atomic.AtomicReference<ByteArray>()
+            val listo = java.util.concurrent.CountDownLatch(1)
+            vista.queueEvent { r.set(Nucleo.charlar(texto.toByteArray())); listo.countDown() }
+            if (listo.await(2, java.util.concurrent.TimeUnit.SECONDS)) Charla.Respuesta.leer(r.get()) else null
+        }
         red.alAudio = voz.nube::recibir
         red.alConversacion = charla::respuesta
         sentidos.alOir = charla::oir
@@ -74,7 +80,14 @@ class Bicho : Activity() {
         var comportamiento = ""
         lienzo.alDibujar = {
             datos.leerNucleo()
-            if (cuadro % 30 == 0) voz.config = Nucleo.voz()
+            if (cuadro % 30 == 0) {
+                voz.config = Nucleo.voz()
+                val propia = Voz.propiaPrendida(this)
+                if (cuadro == 0 || propia != voz.conPropia) {
+                    voz.conPropia = propia
+                    Nucleo.vozPropia(propia)
+                }
+            }
             if (cuadro % 5 == 0) voz.globo(Nucleo.globo())
             if (cuadro % 1800 == 900 && red.enLinea) voz.paquete?.pedir("dia")
             // Cada comportamiento nuevo al registro (para contar cuántos distintos hace en el día).

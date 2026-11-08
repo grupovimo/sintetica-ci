@@ -35,6 +35,36 @@ class Voz(private val contexto: Context) {
     private val colaHabla = Handler(hiloHabla.looper)
     val nube = VozNube().also { n -> n.alLlegar = { a -> colaHabla.post { audioDeLaNube(a) } } }
 
+    /**
+     * La voz propia del núcleo (el balbuceo, firmware/nucleo/voz_propia): si
+     * está prendida, reemplaza al TTS del celu como última opción; un mp3 del
+     * paquete o de la nube la corta. Se elige por adb (tipo voz-propia).
+     */
+    @Volatile var conPropia = false
+    private var pistaPropia: AudioTrack? = null
+    @Volatile private var mp3Hasta = 0L
+
+    /** Lo llama el núcleo (hilo de GL) con cada bloque de la voz propia. */
+    fun propia(m: ShortArray) {
+        if (!conPropia || callada || config[0] <= 0 || SystemClock.elapsedRealtime() < mp3Hasta) return
+        val p = pistaPropia ?: AudioTrack.Builder()
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+            .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .setSampleRate(16000).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+            .setTransferMode(AudioTrack.MODE_STREAM)
+            .setBufferSizeInBytes(16000 * 2)
+            .build().also { it.play(); pistaPropia = it }
+        p.setVolume(config[0] / 100f)
+        p.write(m, 0, m.size, AudioTrack.WRITE_NON_BLOCKING)
+        ocupar(m.size * 1000L / 16000)
+    }
+
+    private fun cortarPropia() {
+        val p = pistaPropia ?: return
+        runCatching { p.pause(); p.flush(); p.play() }
+    }
+
     /** El paquete de voz sin internet (lo pone [Bicho]). */
     @Volatile var paquete: PaqueteVoz? = null
 
@@ -128,6 +158,7 @@ class Voz(private val contexto: Context) {
         if (config[0] <= 0) return
         habla?.stop()
         reproductor?.release()
+        cortarPropia()
         reproductor = runCatching {
             MediaPlayer().apply {
                 setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
@@ -138,6 +169,7 @@ class Voz(private val contexto: Context) {
                 setOnCompletionListener { it.release(); if (reproductor === it) reproductor = null }
                 start()
                 ocupar(duration.toLong())
+                mp3Hasta = SystemClock.elapsedRealtime() + duration
             }
         }.onFailure { Log.w("Bicho", "voz de la nube: no sonó", it) }.getOrNull()
     }
@@ -145,6 +177,7 @@ class Voz(private val contexto: Context) {
     private fun decirLocal() {
         if (globoDicho) return
         globoDicho = true
+        if (conPropia) return  // lo dice la voz propia del núcleo
         val limpio = globoLimpio
         val h = habla ?: return
         if (limpio.isEmpty() || !hablaLista || config[0] <= 0) return
@@ -168,6 +201,7 @@ class Voz(private val contexto: Context) {
         habla?.shutdown()
         habla = null
         reproductor?.release()
+        pistaPropia?.release()
         hilo.quitSafely()
         hiloHabla.quitSafely()
     }
@@ -235,6 +269,12 @@ class Voz(private val contexto: Context) {
             }
             runCatching { audio.setStreamVolume(AudioManager.STREAM_ALARM, audio.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0) }
         }
+
+        /** Si la voz propia del núcleo reemplaza al TTS del celu (por adb; queda guardado). */
+        fun propiaPrendida(contexto: Context) = contexto.getSharedPreferences("voz", 0).getBoolean("propia", false)
+
+        fun ponerPropia(contexto: Context, si: Boolean) =
+            contexto.getSharedPreferences("voz", 0).edit().putBoolean("propia", si).apply()
 
         /** Silencia (o no) la voz del bicho; queda guardado. */
         fun silenciar(contexto: Context, si: Boolean) {

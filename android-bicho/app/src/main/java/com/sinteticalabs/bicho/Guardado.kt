@@ -29,4 +29,5 @@ class Guardado(raiz: File, private val red: Red, private val voz: Voz) : Nucleo.
     override fun notificarNube(caracteristica: Int, datos: ByteArray) = red.notificarNube(caracteristica, datos)
     override fun redCambio() = red.redCambio()
     override fun sonido(nombre: String) = voz.sonar(nombre)
+    override fun audio(muestras: ShortArray) = voz.propia(muestras)
 }

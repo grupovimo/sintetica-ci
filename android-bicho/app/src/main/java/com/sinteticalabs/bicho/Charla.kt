@@ -30,7 +30,20 @@ class Charla(
     private val alPublicar: (String, String) -> Unit,
     /** Si hay nube (para pedir la conversación). */
     private val enLinea: () -> Boolean,
+    /** La charla sin IA del núcleo (firmware/nucleo/charla): primero, siempre. */
+    private val charlar: (String) -> Respuesta?,
 ) {
+    /** Lo que devuelve el núcleo: 1 entendió (ya contestó), 0 no entendió, < 0 error. */
+    class Respuesta(val codigo: Int, val intencion: String, val accion: String, val frase: String) {
+        companion object {
+            fun leer(b: ByteArray): Respuesta? {
+                val p = String(b, Charsets.UTF_8).split('\t', limit = 4)
+                if (p.size < 4) return null
+                return Respuesta(p[0].toIntOrNull() ?: return null, p[1], p[2], p[3])
+            }
+        }
+    }
+
     private val respuestas = LinkedBlockingQueue<String>(4)
     @Volatile private var conversacion: Conversacion? = null
     // Sin cuenta de ElevenLabs (o sin respuesta): no se pide de nuevo por un rato.
@@ -200,6 +213,18 @@ class Charla(
         val enviar = sinPalabra(partes.joinToString(" "), palabra)
         if (enviar.isEmpty()) {
             Log.i("Bicho", "charla: no entendí nada")
+            return
+        }
+        // Primero el motor de charla del celu: sin red y al toque.
+        val local = charlar(enviar)
+        if (local?.codigo == 1) {
+            Log.i("Bicho", "charla: la entendí sin IA (${local.intencion}${if (local.accion.isNotEmpty()) ", " + local.accion else ""})")
+            return
+        }
+        if (local?.codigo == 0 && !enLinea()) {
+            // Sin nube no hay a quién preguntarle: el "no entendí" del motor.
+            Log.i("Bicho", "charla: no la entendí y no hay nube")
+            if (local.frase.isNotEmpty()) alNucleo(byteArrayOf(0x40, 0) + local.frase.toByteArray())
             return
         }
         Log.i("Bicho", "charla: frase de ${enviar.length} letras a la nube")

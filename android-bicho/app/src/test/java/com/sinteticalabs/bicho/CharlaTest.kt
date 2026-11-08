@@ -22,4 +22,13 @@ class CharlaTest {
         assertEquals(200, larga.toByteArray().size)
         assertEquals("ñ".repeat(100), larga)
     }
+
+    @Test fun laRespuestaDelNucleo() {
+        val r = Charla.Respuesta.leer("1\talarma\talarma\t¡Listo! A las 7.".toByteArray())!!
+        assertEquals(1, r.codigo)
+        assertEquals("alarma", r.accion)
+        assertEquals("¡Listo! A las 7.", r.frase)
+        assertEquals(0, Charla.Respuesta.leer("0\t\t\tNo te entendí.".toByteArray())!!.codigo)
+        assertEquals(null, Charla.Respuesta.leer("basura".toByteArray()))
+    }
 }
