@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"sintetica/api/internal/almacen"
-	"sintetica/api/internal/nube"
 )
 
 // Recordatorio es uno de la sección "recordatorios" de la config v2:
@@ -62,34 +61,13 @@ func (r Recordatorio) Toca(t time.Time) bool {
 
 // recordatorios: cada minuto, a los usuarios con Telegram les manda los
 // recordatorios de sus bichos que no están conectados (el bicho conectado
-// lo muestra él; si hay una automatización "recordatorio", esa avisa).
+// lo muestra él; si hay una automatización "recordatorio", esa avisa) y los
+// saludos de cumpleaños (de todos sus bichos).
 func (i *Integraciones) recordatorios(ctx context.Context) {
-	ultimo := time.Now().In(nube.Zona()).Truncate(time.Minute)
-	t := time.NewTicker(15 * time.Second)
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-		}
-		ahora := time.Now().In(nube.Zona()).Truncate(time.Minute)
-		if !ahora.After(ultimo) {
-			continue
-		}
-		// Si se atrasó (la máquina dormía), se ponen al día como mucho 3 minutos.
-		desde := ultimo.Add(time.Minute)
-		if ahora.Sub(desde) > 3*time.Minute {
-			desde = ahora.Add(-2 * time.Minute)
-		}
-		for m := desde; !m.After(ahora); m = m.Add(time.Minute) {
-			i.revisarRecordatorios(ctx, m)
-		}
-		ultimo = ahora
-	}
+	porMinuto(ctx, func(m time.Time) { i.revisarRecordatorios(ctx, m) })
 }
 
-// revisarRecordatorios manda los del minuto m.
+// revisarRecordatorios manda los del minuto m (y los cumples).
 func (i *Integraciones) revisarRecordatorios(ctx context.Context, m time.Time) {
 	vs, err := i.alm.VinculosTelegram(ctx)
 	if err != nil {
@@ -102,11 +80,12 @@ func (i *Integraciones) revisarRecordatorios(ctx context.Context, m time.Time) {
 			continue
 		}
 		for _, r := range rs {
-			if r.conectado {
-				continue
-			}
 			cfg, err := i.alm.UltimaConfig(ctx, r.ID)
 			if errors.Is(err, almacen.ErrNoEncontrado) || err != nil {
+				continue
+			}
+			i.saludarCumples(ctx, v.ChatID, r, leerDatosConfig(cfg.Texto), m)
+			if r.conectado {
 				continue
 			}
 			for _, rec := range recordatoriosDe(cfg.Texto) {

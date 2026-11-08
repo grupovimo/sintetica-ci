@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"sintetica/api/internal/almacen"
+	"sintetica/api/internal/clima"
 	"sintetica/api/internal/eventos"
 	"sintetica/api/internal/nube"
 	"sintetica/api/internal/protocolo"
@@ -45,6 +46,10 @@ type Opciones struct {
 	// HostsPropios son los del propio servicio (la API, la web): no se les
 	// puede mandar un webhook.
 	HostsPropios []string
+	// El clima (Open-Meteo): vacías, las URLs de siempre (los tests ponen un
+	// servidor falso).
+	ClimaURL     string
+	GeocodingURL string
 }
 
 // Integraciones tiene todo lo de este paquete.
@@ -68,6 +73,10 @@ type Integraciones struct {
 	pendientes map[int64]pendiente // lo que espera que el usuario elija un robot
 
 	chats *limitador // pedidos por chat de Telegram
+
+	clima         *clima.Cliente
+	climaEst      estadoClima
+	cambiarConfig CambiarConfig
 }
 
 type entradaCache struct {
@@ -78,6 +87,7 @@ type entradaCache struct {
 
 type disparo struct {
 	bicho, evento string
+	id            string // si no está vacío, solo esa automatización (las de "hora")
 	datos         map[string]any
 }
 
@@ -98,6 +108,8 @@ func Nuevo(op Opciones, alm *almacen.Almacen, r Robots, hub *eventos.Hub, log *s
 		cache:      map[string]entradaCache{},
 		pendientes: map[int64]pendiente{},
 		chats:      nuevoLimitador(),
+		clima:      clima.Nuevo(clima.Opciones{URLPronostico: op.ClimaURL, URLGeocoding: op.GeocodingURL}),
+		climaEst:   estadoClima{mandado: map[string]climaMandado{}, conectado: map[string]bool{}, ya: make(chan string, 64)},
 	}
 	if op.TelegramToken != "" {
 		i.tg = NuevoTelegram(op.TelegramURL, op.TelegramToken, op.TelegramEspera)
@@ -111,8 +123,9 @@ func (i *Integraciones) TelegramActivo() bool { return i.tg != nil }
 // Bot es el usuario del bot (sin "@").
 func (i *Integraciones) Bot() string { return i.op.TelegramBot }
 
-// Correr atiende las automatizaciones y, con token, el bot y los
-// recordatorios. Vuelve cuando se cancela el contexto.
+// Correr atiende las automatizaciones, las rutinas (cuando: hora), el clima
+// de los robots y, con token, el bot, los recordatorios y los cumples. Vuelve
+// cuando se cancela el contexto.
 func (i *Integraciones) Correr(ctx context.Context) {
 	var wg sync.WaitGroup
 	for k := 0; k < 8; k++ {
@@ -129,6 +142,9 @@ func (i *Integraciones) Correr(ctx context.Context) {
 			}
 		}()
 	}
+	wg.Add(2)
+	go func() { defer wg.Done(); porMinuto(ctx, func(m time.Time) { i.revisarRutinas(ctx, m) }) }()
+	go func() { defer wg.Done(); i.trabajadorClima(ctx) }()
 	if i.tg != nil {
 		wg.Add(2)
 		go func() { defer wg.Done(); i.escucharTelegram(ctx) }()
@@ -144,11 +160,14 @@ func (i *Integraciones) Correr(ctx context.Context) {
 
 // Evento lo llama la nube cuando le pasa algo a un bicho (no bloquea).
 func (i *Integraciones) Evento(bicho, evento string, datos map[string]any) {
+	if evento == "conectado" {
+		i.ClimaYa(bicho)
+	}
 	if !i.tieneAutomatizacionPara(bicho, evento) {
 		return
 	}
 	select {
-	case i.cola <- disparo{bicho, evento, datos}:
+	case i.cola <- disparo{bicho: bicho, evento: evento, datos: datos}:
 	default:
 		i.log.Warn("automatizaciones: cola llena, pierdo un evento", "bicho", bicho, "evento", evento)
 	}
@@ -271,6 +290,9 @@ func (i *Integraciones) Probar(ctx context.Context, usuario, bicho, n string) ([
 	}
 	if a.Cuando == "recordatorio" {
 		datos["texto"] = "esto es una prueba"
+	}
+	if a.Cuando == "hora" {
+		datos["hora"] = time.Now().In(nube.Zona()).Format("15:04")
 	}
 	return i.correr(ctx, usuario, bicho, *a, a.Cuando, datos)
 }

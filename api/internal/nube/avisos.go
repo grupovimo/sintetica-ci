@@ -11,7 +11,8 @@ import (
 //     a < 15 %), "expresion" (cambió la cara visible), "duerme", "despierta".
 //   - De la conexión: "conectado", "desconectado".
 //   - De los avisos que el bicho manda solo (un 0x9E sin que nadie lo pida):
-//     "recordatorio" (con el índice en la config) y "pomodoro".
+//     "recordatorio" (con el índice en la config), "pomodoro" y "despertador"
+//     (al empezar a sonar la alarma, v1.6).
 //   - Del registro del motor de vida (comando 0x1E, que la API le pide cada
 //     10 s solo a los bichos con automatizaciones que lo necesitan): los
 //     eventos de EventosRegistro y "hito".
@@ -26,16 +27,21 @@ var EventosRegistro = map[string]string{
 	"sacudida-fuerte": "sacudida-fuerte", "boca-abajo": "boca-abajo", "inclinado": "inclinado", "caida": "caida",
 	"voz": "voz", "nombre": "nombre", "ruido": "ruido", "musica": "musica",
 	"enchufado": "cargando", "desenchufado": "desenchufado", "cargado": "cargado", "volvio": "volvio",
-	"pomodoro": "pomodoro",
+	"pomodoro": "pomodoro", "despertador": "despertador",
+}
+
+// avisaSolo: los eventos que el bicho avisa solo (no hace falta pedirle el registro).
+func avisaSolo(evento string) bool {
+	return evento == "recordatorio" || evento == "pomodoro" || evento == "despertador"
 }
 
 // CuandoDelRegistro dice si ese "cuando" sale del registro (hay que pedírselo
-// al bicho). "recordatorio" y "pomodoro" no: el bicho los avisa solo.
+// al bicho). "recordatorio", "pomodoro" y "despertador" no: el bicho los avisa solo.
 func CuandoDelRegistro(cuando string) bool {
 	if cuando == "hito" {
 		return true
 	}
-	if cuando == "recordatorio" || cuando == "pomodoro" {
+	if avisaSolo(cuando) {
 		return false
 	}
 	for _, c := range EventosRegistro {
@@ -91,7 +97,7 @@ func esAviso(r []protocolo.EntradaRegistro) bool {
 			continue
 		}
 		if e.Tipo == protocolo.RegistroEvento && int(e.Dato) < len(protocolo.Eventos) {
-			if n := protocolo.Eventos[e.Dato]; n == "recordatorio" || n == "pomodoro" {
+			if avisaSolo(protocolo.Eventos[e.Dato]) {
 				continue
 			}
 		}

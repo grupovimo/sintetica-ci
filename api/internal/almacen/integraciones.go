@@ -198,3 +198,24 @@ func (a *Almacen) Historial(ctx context.Context, bichoID string) ([]Ejecucion, e
 	}
 	return l, filas.Err()
 }
+
+// BichosConCuando: los bichos con dueño que tienen alguna automatización
+// activa con ese "cuando" (las rutinas: "hora").
+func (a *Almacen) BichosConCuando(ctx context.Context, cuando string) ([]string, error) {
+	filtro, _ := json.Marshal([]map[string]any{{"cuando": cuando, "activa": true}})
+	filas, err := a.db.Query(ctx, `select au.bicho_id from automatizaciones au join bichos b on b.id = au.bicho_id
+		where b.usuario_id is not null and au.lista @> $1::jsonb`, string(filtro))
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(filas, pgx.RowTo[string])
+}
+
+// YaCorrio: si en el historial del bicho hay una ejecución de esa
+// automatización desde `desde` (los cumples: una vez por año).
+func (a *Almacen) YaCorrio(ctx context.Context, bichoID, automatizacion string, desde time.Time) (bool, error) {
+	var hay bool
+	err := a.db.QueryRow(ctx, `select exists (select 1 from automatizaciones_historial
+		where bicho_id = $1 and automatizacion = $2 and en >= $3)`, bichoID, automatizacion, desde).Scan(&hay)
+	return hay, err
+}

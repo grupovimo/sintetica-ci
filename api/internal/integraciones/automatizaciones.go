@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"sintetica/api/internal/almacen"
+	"sintetica/api/internal/clima"
 	"sintetica/api/internal/eventos"
 	"sintetica/api/internal/nube"
 	"sintetica/api/internal/protocolo"
@@ -23,17 +24,23 @@ type Automatizacion struct {
 	Activa bool     `json:"activa"`
 	Cuando string   `json:"cuando"`
 	Valor  string   `json:"valor,omitempty"` // solo para "expresion": cuál
+	Hora   string   `json:"hora,omitempty"`  // solo para "hora": HH:MM (hora de los bichos)
+	Dias   string   `json:"dias,omitempty"`  // solo para "hora": letras LMXJVSD (vacío = todos)
 	Hacer  []Accion `json:"hacer"`
 }
 
 // Accion es una de las cosas que hace una automatización.
 type Accion struct {
-	Tipo      string `json:"tipo"`                // "telegram", "webhook" o "robot"
-	Texto     string `json:"texto,omitempty"`     // telegram (con plantillas)
+	Tipo      string `json:"tipo"`                // "telegram", "webhook", "robot", "decir", "cara", "modo" o "despertar"
+	Texto     string `json:"texto,omitempty"`     // telegram y decir (con plantillas)
 	URL       string `json:"url,omitempty"`       // webhook
 	Bicho     string `json:"bicho,omitempty"`     // robot: otro bicho del mismo dueño
-	Expresion string `json:"expresion,omitempty"` // robot: la cara que pone
+	Expresion string `json:"expresion,omitempty"` // robot y cara: la cara que pone; decir: opcional
+	Modo      string `json:"modo,omitempty"`      // modo: mascota, reloj, pomodoro, clima o notificaciones
 }
+
+// TiposDeAccion: los "tipo" de una acción.
+var TiposDeAccion = []string{"telegram", "webhook", "robot", "decir", "cara", "modo", "despertar"}
 
 // Resultado de una acción.
 type Resultado struct {
@@ -48,6 +55,7 @@ const (
 	MaxAcciones         = 5
 	MaxTexto            = 1000
 	MaxURL              = 500
+	MaxTextoDecir       = 200 // el texto de "decir" con plantillas (expandido se corta a 60 bytes)
 	DisparoCada         = 10 * time.Second
 	DisparosPorDia      = 200
 )
@@ -58,8 +66,8 @@ var CuandoDeEstado = []string{"conectado", "desconectado", "bateria-baja", "expr
 // Cuandos devuelve todos los "cuando" que la API detecta de verdad.
 func Cuandos() []string {
 	l := append([]string{}, CuandoDeEstado...)
-	l = append(l, "recordatorio", "hito")
-	vistos := map[string]bool{"recordatorio": true}
+	l = append(l, "recordatorio", "hito", "hora", "despertador")
+	vistos := map[string]bool{"recordatorio": true, "hito": true, "hora": true, "despertador": true}
 	for _, e := range protocolo.Eventos {
 		if c, ok := nube.EventosRegistro[e]; ok && !vistos[c] {
 			vistos[c] = true
@@ -79,6 +87,34 @@ func cuandoValido(c string) bool {
 }
 
 var patronID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,40}$`)
+
+var patronHora = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
+
+// diasValidos: letras de LMXJVSD sin repetir (vacío = todos).
+func diasValidos(d string) bool {
+	if len(d) > 7 {
+		return false
+	}
+	vistos := map[rune]bool{}
+	for _, c := range d {
+		if !strings.ContainsRune("LMXJVSD", c) || vistos[c] {
+			return false
+		}
+		vistos[c] = true
+	}
+	return true
+}
+
+func modoValido(m string) bool {
+	for _, x := range protocolo.Modos {
+		if x == m {
+			return true
+		}
+	}
+	return false
+}
+
+func expresionValida(e string) bool { return e != "" && len(e) <= 40 && utf8.ValidString(e) }
 
 // ErrInvalida es una lista de automatizaciones que no se puede guardar.
 type ErrInvalida struct{ Motivo string }
@@ -111,6 +147,16 @@ func Validar(l []Automatizacion, esMio func(id string) bool, w *ClienteWebhook) 
 		if len(a.Valor) > 40 {
 			return invalida("%s: el valor es de hasta 40 bytes", donde)
 		}
+		if a.Cuando == "hora" {
+			if !patronHora.MatchString(a.Hora) {
+				return invalida("%s: la hora es HH:MM (de 00:00 a 23:59)", donde)
+			}
+			if !diasValidos(a.Dias) {
+				return invalida("%s: los días son letras L M X J V S D sin repetir (vacío = todos)", donde)
+			}
+		} else if a.Hora != "" || a.Dias != "" {
+			return invalida("%s: \"hora\" y \"dias\" son solo para \"cuando\": \"hora\"", donde)
+		}
 		if len(a.Hacer) == 0 || len(a.Hacer) > MaxAcciones {
 			return invalida("%s: hace de 1 a %d cosas", donde, MaxAcciones)
 		}
@@ -121,18 +167,18 @@ func Validar(l []Automatizacion, esMio func(id string) bool, w *ClienteWebhook) 
 				if strings.TrimSpace(h.Texto) == "" || len(h.Texto) > MaxTexto || !utf8.ValidString(h.Texto) {
 					return invalida("%s: el texto es de 1 a %d bytes", donde, MaxTexto)
 				}
-				if h.URL != "" || h.Bicho != "" || h.Expresion != "" {
+				if h.URL != "" || h.Bicho != "" || h.Expresion != "" || h.Modo != "" {
 					return invalida("%s: un telegram lleva solo \"texto\"", donde)
 				}
 			case "webhook":
-				if h.Texto != "" || h.Bicho != "" || h.Expresion != "" {
+				if h.Texto != "" || h.Bicho != "" || h.Expresion != "" || h.Modo != "" {
 					return invalida("%s: un webhook lleva solo \"url\"", donde)
 				}
 				if err := w.ValidarURL(h.URL); err != nil {
 					return invalida("%s: %v", donde, err)
 				}
 			case "robot":
-				if h.Texto != "" || h.URL != "" {
+				if h.Texto != "" || h.URL != "" || h.Modo != "" {
 					return invalida("%s: un robot lleva \"bicho\" y \"expresion\"", donde)
 				}
 				id := strings.ToUpper(h.Bicho)
@@ -142,8 +188,36 @@ func Validar(l []Automatizacion, esMio func(id string) bool, w *ClienteWebhook) 
 				if h.Expresion == "" || len(h.Expresion) > 40 || !utf8.ValidString(h.Expresion) {
 					return invalida("%s: la expresión es de 1 a 40 bytes", donde)
 				}
+			case "decir":
+				if strings.TrimSpace(h.Texto) == "" || len(h.Texto) > MaxTextoDecir || !utf8.ValidString(h.Texto) {
+					return invalida("%s: el texto es de 1 a %d bytes (el robot muestra hasta 60)", donde, MaxTextoDecir)
+				}
+				if h.URL != "" || h.Bicho != "" || h.Modo != "" {
+					return invalida("%s: decir lleva \"texto\" y, si querés, \"expresion\"", donde)
+				}
+				if h.Expresion != "" && !expresionValida(h.Expresion) {
+					return invalida("%s: la expresión es de 1 a 40 bytes", donde)
+				}
+			case "cara":
+				if h.Texto != "" || h.URL != "" || h.Bicho != "" || h.Modo != "" {
+					return invalida("%s: cara lleva solo \"expresion\"", donde)
+				}
+				if !expresionValida(h.Expresion) {
+					return invalida("%s: la expresión es de 1 a 40 bytes", donde)
+				}
+			case "modo":
+				if h.Texto != "" || h.URL != "" || h.Bicho != "" || h.Expresion != "" {
+					return invalida("%s: modo lleva solo \"modo\"", donde)
+				}
+				if !modoValido(h.Modo) {
+					return invalida("%s: el modo es %s", donde, strings.Join(protocolo.Modos, ", "))
+				}
+			case "despertar":
+				if h.Texto != "" || h.URL != "" || h.Bicho != "" || h.Expresion != "" || h.Modo != "" {
+					return invalida("%s: despertar no lleva nada más", donde)
+				}
 			default:
-				return invalida("%s: el tipo es \"telegram\", \"webhook\" o \"robot\"", donde)
+				return invalida("%s: el tipo es %s", donde, strings.Join(TiposDeAccion, ", "))
 			}
 		}
 	}
@@ -158,7 +232,7 @@ func (i *Integraciones) disparar(ctx context.Context, d disparo) {
 		return
 	}
 	for _, a := range i.automatizacionesDe(d.bicho) {
-		if !a.Activa || a.Cuando != d.evento {
+		if !a.Activa || a.Cuando != d.evento || (d.id != "" && a.ID != d.id) {
 			continue
 		}
 		if a.Valor != "" {
@@ -181,6 +255,11 @@ func (i *Integraciones) correr(ctx context.Context, usuario, bicho string, a Aut
 	ctx, cancelar := context.WithTimeout(ctx, 30*time.Second)
 	defer cancelar()
 	c := i.contexto(ctx, bicho, evento, datos)
+	if usaClima(a) && c.ubicacion != nil {
+		if cl, err := i.clima.Actual(ctx, c.ubicacion.Lat, c.ubicacion.Lon); err == nil {
+			c.ponerClima(&cl)
+		}
+	}
 	en := time.Now().UTC()
 	res := make([]Resultado, 0, len(a.Hacer))
 	for _, h := range a.Hacer {
@@ -193,6 +272,19 @@ func (i *Integraciones) correr(ctx context.Context, usuario, bicho string, a Aut
 			err = i.mandarWebhook(ctx, usuario, h.URL, c, en)
 		case "robot":
 			err = i.mandarRobot(ctx, usuario, strings.ToUpper(h.Bicho), h.Expresion)
+		case "decir":
+			err = i.decirEnBicho(bicho, c.completar(h.Texto), h.Expresion)
+		case "cara":
+			expr := h.Expresion
+			if expr == "auto" {
+				expr = ""
+			}
+			err = i.mandarAlBicho(bicho, protocolo.Expresion(expr))
+		case "modo":
+			err = i.cambiarModo(ctx, usuario, bicho, h.Modo)
+		case "despertar":
+			m, _ := protocolo.Alarma("despertar")
+			err = i.mandarAlBicho(bicho, m)
 		default:
 			err = errors.New("tipo desconocido")
 		}
@@ -228,15 +320,18 @@ func (i *Integraciones) mandarRobot(ctx context.Context, usuario, id, expresion 
 // --- Plantillas ---
 
 // contexto es lo que se puede usar en los textos: {robot}, {bateria},
-// {expresion}, {evento}, {texto}, {hora}.
+// {expresion}, {evento}, {texto}, {hora}, {dueno}, {ciudad} y los del clima
+// ({clima}, {temp}, {max}, {min}; solo si el robot tiene ubicación).
 type contexto struct {
 	bichoID, robot, bateria, expresion, evento, texto, hora string
+	dueno, ciudad, clima, temp, max, min                    string
+	ubicacion                                               *clima.Ubicacion
 	datos                                                   map[string]any
 }
 
 func (i *Integraciones) contexto(ctx context.Context, bicho, evento string, datos map[string]any) contexto {
 	c := contexto{bichoID: bicho, robot: bicho, bateria: "?", evento: evento, datos: map[string]any{},
-		hora: time.Now().In(nube.Zona()).Format("15:04")}
+		hora: time.Now().In(nube.Zona()).Format("15:04"), clima: "sin datos del clima", temp: "?", max: "?", min: "?"}
 	for k, v := range datos {
 		c.datos[k] = v
 	}
@@ -264,16 +359,22 @@ func (i *Integraciones) contexto(ctx context.Context, bicho, evento string, dato
 	if v, ok := datos["valor"].(string); ok && evento == "expresion" {
 		c.expresion = v
 	}
+	cfg, errCfg := i.alm.UltimaConfig(ctx, bicho)
+	if errCfg == nil {
+		d := leerDatosConfig(cfg.Texto)
+		c.dueno = strings.TrimSpace(d.Dueno.Nombre)
+		if d.Ubicacion != nil {
+			c.ubicacion, c.ciudad = d.Ubicacion, d.Ubicacion.Ciudad
+		}
+	}
 	if v, ok := datos["texto"].(string); ok {
 		c.texto = v
-	} else if k, ok := datos["indice"].(int); ok && evento == "recordatorio" {
+	} else if k, ok := datos["indice"].(int); ok && evento == "recordatorio" && errCfg == nil {
 		// El bicho dice cuál recordatorio mostró: el texto está en su config.
-		if cfg, err := i.alm.UltimaConfig(ctx, bicho); err == nil {
-			if l := recordatoriosDe(cfg.Texto); k >= 0 && k < len(l) {
-				c.texto = l[k].Texto
-				c.datos["texto"] = l[k].Texto
-				c.datos["hora"] = l[k].Hora
-			}
+		if l := recordatoriosDe(cfg.Texto); k >= 0 && k < len(l) {
+			c.texto = l[k].Texto
+			c.datos["texto"] = l[k].Texto
+			c.datos["hora"] = l[k].Hora
 		}
 	}
 	return c
@@ -281,5 +382,6 @@ func (i *Integraciones) contexto(ctx context.Context, bicho, evento string, dato
 
 func (c contexto) completar(s string) string {
 	return strings.NewReplacer("{robot}", c.robot, "{bateria}", c.bateria, "{expresion}", c.expresion,
-		"{evento}", c.evento, "{texto}", c.texto, "{hora}", c.hora).Replace(s)
+		"{evento}", c.evento, "{texto}", c.texto, "{hora}", c.hora, "{dueno}", c.dueno, "{ciudad}", c.ciudad,
+		"{clima}", c.clima, "{temp}", c.temp, "{max}", c.max, "{min}", c.min).Replace(s)
 }

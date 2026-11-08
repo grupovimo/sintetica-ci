@@ -16,7 +16,8 @@ var comandosBot = []map[string]string{
 	{"command": "robots", "description": "Tus robots y cómo están"},
 	{"command": "estado", "description": "El estado de un robot"},
 	{"command": "cara", "description": "Cambiarle la cara a un robot"},
-	{"command": "decir", "description": "Avisarle algo a un robot"},
+	{"command": "decir", "description": "Que un robot diga algo en su pantalla"},
+	{"command": "clima", "description": "El clima donde está un robot"},
 	{"command": "ayuda", "description": "Qué puedo hacer"},
 }
 
@@ -25,7 +26,8 @@ const textoAyuda = `Esto es lo que puedo hacer:
 /robots: tus robots y cómo están
 /estado [nombre]: el estado de un robot
 /cara <expresión> [nombre]: le cambia la cara (por ejemplo: /cara contento)
-/decir <texto> [nombre]: le avisa algo a tu robot
+/decir <texto> [nombre]: tu robot lo dice en su pantalla (hasta 60 letras)
+/clima [nombre]: el clima donde está tu robot
 /ayuda: esto
 
 Si tenés un solo robot, el nombre no hace falta. Los avisos (batería baja, recordatorios…) se arman en la web, en Automatizaciones.`
@@ -335,6 +337,13 @@ func (i *Integraciones) atenderMensaje(ctx context.Context, m *mensaje) {
 			return
 		}
 		i.responder(ctx, chat, i.decir(*r, texto), nil)
+	case "/clima":
+		r, _ := elegir(rs, resto)
+		if r == nil {
+			i.responder(ctx, chat, "¿De cuál?", tecladoRobots(rs, "clima:"))
+			return
+		}
+		i.responder(ctx, chat, i.textoClima(ctx, *r), nil)
 	default:
 		i.responder(ctx, chat, "No entendí. "+textoAyuda, nil)
 	}
@@ -381,18 +390,32 @@ func (i *Integraciones) ponerCara(usuario string, r robot, cara string) string {
 	return "Listo: " + r.nombre + " tiene cara de " + cara + "."
 }
 
-// decir: el núcleo todavía no tiene cómo mostrar un texto que llega de
-// afuera (llega con los recordatorios). Por ahora el robot se entera como de
-// una notificación (reacciona) y el texto queda en el chat.
+// decir: el robot muestra el texto en un globo (marco 0x40).
 func (i *Integraciones) decir(r robot, texto string) string {
-	m, _ := protocolo.Evento("notificacion")
+	m, err := protocolo.Decir(texto, "")
+	if err != nil {
+		return "El texto es de hasta 60 bytes (una tilde ocupa 2): acortalo un poco."
+	}
 	if err := i.robots.Enviar(r.ID, protocolo.CarComando, m); err != nil {
 		if errors.Is(err, nube.ErrDesconectado) {
 			return r.nombre + " no está conectado ahora."
 		}
-		return "No le pude avisar a " + r.nombre + "."
+		i.log.Warn("telegram: no pude mandar el texto", "bicho", r.ID, "error", err)
+		return "No se lo pude decir a " + r.nombre + "."
 	}
-	return "Le avisé a " + r.nombre + " (reacciona como a una notificación). Que muestre el texto en su pantalla todavía no se puede: llega con los recordatorios."
+	return "Listo: " + r.nombre + " lo está diciendo."
+}
+
+// textoClima: lo que contesta /clima.
+func (i *Integraciones) textoClima(ctx context.Context, r robot) string {
+	u, c := i.ClimaDe(ctx, r.ID)
+	if u == nil {
+		return r.nombre + " no sabe dónde está: poné su ubicación en la web (en la config, Clima)."
+	}
+	if c == nil {
+		return "No pude traer el clima de " + u.Ciudad + " ahora: probá en un rato."
+	}
+	return fmt.Sprintf("En %s: %s (máx. %d°, mín. %d°).", u.Ciudad, c.Texto(), c.Max, c.Min)
 }
 
 func (i *Integraciones) atenderBoton(ctx context.Context, c *callback) {
@@ -429,6 +452,8 @@ func (i *Integraciones) atenderBoton(ctx context.Context, c *callback) {
 	switch partes[0] {
 	case "estado":
 		i.responder(ctx, chat, r.detalle(), nil)
+	case "clima":
+		i.responder(ctx, chat, i.textoClima(ctx, *r), nil)
 	case "caras":
 		i.responder(ctx, chat, "¿Qué cara le pongo a "+r.nombre+"?", tecladoCaras(r.ID))
 	case "cara":
