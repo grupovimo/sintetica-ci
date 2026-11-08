@@ -77,7 +77,11 @@ export type Evento =
   // v1.9: la agenda (cambió o se viene un evento), lo que suena (Spotify sin robot; el celu, con su robot) y la charla con IA.
   | { tipo: 'agenda'; bicho?: string; datos: { conectada?: boolean; titulo?: string; minutos?: number; manana?: number } }
   | { tipo: 'musica'; bicho?: string; datos: { conectada?: boolean; nombre?: string; sonando?: boolean; titulo?: string; artista?: string; bpm?: number; de?: string } }
-  | { tipo: 'charla'; bicho: string; datos: { texto: string; expresion: string; de: string; enviado: boolean } };
+  | { tipo: 'charla'; bicho: string; datos: { texto: string; expresion: string; de: string; enviado: boolean } }
+  // La voz (ElevenLabs conectado o no, o cambió la de Edge), el paquete de voz sin internet y la clave de IA propia.
+  | { tipo: 'voz'; bicho?: string; datos: { conectado?: boolean; edge?: boolean } }
+  | { tipo: 'voz-paquete'; bicho: string; datos: { estado: string; version: number; frases: number } }
+  | { tipo: 'ia'; bicho?: string; datos: { propia: boolean } };
 
 // Cómo ve la pantalla cada perfil (también los virtuales).
 export function pantallaDe(b: { perfil: string; estado: Estado | null }) {

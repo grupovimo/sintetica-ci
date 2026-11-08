@@ -26,6 +26,7 @@
     "vitest": "3.1.2"
   },
   "dependencies": {
+    "@elevenlabs/client": "1.35.0",
     "qrcode": "^1.5.4"
   }
 }

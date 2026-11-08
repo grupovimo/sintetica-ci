@@ -6,6 +6,8 @@
   import { usarGuardado } from '../guardado.svelte';
   import type { Modelo } from '../modelo';
   import Perilla from '../Perilla.svelte';
+  import LeerVoz from './LeerVoz.svelte';
+  import PaqueteVoz from './PaqueteVoz.svelte';
 
   let { modelo }: { modelo: Modelo } = $props();
   const b = usarBicho();
@@ -28,6 +30,8 @@
       <p class="texto">Llega con los modelos que hablan.</p>
     </div>
   </div>
+  <!-- Igual se puede conectar la voz: le hablás desde acá, con el micrófono de la compu. -->
+  <LeerVoz />
 {:else}
   <div class="voz">
     <div class="bandeja perillas">
@@ -55,6 +59,8 @@
       </div>
       <p class="texto">“{v.palabra || nombre}, ¿qué hora es?”</p>
     {/if}
+    <LeerVoz />
+    {#if habla}<PaqueteVoz />{/if}
   </div>
 {/if}
 

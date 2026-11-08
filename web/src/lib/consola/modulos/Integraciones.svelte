@@ -10,6 +10,7 @@
   import type { Bicho } from '$lib/tipos';
   import { cortarBytes, JUEGOS, MAX_TEXTO } from '$lib/formato';
   import type { Modelo } from '../modelo';
+  import IAPropia from './IAPropia.svelte';
 
   let { modelo: _ }: { modelo: Modelo } = $props();
   const b = usarBicho();
@@ -251,6 +252,8 @@
         </div>
       {/if}
     </div>
+
+    <IAPropia />
 
     <div class="telegram bandeja">
       <div class="logo" aria-hidden="true">

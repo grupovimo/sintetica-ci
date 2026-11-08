@@ -10,7 +10,8 @@
     visible = '',
     apagado = false,
     etiqueta = '',
-  }: { modelo: Modelo; config: unknown; visible?: string; apagado?: boolean; etiqueta?: string } = $props();
+    mirada = null,
+  }: { modelo: Modelo; config: unknown; visible?: string; apagado?: boolean; etiqueta?: string; mirada?: { x: number; y: number } | null } = $props();
 
   const e = $derived(modelo.encuadre);
 </script>
@@ -20,7 +21,7 @@
   <div class="pantalla" class:redonda={modelo.redonda}
     style="left: {e.pantalla.izq}%; top: {e.pantalla.arriba}%; width: {e.pantalla.ancho}%; height: {e.pantalla.alto}%">
     <div class="encastre" class:apaisada={!modelo.redonda && e.pantalla.alto * 5 > e.pantalla.ancho * 4 * 1.5}>
-      <Pantalla {config} {visible} redonda={modelo.redonda} desnuda etiqueta="Pantalla de {etiqueta || 'tu robot'}, en vivo (tocala)" />
+      <Pantalla {config} {visible} {mirada} redonda={modelo.redonda} desnuda etiqueta="Pantalla de {etiqueta || 'tu robot'}, en vivo (tocala)" />
     </div>
   </div>
   {#if etiqueta}<span class="cartel"><span class="led"></span>{etiqueta}</span>{/if}

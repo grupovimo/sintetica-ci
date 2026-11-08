@@ -8,6 +8,7 @@
   import { usarGuardado } from '$lib/consola/guardado.svelte';
   import Barra from '$lib/consola/Barra.svelte';
   import Producto from '$lib/consola/Producto.svelte';
+  import Conversar from '$lib/consola/Conversar.svelte';
   import { animoDe, hace, modeloDe, NOMBRES_CAPACIDAD, numeroDe, type Capacidad } from '$lib/consola/modelo';
   import Caracter from '$lib/consola/modulos/Caracter.svelte';
   import Cara from '$lib/consola/modulos/Cara.svelte';
@@ -94,14 +95,20 @@
   // Charla con IA (si la nube la tiene): le escribís y contesta él, en su pantalla y acá.
   let charla = $state<{ disponible: boolean; quedan: number; porDia: number } | null>(null);
   let charlando = $state(false);
-  let respuesta = $state<{ yo: string; texto: string; expresion?: string } | null>(null);
+  // de: quién contestó, el motor propio del robot (sin IA) o la IA.
+  let respuesta = $state<{ yo: string; texto: string; expresion?: string; de: 'motor' | 'ia' } | null>(null);
+  // Hablando en vivo (ElevenLabs): la cara y la mirada que pone el agente.
+  let caraConv = $state<string | null>(null);
+  let mirada = $state<{ x: number; y: number } | null>(null);
   async function charlar() {
     const t = frase.trim();
     if (!t || diciendo || !charla) return;
     diciendo = true;
     try {
-      const r = await api<{ texto: string; expresion?: string; enviado: boolean; quedan: number }>(`/v1/bichos/${b.id}/charla`, { cuerpo: { texto: t } });
-      respuesta = { yo: t, texto: r.texto, expresion: r.expresion };
+      const r = await api<{ texto: string; expresion?: string; enviado: boolean; quedan: number; propia?: boolean; origen?: string }>(`/v1/bichos/${b.id}/charla`, { cuerpo: { texto: t } });
+      // Si la API dice el origen, ese; si no: el motor propio no usa IA (ni la del servidor, que siempre tiene tope, ni la tuya).
+      const de = r.origen ? (/^(local|motor|nucleo)/.test(r.origen) ? 'motor' : 'ia') : !r.propia && r.quedan < 0 ? 'motor' : 'ia';
+      respuesta = { yo: t, texto: r.texto, expresion: r.expresion, de };
       charla.quedan = r.quedan;
       frase = '';
     } catch (e) {
@@ -161,7 +168,7 @@
     {/if}
     <section class="heroe">
       <div class="foto">
-        <Producto {modelo} config={b.config} visible={b.bicho.estado?.expresion ?? ''} apagado={!conectado}
+        <Producto {modelo} config={b.config} visible={caraConv ?? b.bicho.estado?.expresion ?? ''} {mirada} apagado={!conectado && !caraConv}
           etiqueta={conectado ? `${nombre} · en vivo` : `Así se ve ${nombre}`} />
       </div>
       <div class="info">
@@ -184,6 +191,7 @@
           <button class="tecla" disabled={!conectado} onclick={() => { elegir('jugar'); document.querySelector('.tablero')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>Jugar</button>
           {#if b.bicho.estado?.fija && !/^(recordatorio|pomodoro|reloj):/.test(b.bicho.estado.expresion)}<button class="tecla negra" disabled={!conectado} onclick={() => hacer({ expresion: '' }, 'Vuelve a ser él')}>Soltar la cara</button>{/if}
         </div>
+        <Conversar alCara={(e) => (caraConv = e)} alMirar={(x, y) => (mirada = { x, y })} />
         <form class="decir visor" class:charla={charlando} onsubmit={(e) => { e.preventDefault(); if (charlando) charlar(); else decir(); }}>
           <div class="cabeza">
             {#if charla}
@@ -197,7 +205,10 @@
           {#if charlando && respuesta}
             <div class="charla-ver" aria-live="polite">
               <span class="yo">{respuesta.yo}</span>
-              <span class="el">“{respuesta.texto}”</span>
+              <span class="el">“{respuesta.texto}”<span class="origen" title={respuesta.de === 'ia' ? 'IA' : 'Motor propio'} aria-label={respuesta.de === 'ia' ? 'Contestó la IA' : 'Contestó su motor propio'}>
+                {#if respuesta.de === 'ia'}<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M8 1l1.6 4.4L14 7l-4.4 1.6L8 13l-1.6-4.4L2 7l4.4-1.6z" /></svg>
+                {:else}<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.5" /><path d="M6 1.5v2M10 1.5v2M6 12.5v2M10 12.5v2M1.5 6h2M1.5 10h2M12.5 6h2M12.5 10h2" /></svg>{/if}
+              </span></span>
             </div>
           {/if}
           <div class="linea">
@@ -263,6 +274,7 @@
   .quedan { font-variant-numeric: tabular-nums; }
   .charla-ver { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
   .charla-ver .yo { align-self: flex-end; max-width: 80%; padding: 6px 12px; border-radius: 12px 12px 4px 12px; background: #2c2925; font: 700 14px/1.3 var(--marca); color: var(--gris-claro); overflow-wrap: anywhere; }
+  .charla-ver .el .origen { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 8px; vertical-align: 2px; border-radius: 5px; background: #1a1714; color: var(--brasa); }
   .charla-ver .el { align-self: flex-start; max-width: 90%; padding: 10px 14px; border-radius: 14px 14px 14px 4px; background: #f3eee8; color: #1a1714; font: 800 18px/1.25 var(--marca); overflow-wrap: anywhere; }
   .suena { display: flex; align-items: center; gap: 10px; margin: -8px 0 0; font: 700 14px/1.2 var(--marca); color: var(--gris); min-width: 0; }
   .suena b { color: var(--c-papel); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

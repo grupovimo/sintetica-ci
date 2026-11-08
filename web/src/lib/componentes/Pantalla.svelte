@@ -4,6 +4,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { fijar, pintar, ponerSprites, vistaPrevia, type VistaPrevia } from '$lib/nucleo';
   import { quizasBicho } from '$lib/bicho.svelte';
+  import { Car, comando } from '$compartido/protocolo.js';
 
   let {
     config = { version: 1 },
@@ -12,6 +13,7 @@
     ancho = 320,
     etiqueta = 'Pantalla del robot',
     desnuda = false,
+    mirada = null,
     alError = (_: string | null) => {},
   }: {
     config?: unknown;
@@ -21,6 +23,8 @@
     etiqueta?: string;
     // Sin la placa de alrededor: el canvas llena su caja (para encastrarlo en la foto del robot).
     desnuda?: boolean;
+    // A dónde mira (de -1 a 1), como el comando Mirar: la conversación en vivo la mueve.
+    mirada?: { x: number; y: number } | null;
     alError?: (e: string | null) => void;
   } = $props();
 
@@ -77,6 +81,14 @@
     void visible;
     void bicho?.sprites;
     sincronizar();
+  });
+
+  let mirado = '';
+  $effect(() => {
+    const m = mirada ? `${mirada.x},${mirada.y}` : '';
+    if (!sim || !mirada || m === mirado) return;
+    mirado = m;
+    sim.bleEscribir(Car.comando, comando.mirar(mirada.x, mirada.y));
   });
 
   let redondaAnterior = redonda;
