@@ -63,7 +63,13 @@ export const NOMBRES_PRESET: Record<string, string> = {
 export const MOVIMIENTOS = ['ninguno', 'rebote', 'saltitos', 'risa', 'mirada-lado', 'salto', 'encogerse', 'dormir', 'temblor', 'resoplido',
   'lagrima', 'achicarse', 'picaro', 'latido', 'bamboleo', 'escuchar', 'hablar', 'pensar', 'duda', 'acercarse', 'suspiro', 'quieto',
   'cabeceo', 'carga', 'orbita', 'buscar', 'caer', 'glitch', 'estirarse'] as const;
-export const PARTICULAS = ['zzz', 'corazon', 'lagrima', 'gota', 'chispa', 'pregunta', 'exclamacion', 'nota', 'estrella', 'burbuja'] as const;
+// Las partículas en el orden del núcleo (rostro.cpp: el índice va a su rostro).
+// Salen del schema al compilar (vite.config.ts); paridad.test.ts las compara con el núcleo.
+export const PARTICULAS: readonly string[] = __PARTICULAS__;
+// Cómo se ve cada una en una tecla.
+export const GLIFO_PARTICULA: Record<string, string> = {
+  zzz: 'z', corazon: '♥', lagrima: '💧', gota: '·', chispa: '✦', pregunta: '?', exclamacion: '!', nota: '♪', estrella: '★', burbuja: '○', oveja: '🐑', reloj: '⏱',
+};
 export const PARPADEOS = ['normal', 'menos', 'mas', 'no', 'lento', 'rapido', 'doble'] as const;
 export const MIRADAS = ['libre', 'frente', 'arriba', 'abajo', 'izquierda', 'derecha', 'lado', 'alrededor', 'perdida', 'reojo', 'estimulo', 'rem', 'ovejas'] as const;
 // Los parámetros del ojo y los globales, con sus límites (los de la marca: config.schema.json).

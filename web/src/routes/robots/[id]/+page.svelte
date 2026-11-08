@@ -24,6 +24,11 @@
   import { api, ErrorApi } from '$lib/api';
   import { bytes, cortarBytes, MAX_TEXTO } from '$lib/formato';
   import Ajustes from '$lib/consola/modulos/Ajustes.svelte';
+  import Amigos from '$lib/consola/modulos/Amigos.svelte';
+  import Habitos from '$lib/consola/modulos/Habitos.svelte';
+  import Agenda from '$lib/consola/modulos/Agenda.svelte';
+  import Avisos from '$lib/consola/modulos/Avisos.svelte';
+  import { escuchar } from '$lib/eventos.svelte';
 
   const b = usarBicho();
   const g = usarGuardado();
@@ -35,9 +40,13 @@
     { clave: 'dia', nombre: 'Su día', modulo: Dia },
     { clave: 'cuidado', nombre: 'Cuidado', modulo: Cuidado },
     { clave: 'recordatorios', nombre: 'Recordatorios', modulo: Recordatorios },
+    { clave: 'habitos', nombre: 'Hábitos', modulo: Habitos },
+    { clave: 'agenda', nombre: 'Agenda', modulo: Agenda },
     { clave: 'modos', nombre: 'Modos', modulo: Modos },
     { clave: 'reflejos', nombre: 'Reflejos', modulo: Reflejos },
     { clave: 'integraciones', nombre: 'Integraciones', modulo: Integraciones },
+    { clave: 'amigos', nombre: 'Amigos', modulo: Amigos },
+    { clave: 'avisos', nombre: 'Avisos', modulo: Avisos },
     { clave: 'habla', nombre: 'Habla', modulo: Habla },
     { clave: 'jugar', nombre: 'Jugar', modulo: Jugar },
     { clave: 'voz', nombre: 'Voz', modulo: Voz, necesita: ['microfono', 'parlante'] as Capacidad[] },
@@ -82,6 +91,38 @@
     diciendo = false;
     setTimeout(() => (aviso = ''), 2500);
   }
+  // Charla con IA (si la nube la tiene): le escribís y contesta él, en su pantalla y acá.
+  let charla = $state<{ disponible: boolean; quedan: number; porDia: number } | null>(null);
+  let charlando = $state(false);
+  let respuesta = $state<{ yo: string; texto: string; expresion?: string } | null>(null);
+  async function charlar() {
+    const t = frase.trim();
+    if (!t || diciendo || !charla) return;
+    diciendo = true;
+    try {
+      const r = await api<{ texto: string; expresion?: string; enviado: boolean; quedan: number }>(`/v1/bichos/${b.id}/charla`, { cuerpo: { texto: t } });
+      respuesta = { yo: t, texto: r.texto, expresion: r.expresion };
+      charla.quedan = r.quedan;
+      frase = '';
+    } catch (e) {
+      aviso = e instanceof ErrorApi ? (e.estado === 429 ? 'Por hoy ya charlaron mucho' : e.estado === 503 ? 'Sin charla en esta nube' : e.message) : 'No contestó';
+      setTimeout(() => (aviso = ''), 2500);
+    }
+    diciendo = false;
+  }
+
+  // Lo que suena (Spotify o el celu), para verlo al lado de él.
+  let suena = $state<{ titulo: string; artista: string } | null>(null);
+  onMount(() => {
+    api<{ disponible: boolean; quedan: number; porDia: number }>('/v1/charla').then((c) => (charla = c.disponible ? c : null)).catch(() => {});
+    api<{ suena?: { sonando: boolean; titulo: string; artista: string } | null }>('/v1/musica').then((m) => (suena = m.suena?.sonando ? m.suena : null)).catch(() => {});
+    return escuchar((e) => {
+      if (e.tipo !== 'musica' || (e.bicho && e.bicho !== b.id) || e.datos.titulo === undefined) return;
+      suena = e.datos.sonando ? { titulo: e.datos.titulo, artista: e.datos.artista ?? '' } : null;
+    });
+  });
+  const MAX_CHARLA = 200;
+
   async function alarma(accion: 'apagar' | 'posponer') {
     b.aviso = null;
     try { await api(`/v1/bichos/${b.id}/alarma`, { cuerpo: { accion } }); } catch { /* ya se apagó o no está */ }
@@ -127,6 +168,7 @@
         <span class="grabado"><span class="led" class:verde={conectado}></span>{conectado ? 'Conectado' : `Desconectado · visto ${hace(b.bicho.ultimaConexion)}`} · {modelo.nombre} {numeroDe(b.id)}</span>
         <h1 class="titular">{nombre}</h1>
         <p class="estado">Está <b>{animoDe(b.bicho).toLowerCase()}</b>{#if b.bicho.estado?.bateria != null} · {b.bicho.estado.bateria}% de batería{/if}.</p>
+        {#if suena}<p class="suena" aria-label="Suena {suena.titulo}"><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span><b>{suena.titulo}</b>{#if suena.artista}<span>{suena.artista}</span>{/if}</p>{/if}
         <div class="capacidades" aria-label="Lo que trae">
           <span class="grabado">Lo que trae</span>
           <div class="chips">
@@ -142,13 +184,27 @@
           <button class="tecla" disabled={!conectado} onclick={() => { elegir('jugar'); document.querySelector('.tablero')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>Jugar</button>
           {#if b.bicho.estado?.fija && !/^(recordatorio|pomodoro|reloj):/.test(b.bicho.estado.expresion)}<button class="tecla negra" disabled={!conectado} onclick={() => hacer({ expresion: '' }, 'Vuelve a ser él')}>Soltar la cara</button>{/if}
         </div>
-        <form class="decir visor" onsubmit={(e) => { e.preventDefault(); decir(); }}>
-          <span class="grabado">Decile algo</span>
+        <form class="decir visor" class:charla={charlando} onsubmit={(e) => { e.preventDefault(); if (charlando) charlar(); else decir(); }}>
+          <div class="cabeza">
+            {#if charla}
+              <div class="modo" role="radiogroup" aria-label="Modo">
+                <button type="button" role="radio" aria-checked={!charlando} onclick={() => (charlando = false)}>Decile algo</button>
+                <button type="button" role="radio" aria-checked={charlando} onclick={() => { charlando = true; frase = cortarBytes(frase, MAX_CHARLA); }}>Charlar</button>
+              </div>
+              {#if charlando}<span class="grabado quedan" aria-label="Quedan {charla.quedan} de {charla.porDia} hoy">{charla.quedan}/{charla.porDia} hoy</span>{/if}
+            {:else}<span class="grabado">Decile algo</span>{/if}
+          </div>
+          {#if charlando && respuesta}
+            <div class="charla-ver" aria-live="polite">
+              <span class="yo">{respuesta.yo}</span>
+              <span class="el">“{respuesta.texto}”</span>
+            </div>
+          {/if}
           <div class="linea">
-            <input class="campo" aria-label="Decile algo" placeholder={conectado ? '¡Hola!' : 'Desconectado'} disabled={!conectado} value={frase}
-              oninput={(e) => { const v = cortarBytes(e.currentTarget.value, MAX_TEXTO); if (v !== e.currentTarget.value) e.currentTarget.value = v; frase = v; }} />
-            <span class="cuenta" class:lleno={usados >= MAX_TEXTO} aria-label="{usados} de {MAX_TEXTO}">{usados}/{MAX_TEXTO}</span>
-            <button class="tecla naranja chica" disabled={!conectado || diciendo || !frase.trim()}>Decir</button>
+            <input class="campo" aria-label={charlando ? 'Charlale' : 'Decile algo'} placeholder={charlando ? '¿Cómo andás?' : conectado ? '¡Hola!' : 'Desconectado'} disabled={!conectado && !charlando} value={frase}
+              oninput={(e) => { const v = cortarBytes(e.currentTarget.value, charlando ? MAX_CHARLA : MAX_TEXTO); if (v !== e.currentTarget.value) e.currentTarget.value = v; frase = v; }} />
+            {#if !charlando}<span class="cuenta" class:lleno={usados >= MAX_TEXTO} aria-label="{usados} de {MAX_TEXTO}">{usados}/{MAX_TEXTO}</span>{/if}
+            <button class="tecla naranja chica" disabled={(!conectado && !charlando) || diciendo || !frase.trim() || (charlando && !charla?.quedan)}>{charlando ? (diciendo ? '…' : 'Charlar') : 'Decir'}</button>
           </div>
         </form>
         {#if aviso}<p class="aviso" aria-live="polite"><span class="led on"></span>{aviso}</p>{/if}
@@ -200,6 +256,21 @@
   .decir .linea { display: flex; align-items: center; gap: 12px; }
   .decir .campo { font-size: 22px; }
   .decir .campo:disabled { cursor: not-allowed; }
+  .decir .cabeza { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 22px; }
+  .modo { display: inline-flex; gap: 4px; padding: 3px; border-radius: 10px; background: #1c1a17; box-shadow: inset 0 1px 3px rgba(0,0,0,.8); }
+  .modo button { padding: 6px 10px; border-radius: 7px; cursor: pointer; font: 800 11px/1 var(--marca); letter-spacing: .12em; text-transform: uppercase; color: var(--gris); }
+  .modo button[aria-checked='true'] { color: #1a1714; background: linear-gradient(180deg, #ff8a5c, #f2541a); box-shadow: 0 2px 0 #9a3209; }
+  .quedan { font-variant-numeric: tabular-nums; }
+  .charla-ver { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
+  .charla-ver .yo { align-self: flex-end; max-width: 80%; padding: 6px 12px; border-radius: 12px 12px 4px 12px; background: #2c2925; font: 700 14px/1.3 var(--marca); color: var(--gris-claro); overflow-wrap: anywhere; }
+  .charla-ver .el { align-self: flex-start; max-width: 90%; padding: 10px 14px; border-radius: 14px 14px 14px 4px; background: #f3eee8; color: #1a1714; font: 800 18px/1.25 var(--marca); overflow-wrap: anywhere; }
+  .suena { display: flex; align-items: center; gap: 10px; margin: -8px 0 0; font: 700 14px/1.2 var(--marca); color: var(--gris); min-width: 0; }
+  .suena b { color: var(--c-papel); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .suena span:not(.eq) { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; flex: none; }
+  .eq i { width: 3px; height: 100%; border-radius: 2px; background: var(--led); animation: eq .9s ease-in-out infinite alternate; transform-origin: bottom; }
+  .eq i:nth-child(2) { animation-delay: -.3s; } .eq i:nth-child(3) { animation-delay: -.6s; }
+  @keyframes eq { from { transform: scaleY(.2); } to { transform: scaleY(1); } }
   .cuenta { flex: none; font: 800 11px/1 var(--marca); color: #5a524a; font-variant-numeric: tabular-nums; }
   .cuenta.lleno { color: var(--brasa); }
 

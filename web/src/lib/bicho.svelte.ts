@@ -71,6 +71,15 @@ export class BichoAbierto {
         case 'config': if (e.datos.version !== this.versionConfig) this.cargarConfig(); break;
         case 'sprites': this.cargarSprites(); break;
         case 'ota': this.ota = e.datos; break;
+        case 'toque': {
+          // Un toque de un amigo (o el que te devolvió): como los otros avisos del robot.
+          const t = e.datos.tipo;
+          const que = { toque: 'un toque', abrazo: 'un abrazo', beso: 'un beso', carita: 'una carita' }[t] ?? 'un toque';
+          const devuelto = { toque: 'el toque', abrazo: 'el abrazo', beso: 'el beso', carita: 'la carita' }[t] ?? 'el toque';
+          const icono = { toque: '👉', abrazo: '🤗', beso: '💋', carita: '😊' }[t] ?? '👉';
+          this.avisar(e.datos.devuelto ? `${e.datos.de} te devolvió ${devuelto}` : `${e.datos.de} te mandó ${que}`, icono);
+          break;
+        }
         case 'mcp': this.avisar(`${e.datos.cliente || 'Tu IA'}: ${e.datos.herramienta.replaceAll('_', ' ')}`, '✦'); break;
         case 'marco': {
           const b = Uint8Array.from(atob(e.datos.datos), (c) => c.charCodeAt(0));

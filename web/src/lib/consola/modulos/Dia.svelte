@@ -3,7 +3,8 @@
   // despertador y los cumpleaños que festeja.
   import { api, ErrorApi } from '$lib/api';
   import { usarBicho } from '$lib/bicho.svelte';
-  import { cortarBytes, MAX_NOMBRE, MAX_TEXTO, type Despertador } from '$lib/formato';
+  import { onMount } from 'svelte';
+  import { cortarBytes, MAX_NOMBRE, MAX_TEXTO, MAX_TEXTO_PRESENCIA, PRESENCIA_BASE, type Despertador } from '$lib/formato';
   import { usarGuardado } from '../guardado.svelte';
   import type { Modelo } from '../modelo';
 
@@ -80,6 +81,15 @@
   }
   const cumpleDueno = $derived(partes(b.config.dueno?.cumple));
   const cumpleRobot = $derived(partes(b.config.cumple));
+
+  // Presencia: los horarios que aprendió la nube (cuándo salís, llegás y dormís) y qué te dice al irte.
+  type Horarios = { llegas: string | null; salis: string | null; dormis: string | null; seguridad: number; dias: number };
+  let horarios = $state<Horarios | null>(null);
+  onMount(() => { api<Horarios>(`/v1/bichos/${b.id}/horarios`).then((h) => (horarios = h)).catch(() => {}); });
+  const presencia = $derived({ ...PRESENCIA_BASE, ...(b.config.presencia ?? {}) });
+  const ponerPresencia = (f: (p: typeof presencia) => void) =>
+    g.cambiar((c) => { const p = { ...PRESENCIA_BASE, ...(c.presencia ?? {}) }; f(p); if (!p.texto) delete (p as { texto?: string }).texto; c.presencia = p; });
+  const segmentos = $derived(Math.round((horarios?.seguridad ?? 0) * 5));
 </script>
 
 <div class="dia">
@@ -141,6 +151,32 @@
     </div>
   </div>
 
+  <div class="presencia bandeja">
+    <div class="aprendidos">
+      {#each [['salis', 'Salís', 'M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10'], ['llegas', 'Llegás', 'M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-5h4v5'], ['dormis', 'Dormís', 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z']] as [k, t, d]}
+        {@const h = horarios?.[k as 'salis']}
+        <div class="visor aprendido" class:sin={!h}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d={d} /></svg>
+          <span class="grabado">{t}</span>
+          <span class="digitos chicos">{h ?? '--:--'}</span>
+        </div>
+      {/each}
+      <div class="visor seguridad" role="meter" aria-label="Seguridad" aria-valuemin={0} aria-valuemax={1} aria-valuenow={horarios?.seguridad ?? 0}>
+        <span class="grabado">Seguro</span>
+        <span class="medidor">{#each [0, 1, 2, 3, 4] as i}<span class:on={i < segmentos}></span>{/each}</span>
+        <span class="grabado">{horarios?.dias ?? 0} d</span>
+      </div>
+    </div>
+    <div class="al-irte">
+      <button class="llave" aria-pressed={presencia.preguntar} onclick={() => ponerPresencia((p) => (p.preguntar = !p.preguntar))}><span class="led"></span>Al irte</button>
+      <label class="visor texto-irte" class:off={!presencia.preguntar}>
+        <span class="solo-lectores">Qué te dice al irte</span>
+        <input class="campo claro" placeholder="¿Llevás las llaves?" disabled={!presencia.preguntar} value={presencia.texto}
+          onchange={(e) => { const t = cortarBytes(e.currentTarget.value.trim(), MAX_TEXTO_PRESENCIA); ponerPresencia((p) => (p.texto = t)); }} />
+      </label>
+    </div>
+  </div>
+
   <div class="cumples">
     <div class="visor">
       <span class="grabado">Vos te llamás</span>
@@ -190,11 +226,29 @@
   .posponer small { font-size: 14px; }
   .chica-c { width: 40px; min-height: 40px; }
   .texto-alarma { flex: 1; min-width: 160px; padding: 10px 16px; }
+  .presencia { gap: 12px; }
+  .aprendidos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 10px; }
+  .aprendido { align-items: flex-start; gap: 8px; padding: 12px 16px; }
+  .aprendido svg { width: 22px; height: 22px; fill: none; stroke: var(--brasa); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .aprendido .digitos { font-size: 30px; }
+  .aprendido.sin .digitos, .aprendido.sin svg { color: #5a524a; stroke: #5a524a; text-shadow: none; }
+  .seguridad { align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; }
+  .medidor { display: flex; flex-direction: column-reverse; gap: 4px; }
+  .medidor span { width: 26px; height: 7px; border-radius: 3px; background: #2c2925; }
+  .medidor span.on { background: var(--verde); box-shadow: 0 0 6px var(--verde); }
+  .al-irte { display: flex; align-items: center; gap: 10px; }
+  .texto-irte { flex: 1; min-width: 0; padding: 10px 16px; }
+  .texto-irte.off { opacity: .5; }
+  .texto-irte .campo { font-size: 18px; }
   .cumples { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   .fecha { display: flex; gap: 8px; }
   .dia-n { width: 3.2em; flex: none; }
   @media (max-width: 760px) {
     .visores, .cumples, .alarma { grid-template-columns: 1fr; }
+    .aprendidos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .seguridad { grid-column: 1 / -1; flex-direction: row; }
+    .medidor { flex-direction: row; }
+    .aprendido .digitos { font-size: 22px; }
     .grande .digitos { font-size: 52px; }
   }
 </style>

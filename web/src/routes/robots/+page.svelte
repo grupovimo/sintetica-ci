@@ -2,6 +2,8 @@
   // Mis robots: el dock donde está cada uno, con su foto real, su cara en vivo,
   // cómo está y cuánta batería tiene.
   import { onMount } from 'svelte';
+  import { replaceState } from '$app/navigation';
+  import { page } from '$app/state';
   import { api, ErrorApi } from '$lib/api';
   import { escuchar } from '$lib/eventos.svelte';
   import type { Bicho } from '$lib/tipos';
@@ -42,7 +44,29 @@
     }
   }
 
+  // Los links que vuelven acá: una invitación de amigo (?amigo=CODIGO) y la vuelta de Spotify (?spotify=ok).
+  let invitado = $state('');
+  let banda = $state<{ texto: string; ok: boolean } | null>(null);
+  function limpiar(...p: string[]) {
+    const u = new URL(page.url);
+    for (const x of p) u.searchParams.delete(x);
+    replaceState(u, {});
+  }
+  async function aceptarAmigo() {
+    try {
+      const a = await api<{ nombre: string }>('/v1/amigos', { cuerpo: { codigo: invitado } });
+      banda = { texto: `¡Ya son amigos con ${a.nombre}!`, ok: true };
+    } catch (e) {
+      banda = { texto: e instanceof ErrorApi && e.estado === 409 ? 'Ya son amigos' : 'Ese código no anda', ok: false };
+    }
+    invitado = '';
+  }
+
   onMount(() => {
+    invitado = (page.url.searchParams.get('amigo') ?? '').replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 8);
+    const sp = page.url.searchParams.get('spotify');
+    if (sp) banda = sp === 'ok' ? { texto: 'Spotify conectado', ok: true } : { texto: sp === 'cancelado' ? 'Spotify: cancelado' : 'Spotify no se conectó', ok: false };
+    if (invitado || sp) limpiar('amigo', 'spotify');
     cargar();
     return escuchar((e) => {
       const b = bichos.find((x) => x.id === e.bicho);
@@ -104,6 +128,16 @@
   </div>
 
   {#if error}<p class="aviso error"><span class="led"></span>{error}</p>{/if}
+  {#if invitado}
+    <div class="invitacion" role="status">
+      <span class="campana" aria-hidden="true">🤗</span>
+      <div><span class="grabado">Te invitaron de amigo</span><b>{invitado.slice(0, 4)}-{invitado.slice(4)}</b></div>
+      <button class="tecla negra" onclick={aceptarAmigo}>Aceptar</button>
+      <button class="tecla negra cuadrada" aria-label="No" onclick={() => (invitado = '')}>✕</button>
+    </div>
+  {:else if banda}
+    <p class="aviso" class:error={!banda.ok} role="status"><span class="led" class:verde={banda.ok}></span>{banda.texto}<button class="tecla negra chica cerrar" onclick={() => (banda = null)}>OK</button></p>
+  {/if}
 
   <div class="dock">
     {#each bichos as b (b.id)}
@@ -172,6 +206,13 @@
 
 <style>
   main { display: flex; flex-direction: column; gap: 40px; padding-top: 8px; padding-bottom: 64px; }
+  .invitacion { display: flex; align-items: center; gap: 14px; padding: 14px 16px 14px 20px; border-radius: 18px; color: #1a1714;
+    background: linear-gradient(180deg, #ff8a5c, #f2541a); box-shadow: 0 6px 0 #9a3209, 0 20px 30px -16px rgba(0,0,0,.8); }
+  .invitacion > div { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .invitacion .grabado { color: rgba(26,23,20,.7); }
+  .invitacion b { font: 900 26px/1 var(--marca); font-stretch: 112%; letter-spacing: .04em; }
+  .campana { font-size: 26px; }
+  .cerrar { margin-left: auto; }
   .encabezado { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
   .titulo { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
   .grande { min-height: 60px; padding: 0 28px; }

@@ -36,3 +36,14 @@ describe('paridad con el núcleo', () => {
     }
   });
 });
+
+describe('las partículas', () => {
+  test('en el mismo orden que el núcleo (el índice va a su rostro)', () => {
+    const fuente = fs.readFileSync(new URL('../../../firmware/nucleo/rostro.cpp', import.meta.url), 'utf8');
+    const m = fuente.match(/NOMBRES_PARTICULAS\[[^\]]*\]\s*=\s*\{([^}]*)\}/);
+    expect(m).not.toBeNull();
+    const nucleo = [...m![1].matchAll(/"([a-z]+)"/g)].map((x) => x[1]);
+    expect([...f.PARTICULAS]).toEqual(nucleo);
+    for (const p of nucleo) expect(f.GLIFO_PARTICULA[p]).toBeTruthy();
+  });
+});

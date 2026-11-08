@@ -7,6 +7,7 @@
   import { usarGuardado } from '../guardado.svelte';
   import type { Modelo } from '../modelo';
   import Perilla from '../Perilla.svelte';
+  import fabrica from '$formato/vida/frases.json';
 
   let { modelo: _ }: { modelo: Modelo } = $props();
   const b = usarBicho();
@@ -19,13 +20,23 @@
 
   // Agrupadas, así la lista se lee de un vistazo.
   const GRUPOS: [string, Situacion[]][] = [
-    ['Su día', ['despertar', 'buen-dia', 'comiste', 'tardaste', 'a-dormir', 'buenas-noches', 'despertador', 'posponer', 'sueno']],
-    ['Con vos', ['saludo', 'volviste', 'te-extrane', 'caricia', 'aburrido', 'como-estas', 'animo-bien', 'animo-medio', 'animo-mal']],
-    ['Cuidarte', ['agua', 'pausa', 'recordatorio-hecho', 'bateria-baja', 'cargando']],
+    ['Su día', ['despertar', 'buen-dia', 'comiste', 'tardaste', 'a-dormir', 'buenas-noches', 'despertador', 'posponer', 'sueno', 'agenda', 'agenda-manana']],
+    ['Con vos', ['saludo', 'volviste', 'te-vas', 'te-extrane', 'caricia', 'aburrido', 'como-estas', 'animo-bien', 'animo-medio', 'animo-mal', 'musica']],
+    ['Amigos', ['toque-recibido', 'toque-devuelto']],
+    ['Cuidarte', ['agua', 'pausa', 'recordatorio-hecho', 'habito-hecho', 'habito-racha', 'habito-cortado', 'bateria-baja', 'cargando']],
+    ['Avisos', ['pago', 'mail', 'github', 'pedido', 'aviso']],
     ['Clima', ['clima-frio', 'clima-calor', 'clima-lluvia', 'clima-lindo']],
     ['Jugar', ['jugar', 'gane', 'perdi', 'empate']],
     ['Fechas', ['cumple-dueno', 'cumple-robot', 'aniversario', 'anio-nuevo', 'navidad', 'dia-del-amigo', 'dia-del-nino', 'hito']],
   ];
+
+  // Las fichas de cada situación: las de siempre y las que usan sus frases de fábrica ({de}, {titulo}, {racha}…).
+  const SIEMPRE = ['{dueno}', '{robot}', '{clima}'];
+  const situaciones = (fabrica as { situaciones: Record<string, unknown> }).situaciones;
+  const fichasDe = (s: Situacion) =>
+    [...SIEMPRE, ...new Set([...JSON.stringify(situaciones[s] ?? '').matchAll(/\{[a-z]+\}/g)].map((m) => m[0]).filter((f) => !SIEMPRE.includes(f)))];
+  // De ejemplo, la primera de fábrica si no hay una propia.
+  const deFabrica = (s: Situacion) => (situaciones[s] as { frases?: { todos?: string[] } } | undefined)?.frases?.todos?.[0];
 
   const frecuencia = $derived(b.config.habla?.frecuencia ?? 0.5);
   const propias = $derived(b.config.habla?.propias ?? {});
@@ -111,13 +122,13 @@
 
   <form class="nueva visor" onsubmit={(e) => { e.preventDefault(); agregar(); }}>
     <div class="linea">
-      <input bind:this={campo} class="campo claro" aria-label="Frase nueva" placeholder={EJEMPLO[situacion] ?? 'Frase nueva'} disabled={total >= MAX_FRASES}
+      <input bind:this={campo} class="campo claro" aria-label="Frase nueva" placeholder={EJEMPLO[situacion] ?? deFabrica(situacion) ?? 'Frase nueva'} disabled={total >= MAX_FRASES}
         value={nueva} oninput={(e) => { const v = cortarBytes(e.currentTarget.value, MAX_TEXTO); if (v !== e.currentTarget.value) e.currentTarget.value = v; nueva = v; }} />
       <span class="cuenta" class:lleno={usados >= MAX_TEXTO}>{usados}/{MAX_TEXTO}</span>
       <button class="tecla naranja chica" disabled={!nueva.trim() || total >= MAX_FRASES}>+ Sumar</button>
     </div>
     <div class="fichas">
-      {#each ['{dueno}', '{robot}', '{clima}'] as f}<button type="button" class="ficha" onclick={() => ficha(f)}>{f}</button>{/each}
+      {#each fichasDe(situacion) as f}<button type="button" class="ficha" onclick={() => ficha(f)}>{f}</button>{/each}
     </div>
   </form>
 </div>
@@ -139,7 +150,7 @@
   .linea { display: flex; align-items: center; gap: 12px; }
   .linea .campo:disabled { cursor: not-allowed; }
   .cuenta { flex: none; font: 800 11px/1 var(--marca); color: #5a524a; font-variant-numeric: tabular-nums; }
-  .fichas { display: flex; gap: 8px; }
+  .fichas { display: flex; flex-wrap: wrap; gap: 8px; }
   .ficha { padding: 7px 10px; border-radius: 8px; cursor: pointer; background: var(--chapa); color: var(--brasa);
     font: 800 12px/1 var(--marca); letter-spacing: .02em; box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 3px 0 #000; }
   .ficha:active { transform: translateY(2px); box-shadow: 0 1px 0 #000; }

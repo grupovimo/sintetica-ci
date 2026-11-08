@@ -7,7 +7,7 @@
   import { foto } from '$lib/foto.svelte';
   import { pintar, vistaPrevia, type VistaPrevia } from '$lib/nucleo';
   import {
-    clonar, COMPORTAMIENTOS_BASE, ESTADO, EVENTOS, NOMBRES_ESTADO, NOMBRES_EVENTO, PARTICULAS, REGLAS_BASE, type Config, type Regla,
+    clonar, COMPORTAMIENTOS_BASE, ESTADO, EVENTOS, NOMBRES_ESTADO, NOMBRES_EVENTO, PARTICULAS, GLIFO_PARTICULA, REGLAS_BASE, type Config, type Regla,
   } from '$lib/formato';
   import { pantallaDe } from '$lib/tipos';
   import { miniaturasDeCaras } from '$lib/consola/miniaturas';
@@ -57,7 +57,7 @@
   const corto = (e: string) => (NOMBRES_EVENTO[e] ?? e).replace(/ \(.*\)$/, '');
   const cuantas = (e: string) => reglas.filter((r) => r.si === e).length;
 
-  const GLIFO: Record<string, string> = { zzz: 'z', corazon: '♥', lagrima: '💧', gota: '·', chispa: '✦', pregunta: '?', exclamacion: '!', nota: '♪', estrella: '★', burbuja: '○' };
+  const GLIFO = GLIFO_PARTICULA;
   const ACCIONES: { tipo: string; nombre: string }[] = [
     { tipo: 'reflejo', nombre: 'Cara ya' }, { tipo: 'expresion', nombre: 'Cara 3 s' }, { tipo: 'comportamiento', nombre: 'Hace' },
     { tipo: 'particula', nombre: 'Le sale' }, { tipo: 'estado', nombre: 'Siente' }, { tipo: 'led', nombre: 'Luz' },

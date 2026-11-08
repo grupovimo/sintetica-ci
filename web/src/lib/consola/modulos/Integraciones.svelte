@@ -37,6 +37,7 @@
     inclinado: 'Lo inclinan', caida: 'Se cae', voz: 'Le hablan', nombre: 'Dicen su nombre', ruido: 'Un ruido fuerte', musica: 'Suena música',
     cargando: 'Lo enchufan', desenchufado: 'Lo desenchufan', cargado: 'Termina de cargar', volvio: 'Volvés después de un rato', hito: 'Un hito (cumple, días juntos)',
     juego: 'Termina un juego', animo: 'Te pregunta cómo estás',
+    llegaste: 'Llegás a casa', 'te-fuiste': 'Te vas', habito: 'Marcás un hábito', agenda: 'Se viene un evento',
   };
   let cuandos = $state<string[]>(['recordatorio', 'bateria-baja', 'desconectado', 'conectado', 'despierta', 'duerme', 'expresion']);
   const CUANDO = $derived([...new Set(['hora', 'despertador', ...cuandos])].map((k) => [k, NOMBRES_CUANDO[k] ?? k] as [string, string]));
@@ -54,6 +55,8 @@
   }
   const CARAS = ['contento', 'sorpresa', 'enamorado', 'guino', 'triste', 'pensando', 'dormido'];
   const PLANTILLAS = ['{robot}', '{dueno}', '{texto}', '{hora}', '{clima}', '{temp}', '{max}', '{min}', '{ciudad}', '{bateria}', '{expresion}'];
+  // Las que solo tienen sentido con un cuando (agenda: {texto} es el título del evento).
+  const PLANTILLAS_CUANDO: Record<string, string[]> = { juego: ['{juego}', '{resultado}'], animo: ['{animo}'], habito: ['{habito}', '{racha}'] };
 
   type Telegram = { activo: boolean; bot?: string; vinculado?: boolean; nombre?: string };
   let telegram = $state<Telegram | null>(null);
@@ -65,6 +68,7 @@
   });
   let autos = $state<Automatizacion[]>([]);
   let historial = $state<Ejecucion[]>([]);
+  const plantillas = $derived([...new Set([...PLANTILLAS, ...autos.flatMap((a) => PLANTILLAS_CUANDO[a.cuando] ?? [])])]);
   let otros = $state<Bicho[]>([]);
   let secreto = $state('');
   let verSecreto = $state(false);
@@ -72,6 +76,16 @@
   let sinNube = $state(false);
   let guardando = $state<'listo' | 'guardando' | 'guardado'>('listo');
   let probado = $state<Record<number, string>>({});
+
+  // Música: Spotify (solo si la nube tiene las claves).
+  type Suena = { sonando: boolean; titulo: string; artista: string; bpm?: number };
+  type Musica = { disponible: boolean; conectada?: boolean; nombre?: string; suena?: Suena | null };
+  let musica = $state<Musica | null>(null);
+  async function cargarMusica() { musica = await api<Musica>('/v1/musica').catch(() => null); }
+  async function conectarSpotify() {
+    try { location.href = (await api<{ url: string }>('/v1/musica/spotify')).url; } catch (e) { error = texto(e, 'No pude abrir Spotify.'); }
+  }
+  async function desconectarSpotify() { await api('/v1/musica/spotify', { metodo: 'DELETE' }).catch(() => {}); await cargarMusica(); }
 
   // Tu IA (MCP): las IAs conectadas por OAuth y los tokens para Claude Code.
   type Cliente = { id: string; cliente: string; creada: string; usada: string | null };
@@ -121,10 +135,16 @@
   onMount(() => {
     cargar();
     cargarIA();
+    cargarMusica();
     return escuchar((e) => {
       const t = (e as { tipo: string; bicho?: string }).tipo;
       if (t === 'telegram' || (t === 'automatizacion' && e.bicho === b.id)) cargar();
       if (t === 'mcp') cargarIA();
+      if (e.tipo === 'musica' && musica) {
+        const d = e.datos;
+        if (d.conectada !== undefined) cargarMusica();
+        else if (d.titulo !== undefined) musica.suena = { sonando: !!d.sonando, titulo: d.titulo, artista: d.artista ?? '', bpm: d.bpm };
+      }
     });
   });
 
@@ -253,6 +273,26 @@
       {/if}
     </div>
 
+    {#if musica?.disponible}
+      <div class="musica bandeja">
+        <div class="logo spotify" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#0e0d0b" stroke-width="2.2" stroke-linecap="round"><path d="M6 9.5c4-1.3 8.5-1 12 1M7 13c3.3-1 6.8-.7 9.5.8M8 16.3c2.6-.7 5-.5 7 .6" /></svg>
+        </div>
+        <div class="que">
+          <span class="grabado">Spotify{musica.nombre ? ` · ${musica.nombre}` : ''}</span>
+          {#if !musica.conectada}<b>Que baile tu música</b>
+          {:else if musica.suena?.titulo}
+            <div class="suena" class:quieto={!musica.suena.sonando}>
+              <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+              <span class="tema"><b>{musica.suena.titulo}</b><small>{musica.suena.artista}</small></span>
+            </div>
+          {:else}<b>Conectado</b>{/if}
+        </div>
+        {#if musica.conectada}<button class="tecla negra chica" onclick={desconectarSpotify}>Desconectar</button>
+        {:else}<button class="tecla naranja" onclick={conectarSpotify}>Conectar</button>{/if}
+      </div>
+    {/if}
+
     <div class="titulo">
       <span class="grabado">Automatizaciones{guardando === 'guardando' ? ' · guardando…' : guardando === 'guardado' ? ' · guardadas' : ''}</span>
       <button class="tecla negra" disabled={autos.length >= 20} onclick={nueva}>+ Nueva</button>
@@ -347,7 +387,7 @@
     {:else}
       <div class="vacio bandeja"><p class="texto">Ej.: recordatorio → Telegram</p></div>
     {/each}
-    <div class="ayuda" aria-label="Plantillas">{#each PLANTILLAS as p}<code>{p}</code>{/each}</div>
+    <div class="ayuda" aria-label="Plantillas">{#each plantillas as p}<code>{p}</code>{/each}</div>
 
     <details class="bandeja webhooks">
       <summary class="grabado">Para desarrolladores: cómo verificar los webhooks</summary>
@@ -380,6 +420,17 @@
   .url .grabado { flex: none; }
   .token-nuevo, .conectadas { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
   .conectadas .ejec { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; }
+  .musica { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: center; }
+  .spotify { background: linear-gradient(180deg, #3ee07a, #1db954) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 5px 0 #13863c !important; }
+  .suena { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: #0e0d0b; min-width: 0; }
+  .tema { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .tema b { font: 800 16px/1.15 var(--marca) !important; text-transform: none !important; color: var(--c-papel); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tema small { font: 700 12px/1 var(--marca); color: var(--gris); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .eq { display: flex; align-items: flex-end; gap: 3px; height: 22px; flex: none; }
+  .eq i { width: 4px; height: 100%; border-radius: 2px; background: #ff6a33; box-shadow: 0 0 6px rgba(255,106,51,.7); animation: eq .9s ease-in-out infinite alternate; transform-origin: bottom; }
+  .eq i:nth-child(2) { animation-delay: -.3s; } .eq i:nth-child(3) { animation-delay: -.6s; } .eq i:nth-child(4) { animation-delay: -.15s; }
+  .quieto .eq i { animation: none; transform: scaleY(.25); }
+  @keyframes eq { from { transform: scaleY(.2); } to { transform: scaleY(1); } }
   .telegram { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: center; }
   .qr { grid-column: 1 / -1; justify-self: center; width: 200px; padding: 10px; border-radius: 18px; background: #f3eee8; box-shadow: 0 6px 0 #a39c90; }
   .qr :global(svg) { display: block; width: 100%; height: auto; }
@@ -420,6 +471,7 @@
     .auto { grid-template-columns: 1fr; }
     .lado { flex-direction: row; flex-wrap: wrap; }
     .telegram { grid-template-columns: auto minmax(0, 1fr); }
-    .telegram > :last-child { grid-column: 1 / -1; }
+    .telegram > :last-child, .musica > :last-child { grid-column: 1 / -1; }
+    .musica { grid-template-columns: auto minmax(0, 1fr); }
   }
 </style>

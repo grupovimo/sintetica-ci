@@ -73,7 +73,11 @@ export type Evento =
   | { tipo: 'mcp'; bicho: string; datos: { cliente: string; herramienta: string; en: string } }
   // v1.9: un toque de un amigo (o el que te devolvió) y un aviso entrante (GitHub, Mercado Pago, JSON propio).
   | { tipo: 'toque'; bicho: string; datos: { de: string; tipo: 'toque' | 'abrazo' | 'beso' | 'carita'; robot: string; devuelto?: boolean } }
-  | { tipo: 'entrante'; bicho?: string; datos: { tipo: 'pago' | 'mail' | 'github' | 'pedido' | 'otro'; titulo: string; de: string; origen: 'json' | 'github' | 'mercadopago'; robots: string[] } };
+  | { tipo: 'entrante'; bicho?: string; datos: { tipo: 'pago' | 'mail' | 'github' | 'pedido' | 'otro'; titulo: string; de: string; origen: 'json' | 'github' | 'mercadopago'; robots: string[] } }
+  // v1.9: la agenda (cambió o se viene un evento), lo que suena (Spotify sin robot; el celu, con su robot) y la charla con IA.
+  | { tipo: 'agenda'; bicho?: string; datos: { conectada?: boolean; titulo?: string; minutos?: number; manana?: number } }
+  | { tipo: 'musica'; bicho?: string; datos: { conectada?: boolean; nombre?: string; sonando?: boolean; titulo?: string; artista?: string; bpm?: number; de?: string } }
+  | { tipo: 'charla'; bicho: string; datos: { texto: string; expresion: string; de: string; enviado: boolean } };
 
 // Cómo ve la pantalla cada perfil (también los virtuales).
 export function pantallaDe(b: { perfil: string; estado: Estado | null }) {

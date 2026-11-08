@@ -8,7 +8,7 @@
   import { pintar, vistaPrevia, type VistaPrevia } from '$lib/nucleo';
   import { Car, comando } from '$compartido/protocolo.js';
   import {
-    clonar, COMPORTAMIENTOS_BASE, MIRADAS, nombreValido, NOMBRES_RASGO, PARPADEOS, PARTICULAS, RASGOS,
+    clonar, COMPORTAMIENTOS_BASE, MIRADAS, nombreValido, NOMBRES_RASGO, PARPADEOS, PARTICULAS, GLIFO_PARTICULA, RASGOS,
     type Comportamiento, type Config, type Paso,
   } from '$lib/formato';
   import { pantallaDe } from '$lib/tipos';
@@ -39,7 +39,7 @@
     ['reaccion', 'Reacciones', 'M13 2 4 14h7l-1 8 9-12h-7l1-8Z'],
     ['rutina', 'Rutinas', 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z'],
   ];
-  const GLIFO: Record<string, string> = { zzz: 'z', corazon: '♥', lagrima: '💧', gota: '·', chispa: '✦', pregunta: '?', exclamacion: '!', nota: '♪', estrella: '★', burbuja: '○' };
+  const GLIFO = GLIFO_PARTICULA;
   const tipoDe = (n: string) => (propios[n] ?? COMPORTAMIENTOS_BASE[n])?.tipo ?? 'ocioso';
   const lista = $derived(todos.filter((n) => tipoDe(n) === tipo));
   const primeraCara = (n: string) => (propios[n] ?? COMPORTAMIENTOS_BASE[n])?.pasos.find((p) => p.cara)?.cara ?? 'neutral';

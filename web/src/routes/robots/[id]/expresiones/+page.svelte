@@ -7,7 +7,7 @@
   import { foto } from '$lib/foto.svelte';
   import { nucleoEditor, pintar, type Simulador } from '$lib/nucleo';
   import {
-    clonar, EXPRESIONES_BASE, esDibujo, esImagen, MOVIMIENTOS, nombreValido, PARAMS_CARA, PARAMS_OJO, PARPADEOS, PARTICULAS,
+    clonar, EXPRESIONES_BASE, esDibujo, esImagen, MOVIMIENTOS, nombreValido, PARAMS_CARA, PARAMS_OJO, PARPADEOS, PARTICULAS, GLIFO_PARTICULA,
     type Config, type ExpresionVida,
   } from '$lib/formato';
   import DeImagen from './DeImagen.svelte';
@@ -64,7 +64,7 @@
     { clave: 'vida', nombre: 'Gestos', icono: 'M4 17c2-6 5-6 8 0s6 6 8 0 M8 7h.01 M16 7h.01', perillas: [] },
   ];
   const actual = $derived(GRUPOS.find((g) => g.clave === grupo)!);
-  const GLIFO: Record<string, string> = { zzz: 'z', corazon: '♥', lagrima: '💧', gota: '·', chispa: '✦', pregunta: '?', exclamacion: '!', nota: '♪', estrella: '★', burbuja: '○' };
+  const GLIFO = GLIFO_PARTICULA;
 
   function configDelEditor(): Config {
     const c = clonar(foto(b.config)) as Config;
