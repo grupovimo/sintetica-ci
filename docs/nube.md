@@ -46,7 +46,7 @@ Cómo se conectan los bichos, las apps y la web. Para levantarlo en local, ver
 ### Entrar con Telegram
 
 Código: `servidor/sesion_telegram.go` (las rutas), `integraciones/entrar.go`
-(el bot), `almacen/entrar_telegram.go`; migración `015_entrar_telegram.sql`.
+(el bot), `almacen/entrar_telegram.go`; migración `017_entrar_telegram.sql`.
 
 1. `POST /v1/sesion/telegram {cliente: "web"|"app"}` → `201 {token, enlace,
    vence, bot}` (y `secreto` si es la app). `enlace` es

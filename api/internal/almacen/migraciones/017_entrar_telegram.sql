@@ -4,7 +4,7 @@
 
 alter table usuarios alter column email drop not null;
 
-create table telegram_entradas (
+create table if not exists telegram_entradas (
   id bigserial primary key,
   token_hash bytea not null unique,   -- el del link (solo el hash)
   secreto_hash bytea not null,        -- el del navegador o la app que lo pidió
@@ -19,4 +19,4 @@ create table telegram_entradas (
   vence timestamptz not null,
   creado timestamptz not null default now()
 );
-create index telegram_entradas_chat on telegram_entradas (chat_id, creado desc);
+create index if not exists telegram_entradas_chat on telegram_entradas (chat_id, creado desc);
