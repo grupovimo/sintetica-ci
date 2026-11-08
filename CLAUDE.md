@@ -50,6 +50,7 @@ en `docs/motor-de-vida.md` (cómo está hecho) y
 - Android: `cd android && ./gradlew testDebugUnitTest`.
 - iOS a TestFlight: `sh herramientas/publicar-ios.sh` (publica HEAD en `grupovimo/sintetica-ios`; compila Actions).
 - La landing a producción: `sh herramientas/desplegar-landing.sh` (HEAD → sintetica.grupovimo.com.ar).
+- La nube completa a producción: `sh herramientas/desplegar-nube.sh` (HEAD → api-sintetica, sintetica y mqtt-sintetica; desde el 8/11 reemplaza a la landing sola). El bot de Telegram corre solo en producción (long polling): el `.env` local va sin `TELEGRAM_TOKEN`.
 
 ## Memoria del proyecto (estado al 8/11/2026)
 
@@ -63,7 +64,7 @@ Rama de trabajo: `claude/pensive-tesla-8fe2fg` (sin PR).
   - **iOS**: compila y sube a TestFlight desde `grupovimo/sintetica-ios` (`herramientas/publicar-ios.sh`); nunca en la Mac.
   - **Broker MQTT embebido** (reemplaza a EMQX): Mochi MQTT adentro de la API (`api/internal/broker`), auth y ACL por ganchos con la lógica de `servidor/mqtt.go`, tcp :1883 (local) y TLS :8883 (producción, el certificado se relee solo). Ver `docs/nube.md`, "El broker", y en `produccion/README.md` los pasos para pasar el VPS.
 - **Sin verificar**: placas reales; claude.ai/ChatGPT conectados de verdad (necesitan la nube con HTTPS público).
-- **Lo próximo posible**: caras de imagen (sprites que el motor anima), apps iOS y Android con la consola, subir la nube al VPS de Grupo Vimo.
+- **Lo próximo posible**: el motor de charla propio en todos lados, la voz en la consola y las apps, el perfil del cubito (ver `docs/xiaozhi.md`).
 
 ## Trampas conocidas
 
