@@ -31,7 +31,6 @@ int leer(void* contexto, uint32_t desplazamiento, uint8_t* destino, size_t m) {
 }
 
 uint16_t g_fila565[4096];
-uint8_t g_filaRgba[4096 * 4];
 
 // Decodifica una imagen entera (o hasta que se corten los datos).
 void decodificar(const Archivo& a, bool rgba, uint32_t saltar) {
@@ -42,11 +41,11 @@ void decodificar(const Archivo& a, bool rgba, uint32_t saltar) {
   memcpy(cab, a.d, a.n < 14 ? a.n : 14);
   // La cabecera suelta y la del decodificador dicen lo mismo.
   if (!DecodificadorQoi::leerCabecera(cab, 14, &w, &h) || w != q.ancho() || h != q.alto()) abort();
-  if (q.ancho() > 4096 || q.canales() < 3 || q.canales() > 4) abort();
+  if (q.ancho() > 4096) abort();
   if (saltar && !q.saltarFilas(saltar % (q.alto() + 1))) return;
   while (q.fila() < q.alto()) {
-    const bool ok = rgba ? q.siguienteFilaRgba(g_filaRgba) : q.siguienteFila(g_fila565);
-    if (!ok) return;
+    // Sin destino también decodifica (es lo que usa saltarFilas).
+    if (!q.siguienteFila(rgba ? nullptr : g_fila565)) return;
   }
   // Pasado el final no hay más filas.
   if (q.siguienteFila(g_fila565)) abort();
