@@ -226,7 +226,15 @@ se sube nada al VPS (ver [local.md](local.md) y [nube.md](nube.md)).
   caras, comportamientos, frases, voces y animaciones son **datos** validados
   por el núcleo, se pueden empaquetar y vender (creadores con reparto, cobro
   por Mercado Pago). La biblioteca de afuera es lo que lo hace posible en los
-  robots con poca memoria. Pendiente de diseño.
+  robots con poca memoria. Pendiente de diseño. Los paquetes del marketplace
+  van **firmados por la nube** y el núcleo solo carga los que verifican.
+- **El robot cerrado** (M8, pedido de Nahuel el 8/11): en los robots que se
+  venden, solo arranca firmware firmado por nosotros (secure boot v2 de la
+  ESP32, con eFuses quemados en fábrica: es irreversible), la flash va cifrada
+  (no se puede leer ni copiar) y el JTAG/USB de depuración queda apagado. Las
+  OTA ya se verifican con firma. La clave de firma vive fuera del servidor de la
+  web, con copia segura: si se pierde, los robots vendidos no se actualizan más.
+  Las placas de desarrollo quedan abiertas.
 
 ### Diferencias con el ejemplo del doc
 
