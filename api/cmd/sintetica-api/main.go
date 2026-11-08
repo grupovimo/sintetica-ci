@@ -194,6 +194,10 @@ func correr(log *slog.Logger) error {
 	if err := n.AlPublicar("charla", integ.CharlaMQTT); err != nil {
 		return fmt.Errorf("charla por MQTT: %w", err)
 	}
+	// Lo que el robot-celu sabe por su cuenta (bicho/{id}/presencia).
+	if err := n.AlPublicar("presencia", integ.PresenciaMQTT); err != nil {
+		return fmt.Errorf("presencia por MQTT: %w", err)
+	}
 	srv = servidor.Nuevo(op, alm, n, integ, hub, c, firmador, log)
 
 	publico := &http.Server{Addr: env("DIRECCION", ":8080"), Handler: srv.Rutas(), ReadHeaderTimeout: 10 * time.Second}

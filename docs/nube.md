@@ -721,6 +721,10 @@ sin ellas, apagado y `GET /v1/musica` → `{"disponible": false}`.
   cada robot publique solo en el suyo. La nube contesta con el `0x40` por su
   `cmd` (con el tope del día: "Por hoy ya charlamos mucho. ¡Mañana más!"). 30
   por hora por robot, 8 a la vez.
+- Lo mismo para la presencia que el robot-celu sabe por su cuenta (el wifi de
+  casa o el Bluetooth del celu del dueño): publica en **`bicho/{id}/presencia`**
+  `{"llegaste": bool}` y la nube solo la anota para los horarios y corre los
+  cuandos (no le reenvía el `0x49`: ya se lo dijo a su núcleo).
 - SSE `charla` (`{texto, expresion, de, enviado}`).
 
 ## MCP: que una IA maneje los robots

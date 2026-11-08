@@ -8,6 +8,7 @@ package integraciones
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"sort"
 	"time"
@@ -55,6 +56,20 @@ func (i *Integraciones) presenciaDelRobot(bicho, tipo string) {
 	if nueva {
 		i.encolar(bicho, tipo, map[string]any{})
 	}
+}
+
+// PresenciaMQTT: el robot-celu supo por su cuenta que llegaste o te fuiste
+// (bicho/{id}/presencia {"llegaste": bool}) y ya se lo dijo a su núcleo: acá
+// solo se anota para los horarios y corren las automatizaciones. Corre en la
+// goroutine del broker, así que lo pesado va aparte.
+func (i *Integraciones) PresenciaMQTT(bicho string, datos []byte) {
+	var p struct {
+		Llegaste *bool `json:"llegaste"`
+	}
+	if len(datos) > 256 || json.Unmarshal(datos, &p) != nil || p.Llegaste == nil {
+		return
+	}
+	go i.presenciaDelRobot(bicho, tipoPresencia(*p.Llegaste))
 }
 
 // anotarDormida: el robot se durmió (de su estado): sirve para "dormís".

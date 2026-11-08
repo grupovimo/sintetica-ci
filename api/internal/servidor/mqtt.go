@@ -45,7 +45,7 @@ func (s *Servidor) AutorizarMQTT(usuario, topico string, publicar bool) bool {
 		return false
 	}
 	if publicar {
-		return resto == "state" || resto == "resp" || resto == "conexion" || resto == "charla"
+		return resto == "state" || resto == "resp" || resto == "conexion" || resto == "charla" || resto == "presencia"
 	}
 	return resto == "cmd"
 }

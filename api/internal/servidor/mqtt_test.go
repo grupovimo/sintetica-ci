@@ -33,6 +33,8 @@ func TestAutorizarMQTT(t *testing.T) {
 		{a, "bicho/" + b + "/charla", true, false},
 		{a, "bicho/+/charla", true, false},
 		{a, "bicho/" + a + "/charla", false, false},
+		{a, "bicho/" + a + "/presencia", true, true}, // v1.9: el robot-celu te vio llegar
+		{a, "bicho/" + b + "/presencia", true, false},
 		{a, "bicho/" + a + "/cmd", true, false}, // no se manda comandos a sí mismo
 		{a, "bicho/" + a + "/otro", true, false},
 		{a, "bicho/" + b + "/state", true, false},
