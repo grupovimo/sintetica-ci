@@ -79,6 +79,10 @@ func (s *Servidor) Rutas() http.Handler {
 
 	m.HandleFunc("POST /v1/sesion/enlace", s.pedirEnlace)
 	m.HandleFunc("POST /v1/sesion/canjear", s.canjear)
+	m.HandleFunc("GET /v1/sesion/metodos", s.metodosSesion)
+	m.HandleFunc("POST /v1/sesion/telegram", s.pedirEntradaTelegram)
+	m.HandleFunc("GET /v1/sesion/telegram/{token}", s.esperarEntradaTelegram)
+	m.HandleFunc("POST /v1/sesion/telegram/{token}/codigo", s.codigoEntradaTelegram)
 	m.HandleFunc("GET /v1/sesion", s.conSesion(s.yo))
 	m.HandleFunc("PATCH /v1/sesion", s.conSesion(s.cambiarNombre))
 	m.HandleFunc("DELETE /v1/sesion", s.conSesion(s.salir))

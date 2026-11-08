@@ -265,6 +265,10 @@ func (i *Integraciones) atenderMensaje(ctx context.Context, m *mensaje) {
 	}
 	resto = strings.TrimSpace(resto)
 
+	if comando == "/start" && strings.HasPrefix(resto, prefijoEntrar) {
+		i.entrarDesdeTelegram(ctx, m, resto[len(prefijoEntrar):])
+		return
+	}
 	if comando == "/start" && strings.HasPrefix(strings.ToLower(resto), "amigo-") {
 		i.responder(ctx, chat, i.aceptarDesdeTelegram(ctx, chat, resto[len("amigo-"):]), nil)
 		return
@@ -489,6 +493,9 @@ func (i *Integraciones) atenderBoton(ctx context.Context, c *callback) {
 	}
 	chat := c.Message.Chat.ID
 	if !i.chats.permitir(fmt.Sprint(chat), 0, 30, time.Minute) {
+		return
+	}
+	if i.botonEntrar(ctx, c) {
 		return
 	}
 	v, err := i.alm.TelegramPorChat(ctx, chat)

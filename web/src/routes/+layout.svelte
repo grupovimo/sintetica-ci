@@ -45,7 +45,7 @@
         {/if}
       </nav>
       <div class="usuario">
-        <span class="etiqueta" title={data.usuario.email}>{data.usuario.nombre || data.usuario.email}</span>
+        <span class="etiqueta" title={data.usuario.email}>{data.usuario.nombre || data.usuario.email || 'Vos'}</span>
         <button class="chico" onclick={salir}>Salir</button>
       </div>
     </div>

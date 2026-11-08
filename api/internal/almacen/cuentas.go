@@ -9,7 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Usuario es una cuenta (se crea sola la primera vez que alguien entra con su email).
+// Usuario es una cuenta (se crea sola la primera vez que alguien entra con su
+// email o con Telegram; las de Telegram no tienen email: Email queda vacío).
 type Usuario struct {
 	ID     string    `json:"id"`
 	Email  string    `json:"email"`
@@ -120,7 +121,7 @@ func (a *Almacen) CrearSesion(ctx context.Context, tokenHash []byte, usuarioID, 
 func (a *Almacen) SesionPorToken(ctx context.Context, tokenHash []byte, duracion time.Duration) (Sesion, error) {
 	var s Sesion
 	var usada time.Time
-	err := a.db.QueryRow(ctx, `select u.id, u.email, u.nombre, u.admin, u.creado, s.cliente, s.vence, s.usada
+	err := a.db.QueryRow(ctx, `select u.id, coalesce(u.email, ''), u.nombre, u.admin, u.creado, s.cliente, s.vence, s.usada
 		from sesiones s join usuarios u on u.id = s.usuario_id
 		where s.token_hash = $1 and s.vence > now()`, tokenHash).
 		Scan(&s.Usuario.ID, &s.Usuario.Email, &s.Usuario.Nombre, &s.Usuario.Admin, &s.Usuario.Creado, &s.Cliente, &s.Vence, &usada)
@@ -155,6 +156,9 @@ func (a *Almacen) Limpiar(ctx context.Context) error {
 		return err
 	}
 	if _, err := a.db.Exec(ctx, `delete from telegram_codigos where vence < now() - interval '1 day'`); err != nil {
+		return err
+	}
+	if _, err := a.db.Exec(ctx, `delete from telegram_entradas where vence < now() - interval '1 day'`); err != nil {
 		return err
 	}
 	_, err := a.db.Exec(ctx, `delete from credenciales where estado = 'pendiente' and vence < now() - interval '1 day'`)

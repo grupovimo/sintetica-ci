@@ -169,8 +169,15 @@ func correr(log *slog.Logger) error {
 		URLInterna:     env("API_URL_INTERNA", "http://api:8080"),
 		FirmarDescarga: func(id int64, bicho string) string { return srv.FirmarDescarga(id, bicho) },
 	}, alm, hub, log)
-	c := &correo.Correo{Servidor: env("SMTP_SERVIDOR", "localhost:1025"), Usuario: os.Getenv("SMTP_USUARIO"),
-		Clave: os.Getenv("SMTP_CLAVE"), De: env("SMTP_DE", "Sintética Labs <hola@sinteticalabs.com>")}
+	// SMTP_SERVIDOR=ninguno (o vacío a propósito): sin mail; se entra con
+	// Telegram. Sin la variable, Mailpit en local.
+	var c *correo.Correo
+	if smtp, hay := os.LookupEnv("SMTP_SERVIDOR"); !hay || (smtp != "" && smtp != "ninguno") {
+		c = &correo.Correo{Servidor: env("SMTP_SERVIDOR", "localhost:1025"), Usuario: os.Getenv("SMTP_USUARIO"),
+			Clave: os.Getenv("SMTP_CLAVE"), De: env("SMTP_DE", "Sintética Labs <hola@sinteticalabs.com>")}
+	} else {
+		log.Info("sin SMTP: no se entra por mail (solo con Telegram)")
+	}
 	// Las integraciones: Telegram (sin TELEGRAM_TOKEN queda apagado),
 	// automatizaciones, webhooks y el clima. Ver docs/nube.md, "Integraciones".
 	integ := integraciones.Nuevo(integraciones.Opciones{

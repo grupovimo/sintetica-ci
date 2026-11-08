@@ -31,12 +31,12 @@
     {#if usuario}
       <div class="cuenta">
         <button class="tecla negra chica" aria-expanded={abierto} onclick={() => (abierto = !abierto)}>
-          <span class="led" class:verde={conexionEnVivo.conectado} title={conexionEnVivo.conectado ? 'En vivo' : 'Reconectando…'}></span><span class="nombre">{usuario.nombre || usuario.email.split('@')[0]}</span>
+          <span class="led" class:verde={conexionEnVivo.conectado} title={conexionEnVivo.conectado ? 'En vivo' : 'Reconectando…'}></span><span class="nombre">{usuario.nombre || usuario.email?.split('@')[0] || 'Vos'}</span>
         </button>
         {#if abierto}
           <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
           <div class="menu chapa" onclick={() => (abierto = false)}>
-            <span class="grabado">{usuario.email}</span>
+            {#if usuario.email}<span class="grabado">{usuario.email}</span>{/if}
             <a href="/robots">Mis robots</a>
             <a href="/caras">Biblioteca de caras</a>
             <a href="/animaciones">Biblioteca de animaciones</a>

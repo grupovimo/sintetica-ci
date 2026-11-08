@@ -19,6 +19,7 @@ package servidor
 // Los tokens son opacos y se guardan hasheados: acceso 1 h, refresco 60 días.
 
 import (
+	"cmp"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -423,7 +424,7 @@ func (s *Servidor) autorizar(w http.ResponseWriter, r *http.Request) {
 	campos.Set("csrf", s.anticsrf(h, p))
 	s.paginaOAuth(w, http.StatusOK, c.Nombre+" quiere manejar tus robots",
 		"Va a poder ver tus robots, cambiarles la cara, la configuración y las imágenes. Lo podés desconectar cuando quieras.",
-		&consentimiento{campos: campos, email: ses.Usuario.Email, destino: destino})
+		&consentimiento{campos: campos, email: cmp.Or(ses.Usuario.Email, ses.Usuario.Nombre), destino: destino})
 }
 
 // POST /oauth/autorizar: Permitir o Cancelar.

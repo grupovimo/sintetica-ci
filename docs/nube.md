@@ -38,6 +38,49 @@ Cómo se conectan los bichos, las apps y la web. Para levantarlo en local, ver
 - Límites: 5 links por email por hora, 20 por IP por hora.
 - La cuenta se crea sola la primera vez. `ADMIN_EMAILS` (emails o `@dominio`)
   marca administradores: pueden subir firmwares.
+- **Sin SMTP** (`SMTP_SERVIDOR=ninguno` o vacío a propósito; sin la variable,
+  Mailpit en local) no se manda mail: `POST /v1/sesion/enlace` responde 503 y
+  la web no ofrece el mail. `GET /v1/sesion/metodos` (público) dice qué hay:
+  `{"email": bool, "telegram": bool, "bot"?: "sinteticalabs_bot"}`.
+
+### Entrar con Telegram
+
+Código: `servidor/sesion_telegram.go` (las rutas), `integraciones/entrar.go`
+(el bot), `almacen/entrar_telegram.go`; migración `015_entrar_telegram.sql`.
+
+1. `POST /v1/sesion/telegram {cliente: "web"|"app"}` → `201 {token, enlace,
+   vence, bot}` (y `secreto` si es la app). `enlace` es
+   `https://t.me/<bot>?start=entrar-<token>`. Un solo uso, 10 minutos; en la
+   base solo los hashes del token y del secreto. A la web, el secreto le
+   queda en la cookie `sintetica_entrada` (`HttpOnly`, 10 min); la app lo
+   guarda y lo manda en `X-Sintetica-Secreto`. **Sin el secreto, el link no
+   sirve**: solo el navegador (o la app) que lo pidió recibe la sesión.
+2. Al tocar Start, el bot toma el pedido para ese chat (otro chat con el mismo
+   link ya no puede). Si el chat ya está vinculado a una cuenta (también una
+   de mail que vinculó Telegram en Integraciones), la aprueba. Si no,
+   pregunta "¿Crear tu cuenta de Sintética?" (botones *Crear mi cuenta* / *No*):
+   la cuenta se crea con el nombre de Telegram, **sin email**, y el chat queda
+   vinculado. Un Telegram ↔ una cuenta. Al aprobar, el bot manda un código
+   de 6 dígitos y un botón *No fui yo* (rechaza el pedido y, si ya abrió la
+   sesión, la cierra). Los mensajes no llevan datos de la cuenta.
+3. `GET /v1/sesion/telegram/{token}?esperar=25` (con la cookie o el
+   encabezado): espera hasta 30 s. Mientras no, `{"estado": "pendiente" |
+   "confirmar", vence}` (`confirmar`: tocó Start y falta *Crear mi cuenta*).
+   Cuando sí, abre la sesión igual que `POST /v1/sesion/canjear` (web: la
+   cookie de siempre; app: `{usuario, token}`) y el pedido queda usado. 410 =
+   venció, ya se usó, se rechazó o el secreto no es.
+4. O `POST /v1/sesion/telegram/{token}/codigo {codigo}` (con el mismo
+   secreto): el código del bot ("123 456" o "123456"). 5 intentos por pedido.
+- Topes: 20 pedidos por IP por hora; 10 entradas por Telegram por hora; los
+  códigos, con el de `canjear` (30 por IP cada 10 min); las esperas, 600 por
+  IP cada 10 min.
+
+**Para las apps (iOS y Android, todavía no):** pedir con `cliente: "app"`,
+guardar `token` y `secreto`, abrir `enlace` (abre Telegram), y hacer el GET
+de arriba en un bucle (con `X-Sintetica-Secreto`) hasta que vuelva el
+`token` de la sesión (180 días, `Authorization: Bearer`). Si vuelve 410,
+empezar de nuevo. Mostrar también un campo para el código de 6 dígitos.
+Consultar `GET /v1/sesion/metodos` para no ofrecer el mail donde no hay SMTP.
 
 ## Sumar un bicho a una cuenta
 
@@ -1123,7 +1166,7 @@ SVG) y el prompt `inventar_cara`.
 | `MQTT_URL_INTERNA` | la que se le da al bicho virtual | `mqtt://api:1883` |
 | `API_URL_PUBLICA`, `API_URL_INTERNA` | de dónde bajan las OTA (placa y virtual); la pública es también el issuer de OAuth y la base del MCP (`/mcp`) | `http://IP_LOCAL:8080`, `http://api:8080` |
 | `WEB_URL` | para los links de los mails | `http://localhost:5173` |
-| `SMTP_SERVIDOR`, `SMTP_USUARIO`, `SMTP_CLAVE`, `SMTP_DE` | el correo | Mailpit, sin usuario |
+| `SMTP_SERVIDOR`, `SMTP_USUARIO`, `SMTP_CLAVE`, `SMTP_DE` | el correo (`SMTP_SERVIDOR=ninguno`: sin mail, se entra con Telegram) | Mailpit, sin usuario |
 | `CLAVE_FIRMA` | la clave privada de las OTA | `/claves/ota-privada.pem` |
 | `SECRETO` | firma los links de descarga (OTA y paquete de voz) y de él sale la clave con la que se cifran el calendario, Spotify, ElevenLabs y la clave de IA propia | uno local |
 | `ADMIN_EMAILS` | quién sube firmwares | vacío |

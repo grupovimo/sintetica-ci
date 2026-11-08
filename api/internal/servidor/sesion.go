@@ -71,7 +71,7 @@ func (s *Servidor) conSesion(h http.HandlerFunc) http.HandlerFunc {
 			token, porCookie = c.Value, true
 		}
 		if token == "" {
-			fallar(w, http.StatusUnauthorized, "tenés que entrar con tu email")
+			fallar(w, http.StatusUnauthorized, "tenés que entrar")
 			return
 		}
 		if porCookie && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Header.Get("X-Sintetica") == "" {
@@ -115,6 +115,10 @@ func (s *Servidor) pedirEnlace(w http.ResponseWriter, r *http.Request) {
 		Volver  string `json:"volver"` // a dónde ir después de entrar en la web (una ruta)
 	}
 	if !leerJSON(w, r, 4096, &p) {
+		return
+	}
+	if s.correo == nil {
+		fallar(w, http.StatusServiceUnavailable, "acá no se entra por mail: entrá con Telegram")
 		return
 	}
 	dir, err := mail.ParseAddress(strings.TrimSpace(p.Email))
@@ -228,31 +232,34 @@ func (s *Servidor) canjear(w http.ResponseWriter, r *http.Request) {
 		s.interno(w, err)
 		return
 	}
+	s.abrirSesion(w, r, u, cliente, p.Descripcion)
+}
+
+// abrirSesion crea la sesión de `u`: a la web le deja la cookie; a la app le
+// devuelve el token. Devuelve el hash del token (nil si falló: ya respondió).
+func (s *Servidor) abrirSesion(w http.ResponseWriter, r *http.Request, u almacen.Usuario, cliente, desc string) []byte {
 	token := aleatorio(32)
 	dur := duracionWeb
 	if cliente == "app" {
 		dur = duracionApp
 	}
-	desc := p.Descripcion
+	if desc == "" {
+		desc = r.UserAgent()
+	}
 	if len(desc) > 80 {
 		desc = desc[:80]
 	}
-	if desc == "" {
-		desc = r.UserAgent()
-		if len(desc) > 80 {
-			desc = desc[:80]
-		}
-	}
 	if err := s.alm.CrearSesion(r.Context(), hash(token), u.ID, cliente, desc, time.Now().Add(dur)); err != nil {
 		s.interno(w, err)
-		return
+		return nil
 	}
 	if cliente == "web" {
 		http.SetCookie(w, s.cookie(token, int(dur.Seconds())))
 		responder(w, http.StatusOK, map[string]any{"usuario": u})
-		return
+		return hash(token)
 	}
 	responder(w, http.StatusOK, map[string]any{"usuario": u, "token": token})
+	return hash(token)
 }
 
 // esAdmin: el email está en ADMIN_EMAILS (o su dominio, escrito "@dominio").
