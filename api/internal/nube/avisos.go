@@ -11,8 +11,9 @@ import (
 //     a < 15 %), "expresion" (cambió la cara visible), "duerme", "despierta".
 //   - De la conexión: "conectado", "desconectado".
 //   - De los avisos que el bicho manda solo (un 0x9E sin que nadie lo pida):
-//     "recordatorio" (con el índice en la config), "pomodoro" y "despertador"
-//     (al empezar a sonar la alarma, v1.6).
+//     "recordatorio" (con el índice en la config), "pomodoro", "despertador"
+//     (al empezar a sonar la alarma, v1.6), "juego" (terminó una partida:
+//     registro tipo 5) y "animo" (respondió el "¿Cómo estás?": tipo 6), v1.7.
 //   - Del registro del motor de vida (comando 0x1E, que la API le pide cada
 //     10 s solo a los bichos con automatizaciones que lo necesitan): los
 //     eventos de EventosRegistro y "hito".
@@ -27,16 +28,21 @@ var EventosRegistro = map[string]string{
 	"sacudida-fuerte": "sacudida-fuerte", "boca-abajo": "boca-abajo", "inclinado": "inclinado", "caida": "caida",
 	"voz": "voz", "nombre": "nombre", "ruido": "ruido", "musica": "musica",
 	"enchufado": "cargando", "desenchufado": "desenchufado", "cargado": "cargado", "volvio": "volvio",
-	"pomodoro": "pomodoro", "despertador": "despertador",
+	"pomodoro": "pomodoro", "despertador": "despertador", "bicho-cerca": "bicho-cerca",
 }
 
 // avisaSolo: los eventos que el bicho avisa solo (no hace falta pedirle el registro).
 func avisaSolo(evento string) bool {
-	return evento == "recordatorio" || evento == "pomodoro" || evento == "despertador"
+	switch evento {
+	case "recordatorio", "pomodoro", "despertador", "juego", "animo":
+		return true
+	}
+	return false
 }
 
 // CuandoDelRegistro dice si ese "cuando" sale del registro (hay que pedírselo
-// al bicho). "recordatorio", "pomodoro" y "despertador" no: el bicho los avisa solo.
+// al bicho). "recordatorio", "pomodoro", "despertador", "juego" y "animo" no:
+// el bicho los avisa solo.
 func CuandoDelRegistro(cuando string) bool {
 	if cuando == "hito" {
 		return true
@@ -93,7 +99,7 @@ func (l *lectorRegistro) reiniciar() { *l = lectorRegistro{} }
 // esAviso: solo trae entradas que el bicho avisa solo.
 func esAviso(r []protocolo.EntradaRegistro) bool {
 	for _, e := range r {
-		if e.Tipo == protocolo.RegistroRecordatorio {
+		if e.Tipo == protocolo.RegistroRecordatorio || e.Tipo == protocolo.RegistroJuego || e.Tipo == protocolo.RegistroAnimo {
 			continue
 		}
 		if e.Tipo == protocolo.RegistroEvento && int(e.Dato) < len(protocolo.Eventos) {
@@ -178,6 +184,14 @@ func traducirRegistro(e protocolo.EntradaRegistro) (eventoRegistro, bool) {
 		return eventoRegistro{"hito", map[string]any{}}, true
 	case protocolo.RegistroRecordatorio:
 		return eventoRegistro{"recordatorio", map[string]any{"indice": int(e.Dato)}}, true
+	case protocolo.RegistroJuego:
+		j, r := protocolo.LeerJuego(e.Dato)
+		return eventoRegistro{"juego", map[string]any{"juego": j, "resultado": r}}, true
+	case protocolo.RegistroAnimo:
+		if int(e.Dato) >= len(protocolo.Animos) {
+			return eventoRegistro{}, false
+		}
+		return eventoRegistro{"animo", map[string]any{"valor": protocolo.Animos[e.Dato]}}, true
 	}
 	return eventoRegistro{}, false
 }

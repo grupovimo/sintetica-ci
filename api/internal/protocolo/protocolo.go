@@ -110,6 +110,8 @@ var Eventos = []string{
 	"desenchufado", "cargado", "sin-wifi", "cambio-de-cara", "bicho-cerca", "volvio", "hito",
 	"recordatorio", "pomodoro", // los genera el sistema (y los avisa solo: ver docs/protocolo-ble.md)
 	"despertador", // v1.6: empezó a sonar la alarma (también lo avisa solo)
+	"juego",       // v1.7: terminó una partida (lo avisa solo, con una entrada de tipo 5)
+	"animo",       // v1.7: respondió el "¿Cómo estás?" (lo avisa solo, con una entrada de tipo 6)
 }
 
 // VariablesEstado y Rasgos: el estado interno y la personalidad, en el orden del protocolo.
@@ -194,6 +196,20 @@ type Memoria struct {
 	EpochEstado       uint32             `json:"epochEstado"`
 	AusenciaMaxima    uint16             `json:"ausenciaMaxima"`
 	AfectoHoy         uint8              `json:"afectoHoy"`
+	// v1.7 (desde el byte 93; en una memoria vieja son ceros). Lo "de hoy"
+	// vale si DiaContadores es hoy (ver AlDia).
+	JuegosGanados uint16   `json:"juegosGanados"`
+	JuegosJugados uint16   `json:"juegosJugados"`
+	MejorReflejo  uint16   `json:"mejorReflejo"` // ms (0 = nunca)
+	JuegosHoy     uint8    `json:"juegosHoy"`
+	SuenosHoy     uint8    `json:"suenosHoy"`
+	SonoConHoy    []string `json:"sonoConHoy"` // de Suenos
+	AnimoHoy      uint8    `json:"animoHoy"`   // 0 sin respuesta, 1 bien, 2 más o menos, 3 mal
+	EsperoHoy     *int     `json:"esperoHoy"`  // a qué hora te esperó hoy (null = no)
+	DiaContadores uint8    `json:"diaContadores"`
+	AnioFechas    uint8    `json:"anioFechas"` // año % 256
+	Fechas        []string `json:"fechas"`     // las festejadas este año (de Fechas)
+	AguaHoy       uint8    `json:"aguaHoy"`    // vasos de agua recordados hoy
 }
 
 // Los gustos y los hitos, en el orden del núcleo (motor_vida.cpp).
@@ -235,6 +251,7 @@ func LeerMemoria(m []byte) (*Memoria, error) {
 	for k, n := range VariablesEstado {
 		r.Estado[n] = float64(m[79+k]) / 255
 	}
+	leerMemoriaNueva(m, r)
 	return r, nil
 }
 
@@ -711,6 +728,7 @@ const (
 	RegistroDormir         = 2 // dato 1 = se durmió, 0 = se despertó
 	RegistroHito           = 3
 	RegistroRecordatorio   = 4 // el bicho mostró un recordatorio (dato: su índice en la config)
+	// 5 (juego) y 6 (ánimo), de la v1.7: en cuidado.go.
 )
 
 // EntradaRegistro es una entrada del registro del motor de vida.
