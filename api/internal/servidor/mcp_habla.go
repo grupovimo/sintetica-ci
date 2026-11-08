@@ -63,7 +63,7 @@ func (s *Servidor) sumarHerramientasHabla(srv *mcp.Server) {
 
 	herramienta(s, srv, "rutinas", "Rutinas",
 		"Cosas que el robot hace todos los días a una hora (las automatizaciones con cuando: hora): decir algo (con plantillas como {clima} o {dueno}), "+
-			"poner una cara, cambiar de modo, despertarlo, mandar un Telegram… listar, crear (hora, dias, hacer) o borrar (id).",
+			"poner una cara, cambiar de modo, despertarlo, invitarte a jugar, mandar un Telegram… listar, crear (hora, dias, hacer) o borrar (id).",
 		esquemaRutinas(), borra, s.hRutinas)
 
 	herramienta(s, srv, "habla", "Cómo habla",
@@ -301,6 +301,7 @@ func esquemaRutinas() *jsonschema.Schema {
 	   "texto":{"type":"string","maxLength":1000,"description":"decir (hasta 200; el robot muestra 60 bytes) y telegram. Plantillas: {robot} {dueno} {hora} {clima} {temp} {max} {min} {ciudad}."},
 	   "expresion":{"type":"string","description":"cara: la que pone; decir: opcional; robot: la que le pone al otro."},
 	   "modo":{"enum":` + jsonDe(protocolo.Modos) + `},
+	   "juego":{"enum":` + jsonDe(protocolo.Juegos) + `,"description":"jugar: a qué lo invita."},
 	   "url":{"type":"string","maxLength":500,"description":"webhook: https://… (POST firmado)."},
 	   "bicho":{"type":"string","description":"robot: el id de otro robot de la cuenta."}}}}}}`)
 }

@@ -8,7 +8,7 @@
   import { usarBicho } from '$lib/bicho.svelte';
   import { escuchar } from '$lib/eventos.svelte';
   import type { Bicho } from '$lib/tipos';
-  import { cortarBytes, MAX_TEXTO } from '$lib/formato';
+  import { cortarBytes, JUEGOS, MAX_TEXTO } from '$lib/formato';
   import type { Modelo } from '../modelo';
 
   let { modelo: _ }: { modelo: Modelo } = $props();
@@ -21,7 +21,8 @@
     | { tipo: 'decir'; texto: string; expresion?: string }
     | { tipo: 'cara'; expresion: string }
     | { tipo: 'modo'; modo: string }
-    | { tipo: 'despertar' };
+    | { tipo: 'despertar' }
+    | { tipo: 'jugar'; juego: string };
   // cuando "hora": a esa hora (HH:MM) los días que diga (L M X J V S D; vacío = todos).
   type Automatizacion = { id: string; activa: boolean; cuando: string; valor?: string; hora?: string; dias?: string; hacer: Accion[] };
   type Ejecucion = { automatizacion: string; evento: string; accion: string; ok: boolean; detalle?: string; en: string };
@@ -40,7 +41,7 @@
   let cuandos = $state<string[]>(['recordatorio', 'bateria-baja', 'desconectado', 'conectado', 'despierta', 'duerme', 'expresion']);
   const CUANDO = $derived([...new Set(['hora', 'despertador', ...cuandos])].map((k) => [k, NOMBRES_CUANDO[k] ?? k] as [string, string]));
   const ACCIONES: [Accion['tipo'], string][] = [
-    ['decir', 'Decir'], ['cara', 'Cara'], ['modo', 'Modo'], ['despertar', 'Despertar'], ['telegram', 'Telegram'], ['webhook', 'URL'], ['robot', 'Otro robot'],
+    ['decir', 'Decir'], ['cara', 'Cara'], ['modo', 'Modo'], ['despertar', 'Despertar'], ['jugar', 'Jugar'], ['telegram', 'Telegram'], ['webhook', 'URL'], ['robot', 'Otro robot'],
   ];
   const MODOS_ACCION: [string, string][] = [['mascota', 'Compañía'], ['reloj', 'Reloj'], ['pomodoro', 'Pomodoro'], ['clima', 'Clima']];
   const DIAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -172,6 +173,7 @@
     if (tipo === 'cara') return { tipo, expresion: 'contento' };
     if (tipo === 'modo') return { tipo, modo: 'reloj' };
     if (tipo === 'despertar') return { tipo };
+    if (tipo === 'jugar') return { tipo, juego: 'dado' };
     return { tipo, bicho: otros[0]?.id ?? '', expresion: 'contento' };
   }
   async function probar(i: number) {
@@ -310,6 +312,11 @@
                   </select></label>
               {:else if h.tipo === 'despertar'}
                 <div class="visor"><span class="grabado">Lo despierta</span><b class="fijo">¡Buen día!</b></div>
+              {:else if h.tipo === 'jugar'}
+                <label class="visor"><span class="grabado">Te invita a</span>
+                  <select class="campo claro" value={h.juego} onchange={(e) => { h.juego = e.currentTarget.value; guardar(); }}>
+                    {#each JUEGOS as [k, t]}<option value={k}>{t}</option>{/each}
+                  </select></label>
               {:else}
                 <div class="visor"><span class="grabado">Otro robot pone una cara</span>
                   <div class="dos">

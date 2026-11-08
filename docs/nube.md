@@ -305,7 +305,9 @@ contado, los juegos y el saludo entre robots).
   `automatizacion`, migración `008`) y se sincroniza como siempre.
 - **`despertar`** `{"tipo":"despertar"}`: el marco `0x42` acción 3 (lo
   despierta con un "¡Buen día!", sin alarma).
-- `decir`, `cara` y `despertar` necesitan que el robot esté conectado (si no,
+- **`jugar`** `{"tipo":"jugar","juego":"dado"}` (`ppt`, `reflejos`, `mirada`,
+  `dado`, `moneda`): el marco `0x43`, lo invita a jugar.
+- `decir`, `cara`, `despertar` y `jugar` necesitan que el robot esté conectado (si no,
   la acción queda en el historial con `ok: false`).
 - **`webhook`**: `POST` JSON `{"evento","robot":{"id","nombre"},"datos":{…},"en":"ISO"}`
   con `X-Sintetica-Firma: sha256=<HMAC-SHA256 del cuerpo en hex>` (y

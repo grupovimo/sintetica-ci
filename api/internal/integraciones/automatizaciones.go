@@ -31,16 +31,17 @@ type Automatizacion struct {
 
 // Accion es una de las cosas que hace una automatización.
 type Accion struct {
-	Tipo      string `json:"tipo"`                // "telegram", "webhook", "robot", "decir", "cara", "modo" o "despertar"
+	Tipo      string `json:"tipo"`                // "telegram", "webhook", "robot", "decir", "cara", "modo", "despertar" o "jugar"
 	Texto     string `json:"texto,omitempty"`     // telegram y decir (con plantillas)
 	URL       string `json:"url,omitempty"`       // webhook
 	Bicho     string `json:"bicho,omitempty"`     // robot: otro bicho del mismo dueño
 	Expresion string `json:"expresion,omitempty"` // robot y cara: la cara que pone; decir: opcional
 	Modo      string `json:"modo,omitempty"`      // modo: mascota, reloj, pomodoro, clima o notificaciones
+	Juego     string `json:"juego,omitempty"`     // jugar: ppt, reflejos, mirada, dado o moneda
 }
 
 // TiposDeAccion: los "tipo" de una acción.
-var TiposDeAccion = []string{"telegram", "webhook", "robot", "decir", "cara", "modo", "despertar"}
+var TiposDeAccion = []string{"telegram", "webhook", "robot", "decir", "cara", "modo", "despertar", "jugar"}
 
 // Resultado de una acción.
 type Resultado struct {
@@ -162,6 +163,9 @@ func Validar(l []Automatizacion, esMio func(id string) bool, w *ClienteWebhook) 
 		}
 		for j, h := range a.Hacer {
 			donde := fmt.Sprintf("%s, acción %d", donde, j+1)
+			if h.Juego != "" && h.Tipo != "jugar" {
+				return invalida("%s: \"juego\" es solo para \"jugar\"", donde)
+			}
 			switch h.Tipo {
 			case "telegram":
 				if strings.TrimSpace(h.Texto) == "" || len(h.Texto) > MaxTexto || !utf8.ValidString(h.Texto) {
@@ -215,6 +219,13 @@ func Validar(l []Automatizacion, esMio func(id string) bool, w *ClienteWebhook) 
 			case "despertar":
 				if h.Texto != "" || h.URL != "" || h.Bicho != "" || h.Expresion != "" || h.Modo != "" {
 					return invalida("%s: despertar no lleva nada más", donde)
+				}
+			case "jugar":
+				if h.Texto != "" || h.URL != "" || h.Bicho != "" || h.Expresion != "" || h.Modo != "" {
+					return invalida("%s: jugar lleva solo \"juego\"", donde)
+				}
+				if j, ok := protocolo.NombreJuego(h.Juego); !ok || j == "terminar" {
+					return invalida("%s: el juego es %s", donde, strings.Join(protocolo.Juegos, ", "))
 				}
 			default:
 				return invalida("%s: el tipo es %s", donde, strings.Join(TiposDeAccion, ", "))
@@ -285,6 +296,11 @@ func (i *Integraciones) correr(ctx context.Context, usuario, bicho string, a Aut
 		case "despertar":
 			m, _ := protocolo.Alarma("despertar")
 			err = i.mandarAlBicho(bicho, m)
+		case "jugar":
+			var m []byte
+			if m, err = protocolo.Jugar(h.Juego); err == nil {
+				err = i.mandarAlBicho(bicho, m)
+			}
 		default:
 			err = errors.New("tipo desconocido")
 		}

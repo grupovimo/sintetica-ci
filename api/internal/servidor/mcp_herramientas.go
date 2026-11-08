@@ -143,7 +143,7 @@ func (s *Servidor) sumarHerramientas(srv *mcp.Server) {
 		 "indice":{"type":"integer","minimum":0,"maximum":23,"description":"Para borrar: la posición (la de listar)."}}}`), borra, s.hReflejos)
 
 	herramienta(s, srv, "automatizaciones", "Automatizaciones",
-		"\"Cuando pasa X en el robot → hacer Y\" (mandar un Telegram, llamar un webhook, poner una cara en otro robot propio, o en este: decir algo, poner una cara, cambiar de modo, despertarlo). "+
+		"\"Cuando pasa X en el robot → hacer Y\" (mandar un Telegram, llamar un webhook, poner una cara en otro robot propio, o en este: decir algo, poner una cara, cambiar de modo, despertarlo, invitarte a jugar). "+
 			"cuando: hora (con hora y dias) es una rutina diaria (más cómodo con la herramienta rutinas). listar devuelve las que hay, el historial y los \"cuando\" posibles; guardar reemplaza la lista entera (hasta 20); probar corre una ya.",
 		esquemaAutomatizaciones(), borra, s.hAutomatizaciones)
 
@@ -1134,7 +1134,8 @@ func esquemaAutomatizaciones() *jsonschema.Schema {
 	       "url":{"type":"string","maxLength":500,"description":"webhook: https://… (POST firmado)."},
 	       "bicho":{"type":"string","description":"robot: el id de otro robot de la cuenta."},
 	       "expresion":{"type":"string","description":"robot: la cara que le pone al otro; cara: la que pone este; decir: opcional."},
-	       "modo":{"enum":` + jsonDe(protocolo.Modos) + `,"description":"modo: el que pone (se guarda en la config)."}}}}}}},
+	       "modo":{"enum":` + jsonDe(protocolo.Modos) + `,"description":"modo: el que pone (se guarda en la config)."},
+	       "juego":{"enum":` + jsonDe(protocolo.Juegos) + `,"description":"jugar: a qué lo invita."}}}}}}},
 	 "n":{"type":"string","description":"Para probar: la posición (desde 0) o el id."}}}`)
 }
 

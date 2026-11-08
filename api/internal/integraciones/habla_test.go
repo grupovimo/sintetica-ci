@@ -30,7 +30,7 @@ func TestValidarRutinasYAccionesNuevas(t *testing.T) {
 			{Tipo: "modo", Modo: "reloj"},
 			{Tipo: "despertar"},
 		}},
-		{ID: "r2", Activa: true, Cuando: "hora", Hora: "23:59", Hacer: []Accion{{Tipo: "modo", Modo: "clima"}}},
+		{ID: "r2", Activa: true, Cuando: "hora", Hora: "23:59", Hacer: []Accion{{Tipo: "modo", Modo: "clima"}, {Tipo: "jugar", Juego: "dado"}, {Tipo: "jugar", Juego: "piedra papel tijera"}}},
 		{ID: "d1", Activa: true, Cuando: "despertador", Hacer: []Accion{{Tipo: "telegram", Texto: "sonó"}}},
 	}
 	if err := Validar(buenas, mio, w); err != nil {
@@ -53,6 +53,11 @@ func TestValidarRutinasYAccionesNuevas(t *testing.T) {
 		"modo raro":          una(hora(Accion{Tipo: "modo", Modo: "fiesta"})),
 		"despertar con algo": una(hora(Accion{Tipo: "despertar", Texto: "x"})),
 		"telegram con modo":  una(hora(Accion{Tipo: "telegram", Texto: "x", Modo: "reloj"})),
+		"jugar sin juego":    una(hora(Accion{Tipo: "jugar"})),
+		"jugar raro":         una(hora(Accion{Tipo: "jugar", Juego: "ajedrez"})),
+		"jugar terminar":     una(hora(Accion{Tipo: "jugar", Juego: "fin"})),
+		"jugar con texto":    una(hora(Accion{Tipo: "jugar", Juego: "dado", Texto: "x"})),
+		"juego en otro":      una(hora(Accion{Tipo: "despertar", Juego: "dado"})),
 	}
 	for nombre, l := range malas {
 		var inv ErrInvalida
@@ -174,11 +179,12 @@ func TestClimaYAccionesEnElRobot(t *testing.T) {
 		{Tipo: "cara", Expresion: "sorpresa"},
 		{Tipo: "modo", Modo: "reloj"},
 		{Tipo: "despertar"},
+		{Tipo: "jugar", Juego: "moneda"},
 	}}}); err != nil {
 		t.Fatal(err)
 	}
 	res, err := i.Probar(ctx, u.ID, id, "r1")
-	if err != nil || len(res) != 4 {
+	if err != nil || len(res) != 5 {
 		t.Fatalf("probar: %v %v", res, err)
 	}
 	for _, r := range res {
@@ -189,7 +195,8 @@ func TestClimaYAccionesEnElRobot(t *testing.T) {
 	dicho := protocolo.CortarUTF8("Buen día, Ana: 18° y nublado en Córdoba (máx. 22°). "+strings.Repeat("ñ", 40), 60)
 	m1, _ := protocolo.Decir(dicho, "contento")
 	m4, _ := protocolo.Alarma("despertar")
-	want := []string{fmt.Sprintf("%s 2 %x", id, m1), fmt.Sprintf("%s 2 %x", id, protocolo.Expresion("sorpresa")), fmt.Sprintf("%s 2 %x", id, m4)}
+	m5, _ := protocolo.Jugar("moneda")
+	want := []string{fmt.Sprintf("%s 2 %x", id, m1), fmt.Sprintf("%s 2 %x", id, protocolo.Expresion("sorpresa")), fmt.Sprintf("%s 2 %x", id, m4), fmt.Sprintf("%s 2 %x", id, m5)}
 	if l := robots.vaciar(); strings.Join(l, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("al robot:\n%s\nesperaba:\n%s", strings.Join(l, "\n"), strings.Join(want, "\n"))
 	}
