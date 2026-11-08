@@ -10,6 +10,7 @@ import com.sinteticalabs.app.consola.numero
 import com.sinteticalabs.app.consola.obj
 import com.sinteticalabs.app.consola.si
 import com.sinteticalabs.app.consola.texto
+import com.sinteticalabs.app.consola.textos
 import com.sinteticalabs.app.protocolo.EspacioImagen
 import com.sinteticalabs.app.protocolo.Estado
 import com.sinteticalabs.app.protocolo.MODOS
