@@ -178,6 +178,43 @@ se sube nada al VPS (ver [local.md](local.md) y [nube.md](nube.md)).
 - RAM: en la 1.47B el `Sistema` va en la PSRAM; en el broche se compactaron los
   datos. Las referencias a "16 caras" del manual siguen valiendo para los dibujos.
 
+### Decisiones de la etapa 6 (consola, utilidad e integraciones, 8/11/2026)
+
+- **Producto**: los productos se llaman **Unidad** y **Broche** (más la joyería:
+  hebilla, colgante, translúcido, alfiler, hebilla de pelo). "Bicho" queda solo
+  en el código; en todo lo que ve la gente es "robot".
+- **La consola**: el panel de cada robot es una consola de hardware (teclas
+  mecánicas, LEDs, visores, placa naranja). Arriba, la foto real del producto
+  con la cara en vivo encastrada; abajo, diez módulos que **guardan solos**
+  (600 ms, validados con el núcleo). Lo avanzado vive en el **Laboratorio**.
+  La primera vez, un **encendido** de cuatro pasos. Las tres apps (web, iOS,
+  Android) se ven y se comportan igual; la web es la referencia.
+- **Poco texto**: rótulos de una o dos palabras, íconos y el efecto visible en
+  vivo en vez de explicaciones; renglones de ~40 caracteres como mucho.
+- **Útil, no solo mascota**: recordatorios (en el robot, con aviso a la nube),
+  modo reloj y pomodoro, protector de pantalla (una imagen, GIF o video corto
+  que se va con cualquier interacción), voz en la config para los modelos con
+  micrófono y parlante. En curso: globo de texto ("decir"), frases propias,
+  cumpleaños, despertador, clima y rutinas por hora.
+- **Integraciones en la nube**: un bot oficial de Telegram (cada usuario se
+  vincula con un link), automatizaciones "cuando pasa X → Telegram / webhook
+  firmado / otro robot" y un **servidor MCP con OAuth** (`/mcp`) para que cada
+  uno conecte su Claude o su ChatGPT y la IA maneje sus robots (inventar caras
+  que valida el núcleo y que vuelven como PNG, imágenes por URL, recordatorios,
+  personalidad, reglas…). En curso: **caras de imagen** (sprites que dibuja la
+  IA y el motor anima).
+- **Tiempo real**: todo lo que cambia en la nube sale por SSE (`/v1/eventos`):
+  estado, config, imágenes, automatizaciones, Telegram, MCP y los avisos del
+  robot (0x9E). Las apps escuchan el mismo canal.
+- **Robustez**: fuzzing con libFuzzer de config, protocolo, QOI y dibujo de
+  expresiones (`firmware/fuzz/`, 60 s por blanco en CI).
+- **Dónde se compila**: la web con Vite en la Mac; iOS solo en GitHub Actions
+  del repo público `grupovimo/sintetica-ios` (publica lo commiteado) y de ahí a
+  TestFlight; Android y firmware en el CI de este repo.
+- **Producción**: por ahora solo la landing en `sintetica.grupovimo.com.ar`
+  (modo `SOLO_LANDING=1`, reservas por Telegram). La nube completa espera el
+  token de GHCR y el dominio propio.
+
 ### Diferencias con el ejemplo del doc
 
 - Las formas de una expresión van en `"formas"` (el ejemplo decía `"ojos"`),
