@@ -219,7 +219,10 @@ func TestEntreRobots(t *testing.T) {
 	}
 	i.saludarEntreRobots(id)
 	i.saludarEntreRobots(otro) // el otro también lo vio: no se repite
-	hola := func(n string) string { m, _ := protocolo.Decir("¡Hola, "+n+"!", "contento"); return fmt.Sprintf("%x", m) }
+	hola := func(n string) string {
+		m, _ := protocolo.Decir("¡Hola, "+n+"!", "contento")
+		return fmt.Sprintf("%x", m)
+	}
 	saludar := fmt.Sprintf("%x", protocolo.Comportamiento("saludar"))
 	want := []string{id + " 2 " + saludar, id + " 2 " + hola("Pepa"), otro + " 2 " + saludar, otro + " 2 " + hola("Pipo")}
 	if l := robots.vaciar(); strings.Join(l, "\n") != strings.Join(want, "\n") {

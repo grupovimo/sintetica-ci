@@ -117,6 +117,9 @@ func (s *Servidor) Rutas() http.Handler {
 	m.HandleFunc("POST /v1/bichos/{id}/alarma", s.conBicho(s.alarma))
 	m.HandleFunc("GET /v1/bichos/{id}/clima", s.conBicho(s.climaDelBicho))
 	m.HandleFunc("GET /v1/clima/buscar", s.conSesion(s.buscarLugar))
+	m.HandleFunc("POST /v1/bichos/{id}/jugar", s.conBicho(s.jugar))          // v1.7 (cuidado.go)
+	m.HandleFunc("POST /v1/bichos/{id}/aviso", s.conBicho(s.aviso))          // v1.7
+	m.HandleFunc("GET /v1/bichos/{id}/resumen", s.conBicho(s.resumenDelDia)) // v1.7
 
 	m.HandleFunc("GET /v1/telegram", s.conSesion(s.verTelegram))
 	m.HandleFunc("POST /v1/telegram/vincular", s.conSesion(s.vincularTelegram))

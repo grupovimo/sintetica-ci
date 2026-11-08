@@ -4,8 +4,10 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"sintetica/api/internal/almacen"
+	"sintetica/api/internal/nube"
 	"sintetica/api/internal/protocolo"
 )
 
@@ -24,7 +26,9 @@ func (s *Servidor) verMemoria(w http.ResponseWriter, r *http.Request) {
 	}
 	var dec *protocolo.Memoria
 	if m.Datos != nil {
-		dec, _ = protocolo.LeerMemoria(m.Datos)
+		if dec, _ = protocolo.LeerMemoria(m.Datos); dec != nil {
+			dec.AlDia(time.Now().In(nube.Zona())) // lo "de hoy" de otro día vale 0
+		}
 	}
 	responder(w, http.StatusOK, map[string]any{
 		"memoria": dec, "actualizada": m.Actualizada, "mudanzaPendiente": m.Deseada != nil, "mudanzaDesde": m.DeseadaDesde,

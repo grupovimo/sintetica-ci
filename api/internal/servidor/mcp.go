@@ -137,6 +137,7 @@ const instruccionesMCP = `Manejás los robots de Sintética del usuario: bichos 
 - Si la cara no sale con parámetros (ojitos de anime, de gato, pixel art, cualquier dibujo), dibujala con dibujar_cara: cada parte en SVG; sigue viva (parpadea, mira, reacciona). Con reposo: true queda como su cara de siempre.
 - Los cambios de config (expresiones, recordatorios, personalidad, horario, modo, reflejos) se guardan y le llegan al robot apenas está conectado. Poner caras y disparar eventos necesita que esté conectado.
 - Para que el robot diga algo ya: decir (hasta 60 bytes). Para que lo haga todos los días a una hora (decir el clima, despertar, cambiar de modo): rutinas. El despertador, el clima (su ubicación) y cuánto habla solo (habla) se guardan en su config.
+- El robot acompaña el día: cuidado (que te recuerde tomar agua, la pausa activa en horario de trabajo, el «¿Cómo estás?», el «te extraño» y el resumen del día por Telegram), avisos (cómo reacciona a una notificación o llamada de tal app o tal contacto), jugar (ppt, reflejos, mirada, dado, moneda) y resumen (cómo fue su día: juegos, sueños, a qué hora te esperó).
 - Hablale al usuario en español rioplatense.`
 
 // registroLlamada: lo que una herramienta anota mientras corre (qué bicho

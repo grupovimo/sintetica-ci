@@ -23,7 +23,10 @@ import (
 // SituacionesHabla: dónde puede hablar solo el robot (habla.propias).
 var SituacionesHabla = []string{"despertar", "buenas-noches", "volviste", "te-extrane", "aburrido", "sueno", "bateria-baja",
 	"cargando", "caricia", "saludo", "hito", "cumple-dueno", "cumple-robot", "recordatorio-hecho", "despertador", "posponer",
-	"clima-frio", "clima-calor", "clima-lluvia", "clima-lindo"}
+	"clima-frio", "clima-calor", "clima-lluvia", "clima-lindo",
+	// v1.7
+	"buen-dia", "comiste", "a-dormir", "tardaste", "agua", "pausa", "como-estas", "animo-bien", "animo-medio", "animo-mal",
+	"jugar", "gane", "perdi", "empate", "anio-nuevo", "navidad", "dia-del-amigo", "dia-del-nino", "aniversario"}
 
 // MaxFrasesPropias: las frases propias, en total.
 const MaxFrasesPropias = 12
