@@ -71,7 +71,11 @@ fun Modifier.colocar(r: Rect) = this.layout { m, c ->
     layout(c.maxWidth, c.maxHeight) { p.place(r.x.roundToInt(), r.y.roundToInt()) }
 }
 
-private fun fotoDe(nombre: String) = if (nombre == "pieza_colgante") R.drawable.pieza_colgante else R.drawable.hebilla
+private fun fotoDe(nombre: String) = when (nombre) {
+    "pieza_colgante" -> R.drawable.pieza_colgante
+    "hebilla" -> R.drawable.hebilla
+    else -> R.drawable.unidad
+}
 
 private val APAGADO = ColorFilter.colorMatrix(ColorMatrix().apply {
     setToSaturation(0.3f)

@@ -144,6 +144,63 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         Instantaneas.pausado = true
+        VidaBase.cargar(app)
+    }
+
+    /** El motor de vida en vivo (la respuesta al comando Vida) y cuándo llegó. */
+    val vida = MutableStateFlow<com.sinteticalabs.app.consola.VidaEnVivo?>(null)
+    val vidaEn = MutableStateFlow(0L)
+    private val conexion = java.util.UUID.randomUUID().toString()
+    private var pausaEspejo = 0L
+
+    /** Las respuestas del robot que importan acá: la vida. */
+    private fun recibirMarco(car: Int, b: ByteArray) {
+        if (car == Car.COMANDO.id && b.size >= 2 && (b[0].toInt() and 0xFF) == 0x9B && b[1].toInt() == 0) {
+            com.sinteticalabs.app.consola.leerVida(b)?.let { vida.value = it; vidaEn.value = System.currentTimeMillis() }
+        }
+    }
+
+    /** Pide el estado del motor de vida (y prende o apaga sus datos en la pantalla). */
+    suspend fun pedirVida(superposicion: Boolean? = null) {
+        val m = Comando.vida(superposicion)
+        runCatching {
+            when (via) {
+                Via.NUBE -> if (robot.value?.conectado == true) api!!.marco(idRobot, Car.COMANDO.id, m, conexion).forEach { (c, b) -> recibirMarco(c, b) }
+                else -> cliente?.escribirCrudo(Car.COMANDO, m)
+            }
+            Unit
+        }
+    }
+
+    /** Prueba un comportamiento en el robot. Devuelve el error o null. */
+    suspend fun probarComportamiento(n: String): String? = try {
+        when (via) {
+            Via.NUBE -> api!!.marco(idRobot, Car.COMANDO.id, Comando.comportamiento(n), conexion).forEach { (c, b) -> recibirMarco(c, b) }
+            else -> cliente!!.probarComportamiento(n)
+        }
+        null
+    } catch (e: Exception) {
+        e.message ?: "No pude."
+    }
+
+    /** Para probar algo en la vista previa sin que el espejo lo pise. */
+    fun pausarEspejo(segundos: Double) {
+        pausaEspejo = System.currentTimeMillis() + (segundos * 1000).toLong()
+        fijado = null
+        if (via != Via.DEMO) Nucleo.bleEscribir(Car.COMANDO.id, Comando.expresion(""))
+    }
+
+    /** Guarda ya (sin esperar): valida con el núcleo y la manda. Devuelve el error o null. */
+    suspend fun guardarAhora(c: JsonObject): String? {
+        reloj?.cancel()
+        pendiente = null
+        val v = Editar.aV2(c)
+        Nucleo.validarConfig(v.toString())?.let { return it }
+        guardado.value = EstadoGuardado.GUARDANDO
+        val e = guardar(v)
+        guardado.value = if (e == null) EstadoGuardado.GUARDADO else EstadoGuardado.ERROR
+        if (e != null) errorGuardado.value = e else aplicarEnVistaPrevia(v)
+        return e
     }
 
     fun apiNube(): ApiSintetica? = api
@@ -232,7 +289,7 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Lo que se ve en el robot se copia en la vista previa (menos los estados del sistema). */
     fun espejar(expresion: String) {
-        if (via == Via.DEMO || esEstadoDelSistema(expresion) || expresion == fijado) return
+        if (via == Via.DEMO || esEstadoDelSistema(expresion) || expresion == fijado || System.currentTimeMillis() < pausaEspejo) return
         fijado = expresion
         Nucleo.bleEscribir(Car.COMANDO.id, Comando.expresion(expresion))
     }
@@ -274,6 +331,7 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
                 "marco" -> {
                     val car = e.datos.numero("car")?.toInt() ?: return@collect
                     val b = e.datos.texto("datos")?.let { runCatching { java.util.Base64.getDecoder().decode(it) }.getOrNull() } ?: return@collect
+                    recibirMarco(car, b)
                     avisosDeMarco(car, b).forEach { avisar(textoDeAviso(it, Recordatorios.leer(config.value), r.estado?.expresion.orEmpty())) }
                 }
             }
@@ -294,6 +352,7 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             c.marcos.collect { (car, b) ->
+                recibirMarco(car.id, b)
                 avisosDeMarco(car.id, b).forEach { avisar(textoDeAviso(it, Recordatorios.leer(config.value), robot.value?.estado?.expresion.orEmpty())) }
             }
         }

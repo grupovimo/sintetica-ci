@@ -86,6 +86,9 @@ class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) 
         runCatching { pedir(Car.COMANDO, Comando.hora(ahora / 1000, zona)) }
     }
 
+    /** Un marco tal cual (la respuesta, si hay, llega por las notificaciones). */
+    suspend fun escribirCrudo(car: Car, datos: ByteArray) = transporte.escribir(car, datos)
+
     suspend fun probarComportamiento(nombre: String) { exigir(Car.COMANDO, Comando.comportamiento(nombre)) }
 
     suspend fun fijarExpresion(nombre: String?) { exigir(Car.COMANDO, Comando.expresion(nombre ?: "")); actualizarEstado() }

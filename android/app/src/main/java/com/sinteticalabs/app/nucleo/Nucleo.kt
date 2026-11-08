@@ -37,6 +37,28 @@ object Nucleo {
     external fun qr(): String
     external fun imagenVisible(): Int
     external fun version(): String
+
+    /** Adelanta el reloj del núcleo (para sacar fotos sin esperar los fundidos). */
+    external fun adelantar(ms: Int)
+
+    private external fun validar(json: ByteArray): String?
+    private external fun dibujarNativo(json: ByteArray?, nombre: String, ancho: Int, alto: Int, redonda: Boolean, t: Float, cierre: Float): IntArray?
+    private external fun vidaBase(tipo: Int): Array<String>
+
+    /** Valida una config con el mismo núcleo del robot: null si está bien; si no, por qué. */
+    fun validarConfig(json: String): String? = validar(json.toByteArray())
+
+    /**
+     * Dibuja una cara paramétrica sin tocar la instancia (miniaturas, el
+     * laboratorio y el dock), en ARGB. Si la config no sirve, prueba con las de
+     * fábrica; null si no hay una cara paramétrica con ese nombre.
+     */
+    fun dibujar(config: String?, nombre: String, ancho: Int, alto: Int, redonda: Boolean, t: Float, cierre: Float = 0f): IntArray? =
+        dibujarNativo(config?.toByteArray(), nombre, ancho, alto, redonda, t, cierre)
+            ?: if (config != null) dibujarNativo(null, nombre, ancho, alto, redonda, t, cierre) else null
+
+    /** Lo de fábrica del motor de vida: 0 = expresiones, 1 = comportamientos (nombre → JSON). */
+    fun deFabrica(tipo: Int): List<Pair<String, String>> = vidaBase(tipo).toList().chunked(2).map { it[0] to it[1] }
 }
 
 /** Un anfitrión que guarda en memoria (vista previa y bicho virtual). */

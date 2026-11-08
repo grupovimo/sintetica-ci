@@ -182,3 +182,18 @@ suspend fun ApiSintetica.tokensMcp(): List<TokenMcp> = pedir("/v1/mcp/tokens").l
 
 suspend fun ApiSintetica.crearTokenMcp(nombre: String): String = pedir("/v1/mcp/tokens", "POST", buildJsonObject { put("nombre", nombre) }).texto("token").orEmpty()
 suspend fun ApiSintetica.borrarTokenMcp(id: String) { crudo("/v1/mcp/tokens/$id", "DELETE") }
+
+// --- Laboratorio: el diario, la mudanza y el secreto de los webhooks ---
+
+/** Lo que recuerda y si hay una mudanza en camino. */
+suspend fun ApiSintetica.memoria(id: String): Pair<com.sinteticalabs.app.consola.Memoria?, Boolean> {
+    val o = pedir("/v1/bichos/$id/memoria")
+    return o.obj("memoria")?.let { com.sinteticalabs.app.consola.Memoria.de(it) } to (o.si("mudanzaPendiente") ?: false)
+}
+
+/** Trae la memoria de otro robot del mismo dueño (le llega al conectarse). */
+suspend fun ApiSintetica.mudar(id: String, desde: String) { pedir("/v1/bichos/$id/mudar", "POST", buildJsonObject { put("desde", desde) }) }
+
+/** El secreto con el que se firman los webhooks (rotar = uno nuevo). */
+suspend fun ApiSintetica.secretoWebhooks(rotar: Boolean): String =
+    pedir("/v1/webhooks/secreto", if (rotar) "POST" else "GET").texto("secreto").orEmpty()

@@ -38,6 +38,8 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+    // Lo de fábrica (reglas, los dibujos del manual y las animaciones de ejemplo), tal cual.
+    sourceSets { getByName("main") { assets.srcDir("../../shared/formato") } }
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 

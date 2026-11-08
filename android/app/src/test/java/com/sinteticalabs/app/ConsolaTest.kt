@@ -176,25 +176,33 @@ class ConsolaTest {
     // --- Encuadres de la foto ---
 
     @Test fun encuadres() {
+        // La Unidad: su foto llena la ventana 4:5.
         val f = RECTANGULAR.rectFoto(400f)
-        assertEquals(-111.12f, f.x, 0.01f)
-        assertEquals(-127.8f, f.y, 0.01f) // 25,56 % de 500
-        assertEquals(622.24f, f.ancho, 0.01f)
-        assertEquals(622.24f * 1.25f, f.alto, 0.01f)
+        assertEquals(0f, f.x, 0.01f)
+        assertEquals(0f, f.y, 0.01f)
+        assertEquals(400f, f.ancho, 0.01f)
+        assertEquals(400f * 1024 / 819, f.alto, 0.01f)
         val p = RECTANGULAR.rectPantalla(400f)
-        assertEquals(144.44f, p.x, 0.01f)
-        assertEquals(116.65f, p.y, 0.01f)
-        assertEquals(100f, p.ancho, 0.01f)
-        assertEquals(213.9f, p.alto, 0.01f)
-        // La rectangular está de pie: la cara apaisada se agranda (185 %) y se centra.
+        assertEquals(94f, p.x, 0.01f)
+        assertEquals(147.5f, p.y, 0.01f) // 29,5 % de 500
+        assertEquals(174f, p.ancho, 0.01f)
+        assertEquals(197.5f, p.alto, 0.01f)
+        // Su pantalla es casi cuadrada: la cara entra entera (contain), centrada.
         val e = RECTANGULAR.encastre(400f, false, 320, 172)
-        assertEquals(185f, e.ancho, 0.01f)
-        assertEquals(185f * 172 / 320, e.alto, 0.01f)
-        assertEquals((100f - 185f) / 2, e.x, 0.01f)
+        assertEquals(174f, e.ancho, 0.01f)
+        assertEquals(174f * 172 / 320, e.alto, 0.01f)
+        assertEquals(0f, e.x, 0.01f)
+        assertEquals((197.5f - 174f * 172 / 320) / 2, e.y, 0.01f)
+        // Una caja muy de pie: la apaisada se agranda (185 %) y se centra.
+        val dePie = RECTANGULAR.copy(pantalla = com.sinteticalabs.app.consola.Caja(36.11f, 23.33f, 25f, 42.78f))
+        val g = dePie.encastre(400f, false, 320, 172)
+        assertEquals(185f, g.ancho, 0.01f)
+        assertEquals((100f - 185f) / 2, g.x, 0.01f)
         // La redonda llena su caja.
         val r = REDONDA.encastre(400f, true, 240, 240)
         assertEquals(REDONDA.rectPantalla(400f).ancho, r.ancho, 0.01f)
         assertEquals(0f, r.x, 0f)
+        assertEquals("unidad", RECTANGULAR.foto)
     }
 
     @Test fun modelos() {

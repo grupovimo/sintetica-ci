@@ -16,10 +16,14 @@ jmethodID g_guardar, g_leer, g_notificar, g_registrar;
 std::string g_id;
 std::mt19937 g_azar{std::random_device{}()};
 const auto g_inicio = std::chrono::steady_clock::now();
+// Para sacar fotos de caras sin esperar los fundidos: solo crece (el tiempo
+// del núcleo nunca vuelve atrás).
+int64_t g_adelanto = 0;
 
 uint32_t ahoraMs(void*) {
   return static_cast<uint32_t>(
-      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - g_inicio).count());
+      std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - g_inicio).count() +
+      g_adelanto);
 }
 uint32_t semilla(void*) { return g_azar(); }
 int minuto(void*) {
@@ -167,4 +171,66 @@ jstring JNI(expresionVisible)(JNIEnv* env, jobject) { return env->NewStringUTF(s
 jstring JNI(qr)(JNIEnv* env, jobject) { return env->NewStringUTF(sintetica_qr()); }
 jint JNI(imagenVisible)(JNIEnv*, jobject) { return sintetica_imagen_visible(); }
 jstring JNI(version)(JNIEnv* env, jobject) { return env->NewStringUTF(sintetica_version()); }
+
+void JNI(adelantar)(JNIEnv*, jobject, jint ms) {
+  if (ms > 0) g_adelanto += ms;
+}
+
+// Valida una config con el mismo núcleo del robot: null si está bien; si no, por qué.
+jstring JNI(validar)(JNIEnv* env, jobject, jbyteArray json) {
+  jsize n = env->GetArrayLength(json);
+  jbyte* d = env->GetByteArrayElements(json, nullptr);
+  char detalle[256] = {0};
+  int r = sintetica_validar_config(reinterpret_cast<const char*>(d), static_cast<size_t>(n), detalle, sizeof detalle);
+  env->ReleaseByteArrayElements(json, d, JNI_ABORT);
+  if (r == 0) return nullptr;
+  return env->NewStringUTF(detalle[0] ? detalle : "No la aceptaría.");
+}
+
+// Dibuja una cara paramétrica sin tocar la instancia (ARGB, como Bitmap.setPixels).
+// null si no hay una cara paramétrica con ese nombre o la config no es válida.
+jintArray JNI(dibujarNativo)(JNIEnv* env, jobject, jbyteArray json, jstring nombre, jint ancho, jint alto, jboolean redonda,
+                             jfloat t, jfloat cierre) {
+  if (ancho < 16 || alto < 16 || ancho > 640 || alto > 640) return nullptr;
+  jsize n = json ? env->GetArrayLength(json) : 0;
+  jbyte* d = json ? env->GetByteArrayElements(json, nullptr) : nullptr;
+  const char* nom = env->GetStringUTFChars(nombre, nullptr);
+  std::string rgba(static_cast<size_t>(ancho) * alto * 4, '\0');
+  char detalle[128] = {0};
+  int r = sintetica_dibujar_expresion_cierre(n > 0 ? reinterpret_cast<const char*>(d) : nullptr, static_cast<size_t>(n), nom, ancho, alto,
+                                             redonda ? 1 : 0, t, cierre, reinterpret_cast<uint8_t*>(&rgba[0]), detalle, sizeof detalle);
+  env->ReleaseStringUTFChars(nombre, nom);
+  if (d) env->ReleaseByteArrayElements(json, d, JNI_ABORT);
+  if (r != 0) return nullptr;
+  const int total = ancho * alto;
+  jintArray a = env->NewIntArray(total);
+  jint* p = env->GetIntArrayElements(a, nullptr);
+  const uint8_t* q = reinterpret_cast<const uint8_t*>(rgba.data());
+  for (int i = 0; i < total; i++)
+    p[i] = static_cast<jint>(0xFF000000u | (uint32_t(q[i * 4]) << 16) | (uint32_t(q[i * 4 + 1]) << 8) | q[i * 4 + 2]);
+  env->ReleaseIntArrayElements(a, p, 0);
+  return a;
+}
+
+// Lo de fábrica del motor de vida: tipo 0 = expresiones, 1 = comportamientos.
+// [nombre, json, nombre, json, …]
+jobjectArray JNI(vidaBase)(JNIEnv* env, jobject, jint tipo) {
+  const char* nombre = nullptr;
+  const char* json = nullptr;
+  int n = sintetica_vida_base(tipo, -1, &nombre, &json);
+  if (n < 0) n = 0;
+  jobjectArray a = env->NewObjectArray(n * 2, env->FindClass("java/lang/String"), nullptr);
+  for (int i = 0; i < n; i++) {
+    nombre = nullptr;
+    json = nullptr;
+    sintetica_vida_base(tipo, i, &nombre, &json);
+    jstring k = env->NewStringUTF(nombre ? nombre : "");
+    jstring v = env->NewStringUTF(json ? json : "{}");
+    env->SetObjectArrayElement(a, i * 2, k);
+    env->SetObjectArrayElement(a, i * 2 + 1, v);
+    env->DeleteLocalRef(k);
+    env->DeleteLocalRef(v);
+  }
+  return a;
+}
 }

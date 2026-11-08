@@ -93,7 +93,7 @@ fun PantallaConsola(vm: RobotViewModel, alVolver: () -> Unit) {
         revisado = true
         if (!vm.encendidoVisto() && Editar.sinEncender(config)) vista = "encender"
     }
-    BackHandler(vista != "consola") { vista = "consola"; vm.aplicarEnVistaPrevia(vm.config.value) }
+    BackHandler(vista != "consola") { vista = "consola"; vm.pausarEspejo(0.0); vm.aplicarEnVistaPrevia(vm.config.value) }
 
     Box(Modifier.fillMaxSize().fondoConsola()) {
         val m = modelo
@@ -110,7 +110,7 @@ fun PantallaConsola(vm: RobotViewModel, alVolver: () -> Unit) {
                 CircularProgressIndicator(color = C.led)
             }
             vista == "encender" -> PantallaEncender(vm, m, alTerminar = { vista = "consola"; vm.aplicarEnVistaPrevia(vm.config.value) })
-            vista == "lab" -> PantallaLaboratorio(vm, m, alVolver = { vista = "consola" })
+            vista == "lab" -> PantallaLaboratorio(vm, m, alVolver = { vista = "consola"; vm.pausarEspejo(0.0); vm.aplicarEnVistaPrevia(vm.config.value) })
             else -> Consola(vm, m, alVolver, alLab = { vista = "lab" })
         }
     }

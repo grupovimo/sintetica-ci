@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -54,12 +56,15 @@ import java.util.Locale
 private val FECHA = SimpleDateFormat("d MMM HH:mm", Locale.forLanguageTag("es-AR"))
 private fun fecha(ms: Long?) = ms?.let { FECHA.format(Date(it)) } ?: "—"
 
-private enum class Rack(val nombre: String) { CARAS("Caras"), HISTORIAL("Historial"), FIRMWARE("Firmware") }
+private enum class Rack(val nombre: String) {
+    EXPRESIONES("Expresiones"), COMPORTAMIENTOS("Comportamientos"), REGLAS("Reglas"), VIDA("Vida"), DIBUJOS("Dibujos"),
+    ANIMACIONES("Animaciones"), CARAS("Caras"), HISTORIAL("Historial"), FIRMWARE("Firmware"),
+}
 
 /** El laboratorio: lo avanzado, como módulos de rack (web: routes/robots/[id]/+layout.svelte). */
 @Composable
 fun PantallaLaboratorio(vm: RobotViewModel, modelo: Modelo, alVolver: () -> Unit) {
-    var rack by rememberSaveable { mutableStateOf(Rack.CARAS) }
+    var rack by rememberSaveable { mutableStateOf(Rack.EXPRESIONES) }
     val llave by vm.vistaPrevia.collectAsState()
     val robot by vm.robot.collectAsState()
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -69,7 +74,9 @@ fun PantallaLaboratorio(vm: RobotViewModel, modelo: Modelo, alVolver: () -> Unit
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Box(Modifier.widthIn(max = 120.dp)) {
-                Producto(modelo, radio = 18.dp, apagado = robot?.conectado != true) { if (llave > 0) PantallaViva(llave, "Vista previa") }
+                // Un solo dibujo vivo de la instancia a la vez: si el rack trae la suya, acá va quieta.
+                val propia = rack in setOf(Rack.COMPORTAMIENTOS, Rack.REGLAS, Rack.DIBUJOS, Rack.ANIMACIONES)
+                Producto(modelo, radio = 18.dp, apagado = robot?.conectado != true) { if (llave > 0 && !propia) PantallaViva(llave, "Vista previa") }
             }
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Rack.entries.forEach { r ->
@@ -78,13 +85,22 @@ fun PantallaLaboratorio(vm: RobotViewModel, modelo: Modelo, alVolver: () -> Unit
                 }
             }
         }
-        Chapa(Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
-            when (rack) {
-                Rack.CARAS -> RackCaras(vm)
-                Rack.HISTORIAL -> RackHistorial(vm)
-                Rack.FIRMWARE -> RackFirmware(vm, modelo)
+        when (rack) {
+            Rack.EXPRESIONES -> LabExpresiones(vm, modelo)
+            Rack.COMPORTAMIENTOS -> LabComportamientos(vm, modelo)
+            Rack.REGLAS -> LabReglas(vm, modelo)
+            Rack.VIDA -> LabVida(vm)
+            Rack.DIBUJOS -> LabDibujos(vm, modelo)
+            Rack.ANIMACIONES -> LabAnimaciones(vm, modelo)
+            else -> Chapa(Modifier.fillMaxWidth()) {
+                when (rack) {
+                    Rack.HISTORIAL -> RackHistorial(vm)
+                    Rack.FIRMWARE -> RackFirmware(vm, modelo)
+                    else -> RackCaras(vm)
+                }
             }
         }
+        Spacer(Modifier.height(32.dp))
     }
 }
 

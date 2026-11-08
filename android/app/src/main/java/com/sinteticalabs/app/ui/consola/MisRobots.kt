@@ -33,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -208,7 +210,7 @@ fun PantallaMisRobots(vm: RobotsViewModel, alAbrir: (String) -> Unit, alEscanear
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         fila.forEach { x ->
                             when (x) {
-                                is RobotNube -> TarjetaRobot(x, Instantaneas.fotos[x.id], Modifier.weight(1f)) { alAbrir(PREFIJO_NUBE + x.id) }
+                                is RobotNube -> TarjetaRobot(x, Instantaneas.fotos[x.id], configs[x.id], Modifier.weight(1f)) { alAbrir(PREFIJO_NUBE + x.id) }
                                 is Vinculado -> TarjetaCerca(x, Modifier.weight(1f)) { alAbrir(x.id) }
                                 else -> BahiaLibre(Modifier.weight(1f)) { sumando = true; vm.buscarVirtuales() }
                             }
@@ -233,12 +235,24 @@ fun PantallaMisRobots(vm: RobotsViewModel, alAbrir: (String) -> Unit, alEscanear
 }
 
 @Composable
-private fun TarjetaRobot(r: RobotNube, foto: androidx.compose.ui.graphics.ImageBitmap?, modifier: Modifier, alTocar: () -> Unit) {
+private fun TarjetaRobot(r: RobotNube, foto: androidx.compose.ui.graphics.ImageBitmap?, config: JsonObject?, modifier: Modifier, alTocar: () -> Unit) {
     val m = modeloDe(r.perfil, r.virtual, r.estado)
     val bat = r.estado?.bateria
-    Chapa(modifier.clickable(onClick = alTocar), radio = 30.dp, relleno = 12.dp) {
+    // La cara en vivo solo mientras la tarjeta se ve en pantalla; si no (o si
+    // lo que muestra no es una cara paramétrica), la última foto.
+    var visible by remember { mutableStateOf(false) }
+    val alto = with(androidx.compose.ui.platform.LocalDensity.current) { androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp.toPx() }
+    val dibujar = remember(config) { com.sinteticalabs.app.consola.Lab.paraDibujar(config ?: buildJsonObject { put("version", 2) }) }
+    val expresion = r.estado?.expresion.orEmpty().ifEmpty { "neutral" }
+    Chapa(modifier.clickable(onClick = alTocar).onGloballyPositioned { c ->
+        val b = c.boundsInWindow()
+        visible = b.bottom > 0 && b.top < alto
+    }, radio = 30.dp, relleno = 12.dp) {
         Box {
-            Producto(m, radio = 22.dp, apagado = !r.conectado) { PantallaQuieta(foto) }
+            Producto(m, radio = 22.dp, apagado = !r.conectado) {
+                if (visible && r.conectado) CaraViva(dibujar, expresion, m.pantalla, Modifier.fillMaxSize(), fps = 15) { PantallaQuieta(foto) }
+                else PantallaQuieta(foto)
+            }
             val sello = when {
                 r.conectado && r.estado?.dormido == true -> "☾ Durmiendo"
                 !r.conectado -> "Fuera de alcance"

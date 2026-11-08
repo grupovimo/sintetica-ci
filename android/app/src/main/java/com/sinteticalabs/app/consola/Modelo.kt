@@ -45,24 +45,31 @@ data class Encuadre(
     }
 
     /**
-     * Una pantalla apaisada en una caja de pie: la cara se agranda para llenar
-     * el ancho (los costados, que suelen estar vacíos, quedan afuera). Devuelve
-     * dónde va la pantalla dentro de su caja.
+     * Dónde va la pantalla dentro de su caja. La redonda la llena. Una
+     * apaisada en una caja muy de pie se agranda (185 %) para que la cara
+     * llene el ancho (los costados, que suelen estar vacíos, quedan afuera);
+     * si no, entra entera (contain), centrada.
      */
     fun encastre(ventana: Float, redonda: Boolean, pantallaAncho: Int, pantallaAlto: Int): Rect {
         val caja = rectPantalla(ventana)
-        if (redonda || pantalla.alto * 5 <= pantalla.ancho * 4) return Rect(0f, 0f, caja.ancho, caja.alto)
-        val w = caja.ancho * 1.85f
-        val h = w * pantallaAlto / pantallaAncho
+        if (redonda) return Rect(0f, 0f, caja.ancho, caja.alto)
+        if (pantalla.alto * 5 > pantalla.ancho * 4 * 1.5f) {
+            val w = caja.ancho * 1.85f
+            val h = w * pantallaAlto / pantallaAncho
+            return Rect((caja.ancho - w) / 2, (caja.alto - h) / 2, w, h)
+        }
+        val k = minOf(caja.ancho / pantallaAncho, caja.alto / pantallaAlto)
+        val w = pantallaAncho * k
+        val h = pantallaAlto * k
         return Rect((caja.ancho - w) / 2, (caja.alto - h) / 2, w, h)
     }
 }
 
 val RECTANGULAR = Encuadre(
-    foto = "hebilla", alt = "El robot puesto en un cinturón",
-    fotoAncho = 155.56f, fotoIzq = -27.78f, fotoArriba = -25.56f, proporcionFoto = 1400f / 1120f,
-    pantalla = Caja(izq = 36.11f, arriba = 23.33f, ancho = 25f, alto = 42.78f),
-    fondo = 0xFF0E0D0B,
+    foto = "unidad", alt = "La Unidad sobre un escritorio",
+    fotoAncho = 100f, fotoIzq = 0f, fotoArriba = 0f, proporcionFoto = 1024f / 819f,
+    pantalla = Caja(izq = 23.5f, arriba = 29.5f, ancho = 43.5f, alto = 39.5f),
+    fondo = 0xFFE9E2D8,
 )
 
 val REDONDA = Encuadre(

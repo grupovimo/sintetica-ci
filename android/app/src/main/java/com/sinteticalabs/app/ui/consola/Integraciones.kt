@@ -54,6 +54,7 @@ import com.sinteticalabs.app.datos.fechaMs
 import com.sinteticalabs.app.datos.guardarAutomatizaciones
 import com.sinteticalabs.app.datos.probarAutomatizacion
 import com.sinteticalabs.app.datos.robots
+import com.sinteticalabs.app.datos.secretoWebhooks
 import com.sinteticalabs.app.datos.telegram
 import com.sinteticalabs.app.datos.tokensMcp
 import com.sinteticalabs.app.datos.vincularTelegram
@@ -102,6 +103,8 @@ fun ModIntegraciones(vm: RobotViewModel) {
     var guardando by remember { mutableStateOf("") }
     val probado = remember { mutableStateMapOf<Int, String>() }
     var reloj by remember { mutableStateOf<Job?>(null) }
+    var secreto by remember { mutableStateOf<String?>(null) }
+    var rotarSeguro by remember { mutableStateOf(false) }
 
     suspend fun cargar() {
         try {
@@ -293,6 +296,27 @@ fun ModIntegraciones(vm: RobotViewModel) {
             }
         }
         Text(Automatizaciones.PLANTILLAS, style = T.dato.copy(fontSize = 12.sp), color = Color(0xB31A1714))
+
+        // El secreto de los webhooks: cada llamada va firmada (X-Sintetica-Firma: sha256=…, HMAC del cuerpo).
+        Bandeja {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Grabado("Webhooks · firma", color = C.sobrePlaca, modifier = Modifier.weight(1f))
+                Tecla(if (secreto == null) "Ver" else "Ocultar", {
+                    if (secreto != null) secreto = null
+                    else alcance.launch { runCatching { secreto = api.secretoWebhooks(false) }.onFailure { error = textoError(it, "No pude traerlo.") } }
+                }, chica = true)
+                Tecla(if (rotarSeguro) "¿Seguro?" else "Rotar", {
+                    if (!rotarSeguro) { rotarSeguro = true; alcance.launch { delay(5000); rotarSeguro = false } }
+                    else {
+                        rotarSeguro = false
+                        alcance.launch { runCatching { secreto = api.secretoWebhooks(true) }.onFailure { error = textoError(it, "No pude rotarlo.") } }
+                    }
+                }, acabado = if (rotarSeguro) Acabado.NARANJA else Acabado.NEGRA, chica = true)
+            }
+            Fila(secreto ?: "••••••••••••••••••••••••", if (secreto == null) "" else if (copiado == "secreto") "Copiado" else "Copiar") {
+                secreto?.let { copiar(contexto, it); aviso("secreto") }
+            }
+        }
         if (historial.isNotEmpty()) Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(C.hundido).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Grabado("Últimas")
             historial.take(6).forEach { h ->
