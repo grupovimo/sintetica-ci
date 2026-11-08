@@ -45,7 +45,7 @@
     {#if escucha}
       <div class="fila">
         <label class="visor">
-          <span class="grabado">Responde cuando le dicen <span class="pista">· una palabra común</span></span>
+          <span class="grabado">Responde cuando le dicen</span>
           <input class="campo" maxlength="16" placeholder={nombre} value={v.palabra ?? ''}
             onchange={(e) => { const t = cortarBytes(e.currentTarget.value.trim(), MAX_PALABRA); poner((y) => { if (t) y.palabra = t; else delete y.palabra; }); }} />
         </label>
@@ -69,6 +69,5 @@
   .grande { min-height: 100%; padding: 0 20px; text-align: left; }
   .grande span:last-child { display: flex; flex-direction: column; gap: 6px; }
   .grande small { font: 600 12px/1.2 var(--marca); letter-spacing: 0; text-transform: none; color: #8f877c; }
-  .pista { color: var(--brasa); letter-spacing: .08em; }
   @media (max-width: 640px) { .fila { grid-template-columns: 1fr; } .grande { min-height: 64px; } }
 </style>

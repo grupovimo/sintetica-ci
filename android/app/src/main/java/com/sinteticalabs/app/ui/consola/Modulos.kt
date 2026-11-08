@@ -578,7 +578,7 @@ fun ModVoz(vm: RobotViewModel, modelo: Modelo) {
         }
         if (escucha) {
             Visor(Modifier.fillMaxWidth()) {
-                Grabado("Responde a · una palabra común")
+                Grabado("Responde a")
                 CampoVisor(v.texto("palabra").orEmpty(), { t ->
                     val x = cortarBytes(t.trim(), Editar.MAX_PALABRA)
                     vm.cambiar { Editar.ponerVoz(it) { y -> if (x.isEmpty()) y.sin("palabra") else y.con("palabra", x) } }

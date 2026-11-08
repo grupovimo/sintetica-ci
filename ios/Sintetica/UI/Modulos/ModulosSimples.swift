@@ -357,7 +357,7 @@ struct ModVoz: View {
                     }
                 }
                 if escucha {
-                    CampoVisor(rotulo: "Responde a · una palabra común", texto: $palabra, ayuda: modelo.nombre) {
+                    CampoVisor(rotulo: "Responde a", texto: $palabra, ayuda: modelo.nombre) {
                         let t = cortarBytes(palabra.trimmingCharacters(in: .whitespaces), MAX_PALABRA)
                         modelo.cambiar { $0.ponerVoz("palabra", t.isEmpty ? nil : t) }
                     }
