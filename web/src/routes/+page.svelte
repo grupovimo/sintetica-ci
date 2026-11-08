@@ -144,8 +144,8 @@
     <div id="inicio" class="contenedor inicio">
       <h1 class="t-display aparece">Tu propio<br /><span class="cromo">robot.</span></h1>
       <div class="dos">
-        <div class="aparece" data-parallax="-0.04" style="transform: translateY(var(--py, 0))">
-          <Foto alt="el Broche en una campera, de noche" proporcion="16 / 10" lineas />
+        <div class="foto-hero aparece">
+          <Foto alt="el Broche en una campera, de noche" proporcion="auto" lineas />
         </div>
         <div class="tarjeta-negra aparece">
           <p class="t-lead">Robots y joyería electrónica.<br /><span class="naranja">Ya es normal tener uno.</span></p>
@@ -461,7 +461,10 @@
   .nav .ficha, .nav .inflado { min-height: 48px; padding: 0 24px; font-size: 15px; }
   .nav nav { flex: 1; display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
   .inicio { display: flex; flex-direction: column; gap: 32px; padding-top: 32px; padding-bottom: 128px; }
-  .dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 24px; }
+  .dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 24px; align-items: stretch; }
+  /* La foto y la tarjeta miden lo mismo: la foto llena el alto de la fila. */
+  .foto-hero { display: flex; min-height: 400px; }
+  .foto-hero :global(.foto) { flex: 1; }
   .tarjeta-negra { display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: 40px; border-radius: 40px; background: #111; color: #fff; box-shadow: 0 32px 48px -32px rgba(0, 0, 0, 0.7); }
 
   /* 2 y 3 */
