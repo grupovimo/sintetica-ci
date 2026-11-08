@@ -5,6 +5,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,6 +29,10 @@ func TestAutorizarMQTT(t *testing.T) {
 		{a, "bicho/" + a + "/state", true, true},
 		{a, "bicho/" + a + "/resp", true, true},
 		{a, "bicho/" + a + "/conexion", true, true},
+		{a, "bicho/" + a + "/charla", true, true}, // v1.9: lo que le dicen al robot-celu
+		{a, "bicho/" + b + "/charla", true, false},
+		{a, "bicho/+/charla", true, false},
+		{a, "bicho/" + a + "/charla", false, false},
 		{a, "bicho/" + a + "/cmd", true, false}, // no se manda comandos a sí mismo
 		{a, "bicho/" + a + "/otro", true, false},
 		{a, "bicho/" + b + "/state", true, false},
@@ -81,6 +87,16 @@ func TestBrokerConLaAPI(t *testing.T) {
 	n.Escuchar(i)
 	s = Nuevo(Opciones{MQTTUsuario: "api", MQTTClave: "clave-api"}, alm, n, i, hub, nil, nil, log)
 	if err := n.Conectar(); err != nil {
+		t.Fatal(err)
+	}
+	// La charla del robot-celu (v1.9): cada uno publica solo en el suyo.
+	var charlasMu sync.Mutex
+	var charlas []string
+	if err := n.AlPublicar("charla", func(bicho string, datos []byte) {
+		charlasMu.Lock()
+		charlas = append(charlas, bicho+" "+string(datos))
+		charlasMu.Unlock()
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := brk.Arrancar(); err != nil {
@@ -140,6 +156,15 @@ func TestBrokerConLaAPI(t *testing.T) {
 	if n.Conectado(b) {
 		t.Error("un bicho dijo que el otro está conectado")
 	}
+
+	ca.Publish("bicho/"+b+"/charla", 1, false, `{"texto":"soy otro"}`).WaitTimeout(3 * time.Second)
+	ca.Publish("bicho/"+a+"/charla", 1, false, `{"texto":"hola"}`).WaitTimeout(3 * time.Second)
+	esperar("llega la charla", func() bool { charlasMu.Lock(); defer charlasMu.Unlock(); return len(charlas) > 0 })
+	charlasMu.Lock()
+	if strings.Join(charlas, "|") != a+` {"texto":"hola"}` {
+		t.Errorf("charlas: %q", charlas)
+	}
+	charlasMu.Unlock()
 
 	// La API de afuera (superusuario) se suscribe a lo de cualquiera (los
 	// comodines están probados en internal/broker).

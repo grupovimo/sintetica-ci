@@ -67,8 +67,8 @@ var CuandoDeEstado = []string{"conectado", "desconectado", "bateria-baja", "expr
 // Cuandos devuelve todos los "cuando" que la API detecta de verdad.
 func Cuandos() []string {
 	l := append([]string{}, CuandoDeEstado...)
-	l = append(l, "recordatorio", "hito", "hora", "despertador", "juego", "animo", "habito")
-	vistos := map[string]bool{"recordatorio": true, "hito": true, "hora": true, "despertador": true, "juego": true, "animo": true, "habito": true}
+	l = append(l, "recordatorio", "hito", "hora", "despertador", "juego", "animo", "habito", "agenda")
+	vistos := map[string]bool{"recordatorio": true, "hito": true, "hora": true, "despertador": true, "juego": true, "animo": true, "habito": true, "agenda": true}
 	for _, e := range protocolo.Eventos {
 		if c, ok := nube.EventosRegistro[e]; ok && !vistos[c] {
 			vistos[c] = true

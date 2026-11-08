@@ -20,6 +20,7 @@ var comandosBot = []map[string]string{
 	{"command": "clima", "description": "El clima donde está un robot"},
 	{"command": "jugar", "description": "Jugar con un robot (dado, moneda, ppt, reflejos, mirada)"},
 	{"command": "habito", "description": "Marcar un hábito de hoy"},
+	{"command": "agenda", "description": "Lo que tenés hoy y mañana"},
 	{"command": "ayuda", "description": "Qué puedo hacer"},
 }
 
@@ -32,8 +33,10 @@ const textoAyuda = `Esto es lo que puedo hacer:
 /clima [nombre]: el clima donde está tu robot
 /jugar [dado|moneda|ppt|reflejos|mirada] [nombre]: juega con vos en su pantalla
 /habito [hábito] [nombre]: marca un hábito de hoy (sin decir cuál, te muestra los que hay)
+/agenda: lo que tenés hoy y mañana en tu calendario
 /ayuda: esto
 
+Si me escribís sin comando, charlás con tu robot (si tenés varios, con el último con el que charlaste).
 Si tenés un solo robot, el nombre no hace falta. Los avisos (batería baja, recordatorios…) se arman en la web, en Automatizaciones.`
 
 // Las caras del teclado de /cara (las de fábrica; "auto" vuelve a la automática).
@@ -293,7 +296,7 @@ func (i *Integraciones) atenderMensaje(ctx context.Context, m *mensaje) {
 		i.log.Warn("telegram: no pude leer los robots", "error", err)
 		return
 	}
-	if len(rs) == 0 && comando != "/ayuda" && comando != "/help" && comando != "/start" {
+	if len(rs) == 0 && comando != "/ayuda" && comando != "/help" && comando != "/start" && comando != "/agenda" {
 		i.responder(ctx, chat, "Todavía no tenés robots en tu cuenta. Sumalos desde la app o la web.", nil)
 		return
 	}
@@ -399,7 +402,13 @@ func (i *Integraciones) atenderMensaje(ctx context.Context, m *mensaje) {
 			return
 		}
 		i.responder(ctx, chat, i.marcarDesdeTelegram(ctx, *r, k), nil)
+	case "/agenda":
+		i.responder(ctx, chat, i.TextoAgendaTelegram(ctx, v.UsuarioID), nil)
 	default:
+		if !strings.HasPrefix(texto, "/") && texto != "" {
+			i.charlaTelegram(ctx, chat, v.UsuarioID, rs, texto)
+			return
+		}
 		i.responder(ctx, chat, "No entendí. "+textoAyuda, nil)
 	}
 }
@@ -544,6 +553,8 @@ func (i *Integraciones) atenderBoton(ctx context.Context, c *callback) {
 			return
 		}
 		i.responder(ctx, chat, i.marcarDesdeTelegram(ctx, *r, k), nil)
+	case "charla":
+		i.charlaDelBoton(ctx, chat, v.UsuarioID, *r)
 	case "jugar":
 		juego := ""
 		if len(partes) == 3 {

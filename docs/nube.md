@@ -622,6 +622,107 @@ mostrar (`regenerar: true`).
 `habito` (con `{habito}` y `{racha}`). Los avisa el robot solo o salen de las
 rutas de arriba: no hace falta pedirle el registro.
 
+### Agenda, música y charla (v1.9)
+
+Código: `api/internal/integraciones/agenda.go`, `musica.go`, `charla.go` y
+`v19.go` (el trabajador); las rutas en `servidor/agenda.go`, `musica.go` y
+`charla.go`; el MCP en `servidor/mcp_agenda.go`; el .ics en
+`api/internal/agenda`. Los secretos de terceros (la dirección del calendario y
+el refresh token de Spotify) van **cifrados** en la base (`api/internal/cifra`:
+AES-256-GCM con una clave que sale de `SECRETO`; si `SECRETO` cambia, hay que
+volver a conectarlos) y nunca se devuelven.
+
+**Agenda** (migración `011_agenda.sql`, un calendario por usuario):
+
+- `PUT /v1/agenda {"ics"?: "https://…" | "webcal://…", "aviso"?: 0..15}`: la
+  "dirección secreta en formato iCal" de Google Calendar (o cualquier `.ics`).
+  Se valida como los webhooks (solo https —http en desarrollo—, sin usuario ni
+  clave, sin IPs internas ni el propio servicio; el DNS se valida al conectar),
+  se baja ya (tope 2 MB y 15 s, hasta 3 redirecciones validadas) y, si no es un
+  calendario, 400 con el motivo. Con solo `aviso`, cambia cuántos minutos antes
+  avisa (por defecto 10; 404 sin calendario). 20 cambios por hora.
+- `GET /v1/agenda` → `{"conectada", "ics": "calendar.google.com/…/basic.ics"
+  (solo la pista), "aviso", "proximos": [{uid, titulo, inicio, fin, todoElDia}]
+  (los 10 próximos que no terminaron), "leida", "error"}`. `DELETE /v1/agenda`.
+- El .ics: VEVENT con `DTSTART`/`DTEND`/`DURATION` (con `TZID` —también los
+  nombres de Windows de Outlook y los prefijados—, en UTC, flotantes o de día
+  entero), `RRULE` (DAILY, WEEKLY, MONTHLY y YEARLY con BYDAY, INTERVAL, COUNT
+  y UNTIL; las de cada hora o menos se toman como una sola vez), `EXDATE`,
+  `RECURRENCE-ID` (una repetición movida) y `STATUS:CANCELLED`. La expansión
+  usa [`github.com/teambition/rrule-go`](https://github.com/teambition/rrule-go)
+  (chica, sin dependencias, la que más se usa en Go para RRULE); el resto del
+  .ics se lee a mano (desdoblar líneas, parámetros, escapes), que es poco y así
+  se controla. Topes: 3000 VEVENT, 20 000 repeticiones miradas por evento, 500
+  ocurrencias. Las zonas van embebidas (`time/tzdata`).
+- **Cada minuto** (`revisarAgendas`): relee los que tienen más de 5 min (si
+  falla, quedan los de antes y `error`), y guarda las ocurrencias de las
+  próximas 2 semanas (`proximos`, jsonb). Lo que empieza dentro de `aviso`
+  minutos (sin los de día entero) va **una sola vez** (las claves `uid@inicio`
+  quedan en `avisados`, así un reinicio no repite) con el `0x48`
+  (`protocolo.Agenda(minutos, duración, título)`) a todos los robots
+  conectados del dueño, el evento SSE `agenda` (`{titulo, minutos, inicio,
+  robots}`) y el **cuando `agenda`** de las automatizaciones de cada robot
+  (`{texto}` = el título; datos `titulo` y `minutos`).
+- **Resumen de mañana**: a la hora de dormir (`horario.duerme` del primer
+  robot si es de 18:00 a 23:59; si no, 22:00; con media hora de margen por si
+  la API estaba caída), si mañana hay algo, una vez por día (`resumen_dia`): el
+  `0x48` con `0xFFFF` (`protocolo.ResumenManana(cantidad, primero)`) a los
+  robots conectados y, con Telegram vinculado, "Mañana tenés 2 cosas:" y la
+  lista.
+- Telegram **`/agenda`**: lo de hoy y mañana. MCP **`agenda`** `{dias?: 1..14}`.
+
+**Música** (`spotify_cuentas` en `012_musica_charla.sql`): con
+`SPOTIFY_CLIENT_ID` y `SPOTIFY_CLIENT_SECRET` (una app en
+developer.spotify.com con el redirect `API_URL_PUBLICA/v1/musica/spotify/vuelta`);
+sin ellas, apagado y `GET /v1/musica` → `{"disponible": false}`.
+
+- `GET /v1/musica/spotify` → `{"url"}`: a donde mandar al usuario (alcances
+  `user-read-currently-playing user-read-playback-state`; el `state` lleva su
+  id y vence en 10 min, firmado con HMAC). La vuelta (`GET
+  /v1/musica/spotify/vuelta`, sin sesión: la autentica el state) canjea el
+  código, guarda el refresh token cifrado y vuelve a la web con
+  `WEB_URL/robots?spotify=ok|error|cancelado`.
+- `GET /v1/musica` → `{"disponible", "conectada", "nombre", "suena":
+  {sonando, titulo, artista, bpm} | null}`. `DELETE /v1/musica/spotify`.
+- Cada 20 s, solo para los usuarios con algún robot conectado, mira qué suena
+  (`/v1/me/player/currently-playing`; el access token vive en memoria y se
+  renueva solo; si Spotify dice `invalid_grant`, se olvida la cuenta) y, si
+  cambió el tema o se pausó, manda el `0x4B` (`protocolo.Musica`) a sus robots
+  conectados y el SSE `musica`. El bpm sale de `/v1/audio-features` si la app
+  tiene acceso (las apps nuevas de Spotify no: entonces 0, y el robot baila a
+  100). Un robot que se conecta recibe lo que suena en la vuelta siguiente.
+- `POST /v1/bichos/{id}/musica {"sonando", "titulo", "artista", "bpm"?}` para
+  el celu (Android lo lee de la sesión de medios): el `0x4B` a ese robot (409 si
+  no está conectado; 30 por minuto). MCP **`musica`** (`ver` / `mandar`).
+
+**Charla con IA** (`charlas_uso` y `charla_robot`): con `ANTHROPIC_API_KEY`
+(modelo `claude-haiku-5-5`, o `CHARLA_MODELO`), con el SDK oficial de Go
+(`github.com/anthropics/anthropic-sdk-go`); sin la clave, `GET /v1/charla` →
+`{"disponible": false}` y charlar da 503.
+
+- `POST /v1/bichos/{id}/charla {"texto"}` (1 a 500 bytes) → `{"texto",
+  "expresion", "enviado", "quedan"}`: el robot contesta y lo dice en su
+  pantalla (`0x40`) si está conectado. `GET /v1/charla` → `{"disponible",
+  "quedan", "porDia": 60}`.
+- El system prompt es corto y tiene solo lo de **ese** robot: su nombre, su
+  personalidad (`personalidad.preset`), el nombre del dueño, la hora, la ciudad
+  y el clima, y lo que recuerda (días juntos, racha, hitos y el resumen de
+  hoy). El modelo no tiene herramientas: no hay cómo sacarle datos de otros. La
+  respuesta es JSON por salida estructurada (`texto` y `expresion`, una de las
+  de fábrica o de su config); el texto se deja en una línea y se corta a 60
+  bytes sin partir letras; una expresión que no existe no se pone.
+- Tope: **60 por día por usuario** (en la base, compartido entre la web, la
+  app, Telegram y el robot), 10 por minuto por HTTP, 20 s de timeout.
+- **Telegram**: un mensaje que no es comando es una charla. Con un robot, con
+  ese; con varios, con el último con el que charló (o pregunta "¿Con cuál
+  charlás?" con botones `charla:<id>`).
+- **El robot-celu** (sin token HTTP, con sus credenciales MQTT) publica en
+  **`bicho/{id}/charla`** `{"texto": "…"}` (hasta 200 bytes); la ACL deja que
+  cada robot publique solo en el suyo. La nube contesta con el `0x40` por su
+  `cmd` (con el tope del día: "Por hoy ya charlamos mucho. ¡Mañana más!"). 30
+  por hora por robot, 8 a la vez.
+- SSE `charla` (`{texto, expresion, de, enviado}`).
+
 ## MCP: que una IA maneje los robots
 
 La API es un **servidor MCP remoto**: cada usuario conecta su Claude
@@ -723,6 +824,8 @@ conectan desde sus servidores: necesitan **HTTPS público**; en local
 | `habitos` | `ver` (con la racha y los días) / `marcar` / `deshacer` (`habito`: nombre o número) |
 | `horarios` | Lo que aprendió la nube: `llegas`, `salis`, `dormis` y `seguridad` |
 | `entrantes` | `ver` (la dirección secreta y cómo usarla con GitHub, Mercado Pago o un JSON) / `regenerar` |
+| `agenda` | `{dias?: 1..14}`: los próximos eventos del calendario conectado (v1.9) |
+| `musica` | `ver` (qué suena en su Spotify) / `mandar` (`robot`, `sonando`, `titulo`, `artista`, `bpm`): el `0x4B` — conectado (v1.9) |
 
 Además, el recurso **`sintetica://guia/caras`** (qué hace cada parámetro, sus
 límites, consejos y ejemplos, armado desde el schema, y la sección "Caras de
@@ -744,7 +847,7 @@ SVG) y el prompt `inventar_cara`.
 | `WEB_URL` | para los links de los mails | `http://localhost:5173` |
 | `SMTP_SERVIDOR`, `SMTP_USUARIO`, `SMTP_CLAVE`, `SMTP_DE` | el correo | Mailpit, sin usuario |
 | `CLAVE_FIRMA` | la clave privada de las OTA | `/claves/ota-privada.pem` |
-| `SECRETO` | firma los links de descarga | uno local |
+| `SECRETO` | firma los links de descarga y de él sale la clave con la que se cifran el calendario y Spotify | uno local |
 | `ADMIN_EMAILS` | quién sube firmwares | vacío |
 | `DESARROLLO` | bichos virtuales y los links en el log | `1` |
 | `BICHOS_VIRTUALES` | dónde están los virtuales | los dos del compose |
@@ -753,6 +856,9 @@ SVG) y el prompt `inventar_cara`.
 | `TELEGRAM_BOT` | el usuario del bot, sin `@` | `sinteticalabs_bot` |
 | `TELEGRAM_API_URL` | la API de Telegram (para tests) | vacío = `https://api.telegram.org` |
 | `CLIMA_API_URL`, `GEOCODING_API_URL` | Open-Meteo (pronóstico y búsqueda de lugares; para tests) | vacío = `https://api.open-meteo.com/v1/forecast` y `https://geocoding-api.open-meteo.com/v1/search` |
+| `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` | la app de Spotify (la música); vacías = apagado | el de `.env` (nunca en el repo) |
+| `ANTHROPIC_API_KEY` | la charla con IA; vacía = apagada | el de `.env` (nunca en el repo) |
+| `CHARLA_MODELO` | el modelo de la charla | vacío = `claude-haiku-5-5` |
 
 ## Antes de ponerlo en el VPS
 

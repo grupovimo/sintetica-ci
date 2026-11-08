@@ -9,7 +9,7 @@ const oyentes = new Set<Oyente>();
 let fuente: EventSource | null = null;
 export const conexionEnVivo = $state({ conectado: false });
 
-const TIPOS = ['estado', 'conexion', 'sincro', 'config', 'imagenes', 'sprites', 'ota', 'marco', 'bicho', 'automatizacion', 'telegram', 'mcp', 'toque', 'entrante'];
+const TIPOS = ['estado', 'conexion', 'sincro', 'config', 'imagenes', 'sprites', 'ota', 'marco', 'bicho', 'automatizacion', 'telegram', 'mcp', 'toque', 'entrante', 'agenda', 'musica', 'charla'];
 
 function abrir() {
   if (fuente || typeof EventSource === 'undefined') return;

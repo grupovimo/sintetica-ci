@@ -181,8 +181,19 @@ func correr(log *slog.Logger) error {
 		GeocodingURL:  os.Getenv("GEOCODING_API_URL"),
 		Desarrollo:    desarrollo,
 		HostsPropios:  []string{op.WebURL, env("API_URL_PUBLICA", ""), env("API_URL_INTERNA", "")},
+		// La v1.9: agenda, Spotify (sin las claves, apagado) y la charla con IA
+		// (sin ANTHROPIC_API_KEY, apagada).
+		V19: integraciones.OpcionesV19{
+			Secreto: secreto, APIURL: op.URLPublica, WebURL: op.WebURL,
+			SpotifyID: os.Getenv("SPOTIFY_CLIENT_ID"), SpotifySecreto: os.Getenv("SPOTIFY_CLIENT_SECRET"),
+			AnthropicClave: os.Getenv("ANTHROPIC_API_KEY"), AnthropicModelo: os.Getenv("CHARLA_MODELO"),
+		},
 	}, alm, n, hub, log)
 	n.Escuchar(integ)
+	// Lo que le dicen al robot-celu por voz (bicho/{id}/charla).
+	if err := n.AlPublicar("charla", integ.CharlaMQTT); err != nil {
+		return fmt.Errorf("charla por MQTT: %w", err)
+	}
 	srv = servidor.Nuevo(op, alm, n, integ, hub, c, firmador, log)
 
 	publico := &http.Server{Addr: env("DIRECCION", ":8080"), Handler: srv.Rutas(), ReadHeaderTimeout: 10 * time.Second}

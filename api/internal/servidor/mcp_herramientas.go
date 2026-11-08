@@ -152,9 +152,10 @@ func (s *Servidor) sumarHerramientas(srv *mcp.Server) {
 		esquemaDe(`{"type":"object","additionalProperties":false,"required":["texto"],"properties":{
 		 "texto":{"type":"string","minLength":1,"maxLength":1000}}}`), afuera, s.hTelegram)
 
-	s.sumarHerramientasHabla(srv)    // mcp_habla.go
-	s.sumarHerramientasCuidado(srv)  // mcp_cuidado.go
-	s.sumarHerramientasCompania(srv) // mcp_compania.go (v1.9)
+	s.sumarHerramientasHabla(srv)        // mcp_habla.go
+	s.sumarHerramientasCuidado(srv)      // mcp_cuidado.go
+	s.sumarHerramientasCompania(srv)     // mcp_compania.go (v1.9)
+	s.sumarHerramientasAgendaMusica(srv) // mcp_agenda.go
 }
 
 func jsonDe(v any) string { b, _ := json.Marshal(v); return string(b) }

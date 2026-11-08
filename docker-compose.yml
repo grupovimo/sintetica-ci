@@ -30,6 +30,10 @@ x-api-entorno: &api-entorno
   # El bot de Telegram (sin token, las integraciones de Telegram quedan apagadas).
   TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
   TELEGRAM_BOT: ${TELEGRAM_BOT:-sinteticalabs_bot}
+  # Spotify y la charla con IA (v1.9; vacías = apagadas).
+  SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+  SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
 
 services:
   postgres:

@@ -50,6 +50,8 @@ type Opciones struct {
 	// servidor falso).
 	ClimaURL     string
 	GeocodingURL string
+	// Lo de la v1.9 (agenda, música y charla; ver v19.go).
+	V19 OpcionesV19
 }
 
 // Integraciones tiene todo lo de este paquete.
@@ -81,6 +83,7 @@ type Integraciones struct {
 	cuid estadoCuidado // lo de la v1.7 (cuidado.go)
 
 	toques estadoToques // los últimos toques, para devolverlos (amigos.go)
+	v19    estadoV19    // lo de la v1.9 (v19.go)
 }
 
 type entradaCache struct {
@@ -118,6 +121,7 @@ func Nuevo(op Opciones, alm *almacen.Almacen, r Robots, hub *eventos.Hub, log *s
 	if op.TelegramToken != "" {
 		i.tg = NuevoTelegram(op.TelegramURL, op.TelegramToken, op.TelegramEspera)
 	}
+	i.iniciarV19()
 	return i
 }
 
@@ -149,6 +153,8 @@ func (i *Integraciones) Correr(ctx context.Context) {
 	wg.Add(2)
 	go func() { defer wg.Done(); porMinuto(ctx, func(m time.Time) { i.revisarRutinas(ctx, m) }) }()
 	go func() { defer wg.Done(); i.trabajadorClima(ctx) }()
+	wg.Add(1)
+	go func() { defer wg.Done(); i.correrV19(ctx) }()
 	if i.tg != nil {
 		wg.Add(2)
 		go func() { defer wg.Done(); i.escucharTelegram(ctx) }()
@@ -167,6 +173,7 @@ func (i *Integraciones) Evento(bicho, evento string, datos map[string]any) {
 	switch evento {
 	case "conectado":
 		i.ClimaYa(bicho)
+		i.musicaYa(bicho)
 	case "juego":
 		i.anotarJuego(bicho, datos)
 	case "bicho-cerca":
@@ -316,6 +323,9 @@ func (i *Integraciones) Probar(ctx context.Context, usuario, bicho, n string) ([
 	}
 	if a.Cuando == "recordatorio" {
 		datos["texto"] = "esto es una prueba"
+	}
+	if a.Cuando == "agenda" {
+		datos["texto"], datos["titulo"], datos["minutos"] = "Evento de prueba", "Evento de prueba", 10
 	}
 	switch a.Cuando {
 	case "hora":

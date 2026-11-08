@@ -320,6 +320,11 @@ const TimeoutBajar = 15 * time.Second
 // devuelve hasta `max` bytes y el Content-Type. Solo https (http también en
 // desarrollo); sigue hasta 3 redirecciones, validando cada una.
 func (c *ClienteWebhook) Bajar(ctx context.Context, destino string, max int64) ([]byte, string, error) {
+	return c.bajar(ctx, destino, max, "image/png, image/jpeg, image/gif, image/*;q=0.8", "Sintetica/1.0 (+imagenes)")
+}
+
+// bajar es Bajar con otro Accept y otro User-Agent (la agenda baja un .ics).
+func (c *ClienteWebhook) bajar(ctx context.Context, destino string, max int64, accept, agente string) ([]byte, string, error) {
 	esquemaOk := func(u *url.URL) bool { return u.Scheme == "https" || (c.permitirInternos && u.Scheme == "http") }
 	u, err := url.Parse(destino)
 	if err != nil || !esquemaOk(u) {
@@ -345,8 +350,8 @@ func (c *ClienteWebhook) Bajar(ctx context.Context, destino string, max int64) (
 	if err != nil {
 		return nil, "", errors.New("url inválida")
 	}
-	req.Header.Set("User-Agent", "Sintetica/1.0 (+imagenes)")
-	req.Header.Set("Accept", "image/png, image/jpeg, image/gif, image/*;q=0.8")
+	req.Header.Set("User-Agent", agente)
+	req.Header.Set("Accept", accept)
 	r, err := cli.Do(req)
 	if err != nil {
 		return nil, "", sinURL(err)
