@@ -450,3 +450,39 @@ PRUEBA("vida: rostro: el dibujo por bloques evalúa la SDF fina solo en los bord
   }
   VERIFICAR(std::abs((abajo - arriba + 1) - 72) <= 2);
 }
+
+PRUEBA("vida: rostro: el halo de los ojos con párpados es redondo, no una caja") {
+  // Los párpados cortan el ojo con un semiplano: con el máximo de las dos
+  // distancias, afuera las curvas de nivel (y el resplandor, que sale de
+  // ahí) quedaban con esquinas, como cajas. Afuera tiene que ser la distancia
+  // de verdad a la forma (la que se mide a mano, contra los puntos de adentro).
+  Config& cfg = Sim::config();
+  cargarBase(cfg);
+  const DatosVida& vida = cfg.vida;
+  for (const char* n : {"sospecha", "dormido", "guino", "pensando", "bateria-baja", "neutral"}) {
+    const int i = vida.indiceCara(n);
+    VERIFICAR(i >= 0);
+    CuadroRostro c;
+    vida.caras[vida.indiceCara("neutral")].aplicar(c.r);
+    vida.caras[i].aplicar(c.r);
+    c.r.limitar();
+    std::vector<std::pair<float, float>> adentro;
+    const float paso = 0.004f;
+    for (float y = -0.7f; y <= 0.7f; y += paso)
+      for (float x = -1.0f; x <= 1.0f; x += paso)
+        if (distanciaRostro(c, x, y) <= 0) adentro.push_back({x, y});
+    VERIFICAR(!adentro.empty());
+    float peor = 0;
+    for (float y = -0.7f; y <= 0.7f; y += 0.015f)
+      for (float x = -1.0f; x <= 1.0f; x += 0.015f) {
+        const float d = distanciaRostro(c, x, y);
+        if (d < 0.02f || d > 0.2f) continue;  // donde llega el resplandor
+        float real = 9;
+        for (const auto& q : adentro) real = std::min(real, std::hypot(x - q.first, y - q.second));
+        if (real > 0.25f) continue;
+        peor = std::max(peor, std::fabs(real - d));
+      }
+    std::printf("    %s: lo peor del halo, %.3f\n", n, peor);
+    VERIFICAR(peor < 0.012f);
+  }
+}
