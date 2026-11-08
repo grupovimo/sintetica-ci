@@ -2,8 +2,9 @@ package integraciones
 
 // La charla con IA: le escribís (o le hablás, en el robot-celu) y el robot te
 // contesta en su pantalla con su personalidad (marco 0x40 Decir con la
-// expresión que elige). Usa la API de Anthropic (ANTHROPIC_API_KEY; sin la
-// clave, apagado) con el SDK oficial de Go. El modelo solo ve los datos de
+// expresión que elige). Usa la API de Anthropic (ANTHROPIC_API_KEY) con el SDK
+// oficial de Go, o un servicio compatible con OpenAI (CHARLA_URL, ver
+// charla_compatible.go); sin ninguno, apagado. El modelo solo ve los datos de
 // ESE robot (su nombre, su personalidad, el nombre del dueño, el clima, la
 // hora y su memoria) y no tiene herramientas: no hay cómo pedirle datos de
 // otros. Tope: 60 por día por usuario (en la base). Ver docs/nube.md, "Charla".
@@ -36,7 +37,7 @@ const (
 	TimeoutCharla      = 20 * time.Second
 )
 
-// ErrCharlaApagada: no hay ANTHROPIC_API_KEY.
+// ErrCharlaApagada: no hay ANTHROPIC_API_KEY ni CHARLA_URL.
 var ErrCharlaApagada = errors.New("la charla con IA no está prendida en este servidor")
 
 // ErrTopeCharla: ya charló 60 veces hoy.
@@ -53,8 +54,10 @@ type RespuestaCharla struct {
 	Quedan    int    `json:"quedan"`  // charlas que le quedan hoy
 }
 
-// CharlaActiva: hay clave de Anthropic.
-func (i *Integraciones) CharlaActiva() bool { return i.op.V19.AnthropicClave != "" }
+// CharlaActiva: hay clave de Anthropic o un servicio compatible.
+func (i *Integraciones) CharlaActiva() bool {
+	return i.op.V19.AnthropicClave != "" || i.charlaCompatible()
+}
 
 func (i *Integraciones) modeloCharla() string {
 	if m := i.op.V19.AnthropicModelo; m != "" {
@@ -222,6 +225,9 @@ func (i *Integraciones) clienteAnthropic() anthropic.Client {
 
 // preguntar le pide la respuesta al modelo.
 func (i *Integraciones) preguntar(ctx context.Context, d datosCharla, texto string) (string, string, error) {
+	if i.charlaCompatible() {
+		return i.preguntarCompatible(ctx, d, texto)
+	}
 	cli := i.clienteAnthropic()
 	ctx, cancelar := context.WithTimeout(ctx, TimeoutCharla+5*time.Second)
 	defer cancelar()

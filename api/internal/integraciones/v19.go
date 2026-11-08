@@ -28,7 +28,10 @@ type OpcionesV19 struct {
 
 	AnthropicClave  string
 	AnthropicURL    string // vacía, la de siempre (los tests ponen un servidor falso)
-	AnthropicModelo string // vacío, claude-haiku-5-5
+	AnthropicModelo string // vacío, claude-haiku-5-5 (con CharlaURL, el modelo de ese servicio)
+	// Un servicio compatible con la API de chat de OpenAI (Groq, OpenRouter,
+	// Gemini, uno propio): con CharlaURL y un modelo, se usa en vez de Anthropic.
+	CharlaURL, CharlaClave string
 }
 
 type estadoV19 struct {

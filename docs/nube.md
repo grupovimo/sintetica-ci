@@ -697,7 +697,13 @@ sin ellas, apagado y `GET /v1/musica` → `{"disponible": false}`.
 
 **Charla con IA** (`charlas_uso` y `charla_robot`): con `ANTHROPIC_API_KEY`
 (modelo `claude-haiku-5-5`, o `CHARLA_MODELO`), con el SDK oficial de Go
-(`github.com/anthropics/anthropic-sdk-go`); sin la clave, `GET /v1/charla` →
+(`github.com/anthropics/anthropic-sdk-go`), **o** con cualquier servicio
+compatible con la API de chat de OpenAI (gana sobre Anthropic): `CHARLA_URL`
+(la base, por ejemplo `https://api.groq.com/openai/v1`, OpenRouter, Gemini o un
+Ollama propio), `CHARLA_CLAVE` y `CHARLA_MODELO` (obligatorio en este modo). Se
+pide `response_format: json_object` y el esquema va en el prompt
+(`charla_compatible.go`). Para arrancar sin costo sirve una capa gratis (Groq);
+el tope de 60 por día por usuario es el mismo. Sin ninguno, `GET /v1/charla` →
 `{"disponible": false}` y charlar da 503.
 
 - `POST /v1/bichos/{id}/charla {"texto"}` (1 a 500 bytes) → `{"texto",
@@ -862,7 +868,8 @@ SVG) y el prompt `inventar_cara`.
 | `CLIMA_API_URL`, `GEOCODING_API_URL` | Open-Meteo (pronóstico y búsqueda de lugares; para tests) | vacío = `https://api.open-meteo.com/v1/forecast` y `https://geocoding-api.open-meteo.com/v1/search` |
 | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` | la app de Spotify (la música); vacías = apagado | el de `.env` (nunca en el repo) |
 | `ANTHROPIC_API_KEY` | la charla con IA; vacía = apagada | el de `.env` (nunca en el repo) |
-| `CHARLA_MODELO` | el modelo de la charla | vacío = `claude-haiku-5-5` |
+| `CHARLA_MODELO` | el modelo de la charla | vacío = `claude-haiku-5-5` (con `CHARLA_URL`, obligatorio) |
+| `CHARLA_URL`, `CHARLA_CLAVE` | un servicio compatible con OpenAI para la charla (Groq, OpenRouter, Gemini, Ollama) | vacías = Anthropic |
 
 ## Antes de ponerlo en el VPS
 

@@ -187,6 +187,7 @@ func correr(log *slog.Logger) error {
 			Secreto: secreto, APIURL: op.URLPublica, WebURL: op.WebURL,
 			SpotifyID: os.Getenv("SPOTIFY_CLIENT_ID"), SpotifySecreto: os.Getenv("SPOTIFY_CLIENT_SECRET"),
 			AnthropicClave: os.Getenv("ANTHROPIC_API_KEY"), AnthropicModelo: os.Getenv("CHARLA_MODELO"),
+			CharlaURL: os.Getenv("CHARLA_URL"), CharlaClave: os.Getenv("CHARLA_CLAVE"),
 		},
 	}, alm, n, hub, log)
 	n.Escuchar(integ)

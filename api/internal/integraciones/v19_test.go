@@ -598,3 +598,46 @@ func TestCharlaPorTelegram(t *testing.T) {
 	}
 	esperarEnviado(t, robots, otro+" 2 ")
 }
+
+func TestCharlaConServicioCompatible(t *testing.T) {
+	a := abrirBase(t)
+	ctx := context.Background()
+	var mu sync.Mutex
+	var pedido map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/openai/v1/chat/completions" || r.Header.Get("Authorization") != "Bearer gsk-prueba" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		mu.Lock()
+		json.NewDecoder(r.Body).Decode(&pedido) //nolint:errcheck
+		mu.Unlock()
+		io.WriteString(w, `{"choices":[{"message":{"role":"assistant","content":"`+"```json\\n"+`{\"texto\":\"¡Hola Ana! Todo bien por acá\",\"expresion\":\"contento\"}`+"\\n```"+`"}}]}`) //nolint:errcheck
+	}))
+	defer srv.Close()
+	u, id := usuarioConBicho(t, a)
+	if _, err := a.NuevaConfig(ctx, id, `{"version":2,"nombre":"Pipo","dueno":{"nombre":"Ana"}}`, 0, "web", &u.ID); err != nil {
+		t.Fatal(err)
+	}
+	robots := &robotsFalsos{duenos: map[string]string{id: u.ID}, estados: map[string]protocolo.Estado{id: {Nombre: "Pipo"}}}
+
+	// Sin modelo no se prende (cada servicio tiene los suyos).
+	if sin := Nuevo(Opciones{V19: OpcionesV19{CharlaURL: srv.URL + "/openai/v1"}}, a, robots, eventos.Nuevo(), sinLog); sin.CharlaActiva() {
+		t.Fatal("prendida sin modelo")
+	}
+	i := Nuevo(Opciones{V19: OpcionesV19{CharlaURL: srv.URL + "/openai/v1/", CharlaClave: "gsk-prueba", AnthropicModelo: "llama-prueba",
+		AnthropicClave: "sk-que-no-se-usa"}}, a, robots, eventos.Nuevo(), sinLog)
+	r, err := i.Charlar(ctx, u.ID, id, "¿cómo andás?", "web")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Texto != "¡Hola Ana! Todo bien por acá" || r.Expresion != "contento" || r.Quedan != CharlasPorDia-1 {
+		t.Fatalf("respuesta: %+v", r)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	msgs, _ := json.Marshal(pedido["messages"])
+	if pedido["model"] != "llama-prueba" || !strings.Contains(string(msgs), "Sos Pipo") || !strings.Contains(string(msgs), `\"expresion\"`) {
+		t.Fatalf("pedido: %v %s", pedido["model"], msgs)
+	}
+}
