@@ -13,12 +13,13 @@ fi
 cd "$destino"
 git pull -q --rebase 2>/dev/null || true
 rm -rf ios firmware shared .github
-mkdir -p firmware shared/protocolo shared/formato .github/workflows
+mkdir -p firmware shared/protocolo shared/formato/vida .github/workflows
 rsync -a --exclude 'Sintetica.xcodeproj' --exclude '.DS_Store' "$raiz/ios/" ios/
 rsync -a --exclude '*.md' "$raiz/firmware/nucleo/" firmware/nucleo/
 rsync -a --exclude 'cgo' "$raiz/firmware/api/" firmware/api/
 cp "$raiz/shared/protocolo/vectores.json" shared/protocolo/
 cp "$raiz/shared/formato/config-ejemplo.json" shared/formato/
+cp "$raiz"/shared/formato/vida/*.json shared/formato/vida/
 cp "$raiz/herramientas/ios-ci/testflight.yml" .github/workflows/
 printf '# Sintética · iOS\n\nCopia de la app de iOS para compilarla y subirla a TestFlight. No se edita acá.\n' > README.md
 git add -A
