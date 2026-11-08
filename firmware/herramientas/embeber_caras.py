@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Embebe shared/formato/caras/*.json en firmware/nucleo/caras_base.h y
-shared/formato/vida/*.json (expresiones paramétricas, comportamientos, reglas
-y personalidades del motor de vida) en firmware/nucleo/vida_base.h.
+shared/formato/vida/*.json (expresiones paramétricas, comportamientos, reglas,
+personalidades y frases del motor de vida) en firmware/nucleo/vida_base.h.
+
+Las frases van como una tabla (no como JSON): el núcleo las lee de la flash
+sin parsear nada, así no ocupan RAM en el broche.
 
 Las caras son datos: el firmware las lee con el mismo parser que usa para la
 configuración que manda la app. Este header es generado; no editarlo a mano.
@@ -21,6 +24,53 @@ DESTINO_VIDA = RAIZ / "firmware" / "nucleo" / "vida_base.h"
 
 def compacto(v) -> str:
     return json.dumps(v, ensure_ascii=False, separators=(",", ":"))
+
+
+LARGO_FRASE = 60  # bytes UTF-8 (lo mismo que el globo del comando Decir)
+
+
+def c_texto(t: str) -> str:
+    """Un texto UTF-8 como literal de C++."""
+    return '"' + t.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def tabla_frases(frases) -> list:
+    sit = frases["situaciones"]
+    lim = frases["limites"]
+    partes = [
+        "struct SituacionBase {",
+        "  const char* nombre;",
+        "  int probabilidad;   // centésimos",
+        "  int enfriamiento;   // segundos",
+        "  bool siempre;       // no cuenta para el límite diario ni depende de la frecuencia",
+        "  int primera, cantidad;  // en FRASES_BASE",
+        "};",
+        "",
+        "struct FraseBase {",
+        '  const char* preset;  // "" = para todos',
+        "  const char* texto;",
+        "};",
+        "",
+        f"constexpr int FRASES_POR_DIA = {int(lim['por_dia'])};",
+        f"constexpr int FRASES_SEPARACION_S = {int(lim['separacion'])};",
+        "",
+    ]
+    filas, tabla = [], []
+    for nombre, s in sit.items():
+        primera = len(tabla)
+        for preset, lista in s["frases"].items():
+            for t in lista:
+                n = len(t.encode("utf-8"))
+                if not 1 <= n <= LARGO_FRASE:
+                    sys.exit(f"frases.json: {nombre}/{preset}: {t!r} tiene {n} bytes (de 1 a {LARGO_FRASE})")
+                tabla.append(f'    {{{c_texto("" if preset == "todos" else preset)}, {c_texto(t)}}},')
+        filas.append(f'    {{"{nombre}", {round(float(s["probabilidad"]) * 100)}, {int(s["enfriamiento"])}, '
+                     f'{"true" if s.get("siempre") else "false"}, {primera}, {len(tabla) - primera}}},')
+    partes += [f"constexpr int CANTIDAD_SITUACIONES_BASE = {len(filas)};",
+               "inline const SituacionBase SITUACIONES_BASE[CANTIDAD_SITUACIONES_BASE] = {", *filas, "};", "",
+               f"constexpr int CANTIDAD_FRASES_BASE = {len(tabla)};",
+               "inline const FraseBase FRASES_BASE[CANTIDAD_FRASES_BASE] = {", *tabla, "};", ""]
+    return partes
 
 
 def generar_vida() -> str:
@@ -54,7 +104,7 @@ def generar_vida() -> str:
                f'inline const char* const REGLAS_VIDA_BASE = R"json({compacto(leer("reglas.json"))})json";',
                "",
                f'inline const char* const PERSONALIDADES_BASE = R"json({compacto(leer("personalidades.json"))})json";',
-               "", "}  // namespace sintetica", ""]
+               "", *tabla_frases(leer("frases.json")), "}  // namespace sintetica", ""]
     return "\n".join(partes)
 
 

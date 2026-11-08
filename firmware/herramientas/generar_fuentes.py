@@ -23,8 +23,8 @@ DESTINO = AQUI.parent / "nucleo" / "fuentes.h"
 
 MAYUS = "ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÜÑ"
 DIGITOS = "0123456789"
-TECNICO = MAYUS + DIGITOS + " #·-—:./%+()"
-VOZ = MAYUS + MAYUS.lower() + DIGITOS + " .,:;!¡?¿-—'()"
+TECNICO = MAYUS + DIGITOS + " #·-—:./%+()°"
+VOZ = MAYUS + MAYUS.lower() + DIGITOS + " .,:;!¡?¿-—'()°"
 
 ESTILOS = [
     # nombre, archivo, tamaño px, ejes variables, tracking px, juego de caracteres
