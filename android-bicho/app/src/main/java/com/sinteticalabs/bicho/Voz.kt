@@ -9,6 +9,7 @@ import android.media.MediaPlayer
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Bundle
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.speech.tts.TextToSpeech
@@ -44,6 +45,9 @@ class Voz(private val contexto: Context) {
     @Volatile private var habla: TextToSpeech? = null
     @Volatile private var hablaLista = false
     private var ultimoGlobo = ""
+    /** Cuándo apareció el último globo (la charla mira si le contestaron). */
+    @Volatile var ultimoGloboEn = 0L
+        private set
     // Del hilo de la habla: el globo que se ve, si ya se dijo y la espera del audio de la nube.
     private var globoCrc = -1L
     private var globoLimpio = ""
@@ -73,6 +77,7 @@ class Voz(private val contexto: Context) {
         val texto = String(utf8, Charsets.UTF_8)
         if (texto == ultimoGlobo) return
         ultimoGlobo = texto
+        if (texto.isNotEmpty()) ultimoGloboEn = SystemClock.elapsedRealtime()
         colaHabla.post { globoNuevo(utf8, texto) }
     }
 

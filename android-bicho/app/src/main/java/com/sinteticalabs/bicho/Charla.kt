@@ -175,7 +175,15 @@ class Charla(
             return
         }
         Log.i("Bicho", "charla: frase de ${enviar.length} letras a la nube")
+        val mandada = android.os.SystemClock.elapsedRealtime()
         alPublicar("charla", JSONObject().put("texto", enviar).toString())
+        // Si nadie contesta (sin nube, sin motor ni IA), no se queda mudo: duda.
+        while (android.os.SystemClock.elapsedRealtime() - mandada < SIN_RESPUESTA_MS) {
+            if (voz.ultimoGloboEn > mandada) return
+            Thread.sleep(200)
+        }
+        Log.i("Bicho", "charla: nadie contestó")
+        alNucleo(byteArrayOf(0x1F) + "dudar".toByteArray())
     }
 
     private fun cargar(): Model? {
@@ -195,6 +203,7 @@ class Charla(
         const val MOSTRAR_MS = 2000
         const val PREVIO = 20  // tramos de 50 ms
         const val ESPERA_URL_MS = 3000L
+        const val SIN_RESPUESTA_MS = 6000L
 
         /** En minúsculas y sin tildes (Vosk escribe así; la palabra puede venir con mayúsculas). */
         fun normalizar(s: String): String =
