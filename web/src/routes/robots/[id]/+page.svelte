@@ -74,7 +74,7 @@
 <Barra>
   {#snippet izquierda()}<a class="tecla negra chica" href="/robots">← Mis robots</a>{/snippet}
   {#snippet medio()}
-    <span class="guardado" class:error={g.estado === 'error'} aria-live="polite"><span class="led" class:on={g.estado === 'guardando'} class:verde={g.estado === 'guardado'}></span>{textoGuardado}</span>
+    <span class="guardado" class:error={g.estado === 'error'} aria-live="polite" title={textoGuardado}><span class="led" class:on={g.estado === 'guardando'} class:verde={g.estado === 'guardado'}></span><span>{textoGuardado}</span></span>
   {/snippet}
 </Barra>
 
@@ -180,7 +180,11 @@
     .modulo b { font-size: 10px; }
   }
   @media (max-width: 560px) {
-    .teclado { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .modulo .n { display: none; }
+    /* En el celu, el teclado es una tira que se desliza: cada tecla con su nombre entero. */
+    .teclado { display: flex; overflow-x: auto; gap: 8px; margin: -6px -16px 0; padding: 6px 16px 12px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+    .teclado::-webkit-scrollbar { display: none; }
+    .modulo { flex: none; min-width: 112px; scroll-snap-align: start; }
+    .modulo b { font-size: 11px; overflow-wrap: normal; white-space: nowrap; }
+    .guardado span:not(.led) { display: none; }
   }
 </style>

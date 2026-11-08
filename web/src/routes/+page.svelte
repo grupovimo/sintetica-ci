@@ -46,6 +46,14 @@
     else scrollTo({ top: y });
   }
   const configVivo = $derived({ version: 2, personalidad: { preset: personalidad } });
+  // La cara que "inventó la IA" en la sección Tu IA.
+  const configEstrellas = { version: 2, expresiones: { estrellas: { ojo: { star: 1, w: 0.13, h: 0.2 }, mcurve: 0.8, mo: 0.04, blush: 0.6, particula: 'chispa' } } };
+  const AYUDAS: [string, string][] = [
+    ['Te recuerda', 'M12 7v5l3 2 M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z'],
+    ['Pomodoro', 'M9 2h6 M12 5v3 M12 22a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z M12 14l3-3'],
+    ['Reloj', 'M3 7h18v10H3z M8 12h.01 M12 12h.01 M16 12h.01'],
+    ['Te avisa por Telegram', 'M21 4 3 11l6 2 2 6 3-4 5 4 2-15Z'],
+  ];
   let caras = $state<{ nombre: string; url: string }[]>([]);
 
   // La reserva
@@ -294,7 +302,40 @@
     </div>
   </section>
 
-  <!-- 6 · La app -->
+  <!-- 6 · Te ayuda -->
+  <section id="ayuda" class="hueso seccion">
+    <div class="contenedor angosto pila-48">
+      <h2 class="t-h2 aparece">Además,<br />te ayuda.</h2>
+      <ul class="ayudas">
+        {#each AYUDAS as [titulo, icono], i}
+          <li class="ayuda aparece" style:transition-delay={`${i * 70}ms`}>
+            <span class="inflado naranja icono grande" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d={icono} /></svg></span>
+            <span class="t-h4">{titulo}</span>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  </section>
+
+  <!-- 7 · Tu IA -->
+  <section id="ia" class="negra seccion">
+    <div class="contenedor angosto ia">
+      <div class="pila-32">
+        <h2 class="t-h2 aparece">Tu IA<br /><span class="naranja">lo maneja.</span></h2>
+        <div class="chat aparece" aria-label="Ejemplo de chat con tu IA">
+          <p class="burbuja vos">Ponele ojitos de estrella</p>
+          <p class="burbuja ia-b"><span aria-hidden="true">✦</span> Listo</p>
+        </div>
+        <p class="t-cuerpo apagado">Claude o ChatGPT.</p>
+      </div>
+      <div class="vivo aparece">
+        <Pantalla config={configEstrellas} visible="estrellas" ancho={640} etiqueta="La cara que inventó la IA, en vivo" />
+        <span class="ficha"><i class="punto"></i>En vivo</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 · La app -->
   <section id="app" class="hueso seccion">
     <div class="contenedor angosto app">
       <div class="pila-40">
@@ -303,6 +344,7 @@
           <li class="aparece"><span class="inflado naranja icono" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="3" /><path d="M9 10v4M15 10v4" /></svg></span><span class="t-h4">Tus robots, en vivo</span></li>
           <li class="aparece"><span class="inflado naranja icono" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" /></svg></span><span class="t-h4">Su personalidad</span></li>
           <li class="aparece"><span class="inflado naranja icono" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="9" cy="9" r="2" /><path d="M21 15l-5-5L5 21" /></svg></span><span class="t-h4">Imágenes y GIFs</span></li>
+          <li class="aparece"><span class="inflado naranja icono" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2Z" /></svg></span><span class="t-h4">Tu IA lo maneja</span></li>
         </ul>
         <div class="fila">
           <a class="tienda" href={APP_STORE || '#app'} aria-label="Descárgalo en el App Store">
@@ -321,58 +363,25 @@
         <div class="sombra-piso" aria-hidden="true"></div>
         <div class="telefono izq" data-parallax="0.05" style="transform: translateY(var(--py, 0px)) rotate(-8deg)">
           <i class="boton b1"></i><i class="boton b2"></i><i class="boton b3"></i>
-          <div class="bisel"><div class="pantalla-tel" role="img" aria-label="La app: Mis robots, con la Unidad conectada y el Broche cerca">
+          <div class="bisel"><div class="pantalla-tel" role="img" aria-label="La app: Mis robots">
             <span class="isla"></span>
-            <div class="tel-cuerpo">
-              <span class="tel-titulo">Mis robots</span>
-              <div class="tel-tarjeta col">
-                <svg viewBox="0 0 160 86" class="tel-cara" aria-hidden="true"><rect x="52" y="22" width="14" height="40" rx="7" fill="#ff6a33" /><rect x="94" y="22" width="14" height="40" rx="7" fill="#ff6a33" /></svg>
-                <div class="entre"><b>Unidad #001</b><small class="ok">● Conectada</small></div>
-              </div>
-              <div class="tel-tarjeta">
-                <svg viewBox="0 0 60 60" width="44" height="44" aria-hidden="true"><circle cx="30" cy="30" r="29" fill="#0b0a09" /><rect x="19" y="20" width="7" height="20" rx="3.5" fill="#ff6a33" /><rect x="34" y="20" width="7" height="20" rx="3.5" fill="#ff6a33" /></svg>
-                <div class="col"><b>Broche #014</b><small class="cerca">● Cerca</small></div>
-              </div>
-            </div>
-            <div class="pestanas"><span class:activa={true}><i></i>Robots</span><span class:activa={false}><i></i>Caras</span><span class:activa={false}><i></i>Imágenes</span><span class:activa={false}><i></i>Cuenta</span></div>
+            <img class="captura" src="/landing/app-robots.jpg" alt="" loading="lazy" />
             <span class="reflejo"></span>
           </div></div>
         </div>
         <div class="telefono der" data-parallax="0.05" style="transform: translateY(var(--py, 0px)) rotate(8deg)">
           <i class="boton b1"></i><i class="boton b2"></i><i class="boton b3"></i>
-          <div class="bisel"><div class="pantalla-tel" role="img" aria-label="La app: imágenes y GIFs para la pantalla del robot">
+          <div class="bisel"><div class="pantalla-tel" role="img" aria-label="La app: el carácter de tu robot">
             <span class="isla"></span>
-            <div class="tel-cuerpo">
-              <span class="tel-titulo">Imágenes</span>
-              <div class="miniaturas">
-                <span style="background: linear-gradient(135deg, #e8c39e, #8b5e3c)"></span>
-                <span style="background: linear-gradient(135deg, #7bd3ff, #3d2c8d)"><em>GIF</em></span>
-                <span style="background: linear-gradient(135deg, #b6ff5a, #1f6b3a)"></span>
-                <span style="background: linear-gradient(135deg, #ffd1f4, #c2410c)"></span>
-                <span class="sumar">+</span>
-              </div>
-            </div>
-            <div class="pestanas"><span class:activa={false}><i></i>Robots</span><span class:activa={false}><i></i>Caras</span><span class:activa={true}><i></i>Imágenes</span><span class:activa={false}><i></i>Cuenta</span></div>
+            <img class="captura" src="/landing/app-caracter.jpg" alt="" loading="lazy" />
             <span class="reflejo"></span>
           </div></div>
         </div>
         <div class="telefono centro" data-parallax="-0.04" style="transform: translateY(var(--py, 0px))">
           <i class="boton b1"></i><i class="boton b2"></i><i class="boton b3"></i>
-          <div class="bisel"><div class="pantalla-tel" role="img" aria-label="La app: la Unidad, con su cara en vivo y la personalidad Pícaro">
+          <div class="bisel"><div class="pantalla-tel" role="img" aria-label="La app: tu robot, en vivo">
             <span class="isla"></span>
-            <div class="tel-cuerpo">
-              <div class="entre"><span class="tel-titulo chico">Unidad #001</span><small class="vivo-chip">● En vivo</small></div>
-              <div class="marco-cara"><svg viewBox="0 0 160 86" class="tel-cara" aria-hidden="true"><path d="M50 52 Q59 26 68 52 M92 52 Q101 26 110 52" fill="none" stroke="#ff6a33" stroke-width="8" stroke-linecap="round" /></svg></div>
-              <div class="fila chica"><span class="pildora oscura">Contento</span><span class="pildora">Jugando</span></div>
-              <b class="tel-etiqueta">Personalidad</b>
-              <div class="fila chica"><span class="pildora activa">Pícaro</span><span class="pildora">Tímido</span><span class="pildora">Curioso</span></div>
-              <div class="tel-tarjeta col barras">
-                {#each [['Energía', 72], ['Curiosidad', 58]] as [n, v]}
-                  <div class="col"><small>{n}</small><span class="barra" style:--v={`${v}%`}></span></div>
-                {/each}
-              </div>
-            </div>
-            <div class="pestanas"><span class:activa={true}><i></i>Robots</span><span class:activa={false}><i></i>Caras</span><span class:activa={false}><i></i>Imágenes</span><span class:activa={false}><i></i>Cuenta</span></div>
+            <img class="captura" src="/landing/app-consola.jpg" alt="" loading="lazy" />
             <span class="reflejo"></span>
           </div></div>
         </div>
@@ -380,7 +389,7 @@
     </div>
   </section>
 
-  <!-- 7 · Reserva -->
+  <!-- 9 · Reserva -->
   <section id="reservar" class="seccion reserva">
     <div class="puntos" data-parallax="0.08" aria-hidden="true"></div>
     <div class="contenedor angosto pila-48">
@@ -494,6 +503,18 @@
   .funciones li { display: flex; align-items: center; gap: 16px; }
   .funciones .t-h4 { font-size: 28px; }
   .icono { width: 48px; min-height: 48px; padding: 0; }
+  .ayudas { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 20px; }
+  .ayuda { display: flex; flex-direction: column; gap: 18px; padding: 24px; border-radius: 28px; background: #fff; box-shadow: 0 30px 50px -36px rgba(0, 0, 0, 0.4); }
+  .icono.grande { width: 64px; height: 64px; }
+  .ia { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: center; }
+  .ia h2 { font-size: clamp(52px, 6.4vw, 104px); }
+  .ayuda .t-h4 { font-size: clamp(20px, 2vw, 26px); overflow-wrap: anywhere; }
+  .chat { display: flex; flex-direction: column; gap: 10px; max-width: 340px; }
+  .burbuja { margin: 0; padding: 14px 18px; border-radius: 22px; font-weight: 700; font-size: 18px; line-height: 1.3; }
+  .burbuja.vos { align-self: flex-end; background: #ff5a1f; color: #111; border-bottom-right-radius: 6px; }
+  .burbuja.ia-b { align-self: flex-start; background: #2a2622; color: #f5f2ec; border-bottom-left-radius: 6px; }
+  .apagado { opacity: 0.6; }
+  @media (max-width: 860px) { .ia { grid-template-columns: 1fr; gap: 32px; } }
   .tienda { display: inline-flex; align-items: center; gap: 12px; min-height: 64px; padding: 0 24px 0 18px; border-radius: 16px; background: #000; color: #fff !important; box-shadow: inset 0 0 0 1px #a6a6a6; transition: transform 0.2s; }
   .tienda:hover { transform: translateY(-2px); }
   .tienda-texto { display: flex; flex-direction: column; gap: 2px; font-family: Roboto, Arial, sans-serif; }
@@ -513,37 +534,11 @@
   .b3 { right: -3px; top: 150px; height: 80px; border-radius: 0 2px 2px 0; }
   .bisel { width: 100%; height: 100%; padding: 4px; border-radius: 32px; background: #050505; }
   .telefono.centro .bisel { border-radius: 40px; }
-  .pantalla-tel { position: relative; width: 100%; height: 100%; border-radius: 28px; overflow: hidden; background: #f5f2ec; color: #1a1714; display: flex; flex-direction: column; }
+  .captura { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .pantalla-tel { position: relative; width: 100%; height: 100%; border-radius: 28px; overflow: hidden; background: #16140f; color: #1a1714; display: flex; flex-direction: column; }
   .telefono.centro .pantalla-tel { border-radius: 36px; }
   .isla { position: absolute; z-index: 3; top: 10px; left: 50%; width: 92px; height: 26px; margin-left: -46px; border-radius: 999px; background: #000; }
   .reflejo { position: absolute; z-index: 4; inset: 0; pointer-events: none; background: linear-gradient(115deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 32%); }
-  .tel-cuerpo { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 48px 14px 12px; }
-  .tel-titulo { font: 900 24px/1 'Archivo', sans-serif; font-stretch: 115%; letter-spacing: -0.03em; }
-  .tel-titulo.chico { font-size: 22px; }
-  .tel-tarjeta { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 22px; background: #fff; box-shadow: 0 8px 16px -12px rgba(0, 0, 0, 0.4); }
-  .tel-tarjeta.col { flex-direction: column; align-items: stretch; }
-  .tel-tarjeta b, .tel-etiqueta { font: 800 14px/1 'Archivo', sans-serif; }
-  .tel-etiqueta { color: #5c5650; font-size: 13px; }
-  .pantalla-tel small { font: 700 10px/1 'Archivo', sans-serif; }
-  .ok { color: #2f7d5b; }
-  .cerca { color: #a8650a; }
-  .vivo-chip { padding: 6px 10px; border-radius: 999px; background: #e3f2ea; color: #2f7d5b; }
-  .tel-cara { width: 100%; display: block; border-radius: 18px; background: #0b0a09; }
-  .marco-cara { padding: 10px; border-radius: 26px; background: linear-gradient(160deg, #2b2b2b, #0c0c0c); box-shadow: 0 16px 24px -16px rgba(0, 0, 0, 0.6); }
-  .pildora { padding: 8px 12px; border-radius: 999px; background: #fff; font: 700 12px/1 'Archivo', sans-serif; }
-  .pildora.oscura { background: #1a1714; color: #fff; }
-  .pildora.activa { background: radial-gradient(130% 150% at 30% 0%, #ffb08a, #ff5a1f 45%, #c2410c); box-shadow: inset 0 2px 1px rgba(255, 255, 255, 0.6); font-weight: 800; }
-  .barras { gap: 10px; padding: 14px; }
-  .barra { height: 8px; border-radius: 999px; background: linear-gradient(90deg, #ff6a33 var(--v), #ece7de var(--v)); }
-  .miniaturas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .miniaturas span { position: relative; aspect-ratio: 16 / 10; border-radius: 12px; }
-  .miniaturas em { position: absolute; right: 5px; bottom: 5px; padding: 3px 6px; border-radius: 999px; background: #000; color: #fff; font: 800 9px/1 'Archivo', sans-serif; font-style: normal; }
-  .miniaturas .sumar { border: 2px dashed #b8b2a8; display: flex; align-items: center; justify-content: center; font: 800 18px/1 'Archivo', sans-serif; color: #8a847c; }
-  .pestanas { display: flex; justify-content: space-around; align-items: center; padding: 10px 12px 18px; background: rgba(255, 255, 255, 0.85); border-top: 1px solid #e2ddd4; }
-  .pestanas span { display: flex; flex-direction: column; align-items: center; gap: 4px; font: 700 10px/1 'Archivo', sans-serif; color: #8a847c; }
-  .pestanas i { width: 22px; height: 22px; border-radius: 8px; background: #d6d1c8; }
-  .pestanas span.activa { color: #c2410c; }
-  .pestanas span.activa i { background: #ff5a1f; }
   .relleno { flex: 1; }
 
   /* 7 · Reserva */
