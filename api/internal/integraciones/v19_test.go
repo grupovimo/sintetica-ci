@@ -472,13 +472,10 @@ func TestCharlaConAnthropicFalso(t *testing.T) {
 	}
 	robots := &robotsFalsos{duenos: map[string]string{id: u.ID, idAjeno: ajeno.ID}, estados: map[string]protocolo.Estado{id: {Nombre: "Pipo"}}}
 
-	apagada := Nuevo(Opciones{}, a, robots, eventos.Nuevo(), sinLog)
-	if _, err := apagada.Charlar(ctx, u.ID, id, "hola", "web"); !errors.Is(err, ErrCharlaApagada) {
-		t.Fatal(err)
-	}
 	i := Nuevo(Opciones{V19: OpcionesV19{AnthropicClave: "sk-prueba", AnthropicURL: srv.URL}}, a, robots, eventos.Nuevo(), sinLog)
+	i.cm.espera = 20 * time.Millisecond
 
-	r, err := i.Charlar(ctx, u.ID, id, "¿cómo andás?", "web")
+	r, err := i.Charlar(ctx, u.ID, id, "¿qué opinás de la vida?", "web")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -500,7 +497,7 @@ func TestCharlaConAnthropicFalso(t *testing.T) {
 		t.Fatalf("output_config: %s", oc)
 	}
 	msgs, _ := json.Marshal(p["messages"])
-	if !strings.Contains(string(msgs), "¿cómo andás?") {
+	if !strings.Contains(string(msgs), "¿qué opinás de la vida?") {
 		t.Fatalf("mensajes: %s", msgs)
 	}
 
@@ -508,7 +505,7 @@ func TestCharlaConAnthropicFalso(t *testing.T) {
 	falso.mu.Lock()
 	falso.respuesta = `{"texto":"Bah, más o menos.","expresion":"enojado"}`
 	falso.mu.Unlock()
-	if r, err := i.Charlar(ctx, u.ID, id, "hola", "app"); err != nil || r.Texto != "Bah, más o menos." || r.Expresion != "enojado" {
+	if r, err := i.Charlar(ctx, u.ID, id, "contame de los agujeros negros", "app"); err != nil || r.Texto != "Bah, más o menos." || r.Expresion != "enojado" {
 		t.Fatalf("con expresión: %+v %v", r, err)
 	}
 	// El robot de otro: ni se le pregunta a la IA.
@@ -522,7 +519,7 @@ func TestCharlaConAnthropicFalso(t *testing.T) {
 
 	// Por MQTT (el robot-celu): lo que dice va por su cmd.
 	vaciar(robots)
-	i.CharlaMQTT(id, []byte(`{"texto":"hola desde el celu"}`))
+	i.CharlaMQTT(id, []byte(`{"texto":"¿qué es la fotosíntesis?"}`))
 	m, _ = protocolo.Decir("Bah, más o menos.", "enojado")
 	esperarEnviado(t, robots, fmt.Sprintf("%s 2 %x", id, m))
 	antes = falso.cantidad()
@@ -538,12 +535,16 @@ func TestCharlaConAnthropicFalso(t *testing.T) {
 	for k := i.CharlasQuedan(ctx, u.ID); k > 0; k-- {
 		a.UsarCharla(ctx, u.ID, time.Now().In(nube.Zona()), CharlasPorDia) //nolint:errcheck
 	}
-	if _, err := i.Charlar(ctx, u.ID, id, "hola", "web"); !errors.Is(err, ErrTopeCharla) {
+	if _, err := i.Charlar(ctx, u.ID, id, "¿qué opinás de la vida?", "web"); !errors.Is(err, ErrTopeCharla) {
 		t.Fatalf("tope: %v", err)
+	}
+	// Lo que entiende el motor no gasta el tope: sigue andando.
+	if r, err := i.Charlar(ctx, u.ID, id, "hola", "web"); err != nil || r.Fuente != FuenteMotor {
+		t.Fatalf("motor con el tope lleno: %+v %v", r, err)
 	}
 	vaciar(robots)
 	i.limite = nuevoLimitador()
-	i.CharlaMQTT(id, []byte(`{"texto":"hola"}`))
+	i.CharlaMQTT(id, []byte(`{"texto":"¿cuál es la capital de Mongolia?"}`))
 	m, _ = protocolo.Decir("Por hoy ya charlamos mucho. ¡Mañana más!", "dormido")
 	esperarEnviado(t, robots, fmt.Sprintf("%x", m))
 }
@@ -562,6 +563,7 @@ func TestCharlaPorTelegram(t *testing.T) {
 	robots := &robotsFalsos{duenos: map[string]string{id: u.ID, otro: u.ID}, estados: map[string]protocolo.Estado{id: {Nombre: "Pipo"}, otro: {Nombre: "Lola"}}}
 	i := Nuevo(Opciones{TelegramToken: token, TelegramURL: stg.URL, TelegramEspera: 1,
 		V19: OpcionesV19{AnthropicClave: "sk-prueba", AnthropicURL: sia.URL}}, a, robots, eventos.Nuevo(), sinLog)
+	i.cm.espera = 20 * time.Millisecond
 	ctx, cancelar := context.WithCancel(context.Background())
 	defer cancelar()
 	enlace, _, _ := i.CrearVinculo(ctx, u.ID)
@@ -573,7 +575,7 @@ func TestCharlaPorTelegram(t *testing.T) {
 	base := time.Now().UnixNano() % 1_000_000_000
 	tg.mu.Lock()
 	tg.updates = []map[string]any{
-		mensajeDe(base+1, chat, "hola, ¿cómo estás?"), // dos robots y nunca charló: pregunta con cuál
+		mensajeDe(base+1, chat, "¿qué opinás de la vida?"), // dos robots y nunca charló: pregunta con cuál
 		botonDe(base+2, chat, "charla:"+otro),
 		mensajeDe(base+3, chat, "¿y ahora?"), // el último: Lola
 	}
@@ -627,7 +629,7 @@ func TestCharlaConServicioCompatible(t *testing.T) {
 	}
 	i := Nuevo(Opciones{V19: OpcionesV19{CharlaURL: srv.URL + "/openai/v1/", CharlaClave: "gsk-prueba", AnthropicModelo: "llama-prueba",
 		AnthropicClave: "sk-que-no-se-usa"}}, a, robots, eventos.Nuevo(), sinLog)
-	r, err := i.Charlar(ctx, u.ID, id, "¿cómo andás?", "web")
+	r, err := i.Charlar(ctx, u.ID, id, "¿qué opinás de la vida?", "web")
 	if err != nil {
 		t.Fatal(err)
 	}

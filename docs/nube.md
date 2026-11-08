@@ -751,13 +751,14 @@ compatible con la API de chat de OpenAI (gana sobre Anthropic): `CHARLA_URL`
 Ollama propio), `CHARLA_CLAVE` y `CHARLA_MODELO` (obligatorio en este modo). Se
 pide `response_format: json_object` y el esquema va en el prompt
 (`charla_compatible.go`). Para arrancar sin costo sirve una capa gratis (Groq);
-el tope de 60 por día por usuario es el mismo. Sin ninguno, `GET /v1/charla` →
-`{"disponible": false}` y charlar da 503.
+el tope de 60 por día por usuario es el mismo. Sin ninguno charla igual el
+**motor propio** (abajo): `GET /v1/charla` → `{"disponible": true, "ia":
+false, "quedan": -1, "sin_tope": true}`.
 
 - `POST /v1/bichos/{id}/charla {"texto"}` (1 a 500 bytes) → `{"texto",
-  "expresion", "enviado", "quedan"}`: el robot contesta y lo dice en su
-  pantalla (`0x40`) si está conectado. `GET /v1/charla` → `{"disponible",
-  "quedan", "porDia": 60}`.
+  "expresion", "enviado", "quedan", "fuente": "motor" | "ia", "intencion",
+  "accion", "guardado"}`: el robot contesta y lo dice en su pantalla si está
+  conectado. `GET /v1/charla` → `{"disponible", "ia", "quedan", "porDia": 60}`.
 - El system prompt es corto y tiene solo lo de **ese** robot: su nombre, su
   personalidad (`personalidad.preset`), el nombre del dueño, la hora, la ciudad
   y el clima, y lo que recuerda (días juntos, racha, hitos y el resumen de
@@ -779,14 +780,14 @@ el tope de 60 por día por usuario es el mismo. Sin ninguno, `GET /v1/charla` �
   casa o el Bluetooth del celu del dueño): publica en **`bicho/{id}/presencia`**
   `{"llegaste": bool}` y la nube solo la anota para los horarios y corre los
   cuandos (no le reenvía el `0x49`: ya se lo dijo a su núcleo).
-- SSE `charla` (`{texto, expresion, de, enviado}`).
+- SSE `charla` (`{texto, expresion, de, enviado, fuente}`; del motor, también `intencion` y `accion`).
 
 **La clave de IA propia** (`integraciones/ia.go`, rutas en
 `servidor/ia_paquete.go`, migración `015_ia_propia.sql`): cualquiera puede
 poner la suya (Anthropic o un servicio compatible) y su charla —HTTP,
 Telegram y el robot-celu por MQTT— usa **su** clave y **su** tope; la factura
 le llega a él. Los demás siguen con la del servidor y el tope de 60; sin
-ninguna, `GET /v1/charla` → `{"disponible": false}`. (La conversación en
+ninguna, charla el motor propio (`"ia": false`). (La conversación en
 tiempo real de ElevenLabs no usa esta clave: el modelo lo pone ElevenLabs.)
 
 - `PUT /v1/ia {"proveedor": "anthropic" | "compatible", "clave", "url"?,
@@ -809,9 +810,36 @@ tiempo real de ElevenLabs no usa esta clave: el modelo lo pone ElevenLabs.)
 - `GET /v1/charla` dice `"propia"`; con la propia sin tope, `"sin_tope": true`,
   `"quedan": -1` y `"porDia": 0` (y la respuesta de `POST …/charla` trae
   `"propia"` y `"quedan": -1`).
-- **El punto de enchufe**: `Charlar` pasa por `contestar`, que primero prueba
-  un motor sin IA (`UsarCharlaLocal`, para el motor de charla del núcleo que
-  viene: si entiende, contesta y no gasta el tope) y si no, la IA del usuario.
+
+**La charla sin IA en la nube** (v1.10, `integraciones/charla_motor.go`,
+migración `018_charla_motor.sql`): toda charla (HTTP, Telegram y
+`bicho/{id}/charla`) pasa **primero** por el mismo motor del robot
+(`nucleo.Charlar`, ver motor-de-vida.md, "Charla sin IA"), con un contexto
+armado de verdad (dueño, nombre, `personalidad.preset`, hora local, el clima
+de hoy, la agenda de hoy y de mañana, lo que suena en Spotify, los hábitos de
+la config en orden y los gustos) y el hilo de cada robot en la memoria (10 min;
+el motor lo olvida a los 90 s de la última frase). No gasta el tope.
+
+- **Entendió y el robot está conectado**: le manda `0x4C` con el texto y lo
+  charla él (globo, cara, voz propia, la acción en su RAM); la respuesta HTTP
+  trae la frase de su `0xCC` (lo espera 4 s). Con un firmware que rechaza el
+  `0x4C`, lo hace la nube y le manda `0x40`.
+- **Cada `0xCC`** (la respuesta o el aviso de lo que charló desde adentro, por
+  `bicho/{id}/resp`; el trabajador lo pasa como el evento `charla`) guarda lo
+  que vive en la config: el despertador de todos los días, un recordatorio con
+  días, el dueño, el volumen, el modo; los gustos van a `charla_gustos` (8 por
+  robot: al contexto y al prompt de la IA); los toques a un amigo (por su
+  nombre) los manda la nube. Lo de una vez (una alarma, "en 10 minutos") queda
+  en su RAM.
+- **Entendió y no está conectado**: la nube hace la acción en la config por
+  el mismo camino validado que `PUT config` (autor **`charla`**): el
+  despertador y los recordatorios (los de una vez con la letra de ese día; se
+  anotan en `charla_una_vez` y se sacan solos un rato después de su hora, y
+  el despertador que había vuelve), el hábito, el gusto, el dueño, el volumen y
+  el modo. La frase se contesta por HTTP o Telegram ("le llega cuando
+  vuelva") y, si hizo algo, se la dice con `0x40` al conectarse (30 min).
+- **No entendió**: si hay IA (la propia o la del servidor), la IA (con el
+  tope); si no hay o falla, la frase del motor.
 
 ### Voz: ElevenLabs (cada usuario con su cuenta) y la voz gratis (Edge)
 

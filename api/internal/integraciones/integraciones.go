@@ -90,7 +90,7 @@ type Integraciones struct {
 	ia     estadoIA      // la clave de IA propia de cada usuario (ia.go)
 	paq    estadoPaquete // el paquete de voz sin internet (paquete_voz.go)
 
-	charlaLocal CharlaLocal // el motor de charla sin IA (nil: solo la IA)
+	cm estadoCharlaMotor // la charla sin IA: el hilo de cada robot (charla_motor.go)
 }
 
 type entradaCache struct {
@@ -129,6 +129,7 @@ func Nuevo(op Opciones, alm *almacen.Almacen, r Robots, hub *eventos.Hub, log *s
 		i.tg = NuevoTelegram(op.TelegramURL, op.TelegramToken, op.TelegramEspera)
 	}
 	i.iniciarV19()
+	i.cm = nuevoEstadoCharlaMotor()
 	return i
 }
 
@@ -157,8 +158,9 @@ func (i *Integraciones) Correr(ctx context.Context) {
 			}
 		}()
 	}
-	wg.Add(2)
+	wg.Add(3)
 	go func() { defer wg.Done(); porMinuto(ctx, func(m time.Time) { i.revisarRutinas(ctx, m) }) }()
+	go func() { defer wg.Done(); porMinuto(ctx, func(time.Time) { i.limpiarUnaVez(ctx) }) }()
 	go func() { defer wg.Done(); i.trabajadorClima(ctx) }()
 	wg.Add(1)
 	go func() { defer wg.Done(); i.correrV19(ctx) }()
@@ -181,7 +183,7 @@ func (i *Integraciones) Evento(bicho, evento string, datos map[string]any) {
 	case "conectado":
 		i.ClimaYa(bicho)
 		i.musicaYa(bicho)
-		go func() { time.Sleep(3 * time.Second); i.avisarVoz(bicho) }() // cuando ya mandó su estado
+		go func() { time.Sleep(3 * time.Second); i.avisarVoz(bicho); i.decirPendiente(bicho) }() // cuando ya mandó su estado
 	case "recordatorio", "despertador": // lo lee en voz alta (voz.go) y sigue
 		go i.leerGloboPropio(bicho, evento, datos)
 	case "juego":
@@ -198,6 +200,9 @@ func (i *Integraciones) Evento(bicho, evento string, datos map[string]any) {
 		return
 	case "habito": // v1.9: lo marcó con un toque (habitos.go)
 		go i.habitoDelRobot(bicho, datos)
+		return
+	case "charla": // v1.10: el 0xCC (charla_motor.go)
+		go i.charlaDelRobot(bicho, datos)
 		return
 	}
 	i.encolar(bicho, evento, datos)

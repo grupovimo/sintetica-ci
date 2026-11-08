@@ -21,7 +21,7 @@ import (
 
 // CambiarConfig cambia claves de arriba de todo de la config de un bicho por el
 // mismo camino que PUT /v1/bichos/{id}/config (validada por el núcleo, versión
-// nueva con ese autor). La pone el servidor (UsarConfig).
+// nueva con ese autor; una clave en nil se saca). La pone el servidor (UsarConfig).
 type CambiarConfig func(ctx context.Context, bicho, usuario, autor string, claves map[string]any) error
 
 // UsarConfig le da a las integraciones cómo guardar la config (sin esto, la

@@ -8,19 +8,17 @@ import (
 	"sintetica/api/internal/integraciones"
 )
 
-// GET /v1/charla → {disponible, propia, quedan, porDia} (con la clave de IA
-// propia y sin tope: quedan -1, porDia 0 y sin_tope).
+// GET /v1/charla → {disponible, ia, propia, quedan, porDia} (disponible
+// siempre: sin IA charla el motor propio; sin tope: quedan -1 y sin_tope).
 func (s *Servidor) verCharla(w http.ResponseWriter, r *http.Request) {
 	responder(w, http.StatusOK, s.integ.EstadoCharla(r.Context(), usuarioDe(r).Usuario.ID))
 }
 
-// POST /v1/bichos/{id}/charla {texto} → {texto, expresion, enviado, quedan}:
-// el robot contesta (y lo dice en su pantalla si está conectado).
+// POST /v1/bichos/{id}/charla {texto} → {texto, expresion, enviado, quedan,
+// fuente: "motor" | "ia", intencion, accion, guardado}: el robot contesta
+// (con el motor propio y, si no entiende y hay IA, con la IA) y lo dice en su
+// pantalla si está conectado.
 func (s *Servidor) charlar(w http.ResponseWriter, r *http.Request) {
-	if !s.integ.CharlaDisponible(r.Context(), usuarioDe(r).Usuario.ID) {
-		fallar(w, http.StatusServiceUnavailable, integraciones.ErrCharlaApagada.Error())
-		return
-	}
 	var p struct {
 		Texto string `json:"texto"`
 	}

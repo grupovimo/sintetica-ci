@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"sintetica/api/internal/almacen"
@@ -24,11 +25,12 @@ func TestAgendaMusicaCharlaApagadas(t *testing.T) {
 	otro, _ := cuentaDePrueba(t, alm)
 	base := "/v1/bichos/" + bichos[0]
 
-	if cod, v := pedir(t, h, token, "GET", "/v1/charla", ""); cod != 200 || v["disponible"] != false {
+	// Sin IA charla igual: con el motor propio.
+	if cod, v := pedir(t, h, token, "GET", "/v1/charla", ""); cod != 200 || v["disponible"] != true || v["ia"] != false || v["quedan"] != -1.0 {
 		t.Fatalf("GET charla: %d %v", cod, v)
 	}
-	if cod, _ := pedir(t, h, token, "POST", base+"/charla", `{"texto":"hola"}`); cod != http.StatusServiceUnavailable {
-		t.Fatalf("charla sin clave: %d", cod)
+	if cod, v := pedir(t, h, token, "POST", base+"/charla", `{"texto":"hola"}`); cod != 200 || v["fuente"] != "motor" || v["texto"] == "" {
+		t.Fatalf("charla sin clave: %d %v", cod, v)
 	}
 	if cod, v := pedir(t, h, token, "GET", "/v1/musica", ""); cod != 200 || v["disponible"] != false {
 		t.Fatalf("GET musica: %d %v", cod, v)
@@ -86,7 +88,9 @@ func TestCharlaHTTP(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(alm.Cerrar)
+	var llamadas atomic.Int32
 	ia := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		llamadas.Add(1)
 		var p map[string]any
 		json.NewDecoder(r.Body).Decode(&p) //nolint:errcheck
 		w.Header().Set("Content-Type", "application/json")
@@ -109,8 +113,9 @@ func TestCharlaHTTP(t *testing.T) {
 	if cod, v := pedir(t, h, token, "GET", "/v1/charla", ""); cod != 200 || v["disponible"] != true || v["quedan"] != float64(integraciones.CharlasPorDia) {
 		t.Fatalf("GET charla: %d %v", cod, v)
 	}
-	cod, v := pedir(t, h, token, "POST", base+"/charla", `{"texto":"¿cómo andás?"}`)
-	if cod != 200 || v["texto"] != "¡Hola! Acá estoy." || v["expresion"] != "contento" || v["enviado"] != false || v["quedan"] != float64(integraciones.CharlasPorDia-1) {
+	cod, v := pedir(t, h, token, "POST", base+"/charla", `{"texto":"¿qué opinás de la vida?"}`)
+	if cod != 200 || v["texto"] != "¡Hola! Acá estoy." || v["expresion"] != "contento" || v["enviado"] != false || v["quedan"] != float64(integraciones.CharlasPorDia-1) ||
+		v["fuente"] != "ia" {
 		t.Fatalf("charla: %d %v", cod, v)
 	}
 	for _, c := range []string{`{"texto":""}`, `{"texto":"` + strings.Repeat("a", 501) + `"}`, `{"otra":1}`} {
@@ -120,5 +125,33 @@ func TestCharlaHTTP(t *testing.T) {
 	}
 	if cod, _ := pedir(t, h, otro, "POST", base+"/charla", `{"texto":"hola"}`); cod != http.StatusNotFound {
 		t.Fatalf("charla ajena: %d", cod)
+	}
+
+	// Lo que entiende el motor no va a la IA ni gasta el tope, y lo que hace
+	// queda en la config (el robot no está conectado), por el mismo camino
+	// validado que PUT config.
+	if cod, _ := pedir(t, h, token, "PUT", base+"/config", `{"version":2,"nombre":"Pipo","dueno":{"nombre":"Ana"}}`); cod != 200 {
+		t.Fatalf("PUT config: %d", cod)
+	}
+	antes := llamadas.Load()
+	cod, v = pedir(t, h, token, "POST", base+"/charla", `{"texto":"despertame a las 7"}`)
+	if cod != 200 || v["fuente"] != "motor" || v["accion"] != "alarma" || v["guardado"] != true || v["quedan"] != float64(integraciones.CharlasPorDia-1) ||
+		llamadas.Load() != antes {
+		t.Fatalf("despertame: %d %v (%d llamadas)", cod, v, llamadas.Load()-antes)
+	}
+	cod, v = pedir(t, h, token, "GET", base+"/config", "")
+	cfg, _ := v["config"].(map[string]any)
+	des, _ := cfg["despertador"].(map[string]any)
+	if cod != 200 || v["autor"] != integraciones.AutorCharla || des["hora"] != "07:00" || des["activo"] != true || cfg["nombre"] != "Pipo" {
+		t.Fatalf("config: %d %v", cod, v)
+	}
+	if cod, v := pedir(t, h, token, "POST", base+"/charla", `{"texto":"poné el modo reloj"}`); cod != 200 || v["fuente"] != "motor" || llamadas.Load() != antes {
+		t.Fatalf("modo: %d %v", cod, v)
+	}
+	if _, v := pedir(t, h, token, "GET", base+"/config", ""); v["config"].(map[string]any)["modo"] != "reloj" {
+		t.Fatalf("modo: %v", v["config"])
+	}
+	if cod, v := pedir(t, h, token, "POST", base+"/charla", `{"texto":"¿qué opinás de la vida?"}`); cod != 200 || v["fuente"] != "ia" || llamadas.Load() != antes+1 {
+		t.Fatalf("a la IA: %d %v", cod, v)
 	}
 }

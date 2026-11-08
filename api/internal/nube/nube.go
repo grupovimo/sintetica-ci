@@ -80,7 +80,8 @@ func (n *Nube) UsarVoz(v Voz) { n.voz = v }
 // Evento no puede bloquear: lo llama el trabajador del bicho.
 type Oyente interface {
 	// Evento: "conectado", "desconectado", "bateria-baja", "expresion",
-	// "duerme", "despierta" y los del registro (ver nube.EventosRegistro).
+	// "duerme", "despierta", los del registro (ver nube.EventosRegistro) y
+	// "charla" (el 0xCC de la charla sin IA, en datos["marco"]).
 	Evento(bicho, evento string, datos map[string]any)
 	// QuiereRegistro: si hay que pedirle el registro al bicho (cada 10 s)
 	// para enterarse de sus eventos (tacto, sacudida, recordatorio…).

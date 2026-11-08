@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"sintetica/api/internal/eventos"
 	"sintetica/api/internal/protocolo"
@@ -48,11 +49,13 @@ func TestIAPropiaAnthropic(t *testing.T) {
 	robots := &robotsFalsos{duenos: map[string]string{id: u.ID}, estados: map[string]protocolo.Estado{id: {Nombre: "Pipo"}}}
 	// El servidor sin IA: sin clave propia, apagada.
 	i := Nuevo(Opciones{V19: OpcionesV19{Secreto: []byte("secreto de prueba 1234"), AnthropicURL: srv.URL}}, a, robots, eventos.Nuevo(), sinLog)
-	if e := i.EstadoCharla(ctx, u.ID); e["disponible"] != false {
+	i.cm.espera = 20 * time.Millisecond
+	if e := i.EstadoCharla(ctx, u.ID); e["disponible"] != true || e["ia"] != false {
 		t.Fatalf("sin nada: %v", e)
 	}
-	if _, err := i.Charlar(ctx, u.ID, id, "hola", "web"); !errors.Is(err, ErrCharlaApagada) {
-		t.Fatal(err)
+	// Sin IA contesta el motor propio.
+	if r, err := i.Charlar(ctx, u.ID, id, "¿qué opinás de la vida?", "web"); err != nil || r.Fuente != FuenteMotor || r.Texto == "" || falso.cantidad() != 0 {
+		t.Fatalf("sin IA: %+v %v", r, err)
 	}
 
 	// Una clave mala, un modelo que no está o un proveedor raro no se guardan.
@@ -92,13 +95,13 @@ func TestIAPropiaAnthropic(t *testing.T) {
 	if e := i.EstadoCharla(ctx, u.ID); e["disponible"] != true || e["propia"] != true || e["quedan"] != -1 || e["sin_tope"] != true {
 		t.Fatalf("charla: %v", e)
 	}
-	r, err := i.Charlar(ctx, u.ID, id, "¿cómo andás?", "web")
-	if err != nil || r.Texto != "¡Con mi clave!" || !r.Propia || r.Quedan != -1 {
+	r, err := i.Charlar(ctx, u.ID, id, "¿qué opinás de la vida?", "web")
+	if err != nil || r.Texto != "¡Con mi clave!" || !r.Propia || r.Quedan != -1 || r.Fuente != FuenteIA {
 		t.Fatalf("charlar: %+v %v", r, err)
 	}
 	// Por MQTT (el robot-celu) también, aunque el servidor no tenga IA.
 	vaciar(robots)
-	i.CharlaMQTT(id, []byte(`{"texto":"hola desde el celu"}`))
+	i.CharlaMQTT(id, []byte(`{"texto":"contame de los agujeros negros"}`))
 	m, _ := protocolo.Decir("¡Con mi clave!", "contento")
 	esperarEnviado(t, robots, fmt.Sprintf("%s 2 %x", id, m))
 
@@ -125,7 +128,7 @@ func TestIAPropiaAnthropic(t *testing.T) {
 	if err := i.DesconectarIA(ctx, u.ID); err != nil {
 		t.Fatal(err)
 	}
-	if e := i.EstadoCharla(ctx, u.ID); e["disponible"] != false {
+	if e := i.EstadoCharla(ctx, u.ID); e["ia"] != false {
 		t.Fatalf("borrada: %v", e)
 	}
 	if err := i.ConectarIA(ctx, u.ID, CambiosIA{Tope: &dos}); !errors.Is(err, ErrSinIA) {
@@ -198,7 +201,7 @@ func TestIAPropiaCompatible(t *testing.T) {
 		e["servidor"] != true {
 		t.Fatalf("estado: %v", e)
 	}
-	r, err := i.Charlar(ctx, u.ID, id, "hola", "web")
+	r, err := i.Charlar(ctx, u.ID, id, "¿qué opinás de la vida?", "web")
 	if err != nil || r.Texto != "Desde mi servicio: llama-propia" || r.Quedan != 4 || !r.Propia {
 		t.Fatalf("charlar: %+v %v", r, err)
 	}

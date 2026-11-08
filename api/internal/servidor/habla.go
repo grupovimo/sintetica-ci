@@ -26,7 +26,11 @@ var patronExpresion = regexp.MustCompile(patronNombre)
 func (s *Servidor) cambiarClaves(ctx context.Context, bicho, usuario, autor string, claves map[string]any) error {
 	_, err := s.cambiarConfigDe(ctx, bicho, usuario, autor, func(o *objeto) error {
 		for k, v := range claves {
-			o.poner(k, v)
+			if v == nil {
+				o.quitar(k)
+			} else {
+				o.poner(k, v)
+			}
 		}
 		return nil
 	})

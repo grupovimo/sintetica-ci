@@ -66,7 +66,7 @@ func TestIAYPaqueteHTTP(t *testing.T) {
 	otro, _ := cuentaDePrueba(t, alm)
 
 	// Sin IA en el servidor ni propia: apagada.
-	if cod, v := pedir(t, h, token, "GET", "/v1/charla", ""); cod != 200 || v["disponible"] != false {
+	if cod, v := pedir(t, h, token, "GET", "/v1/charla", ""); cod != 200 || v["ia"] != false {
 		t.Fatalf("charla: %d %v", cod, v)
 	}
 	if cod, v := pedir(t, h, token, "GET", "/v1/ia", ""); cod != 200 || v["propia"] != false || v["servidor"] != false {
@@ -89,10 +89,10 @@ func TestIAYPaqueteHTTP(t *testing.T) {
 	if cod, v := pedir(t, h, token, "GET", "/v1/charla", ""); cod != 200 || v["disponible"] != true || v["propia"] != true || v["sin_tope"] != true {
 		t.Fatalf("charla propia: %d %v", cod, v)
 	}
-	if cod, v := pedir(t, h, token, "POST", "/v1/bichos/"+bichos[0]+"/charla", `{"texto":"hola"}`); cod != 200 || v["texto"] != "¡Hola!" || v["propia"] != true {
+	if cod, v := pedir(t, h, token, "POST", "/v1/bichos/"+bichos[0]+"/charla", `{"texto":"¿qué opinás de la vida?"}`); cod != 200 || v["texto"] != "¡Hola!" || v["propia"] != true {
 		t.Fatalf("charlar: %d %v", cod, v)
 	}
-	if cod, v := pedir(t, h, otro, "GET", "/v1/charla", ""); cod != 200 || v["disponible"] != false {
+	if cod, v := pedir(t, h, otro, "GET", "/v1/charla", ""); cod != 200 || v["ia"] != false {
 		t.Fatalf("otro: %d %v", cod, v)
 	}
 	if cod, v := pedir(t, h, token, "DELETE", "/v1/ia", ""); cod != 200 || v["propia"] != false {

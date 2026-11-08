@@ -134,6 +134,10 @@ func (t *trabajador) respuestaVida(d []byte) {
 		for _, ev := range t.registro.nuevas(l) {
 			t.n.avisar(t.id, ev.nombre, ev.datos)
 		}
+	case len(d) >= 2 && d[0] == protocolo.CmdCharlar|protocolo.Respuesta:
+		// La charla sin IA (v1.10): lo que entendió e hizo (respuesta a un
+		// 0x4C o un aviso de lo que charló desde adentro).
+		t.n.avisar(t.id, "charla", map[string]any{"marco": append([]byte(nil), d...)})
 	case len(d) >= 2 && d[0] == protocolo.CmdRestaurar|protocolo.Respuesta:
 		if d[1] != protocolo.Ok {
 			t.n.log.Warn("el bicho rechazó la mudanza", "bicho", t.id, "codigo", d[1])
