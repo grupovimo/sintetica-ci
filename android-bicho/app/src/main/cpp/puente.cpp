@@ -333,6 +333,14 @@ jstring JNI(palabra)(JNIEnv* env, jobject) {
   if (g_listo) sintetica_voz(nullptr, nullptr, nullptr, &p);
   return env->NewStringUTF(p);
 }
+// Lo que dice el globo, en bytes UTF-8 (NewStringUTF no acepta los emojis).
+jbyteArray JNI(globo)(JNIEnv* env, jobject) {
+  const char* t = g_listo ? sintetica_globo() : "";
+  const jsize n = static_cast<jsize>(strlen(t));
+  jbyteArray a = env->NewByteArray(n);
+  env->SetByteArrayRegion(a, 0, n, reinterpret_cast<const jbyte*>(t));
+  return a;
+}
 void JNI(mostrarQr)(JNIEnv*, jobject) {
   if (g_listo) sintetica_mostrar_qr();
 }

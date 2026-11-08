@@ -7,9 +7,12 @@ import android.media.AudioManager
 import android.media.AudioTrack
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.speech.tts.TextToSpeech
 import android.util.Log
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.sin
@@ -18,7 +21,8 @@ import kotlin.random.Random
 /**
  * La voz de criatura: los sonidos del núcleo (Hal::sonido) sintetizados acá,
  * sin archivos. El tono depende de voz.tipo y el volumen de voz.volumen; el
- * despertador va por el canal de alarma y sube de 1 a 5.
+ * despertador va por el canal de alarma y sube de 1 a 5. Lo que dice el globo
+ * lo lee en voz alta el TTS del celu (sin red: si no hay voz en español, calla).
  */
 class Voz(contexto: Context) {
     private val hilo = HandlerThread("voz").apply { start() }
@@ -27,6 +31,34 @@ class Voz(contexto: Context) {
 
     /** {volumen, micrófono, tipo, conversa}, como lo da [Nucleo.voz]; lo actualiza el hilo de GL. */
     @Volatile var config = intArrayOf(70, 60, 1, 0)
+
+    private var habla: TextToSpeech? = null
+    @Volatile private var hablaLista = false
+    private var ultimoGlobo = ""
+
+    init {
+        habla = TextToSpeech(contexto.applicationContext) { estado ->
+            val h = habla ?: return@TextToSpeech
+            val r = if (estado == TextToSpeech.SUCCESS) h.setLanguage(Locale("es", "AR")) else TextToSpeech.ERROR
+            hablaLista = r >= TextToSpeech.LANG_AVAILABLE
+            Log.i("Bicho", "habla: ${if (hablaLista) "lista" else "sin voz en español ($r)"}")
+        }
+    }
+
+    /** Lo llama el hilo de GL con el texto del globo: lo lee cuando aparece uno nuevo. */
+    fun globo(utf8: ByteArray) {
+        val texto = String(utf8, Charsets.UTF_8)
+        if (texto == ultimoGlobo) return
+        ultimoGlobo = texto
+        val limpio = Sintesis.paraLeer(texto)
+        val h = habla ?: return
+        if (limpio.isEmpty() || !hablaLista || config[0] <= 0) return
+        val (tono, ritmo) = Sintesis.tonoHabla(config[2])
+        h.setPitch(tono)
+        h.setSpeechRate(ritmo)
+        val p = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, config[0] / 100f) }
+        h.speak(limpio, TextToSpeech.QUEUE_FLUSH, p, "globo")
+    }
 
     /** Lo llama el núcleo (hilo de GL): se arma y suena en el hilo de la voz. */
     fun sonar(nombre: String) {
@@ -37,7 +69,11 @@ class Voz(contexto: Context) {
         }
     }
 
-    fun apagar() = hilo.quitSafely()
+    fun apagar() {
+        habla?.shutdown()
+        habla = null
+        hilo.quitSafely()
+    }
 
     private fun tocar(nombre: String, volumen: Float, tipo: Int) {
         Log.i("Bicho", "voz: $nombre")
@@ -111,6 +147,28 @@ object Sintesis {
         2 -> 620f
         else -> 400f
     }
+
+    /** Tono y ritmo del TTS según voz.tipo (el robot, grave y parejo). */
+    fun tonoHabla(tipo: Int) = when (tipo) {
+        0 -> 0.8f to 0.95f
+        2 -> 1.5f to 1.05f
+        3 -> 0.6f to 0.9f
+        else -> 1.15f to 1f
+    }
+
+    /** El texto sin emojis ni símbolos (el TTS los nombra): letras, números y puntuación. */
+    fun paraLeer(texto: String): String {
+        val b = StringBuilder()
+        var i = 0
+        while (i < texto.length) {
+            val c = texto.codePointAt(i)
+            i += Character.charCount(c)
+            b.append(if (Character.isLetterOrDigit(c) || c in PUNTUACION) String(Character.toChars(c)) else " ")
+        }
+        return b.toString().replace(Regex("\\s+"), " ").trim()
+    }
+
+    private val PUNTUACION = " .,;:¡!¿?-'\"()%\n".map { it.code }.toSet()
 
     fun notas(nombre: String): List<Nota>? = when (nombre) {
         "llamar" -> listOf(Nota(1f, 1.5f, 120), Nota(1.2f, 1.8f, 150))

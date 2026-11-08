@@ -69,6 +69,8 @@ object Nucleo {
     external fun palabra(): String
     external fun fpsSugerido(): Int
     /** El QR para vincular otro celu, un par de minutos. */
+    /** El texto del globo que se ve, en UTF-8 (vacío si no hay). */
+    external fun globo(): ByteArray
     external fun mostrarQr()
     /** Algo que mirar (la cara que ve), de -1 a 1; y hacia arriba. */
     external fun seguir(x: Float, y: Float)

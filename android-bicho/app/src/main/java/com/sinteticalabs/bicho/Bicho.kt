@@ -54,7 +54,9 @@ class Bicho : Activity() {
         var cuadro = 0
         lienzo.alDibujar = {
             datos.leerNucleo()
-            if (cuadro++ % 30 == 0) voz.config = Nucleo.voz()
+            if (cuadro % 30 == 0) voz.config = Nucleo.voz()
+            if (cuadro % 5 == 0) voz.globo(Nucleo.globo())
+            cuadro++
         }
         Avisos.alAviso = { comando -> vista.queueEvent { Nucleo.nubeEscribir(2, comando) } }
     }
