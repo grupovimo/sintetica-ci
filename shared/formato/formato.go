@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-//go:embed config.schema.json config-ejemplo.json caras/*.json animaciones/*.json
+//go:embed config.schema.json config-ejemplo.json caras/*.json animaciones/*.json vida/frases.json vida/personalidades.json
 var archivos embed.FS
 
 // Schema devuelve el JSON Schema de la config.
@@ -20,6 +20,12 @@ func Schema() []byte { b, _ := archivos.ReadFile("config.schema.json"); return b
 
 // Ejemplo devuelve la config de ejemplo.
 func Ejemplo() []byte { b, _ := archivos.ReadFile("config-ejemplo.json"); return b }
+
+// Frases devuelve las frases de fábrica del motor de vida (vida/frases.json).
+func Frases() []byte { b, _ := archivos.ReadFile("vida/frases.json"); return b }
+
+// Personalidades devuelve los rasgos de cada preset (vida/personalidades.json).
+func Personalidades() []byte { b, _ := archivos.ReadFile("vida/personalidades.json"); return b }
 
 // Pieza es una cara o una animación con su nombre.
 type Pieza struct {

@@ -84,9 +84,13 @@ type Integraciones struct {
 
 	cuid estadoCuidado // lo de la v1.7 (cuidado.go)
 
-	toques estadoToques // los últimos toques, para devolverlos (amigos.go)
-	v19    estadoV19    // lo de la v1.9 (v19.go)
-	voz    estadoVoz    // ElevenLabs (voz.go)
+	toques estadoToques  // los últimos toques, para devolverlos (amigos.go)
+	v19    estadoV19     // lo de la v1.9 (v19.go)
+	voz    estadoVoz     // ElevenLabs (voz.go)
+	ia     estadoIA      // la clave de IA propia de cada usuario (ia.go)
+	paq    estadoPaquete // el paquete de voz sin internet (paquete_voz.go)
+
+	charlaLocal CharlaLocal // el motor de charla sin IA (nil: solo la IA)
 }
 
 type entradaCache struct {

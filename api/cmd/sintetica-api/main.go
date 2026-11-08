@@ -191,6 +191,7 @@ func correr(log *slog.Logger) error {
 			CharlaURL: os.Getenv("CHARLA_URL"), CharlaClave: os.Getenv("CHARLA_CLAVE"),
 			// La voz gratis (Edge TTS): prendida salvo EDGE_TTS=0.
 			EdgeApagado: env("EDGE_TTS", "1") == "0", EdgeTope: numero(log, "EDGE_TTS_TOPE", integraciones.TopeEdgePorDefecto),
+			EdgeTopePaquete: numero(log, "EDGE_TTS_TOPE_PAQUETE", integraciones.TopeEdgePaquete),
 		},
 	}, alm, n, hub, log)
 	n.Escuchar(integ)
@@ -207,6 +208,10 @@ func correr(log *slog.Logger) error {
 	// El robot-celu pide una conversación en tiempo real (bicho/{id}/conversacion).
 	if err := n.AlPublicar("conversacion", integ.ConversacionMQTT); err != nil {
 		return fmt.Errorf("conversación por MQTT: %w", err)
+	}
+	// El robot pide su paquete de voz sin internet (bicho/{id}/voz/paquete).
+	if err := n.AlPublicar("voz/paquete", integ.PaqueteVozMQTT); err != nil {
+		return fmt.Errorf("paquete de voz por MQTT: %w", err)
 	}
 	srv = servidor.Nuevo(op, alm, n, integ, hub, c, firmador, log)
 

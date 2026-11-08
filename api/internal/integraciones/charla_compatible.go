@@ -4,7 +4,9 @@ package integraciones
 // (Groq, OpenRouter, Gemini, Cloudflare, un Ollama propio…): CHARLA_URL es la
 // base (por ejemplo https://api.groq.com/openai/v1), CHARLA_CLAVE la clave (puede
 // ir vacía para uno propio) y CHARLA_MODELO el modelo. Con CHARLA_URL se usa
-// esto en vez de Anthropic. Mismo prompt, mismo tope y misma limpieza.
+// esto en vez de Anthropic. Mismo prompt, mismo tope y misma limpieza. Un
+// usuario puede poner el suyo (ia.go): entonces va con su URL, su clave y su
+// modelo, por el cliente con las protecciones de los webhooks.
 
 import (
 	"bytes"
@@ -25,11 +27,11 @@ func (i *Integraciones) charlaCompatible() bool {
 
 // preguntarCompatible: POST {base}/chat/completions pidiendo JSON. No todos
 // aceptan json_schema, así que se pide json_object y el esquema va en el prompt.
-func (i *Integraciones) preguntarCompatible(ctx context.Context, d datosCharla, texto string) (string, string, error) {
+func (i *Integraciones) preguntarCompatible(ctx context.Context, m motorIA, d datosCharla, texto string) (string, string, error) {
 	esquema, _ := json.Marshal(esquemaCharla(d.Expresiones))
 	sistema := promptCharla(d) + "\nContestá solo con un JSON que cumpla este esquema: " + string(esquema)
 	cuerpo, _ := json.Marshal(map[string]any{
-		"model": i.op.V19.AnthropicModelo,
+		"model": m.modelo,
 		"messages": []map[string]string{
 			{"role": "system", "content": sistema},
 			{"role": "user", "content": texto},
@@ -40,16 +42,19 @@ func (i *Integraciones) preguntarCompatible(ctx context.Context, d datosCharla, 
 	})
 	ctx, cancelar := context.WithTimeout(ctx, TimeoutCharla)
 	defer cancelar()
-	url := strings.TrimRight(i.op.V19.CharlaURL, "/") + "/chat/completions"
+	url := strings.TrimRight(m.url, "/") + "/chat/completions"
 	pedido, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(cuerpo))
 	if err != nil {
 		return "", "", errors.New("no me pude comunicar con la IA")
 	}
 	pedido.Header.Set("Content-Type", "application/json")
-	if c := i.op.V19.CharlaClave; c != "" {
+	if c := m.clave; c != "" {
 		pedido.Header.Set("Authorization", "Bearer "+c)
 	}
 	cli := &http.Client{Timeout: TimeoutCharla + 5*time.Second}
+	if m.propia {
+		cli = i.ia.http // la URL la eligió el usuario: sin IPs internas
+	}
 	r, err := cli.Do(pedido)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {

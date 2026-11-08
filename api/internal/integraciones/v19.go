@@ -40,6 +40,7 @@ type OpcionesV19 struct {
 	// (EDGE_TTS_TOPE, por defecto 3000). Las URLs, para los tests.
 	EdgeApagado           bool
 	EdgeTope              int
+	EdgeTopePaquete       int // caracteres por usuario por día para los paquetes de voz (EDGE_TTS_TOPE_PAQUETE, 20000)
 	EdgeURL, EdgeVocesURL string
 }
 
@@ -66,6 +67,8 @@ func (i *Integraciones) iniciarV19() {
 		charlas: make(chan struct{}, 8),
 	}
 	i.iniciarVoz(sec)
+	i.iniciarIA(sec)
+	i.iniciarPaquete(sec)
 }
 
 func (i *Integraciones) ahora() time.Time { return i.v19.ahora() }

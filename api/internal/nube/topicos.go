@@ -8,7 +8,8 @@ import (
 )
 
 // AlPublicar llama a f cada vez que un bicho publica en bicho/{id}/{sufijo}
-// (por ahora, "charla": el robot-celu manda lo que le dijeron). f corre en la
+// ("charla": el robot-celu manda lo que le dijeron; el sufijo puede tener
+// varias partes, como "voz/paquete"). f corre en la
 // goroutine del broker: no puede bloquear. La ACL (servidor/mqtt.go) deja que
 // cada bicho publique solo en el suyo; acá se revisa igual el id.
 func (n *Nube) AlPublicar(sufijo string, f func(bicho string, datos []byte)) error {
@@ -16,11 +17,12 @@ func (n *Nube) AlPublicar(sufijo string, f func(bicho string, datos []byte)) err
 		return errors.New("la nube no tiene broker")
 	}
 	return n.op.Broker.Suscribir("bicho/+/"+sufijo, func(topico string, datos []byte) {
-		partes := strings.Split(topico, "/")
-		if len(partes) != 3 || partes[0] != "bicho" || partes[2] != sufijo || !protocolo.IDValido(partes[1]) {
+		resto, ok := strings.CutPrefix(topico, "bicho/")
+		id, ok2 := strings.CutSuffix(resto, "/"+sufijo)
+		if !ok || !ok2 || !protocolo.IDValido(id) {
 			return
 		}
-		f(partes[1], append([]byte(nil), datos...))
+		f(id, append([]byte(nil), datos...))
 	})
 }
 
@@ -31,7 +33,7 @@ func (n *Nube) PublicarAudio(id string, paquete []byte) error {
 }
 
 // PublicarEn manda algo a bicho/{id}/{sufijo} (QoS 1), si está conectado:
-// "audio" y "conversacion/url" (la ACL deja que cada bicho se suscriba a los
+// "audio", "conversacion/url" y "voz/paquete/url" (la ACL deja que cada bicho se suscriba a los
 // suyos).
 func (n *Nube) PublicarEn(id, sufijo string, datos []byte) error {
 	if !n.Conectado(id) {

@@ -20,6 +20,12 @@ func (s *Servidor) rutasVoz(m *http.ServeMux) {
 	m.HandleFunc("GET /v1/voz/edge", s.conSesion(s.verEdge))
 	m.HandleFunc("PUT /v1/voz/edge", s.conSesion(s.guardarEdge))
 	m.HandleFunc("POST /v1/voz/edge/probar", s.conSesion(s.probarEdge))
+	m.HandleFunc("GET /v1/bichos/{id}/voz/paquete", s.conBicho(s.verPaqueteVoz))
+	m.HandleFunc("POST /v1/bichos/{id}/voz/paquete", s.conBicho(s.generarPaqueteVoz))
+	m.HandleFunc("GET /v1/voz/paquete/{id}", s.bajarPaqueteVoz) // sin sesión: con la firma del link
+	m.HandleFunc("GET /v1/ia", s.conSesion(s.verIA))
+	m.HandleFunc("PUT /v1/ia", s.conSesion(s.guardarIA))
+	m.HandleFunc("DELETE /v1/ia", s.conSesion(s.borrarIA))
 }
 
 // GET /v1/voz/edge → {disponible, prendida, voz, voces: [{id, nombre, idioma,

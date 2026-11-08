@@ -40,6 +40,12 @@ func TestAutorizarMQTT(t *testing.T) {
 		{a, "bicho/" + a + "/conversacion/url", false, true}, // y la recibe acá
 		{a, "bicho/" + b + "/conversacion/url", false, false},
 		{a, "bicho/" + a + "/conversacion/url", true, false},
+		{a, "bicho/" + a + "/voz/paquete", true, true}, // pide su paquete de voz
+		{a, "bicho/" + b + "/voz/paquete", true, false},
+		{a, "bicho/" + a + "/voz/paquete", false, false},
+		{a, "bicho/" + a + "/voz/paquete/url", false, true}, // y recibe la URL acá
+		{a, "bicho/" + b + "/voz/paquete/url", false, false},
+		{a, "bicho/" + a + "/voz/paquete/url", true, false},
 		{a, "bicho/" + a + "/audio", false, true}, // el audio de la voz
 		{a, "bicho/" + b + "/audio", false, false},
 		{a, "bicho/" + a + "/audio", true, false}, // el micrófono, cuando haya (M7): todavía no

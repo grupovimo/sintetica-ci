@@ -48,6 +48,15 @@ func NuevoClienteWebhook(permitirInternos bool, propios []string) *ClienteWebhoo
 	c.resolver = func(ctx context.Context, host string) ([]netip.Addr, error) {
 		return net.DefaultResolver.LookupNetIP(ctx, "ip", host)
 	}
+	c.cli = c.ClienteSeguro(TimeoutWebhook)
+	return c
+}
+
+// ClienteSeguro: un cliente HTTP con las protecciones de los webhooks (DNS
+// validado al conectar, sin IPs internas ni el propio servicio, sin proxies
+// ni redirecciones) que espera la respuesta hasta `espera` (la charla con la
+// IA propia de un usuario, a una URL que eligió él).
+func (c *ClienteWebhook) ClienteSeguro(espera time.Duration) *http.Client {
 	marcador := &net.Dialer{Timeout: TimeoutWebhook}
 	tr := &http.Transport{
 		Proxy: nil, // un proxy se saltearía la validación de la IP
@@ -63,16 +72,15 @@ func NuevoClienteWebhook(permitirInternos bool, propios []string) *ClienteWebhoo
 			return marcador.DialContext(ctx, red, net.JoinHostPort(ip.String(), puerto))
 		},
 		TLSHandshakeTimeout:    TimeoutWebhook,
-		ResponseHeaderTimeout:  TimeoutWebhook,
+		ResponseHeaderTimeout:  espera,
 		DisableKeepAlives:      true,
 		MaxResponseHeaderBytes: 16 << 10,
 	}
-	c.cli = &http.Client{
-		Timeout:       TimeoutWebhook,
+	return &http.Client{
+		Timeout:       espera,
 		Transport:     tr,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
-	return c
 }
 
 // hostDe saca el host de una URL o de un "host:puerto" (en minúsculas).

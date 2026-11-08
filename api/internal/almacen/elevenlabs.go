@@ -205,6 +205,8 @@ func (a *Almacen) limpiarElevenLabs(ctx context.Context) error {
 	if _, err := a.db.Exec(ctx, `delete from elevenlabs_uso where dia < now() - interval '60 days'`); err != nil {
 		return err
 	}
-	_, err := a.db.Exec(ctx, `delete from voz_edge_uso where dia < now() - interval '60 days'`)
-	return err
+	if _, err := a.db.Exec(ctx, `delete from voz_edge_uso where dia < now() - interval '60 days'`); err != nil {
+		return err
+	}
+	return a.limpiarPaquetes(ctx)
 }

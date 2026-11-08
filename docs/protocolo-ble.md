@@ -320,6 +320,35 @@ Para los modelos con micrófono y parlante (dos micrófonos, un parlante):
   llega unos segundos después de conectarse y cada vez que el dueño cambia la
   cuenta. Con el bit, para sus recordatorios y el despertador el robot espera
   hasta 3 s el audio de origen 1 o 2 antes de usar su voz local.
+- **Paquete de voz sin internet** (ver `docs/nube.md`, "Paquete de voz"): el
+  robot guarda el mp3 de las frases que dice solo y, sin wifi, habla con voz
+  real. El contrato del lado del robot:
+  - **Pedirlo**: por MQTT, `bicho/{id}/voz/paquete` `{"pedir": true, "tope":
+    bytes}` al conectarse (y una vez por día, o cuando cambia la config: el
+    paquete sigue a sus frases) con lo que tiene de lugar (el cubito, en la
+    flash interna, ~3 000 000; el Moto E4, 0 = todo). La respuesta llega a
+    `bicho/{id}/voz/paquete/url` (suscribirse antes de pedir): `{"url",
+    "version", "bytes", …}`, `{"estado": "generando"}` (la URL llega sola
+    cuando termina, a veces un par de minutos después), `{"estado":
+    "falta-pedir"}` (lo tiene que pedir el dueño desde la consola) o
+    `{"error"}`.
+  - **Bajarlo**: si `version` es la que ya tiene, nada. Si no, `GET` a la
+    `url` (https, sin token: la firma va en la URL y vence en 10 min; 410 =
+    cambió, pedir de nuevo). Es un tar ustar: `indice.json` y después un
+    `<hash>.mp3` por frase. Guardarlo **entero en una carpeta nueva** y recién
+    al final reemplazar la anterior (si se corta, queda el viejo).
+  - **El hash**: CRC-32 (IEEE, el de zlib, el mismo del audio tipo 2) del
+    **texto final** del globo en UTF-8 (con `{dueno}` y `{robot}` ya puestos,
+    cortado a 60 bytes), en hex de 8 letras minúsculas: `"¡Hola, Ana!"` →
+    `b34a676f` → `b34a676f.mp3`. La voz no entra en el
+    hash: el paquete es de una sola voz (`voz` en el índice; si cambia, cambia
+    la versión).
+  - **Al decir un globo propio** (habla, despertador, recordatorio): calcular
+    el hash del texto; si está en el índice, reproducir ese mp3 (formato 1);
+    si no (está en `fuera` o es una frase con `{clima}`, `{titulo}`…), pedir
+    el audio a la nube si hay conexión o usar la voz local. Con conexión, el
+    audio tipo 2 de la nube (origen 1 y 2) sigue llegando igual: si ya está
+    sonando el del paquete, se ignora.
 - **Conversación en tiempo real** (la plataforma de agentes de ElevenLabs): no
   pasa por este tópico. El robot-celu pide la URL por
   `bicho/{id}/conversacion` y habla directo con ElevenLabs (ver

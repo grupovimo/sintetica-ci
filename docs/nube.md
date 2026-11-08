@@ -738,6 +738,38 @@ el tope de 60 por día por usuario es el mismo. Sin ninguno, `GET /v1/charla` �
   cuandos (no le reenvía el `0x49`: ya se lo dijo a su núcleo).
 - SSE `charla` (`{texto, expresion, de, enviado}`).
 
+**La clave de IA propia** (`integraciones/ia.go`, rutas en
+`servidor/ia_paquete.go`, migración `015_ia_propia.sql`): cualquiera puede
+poner la suya (Anthropic o un servicio compatible) y su charla —HTTP,
+Telegram y el robot-celu por MQTT— usa **su** clave y **su** tope; la factura
+le llega a él. Los demás siguen con la del servidor y el tope de 60; sin
+ninguna, `GET /v1/charla` → `{"disponible": false}`. (La conversación en
+tiempo real de ElevenLabs no usa esta clave: el modelo lo pone ElevenLabs.)
+
+- `PUT /v1/ia {"proveedor": "anthropic" | "compatible", "clave", "url"?,
+  "modelo"?, "tope"?}`. Se valida con un pedido que no gasta tokens: Anthropic,
+  `GET /v1/models/{modelo}` (401 → 400 "no aceptó la clave", 404 → "ese modelo
+  no está"; el modelo por defecto es `claude-haiku-5-5`); compatible,
+  `GET {url}/models` (y el modelo tiene que estar en la lista; si el servicio
+  no tiene `/models`, una charla de 1 token). La `url` de un compatible se
+  valida **como los webhooks**: solo `https://` (http en desarrollo), sin
+  usuario ni clave, sin `?`, sin IPs internas ni el propio servicio, y los
+  pedidos van por el mismo cliente (DNS validado al conectar, sin proxies ni
+  redirecciones). `modelo` es obligatorio con un compatible. `tope`: charlas
+  por día, de 0 (**sin tope**, por defecto) a 10 000. Sin `clave`, cambia el
+  modelo o el tope de la que ya está (404 si no hay). 20 cambios por hora.
+- La clave va **cifrada** en `ia_cuentas` (`api/internal/cifra`, derivación
+  `ia`); nunca se devuelve ni se loguea. `GET /v1/ia` → `{"propia",
+  "servidor"` (si hay una del servidor)`, "proveedor", "modelo", "url_pista"`
+  (solo el host)`, "usadas_hoy", "tope"}` (0 = sin tope). `DELETE /v1/ia` la
+  olvida. SSE `ia` `{propia}`.
+- `GET /v1/charla` dice `"propia"`; con la propia sin tope, `"sin_tope": true`,
+  `"quedan": -1` y `"porDia": 0` (y la respuesta de `POST …/charla` trae
+  `"propia"` y `"quedan": -1`).
+- **El punto de enchufe**: `Charlar` pasa por `contestar`, que primero prueba
+  un motor sin IA (`UsarCharlaLocal`, para el motor de charla del núcleo que
+  viene: si entiende, contesta y no gasta el tope) y si no, la IA del usuario.
+
 ### Voz: ElevenLabs (cada usuario con su cuenta) y la voz gratis (Edge)
 
 Código: `api/internal/integraciones/elevenlabs.go` (el cliente y la cuenta),
@@ -887,6 +919,88 @@ ElevenLabs, con la cuenta del dueño):
   comandos (`POST /v1/bichos/{id}/marcos`); si no, mueven la cara en vivo de
   la web.
 
+### Paquete de voz sin internet
+
+Código: `api/internal/integraciones/paquete_voz.go`, rutas en
+`servidor/ia_paquete.go`, migración `016_voz_paquete.sql`. Para que el robot
+hable con **voz real sin wifi y sin costo por frase**: la nube genera **una
+vez** el mp3 de cada frase que el robot dice **solo** y el robot se lo baja.
+
+- **Qué frases** (`FrasesDelRobot`): las de fábrica de
+  `shared/formato/vida/frases.json` (embebido en `shared/formato`) de `todos`
+  y de su preset (el más parecido a sus rasgos, como `presetCercano` del
+  núcleo, y el de `personalidad.preset` si es otro), las propias
+  (`habla.propias`: si tiene para una situación, las de fábrica de esa no
+  van), el texto del despertador y los recordatorios. `{dueno}` y `{robot}`
+  ya puestos **igual que el núcleo** (`completarFrase`: sin dueño "¡Hola,
+  {dueno}!" queda "¡Hola!" y las que empiezan con `{dueno}` no van; cortadas a
+  60 bytes sin partir letras). Las que tienen una plantilla que cambia
+  (`{clima}`, `{titulo}`, `{de}`, `{minutos}`, `{racha}`…) **no van**: el
+  robot las pide a la nube o las dice con su voz propia. Un robot típico:
+  **~100 frases, ~2000 letras**.
+- **Orden** (lo que entra primero en un paquete chico): las situaciones más
+  frecuentes (`despertar`, `saludo`, `buenas-noches`, `volviste`, `caricia`,
+  `como-estas`, `te-extrane`, `aburrido`, `sueno`, `despertador`, `posponer`,
+  `bateria-baja`, `cargando`), después **las propias del usuario**, después el
+  resto (las más probables primero). En cada situación, las de su preset
+  primero.
+- **La voz**: la misma que lee en voz alta. **ElevenLabs** si el dueño la
+  conectó (con `leer` prendido): **gasta de su cuenta**, así que el paquete lo
+  pide él después de ver cuánto (`gasta`, en caracteres) y respeta su tope
+  del día (si no entra todo, queda `parcial` y al otro día se pide de nuevo y
+  sigue). Si no, **Edge** (la gratis): su propio tope de **20 000 caracteres
+  por usuario por día** (`EDGE_TTS_TOPE_PAQUETE`, `voz_paquete_uso`, aparte
+  del de leer en voz alta), de a una frase, con 300 ms entre frase y frase y
+  como mucho 2 paquetes a la vez en todo el servidor (y dentro de los 4 de
+  Edge). Medido: "Hola, ¿cómo andás?" son 15 KB y ~1 s; un paquete típico
+  con Edge pesa **~1,5 a 1,8 MB** y tarda **~2 minutos**; con ElevenLabs
+  (32 kbps), ~1,1 MB y ~2000 caracteres de su cuenta.
+- **Formato**: mp3 mono, el **formato 1** del audio tipo 2 (Edge a 24 kHz y
+  48 kbps; ElevenLabs a 22,05 kHz y 32 kbps, `mp3_22050_32`, el más liviano
+  que tiene). Edge no ofrece otro por este servicio y recodificar en la nube
+  no vale la pena (habría que sumar un codificador): para un robot con poca
+  flash, el **tope** elige las frases más útiles.
+- **Se regenera solo lo que cambió**: cada audio se guarda en la base
+  (`voz_clips`, por usuario: dos robots con la misma voz comparten) con la
+  clave sha256 de la voz y el texto final; si cambia una frase o la voz, se
+  genera solo esa. Tope de **30 MB por cuenta**; los que ningún paquete usa se
+  borran (después de una hora). El paquete de cada robot (`voz_paquetes`) dice
+  qué audios tiene, en orden, y su **versión** (sube cuando cambia lo que hay).
+- `GET /v1/bichos/{id}/voz/paquete[?tope=bytes]` → `{"estado": "nuevo" |
+  "generando" | "listo" | "parcial" | "error", "error"?, "version", "voz"
+  ("edge:es-AR-ElenaNeural" o "elevenlabs:<id>"), "frases", "bytes"` (lo que
+  baja con ese tope)`, "disponible", "proveedor", "voz_nueva", "total",
+  "faltan", "caracteres", "gasta"` (con ElevenLabs, caracteres de su cuenta;
+  con Edge, 0)`, "bytes_estimados", "tope_dia", "quedan_hoy", "usados_bytes",
+  "tope_bytes", "progreso"?: {hechas, de}}`.
+- `POST /v1/bichos/{id}/voz/paquete {"confirmar"?, "tope"?}` → 202 con el
+  estado: lo genera en segundo plano. Con ElevenLabs y algo que gastar, sin
+  `confirmar: true` → **409** con el estado (para mostrar cuánto va a gastar).
+  20 por hora. SSE `voz-paquete` `{estado, version, frases}` al terminar.
+- **El robot lo pide por MQTT**: publica en **`bicho/{id}/voz/paquete`**
+  `{"pedir": true, "tope"?: bytes}` (0 o sin tope = todo; el cubito, que no
+  tiene microSD, pide ~3 MB; 20 por hora) y recibe en
+  **`bicho/{id}/voz/paquete/url`** (la ACL, como los otros tópicos del robot)
+  uno de: `{"url", "version", "voz", "formato": 1, "frases", "bytes",
+  "vence", "estado"}`; `{"estado": "generando", "faltan"}` (con Edge lo
+  genera solo y **manda la URL cuando termina**); `{"estado": "falta-pedir",
+  "gasta"}` (con ElevenLabs y sin paquete con esa voz: lo pide el dueño desde
+  la consola; si ya hay uno con esa voz, manda ese); o `{"error"}`.
+- **La bajada**: `GET /v1/voz/paquete/{id}?v&tope&vence&firma` **sin sesión**:
+  la autentica la firma (HMAC-SHA256 con una clave que sale de `SECRETO`, de
+  `id.version.tope.vence`), que **vence en 10 minutos** (403 si no vale o
+  venció; 410 si el paquete cambió de versión: pedir otra URL). Devuelve un
+  **tar** (ustar) con `indice.json` primero y un `<hash>.mp3` por frase, en
+  orden; con `&indice=1`, solo el índice. 30 por hora por robot.
+- **El índice**: `{"version", "voz", "formato": 1, "tope", "bytes", "frases":
+  [{situacion, preset?, propia?, texto, hash, bytes}], "fuera": [{situacion,
+  preset?, propia?, texto, hash}]}`. `frases` son las que entraron en el tope
+  (en orden de prioridad; una que no entra no corta: siguen las que sí);
+  `fuera`, las que el robot dice solo y **no** están (para pedirlas a la nube
+  al momento o decirlas con su voz propia). El contrato del lado del robot (el
+  hash, dónde guardarlo, cuándo pedirlo) está en `docs/protocolo-ble.md`,
+  "Voz".
+
 ## MCP: que una IA maneje los robots
 
 La API es un **servidor MCP remoto**: cada usuario conecta su Claude
@@ -1011,7 +1125,7 @@ SVG) y el prompt `inventar_cara`.
 | `WEB_URL` | para los links de los mails | `http://localhost:5173` |
 | `SMTP_SERVIDOR`, `SMTP_USUARIO`, `SMTP_CLAVE`, `SMTP_DE` | el correo | Mailpit, sin usuario |
 | `CLAVE_FIRMA` | la clave privada de las OTA | `/claves/ota-privada.pem` |
-| `SECRETO` | firma los links de descarga y de él sale la clave con la que se cifran el calendario y Spotify | uno local |
+| `SECRETO` | firma los links de descarga (OTA y paquete de voz) y de él sale la clave con la que se cifran el calendario, Spotify, ElevenLabs y la clave de IA propia | uno local |
 | `ADMIN_EMAILS` | quién sube firmwares | vacío |
 | `DESARROLLO` | bichos virtuales y los links en el log | `1` |
 | `BICHOS_VIRTUALES` | dónde están los virtuales | los dos del compose |
@@ -1024,6 +1138,7 @@ SVG) y el prompt `inventar_cara`.
 | `ANTHROPIC_API_KEY` | la charla con IA; vacía = apagada | el de `.env` (nunca en el repo) |
 | `CHARLA_MODELO` | el modelo de la charla | vacío = `claude-haiku-5-5` (con `CHARLA_URL`, obligatorio) |
 | `CHARLA_URL`, `CHARLA_CLAVE` | un servicio compatible con OpenAI para la charla (Groq, OpenRouter, Gemini, Ollama) | vacías = Anthropic |
+| `EDGE_TTS_TOPE_PAQUETE` | caracteres por usuario por día con la voz gratis para los paquetes de voz | `20000` |
 
 ## Antes de ponerlo en el VPS
 

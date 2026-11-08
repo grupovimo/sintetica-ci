@@ -7,7 +7,8 @@ package integraciones
 // charla_compatible.go); sin ninguno, apagado. El modelo solo ve los datos de
 // ESE robot (su nombre, su personalidad, el nombre del dueño, el clima, la
 // hora y su memoria) y no tiene herramientas: no hay cómo pedirle datos de
-// otros. Tope: 60 por día por usuario (en la base). Ver docs/nube.md, "Charla".
+// otros. Tope: 60 por día por usuario (en la base). Un usuario con su clave
+// propia (ia.go) charla con la suya y con su tope. Ver docs/nube.md, "Charla".
 
 import (
 	"context"
@@ -40,8 +41,16 @@ const (
 // ErrCharlaApagada: no hay ANTHROPIC_API_KEY ni CHARLA_URL.
 var ErrCharlaApagada = errors.New("la charla con IA no está prendida en este servidor")
 
-// ErrTopeCharla: ya charló 60 veces hoy.
+// ErrTopeCharla: ya charló lo del día (60, o el tope de su clave propia).
 var ErrTopeCharla = fmt.Errorf("ya charlaron %d veces hoy: mañana sigue", CharlasPorDia)
+
+// errTopeCharla: el tope de una clave propia (errors.Is con ErrTopeCharla).
+type errTopeCharla struct{ n int }
+
+func (e errTopeCharla) Error() string {
+	return fmt.Sprintf("ya charlaron %d veces hoy: mañana sigue (o subí el tope)", e.n)
+}
+func (e errTopeCharla) Is(t error) bool { return t == ErrTopeCharla }
 
 // ErrTextoCharla: vacío o muy largo.
 var ErrTextoCharla = fmt.Errorf("el texto es de 1 a %d bytes", MaxTextoCharla)
@@ -51,12 +60,34 @@ type RespuestaCharla struct {
 	Texto     string `json:"texto"`
 	Expresion string `json:"expresion"`
 	Enviado   bool   `json:"enviado"` // si le llegó al robot (estaba conectado)
-	Quedan    int    `json:"quedan"`  // charlas que le quedan hoy
+	Quedan    int    `json:"quedan"`  // charlas que le quedan hoy (-1: sin tope)
+	Propia    bool   `json:"propia"`  // con la clave de IA propia del usuario
 }
 
-// CharlaActiva: hay clave de Anthropic o un servicio compatible.
+// CharlaActiva: el servidor tiene IA (clave de Anthropic o un servicio
+// compatible). Un usuario puede tener la suya aunque no: CharlaDisponible.
 func (i *Integraciones) CharlaActiva() bool {
 	return i.op.V19.AnthropicClave != "" || i.charlaCompatible()
+}
+
+// CharlaDisponible: ese usuario puede charlar (con su clave o la del servidor).
+func (i *Integraciones) CharlaDisponible(ctx context.Context, usuario string) bool {
+	_, ok := i.motorDe(ctx, usuario)
+	return ok || i.charlaLocal != nil
+}
+
+// EstadoCharla: GET /v1/charla → {disponible, propia, quedan, porDia}
+// (sin tope: quedan -1, porDia 0 y sin_tope).
+func (i *Integraciones) EstadoCharla(ctx context.Context, usuario string) map[string]any {
+	m, ok := i.motorDe(ctx, usuario)
+	if !ok {
+		return map[string]any{"disponible": false, "propia": false}
+	}
+	r := map[string]any{"disponible": true, "propia": m.propia, "porDia": m.tope, "quedan": i.charlasQuedan(ctx, usuario, m.tope)}
+	if m.tope == 0 {
+		r["sin_tope"] = true
+	}
+	return r
 }
 
 func (i *Integraciones) modeloCharla() string {
@@ -66,13 +97,24 @@ func (i *Integraciones) modeloCharla() string {
 	return ModeloCharla
 }
 
-// CharlasQuedan: cuántas le quedan hoy al usuario.
+// CharlasQuedan: cuántas le quedan hoy al usuario (-1: sin tope).
 func (i *Integraciones) CharlasQuedan(ctx context.Context, usuario string) int {
+	m, ok := i.motorDe(ctx, usuario)
+	if !ok {
+		return 0
+	}
+	return i.charlasQuedan(ctx, usuario, m.tope)
+}
+
+func (i *Integraciones) charlasQuedan(ctx context.Context, usuario string, tope int) int {
+	if tope == 0 {
+		return -1
+	}
 	n, err := i.alm.CharlasDeHoy(ctx, usuario, i.ahora().In(nube.Zona()))
 	if err != nil {
 		return 0
 	}
-	return max(0, CharlasPorDia-n)
+	return max(0, tope-n)
 }
 
 // Las expresiones de fábrica (las paramétricas que el robot sabe poner).
@@ -215,24 +257,64 @@ func esquemaCharla(expresiones []string) map[string]any {
 	}
 }
 
-func (i *Integraciones) clienteAnthropic() anthropic.Client {
-	op := []option.RequestOption{option.WithAPIKey(i.op.V19.AnthropicClave), option.WithRequestTimeout(TimeoutCharla), option.WithMaxRetries(1)}
+func (i *Integraciones) clienteAnthropic(clave string) anthropic.Client {
+	op := []option.RequestOption{option.WithAPIKey(clave), option.WithRequestTimeout(TimeoutCharla), option.WithMaxRetries(1)}
 	if u := i.op.V19.AnthropicURL; u != "" {
 		op = append(op, option.WithBaseURL(u))
 	}
 	return anthropic.NewClient(op...)
 }
 
-// preguntar le pide la respuesta al modelo.
-func (i *Integraciones) preguntar(ctx context.Context, d datosCharla, texto string) (string, string, error) {
-	if i.charlaCompatible() {
-		return i.preguntarCompatible(ctx, d, texto)
+// CharlaLocal: un motor que contesta sin IA (el de charla del núcleo, que
+// viene). ok false: no entendió y sigue la IA.
+type CharlaLocal func(ctx context.Context, bicho, texto string) (respuesta, expresion string, ok bool)
+
+// UsarCharlaLocal enchufa el motor sin IA (va antes de la IA y no gasta el
+// tope). Se llama antes de Correr.
+func (i *Integraciones) UsarCharlaLocal(f CharlaLocal) { i.charlaLocal = f }
+
+// contestar: el punto único entre la charla y quien contesta. Primero el
+// motor sin IA (si hay y entiende); si no, la IA de ese usuario (su clave
+// propia o la del servidor) con su tope del día. n: las que lleva hoy (-1 si
+// contestó el motor sin IA).
+func (i *Integraciones) contestar(ctx context.Context, usuario, bicho string, d datosCharla, texto string) (t, e string, m motorIA, n int, err error) {
+	if i.charlaLocal != nil {
+		if t, e, ok := i.charlaLocal(ctx, bicho, texto); ok {
+			return t, e, motorIA{}, -1, nil
+		}
 	}
-	cli := i.clienteAnthropic()
+	m, ok := i.motorDe(ctx, usuario)
+	if !ok {
+		return "", "", m, 0, ErrCharlaApagada
+	}
+	tope := m.tope
+	if tope == 0 {
+		tope = sinTopeIA
+	}
+	n, ok, err = i.alm.UsarCharla(ctx, usuario, i.ahora().In(nube.Zona()), tope)
+	if err != nil {
+		return "", "", m, 0, err
+	}
+	if !ok {
+		if m.propia {
+			return "", "", m, 0, errTopeCharla{m.tope}
+		}
+		return "", "", m, 0, ErrTopeCharla
+	}
+	t, e, err = i.preguntar(ctx, m, d, texto)
+	return t, e, m, n, err
+}
+
+// preguntar le pide la respuesta al modelo.
+func (i *Integraciones) preguntar(ctx context.Context, m motorIA, d datosCharla, texto string) (string, string, error) {
+	if m.proveedor == IACompatible {
+		return i.preguntarCompatible(ctx, m, d, texto)
+	}
+	cli := i.clienteAnthropic(m.clave)
 	ctx, cancelar := context.WithTimeout(ctx, TimeoutCharla+5*time.Second)
 	defer cancelar()
 	r, err := cli.Messages.New(ctx, anthropic.MessageNewParams{
-		Model:     anthropic.Model(i.modeloCharla()),
+		Model:     anthropic.Model(m.modelo),
 		MaxTokens: 1024,
 		System:    []anthropic.TextBlockParam{{Text: promptCharla(d)}},
 		Messages:  []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock(texto))},
@@ -289,7 +371,7 @@ func limpiarRespuesta(texto, expresion string, validas []string) (string, string
 // Charlar: el usuario le dice algo a su robot y el robot contesta (y lo dice
 // en su pantalla si está conectado). desde: "web", "app", "telegram" o "robot".
 func (i *Integraciones) Charlar(ctx context.Context, usuario, bicho, texto, desde string) (RespuestaCharla, error) {
-	if !i.CharlaActiva() {
+	if !i.CharlaDisponible(ctx, usuario) {
 		return RespuestaCharla{}, ErrCharlaApagada
 	}
 	texto = strings.TrimSpace(texto)
@@ -299,21 +381,20 @@ func (i *Integraciones) Charlar(ctx context.Context, usuario, bicho, texto, desd
 	if _, err := i.alm.BichoDe(ctx, bicho, usuario); err != nil {
 		return RespuestaCharla{}, errors.New("ese robot no está en tu cuenta")
 	}
-	n, ok, err := i.alm.UsarCharla(ctx, usuario, i.ahora().In(nube.Zona()), CharlasPorDia)
-	if err != nil {
+	d := i.datosCharla(ctx, bicho)
+	t, e, mo, n, err := i.contestar(ctx, usuario, bicho, d, texto)
+	if errors.Is(err, ErrTopeCharla) || errors.Is(err, ErrCharlaApagada) {
 		return RespuestaCharla{}, err
 	}
-	if !ok {
-		return RespuestaCharla{}, ErrTopeCharla
-	}
-	d := i.datosCharla(ctx, bicho)
-	t, e, err := i.preguntar(ctx, d, texto)
 	if err != nil {
-		i.log.Warn("charla: la IA no contestó", "bicho", bicho, "error", err)
+		i.log.Warn("charla: la IA no contestó", "bicho", bicho, "propia", mo.propia, "error", err)
 		return RespuestaCharla{}, err
 	}
 	t, e = limpiarRespuesta(t, e, d.Expresiones)
-	r := RespuestaCharla{Texto: t, Expresion: e, Quedan: CharlasPorDia - n}
+	r := RespuestaCharla{Texto: t, Expresion: e, Quedan: -1, Propia: mo.propia}
+	if mo.tope > 0 && n >= 0 {
+		r.Quedan = mo.tope - n
+	}
 	if m, err := protocolo.Decir(t, e); err == nil {
 		r.Enviado = i.robots.Enviar(bicho, protocolo.CarComando, m) == nil
 	}
@@ -326,10 +407,6 @@ func (i *Integraciones) Charlar(ctx context.Context, usuario, bicho, texto, desd
 // CharlaMQTT: el robot-celu publicó en bicho/{id}/charla {"texto": "…"} (lo
 // que le dijeron por voz). La respuesta va por su cmd (0x40). No bloquea.
 func (i *Integraciones) CharlaMQTT(bicho string, datos []byte) {
-	if !i.CharlaActiva() {
-		i.log.Info("charla por MQTT sin IA configurada (ANTHROPIC_API_KEY o CHARLA_URL)", "bicho", bicho)
-		return
-	}
 	var p struct {
 		Texto string `json:"texto"`
 	}
@@ -342,6 +419,10 @@ func (i *Integraciones) CharlaMQTT(bicho string, datos []byte) {
 	}
 	usuario := i.robots.Dueno(bicho)
 	if usuario == "" {
+		return
+	}
+	if !i.charlaDisponibleYa(usuario) {
+		i.log.Info("charla por MQTT sin IA (ni la del servidor ni una propia)", "bicho", bicho)
 		return
 	}
 	if !i.limite.permitir("charla-mqtt/"+bicho, 2*time.Second, 30, time.Hour) {
@@ -370,12 +451,20 @@ func (i *Integraciones) CharlaMQTT(bicho string, datos []byte) {
 	}()
 }
 
+// charlaDisponibleYa: CharlaDisponible con una espera corta (corre en la
+// goroutine del broker).
+func (i *Integraciones) charlaDisponibleYa(usuario string) bool {
+	ctx, cancelar := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancelar()
+	return i.CharlaDisponible(ctx, usuario)
+}
+
 // --- Telegram: un mensaje libre es una charla ---
 
 // charlaTelegram: con un robot, con ese; con varios, el último con el que
 // charló (o pregunta cuál).
 func (i *Integraciones) charlaTelegram(ctx context.Context, chat int64, usuario string, rs []robot, texto string) {
-	if !i.CharlaActiva() {
+	if !i.CharlaDisponible(ctx, usuario) {
 		i.responder(ctx, chat, "No entendí. "+textoAyuda, nil)
 		return
 	}
