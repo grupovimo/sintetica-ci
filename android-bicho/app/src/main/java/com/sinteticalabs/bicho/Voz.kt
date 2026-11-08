@@ -78,10 +78,22 @@ class Voz(contexto: Context) {
     }
 
     companion object {
-        /** Los canales que usa el bicho, al máximo (el volumen lo pone él). */
-        fun canales(audio: AudioManager) {
-            for (c in intArrayOf(AudioManager.STREAM_MUSIC, AudioManager.STREAM_ALARM))
-                runCatching { audio.setStreamVolume(c, audio.getStreamMaxVolume(c), 0) }
+        /**
+         * Los canales que usa el bicho, al máximo (el volumen lo pone él), salvo
+         * que lo hayan silenciado por adb (el despertador suena igual).
+         */
+        fun canales(contexto: Context, audio: AudioManager) {
+            val callado = contexto.getSharedPreferences("voz", 0).getBoolean("silencio", false)
+            runCatching {
+                audio.setStreamVolume(AudioManager.STREAM_MUSIC, if (callado) 0 else audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC), 0)
+            }
+            runCatching { audio.setStreamVolume(AudioManager.STREAM_ALARM, audio.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0) }
+        }
+
+        /** Silencia (o no) la voz del bicho; queda guardado. */
+        fun silenciar(contexto: Context, si: Boolean) {
+            contexto.getSharedPreferences("voz", 0).edit().putBoolean("silencio", si).apply()
+            canales(contexto, contexto.getSystemService(Context.AUDIO_SERVICE) as AudioManager)
         }
     }
 }

@@ -80,7 +80,7 @@ object Kiosco {
         val audio = a.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         for (canal in intArrayOf(AudioManager.STREAM_RING, AudioManager.STREAM_NOTIFICATION, AudioManager.STREAM_SYSTEM))
             runCatching { audio.setStreamVolume(canal, 0, 0) }
-        Voz.canales(audio)
+        Voz.canales(a, audio)
     }
 
     /** La salida secreta: suelta todo y abre los ajustes. */
