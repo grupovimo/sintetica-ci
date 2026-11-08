@@ -249,8 +249,14 @@ data class HabitoVista(val indice: Int, val nombre: String, val racha: Int, val 
 data class Entrantes(val url: String?, val token: String?, val mercadoPago: Boolean, val regenerar: Boolean)
 data class Suena(val sonando: Boolean, val titulo: String, val artista: String)
 data class Musica(val disponible: Boolean, val conectada: Boolean, val nombre: String, val suena: Suena?)
-data class Charla(val disponible: Boolean, val quedan: Int, val porDia: Int)
-data class RespuestaCharla(val texto: String, val expresion: String?, val quedan: Int)
+/** La charla siempre está (sin IA, contesta el motor propio); quedan = -1 es sin tope. */
+data class Charla(val disponible: Boolean, val quedan: Int, val porDia: Int, val ia: Boolean = false)
+/** origen: "motor" (su motor propio) o "ia". */
+data class RespuestaCharla(val texto: String, val expresion: String?, val quedan: Int, val origen: String = "ia")
+
+/** Quién contestó: lo dice la API; si no, sin tope y sin IA propia es el motor (como la web). */
+fun origenCharla(origen: String?, propia: Boolean, quedan: Int): String =
+    if (origen != null) (if (Regex("^(local|motor|nucleo)").containsMatchIn(origen)) "motor" else "ia") else if (!propia && quedan < 0) "motor" else "ia"
 
 private fun amigoDe(o: JsonObject) = Amigo(o.numero("id")?.toLong() ?: 0, o.texto("nombre").orEmpty().ifEmpty { "Tu amigo" },
     o.lista("robots").orEmpty().mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }, o.si("todos") ?: true, o.si("conectado") ?: false)
@@ -320,7 +326,69 @@ suspend fun ApiSintetica.mandarMusica(id: String, sonando: Boolean, titulo: Stri
     pedir("/v1/bichos/$id/musica", "POST", buildJsonObject { put("sonando", sonando); put("titulo", titulo); put("artista", artista) })
 }
 
-suspend fun ApiSintetica.charla(): Charla = pedir("/v1/charla").let { Charla(it.si("disponible") ?: false, it.numero("quedan")?.toInt() ?: 0, it.numero("porDia")?.toInt() ?: 60) }
+suspend fun ApiSintetica.charla(): Charla = pedir("/v1/charla").let {
+    Charla(it.si("disponible") ?: true, it.numero("quedan")?.toInt() ?: -1, it.numero("porDia")?.toInt() ?: 0, it.si("ia") ?: false)
+}
 suspend fun ApiSintetica.charlar(id: String, texto: String): RespuestaCharla = pedir("/v1/bichos/$id/charla", "POST", buildJsonObject { put("texto", texto) }).let {
-    RespuestaCharla(it.texto("texto").orEmpty(), it.texto("expresion"), it.numero("quedan")?.toInt() ?: 0)
+    val quedan = it.numero("quedan")?.toInt() ?: -1
+    RespuestaCharla(it.texto("texto").orEmpty(), it.texto("expresion"), quedan, origenCharla(it.texto("origen"), it.si("propia") ?: false, quedan))
+}
+
+// --- La voz (Edge gratis y ElevenLabs), el paquete sin internet, tu IA y la conversación ---
+
+data class VozOpcion(val id: String, val nombre: String)
+data class VozEdge(val disponible: Boolean, val prendida: Boolean, val voz: String, val voces: List<VozOpcion>, val usados: Int, val tope: Int)
+data class VozEleven(val conectado: Boolean, val voz: String, val voces: List<VozOpcion>, val leer: Boolean, val usados: Int, val tope: Int, val segundos: Int, val topeMinutos: Int)
+data class PaqueteVoz(
+    val estado: String, val error: String?, val version: Int, val voz: String, val frases: Int, val total: Int, val bytes: Long,
+    val bytesEstimados: Long, val disponible: Boolean, val proveedor: String, val vozNueva: String?, val faltan: Int, val gasta: Int,
+    val hechas: Int, val de: Int,
+)
+data class IAPropia(val propia: Boolean, val servidor: Boolean, val proveedor: String, val modelo: String, val urlPista: String, val usadas: Int, val tope: Int)
+data class Conversacion(val token: String, val segundos: Int, val quedan: Int, val expresiones: List<String>)
+
+private fun vozEdgeDe(o: JsonObject) = VozEdge(o.si("disponible") ?: false, o.si("prendida") ?: false, o.texto("voz").orEmpty(),
+    o.lista("voces").orEmpty().mapNotNull { (it as? JsonObject)?.let { v -> VozOpcion(v.texto("id").orEmpty(), "${v.texto("nombre").orEmpty().substringBefore(' ')} · ${v.texto("idioma").orEmpty().drop(3)}") } },
+    o.numero("usados_hoy")?.toInt() ?: 0, o.numero("tope")?.toInt() ?: 0)
+
+private fun vozElevenDe(o: JsonObject) = VozEleven(o.si("conectado") ?: false, o.texto("voz").orEmpty(),
+    o.lista("voces").orEmpty().mapNotNull { (it as? JsonObject)?.let { v -> VozOpcion(v.texto("id").orEmpty(), v.texto("nombre").orEmpty()) } },
+    o.si("leer") ?: true, o.numero("usados_hoy")?.toInt() ?: 0, o.numero("tope")?.toInt() ?: 5000, o.numero("segundos_hoy")?.toInt() ?: 0, o.numero("tope_minutos")?.toInt() ?: 10)
+
+fun paqueteDe(o: JsonObject) = PaqueteVoz(
+    o.texto("estado") ?: "nuevo", o.texto("error")?.ifEmpty { null }, o.numero("version")?.toInt() ?: 0, o.texto("voz").orEmpty(), o.numero("frases")?.toInt() ?: 0,
+    o.numero("total")?.toInt() ?: 0, o.numero("bytes")?.toLong() ?: 0, o.numero("bytes_estimados")?.toLong() ?: 0, o.si("disponible") ?: false,
+    o.texto("proveedor").orEmpty(), o.texto("voz_nueva"), o.numero("faltan")?.toInt() ?: 0, o.numero("gasta")?.toInt() ?: 0,
+    o.obj("progreso")?.numero("hechas")?.toInt() ?: 0, o.obj("progreso")?.numero("de")?.toInt() ?: 0,
+)
+
+private fun iaDe(o: JsonObject) = IAPropia(o.si("propia") ?: false, o.si("servidor") ?: false, o.texto("proveedor").orEmpty(), o.texto("modelo").orEmpty(),
+    o.texto("url_pista").orEmpty(), o.numero("usadas_hoy")?.toInt() ?: 0, o.numero("tope")?.toInt() ?: 0)
+
+suspend fun ApiSintetica.vozEdge(): VozEdge = vozEdgeDe(pedir("/v1/voz/edge"))
+suspend fun ApiSintetica.ponerVozEdge(cuerpo: JsonObject): VozEdge = vozEdgeDe(pedir("/v1/voz/edge", "PUT", cuerpo))
+suspend fun ApiSintetica.vozEleven(): VozEleven = vozElevenDe(pedir("/v1/voz/elevenlabs"))
+suspend fun ApiSintetica.ponerVozEleven(cuerpo: JsonObject): VozEleven = vozElevenDe(pedir("/v1/voz/elevenlabs", "PUT", cuerpo))
+suspend fun ApiSintetica.sacarVozEleven(): VozEleven = vozElevenDe(pedir("/v1/voz/elevenlabs", "DELETE"))
+
+/** Una prueba de la voz: el mp3 (cual: "edge" o "elevenlabs"). */
+suspend fun ApiSintetica.probarVoz(cual: String, texto: String): ByteArray =
+    crudo("/v1/voz/$cual/probar", "POST", buildJsonObject { put("texto", texto) }.toString().toByteArray())
+
+suspend fun ApiSintetica.paqueteVoz(id: String): PaqueteVoz = paqueteDe(pedir("/v1/bichos/$id/voz/paquete"))
+
+/** Generarlo: el estado, o (con ElevenLabs y sin confirmar) el 409 con cuánto gasta. */
+suspend fun ApiSintetica.generarPaquete(id: String, confirmar: Boolean): Pair<Int, PaqueteVoz?> {
+    val (e, o) = conEstado("/v1/bichos/$id/voz/paquete", "POST", if (confirmar) buildJsonObject { put("confirmar", true) } else buildJsonObject { })
+    if (e >= 400 && e != 409) throw ErrorApi(e, o.texto("error") ?: "Error $e", o.texto("detalle").orEmpty())
+    return e to (if (o.texto("estado") != null) paqueteDe(o) else null)
+}
+
+suspend fun ApiSintetica.ia(): IAPropia = iaDe(pedir("/v1/ia"))
+suspend fun ApiSintetica.ponerIa(cuerpo: JsonObject): IAPropia = iaDe(pedir("/v1/ia", "PUT", cuerpo))
+suspend fun ApiSintetica.sacarIa() { crudo("/v1/ia", "DELETE") }
+
+/** El token para hablar en tiempo real (WebRTC, el SDK de Android), con los segundos que puede durar y sus caras. */
+suspend fun ApiSintetica.conversacion(id: String): Conversacion = pedir("/v1/bichos/$id/conversacion?modo=webrtc").let {
+    Conversacion(it.texto("token") ?: it.texto("url").orEmpty(), it.numero("segundos")?.toInt() ?: 60, it.numero("quedan")?.toInt() ?: 0, it.textos("expresiones"))
 }

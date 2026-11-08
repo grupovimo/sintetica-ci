@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -17,6 +18,11 @@
     <uses-permission android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE" />
     <uses-feature android:name="android.software.companion_device_setup" android:required="false" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Hablarle en tiempo real (se pide al usarlo). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Lo que suma LiveKit y no se usa. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" tools:node="remove" />
     <!-- La cuenta y los bichos lejos (la API). -->
     <uses-permission android:name="android.permission.INTERNET" />
 
@@ -43,6 +49,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="sintetica" android:host="entrar" />
             </intent-filter>
+            <!-- Los links de la web: una invitación de amigo (?amigo=) y la vuelta de Spotify (?spotify=).
+                 Sin autoVerify (haría falta .well-known/assetlinks.json en la web): Android ofrece abrirlos con la app. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="sintetica.grupovimo.com.ar" android:pathPrefix="/robots" />
+            </intent-filter>
         </activity>
         <!-- Opcional: los avisos del celu al robot (solo app y contacto de las notificaciones elegidas). -->
         <service
@@ -63,6 +77,7 @@
             </intent-filter>
         </service>
         <receiver android:name=".datos.GeocercaCasa" android:exported="false" />
+        <service android:name="io.livekit.android.room.track.screencapture.ScreenCaptureService" tools:node="remove" />
         <!-- El modelo de QR de ML Kit va dentro de la app (sin descargas de Play Services). -->
         <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode" />
     </application>

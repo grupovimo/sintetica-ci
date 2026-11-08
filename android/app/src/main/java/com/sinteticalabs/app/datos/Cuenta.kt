@@ -18,12 +18,16 @@ private val SERVIDOR = stringPreferencesKey("servidor")
 private val EMAIL = stringPreferencesKey("email")
 private val TOKEN = stringPreferencesKey("token")
 
-/** En local, la API corre en la Mac: http://<la IP de la Mac>:8080. */
-const val SERVIDOR_POR_DEFECTO = "http://192.168.1.10:8080"
+/** La nube de producción. En local (solo para depurar), la API corre en la Mac: http://<la IP>:8080. */
+const val SERVIDOR_POR_DEFECTO = "https://api-sintetica.grupovimo.com.ar"
+/** La web (los links de amigos y la vuelta de Spotify abren la app). */
+const val WEB_POR_DEFECTO = "https://sintetica.grupovimo.com.ar"
+/** El de antes por defecto: quien no lo cambió, pasa a la nube. */
+private const val SERVIDOR_VIEJO = "http://192.168.1.10:8080"
 
 class Cuenta(private val contexto: Context) {
     val sesion: Flow<Sesion> = contexto.cuenta.data.map { p ->
-        Sesion(p[SERVIDOR] ?: SERVIDOR_POR_DEFECTO, p[EMAIL].orEmpty(), p[TOKEN].orEmpty())
+        Sesion(p[SERVIDOR]?.takeIf { it != SERVIDOR_VIEJO } ?: SERVIDOR_POR_DEFECTO, p[EMAIL].orEmpty(), p[TOKEN].orEmpty())
     }
 
     suspend fun actual(): Sesion = sesion.first()

@@ -89,6 +89,31 @@ class ApiSintetica(private val servidor: String, private val token: String = "")
         return r["token"]?.jsonPrimitive?.contentOrNull ?: throw ErrorApi(0, "La API no dio el token.")
     }
 
+    /** Cómo se entra en este servidor (sin SMTP no hay mail). */
+    suspend fun metodos(): Pair<Boolean, Boolean> {
+        val r = pedir("/v1/sesion/metodos")
+        return (r["email"]?.jsonPrimitive?.booleanOrNull ?: true) to (r["telegram"]?.jsonPrimitive?.booleanOrNull ?: false)
+    }
+
+    /** Entrar con Telegram: el pedido (token, link a t.me y el secreto de este celu). */
+    suspend fun pedirTelegram(): Triple<String, String, String> {
+        val r = pedir("/v1/sesion/telegram", "POST", buildJsonObject { put("cliente", "app") })
+        return Triple(r["token"]!!.jsonPrimitive.content, r["enlace"]!!.jsonPrimitive.content, r["secreto"]?.jsonPrimitive?.contentOrNull.orEmpty())
+    }
+
+    /** Espera (hasta 25 s) a que lo apruebe en Telegram: el token de la sesión, o el estado ("pendiente" o "confirmar"). */
+    suspend fun esperarTelegram(token: String, secreto: String): Pair<String?, String> {
+        val r = pedir("/v1/sesion/telegram/${java.net.URLEncoder.encode(token, "UTF-8")}?esperar=25", encabezados = mapOf("X-Sintetica-Secreto" to secreto))
+        return r["token"]?.jsonPrimitive?.contentOrNull to (r["estado"]?.jsonPrimitive?.contentOrNull ?: "pendiente")
+    }
+
+    /** O con el código de 6 dígitos que manda el bot. Devuelve el token de la sesión. */
+    suspend fun codigoTelegram(token: String, secreto: String, codigo: String): String {
+        val r = pedir("/v1/sesion/telegram/${java.net.URLEncoder.encode(token, "UTF-8")}/codigo", "POST",
+            buildJsonObject { put("codigo", codigo.filter { it.isDigit() }) }, mapOf("X-Sintetica-Secreto" to secreto))
+        return r["token"]?.jsonPrimitive?.contentOrNull ?: throw ErrorApi(0, "La API no dio el token.")
+    }
+
     suspend fun salir() { runCatching { pedir("/v1/sesion", "DELETE") } }
 
     suspend fun email(): String = pedir("/v1/sesion")["usuario"]?.jsonObject?.get("email")?.jsonPrimitive?.contentOrNull.orEmpty()
@@ -149,6 +174,23 @@ class ApiSintetica(private val servidor: String, private val token: String = "")
         try {
             if (c.responseCode != 200) throw ErrorApi(c.responseCode, "No pude bajar el firmware.")
             c.inputStream.use { it.readBytes() }
+        } finally {
+            c.disconnect()
+        }
+    }
+
+    /** Un pedido JSON que devuelve el estado y el cuerpo aunque sea un error (el 409 del paquete de voz trae el estado). */
+    suspend fun conEstado(ruta: String, metodo: String, cuerpo: JsonElement?): Pair<Int, JsonObject> = withContext(Dispatchers.IO) {
+        val c = abrir(ruta, metodo)
+        try {
+            if (cuerpo != null) {
+                c.doOutput = true
+                c.setRequestProperty("Content-Type", "application/json")
+                c.outputStream.use { it.write(cuerpo.toString().toByteArray()) }
+            }
+            val estado = try { c.responseCode } catch (e: Exception) { throw ErrorApi(0, "Sin conexión con el servidor.") }
+            val texto = (if (estado < 400) c.inputStream else c.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
+            estado to (runCatching { json.parseToJsonElement(texto).jsonObject }.getOrNull() ?: JsonObject(emptyMap()))
         } finally {
             c.disconnect()
         }

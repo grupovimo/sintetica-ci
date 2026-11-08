@@ -232,6 +232,7 @@ private fun Consola(vm: RobotViewModel, modelo: Modelo, alVolver: () -> Unit, al
                 Tecla("Jugar", { actual = Modulo.JUGAR }, habilitada = conectado)
                 if (sePuedeSoltar(estado)) Tecla("Soltar", { hacer(null, "", "Vuelve a ser él") }, acabado = Acabado.NEGRA, habilitada = conectado)
             }
+            Conversar(vm)
             DecileOCharla(vm, conectado)
             respuesta?.let { AvisoLinea(it) }
             if (!conectado) Text("Le llega cuando vuelva.", style = T.texto)

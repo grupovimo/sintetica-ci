@@ -201,6 +201,9 @@ fun ModIntegraciones(vm: RobotViewModel) {
             }
         }
 
+        // La charla: con la IA del servidor, la tuya o su motor propio.
+        SeccionIAPropia(vm)
+
         // La música: Spotify (si la nube lo tiene) y la del celu.
         SeccionMusica(vm)
 

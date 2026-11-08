@@ -557,6 +557,8 @@ fun ModVoz(vm: RobotViewModel, modelo: Modelo) {
                 }
             }
         }
+        // Igual se puede conectar la voz: le hablás desde acá, con el micrófono del celu.
+        SeccionLeerVoz(vm)
         return
     }
     val v = Editar.voz(c)
@@ -587,6 +589,8 @@ fun ModVoz(vm: RobotViewModel, modelo: Modelo) {
             Llave("Charlar · después de su nombre", v.si("conversar") == true, { vm.cambiar { Editar.ponerVoz(it) { y -> y.con("conversar", !(y.si("conversar") ?: false)) } } })
             Text("“${v.texto("palabra") ?: nombre}, ¿qué hora es?”", style = T.texto, color = Color(0xCC1A1714))
         }
+        SeccionLeerVoz(vm)
+        if (habla) SeccionPaqueteVoz(vm)
     }
 }
 

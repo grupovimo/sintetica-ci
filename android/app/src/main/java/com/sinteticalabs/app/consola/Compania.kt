@@ -149,3 +149,19 @@ object Compania {
         else -> app to quien
     }
 }
+
+/** Los links de la web que abren la app (https://sintetica.grupovimo.com.ar/robots?…). */
+object LinksWeb {
+    const val HOST = "sintetica.grupovimo.com.ar"
+
+    /** ("amigo", "ABCDEFGH") o ("spotify", "ok"); null si no es uno de esos. */
+    fun leer(esquema: String?, host: String?, ruta: String?, amigo: String?, spotify: String?): Pair<String, String>? {
+        if (esquema != "https" || host != HOST || ruta?.startsWith("/robots") != true) return null
+        val c = Compania.limpiarCodigo(amigo.orEmpty())
+        if (c.length == 8) return "amigo" to c
+        if (!spotify.isNullOrEmpty()) return "spotify" to spotify
+        return null
+    }
+
+    fun textoSpotify(v: String) = when (v) { "ok" -> "Spotify conectado"; "cancelado" -> "Spotify: cancelado"; else -> "Spotify no se conectó" }
+}

@@ -259,6 +259,27 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Un marco tal cual al robot (por la nube o por BLE), sin esperar respuesta. */
+    suspend fun mandarMarco(datos: ByteArray) {
+        runCatching {
+            when (via) {
+                Via.NUBE -> if (robot.value?.conectado == true) api!!.marco(idRobot, Car.COMANDO.id, datos, conexion).forEach { (c, b) -> recibirMarco(c, b) }
+                else -> cliente?.escribirCrudo(Car.COMANDO, datos)
+            }
+            Unit
+        }
+    }
+
+    /** La cara de la vista previa (la conversación la mueve; null la suelta). */
+    fun caraEnVistaPrevia(expresion: String?) {
+        pausarEspejo(if (expresion == null) 0.0 else 30.0)
+        if (via != Via.DEMO && expresion != null) Nucleo.bleEscribir(Car.COMANDO.id, Comando.expresion(expresion))
+    }
+
+    fun miradaEnVistaPrevia(x: Double, y: Double) {
+        if (via != Via.DEMO) Nucleo.bleEscribir(Car.COMANDO.id, Comando.mirar(x, y))
+    }
+
     /** Prueba un comportamiento en el robot. Devuelve el error o null. */
     suspend fun probarComportamiento(n: String): String? = try {
         when (via) {

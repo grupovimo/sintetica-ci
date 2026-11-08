@@ -42,6 +42,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -560,13 +562,14 @@ fun DecileOCharla(vm: RobotViewModel, conectado: Boolean) {
     var charla by remember { mutableStateOf<com.sinteticalabs.app.datos.Charla?>(null) }
     var charlando by remember { mutableStateOf(false) }
     var frase by remember { mutableStateOf("") }
-    var respuesta by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var respuesta by remember { mutableStateOf<Triple<String, String, String>?>(null) }
     var aviso by remember { mutableStateOf<String?>(null) }
     var diciendo by remember { mutableStateOf(false) }
     val suena by vm.suena.collectAsState()
     LaunchedEffect(Unit) {
         if (vm.via == Via.NUBE && api != null) {
-            charla = runCatching { api.charla() }.getOrNull()?.takeIf { it.disponible }
+            // La charla siempre está: sin IA en la nube contesta su motor propio.
+            charla = runCatching { api.charla() }.getOrNull() ?: com.sinteticalabs.app.datos.Charla(true, -1, 0)
             runCatching { api.musica() }.getOrNull()?.suena?.takeIf { it.sonando }?.let { if (vm.suena.value == null) vm.suena.value = it }
         }
     }
@@ -585,15 +588,20 @@ fun DecileOCharla(vm: RobotViewModel, conectado: Boolean) {
                 Tecla("Decile algo", { charlando = false; frase = cortarBytes(frase, Acompanar.MAX_TEXTO) }, acabado = if (!charlando) Acabado.NARANJA else Acabado.NEGRA, chica = true, alto = 32.dp)
                 Tecla("Charlar", { charlando = true }, acabado = if (charlando) Acabado.NARANJA else Acabado.NEGRA, chica = true, alto = 32.dp)
                 Spacer(Modifier.weight(1f))
-                if (charlando) Grabado("${ch.quedan}/${ch.porDia} hoy") else Grabado("${largoBytes(frase)}/$max")
+                if (charlando) { if (ch.quedan >= 0) Grabado("${ch.quedan}/${ch.porDia} hoy") } else Grabado("${largoBytes(frase)}/$max")
             } else {
                 Grabado("Decile algo", Modifier.weight(1f))
                 Grabado("${largoBytes(frase)}/$max", color = if (largoBytes(frase) >= max) C.brasa else C.grisOscuro)
             }
         }
-        if (charlando) respuesta?.let { (yo, el) ->
+        if (charlando) respuesta?.let { (yo, el, origen) ->
             Text(yo, style = T.dato, color = C.gris, maxLines = 2)
-            Text("“$el”", style = T.campoClaro.copy(color = C.brasa))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("“$el”", style = T.campoClaro.copy(color = C.brasa), modifier = Modifier.weight(1f, fill = false))
+                // De dónde salió: su motor propio (⚙) o la IA (✦).
+                Box(Modifier.size(20.dp).clip(RoundedCornerShape(5.dp)).background(C.tinta).descripcion(if (origen == "ia") "Contestó la IA" else "Contestó su motor propio"),
+                    contentAlignment = Alignment.Center) { Text(if (origen == "ia") "✦" else "⚙", style = T.dato.copy(fontSize = 11.sp), color = C.brasa) }
+            }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(Modifier.weight(1f)) {
@@ -606,7 +614,7 @@ fun DecileOCharla(vm: RobotViewModel, conectado: Boolean) {
                     diciendo = true
                     if (charlando) {
                         runCatching { api!!.charlar(vm.idRobot, t) }
-                            .onSuccess { r -> respuesta = t to r.texto; charla = charla?.copy(quedan = r.quedan); frase = "" }
+                            .onSuccess { r -> respuesta = Triple(t, r.texto, r.origen); charla = charla?.copy(quedan = r.quedan); frase = "" }
                             .onFailure { x ->
                                 aviso = if (x is ErrorApi) (if (x.estado == 429) "Por hoy ya charlaron mucho" else if (x.estado == 503) "Sin charla en esta nube" else x.message) else "No contestó"
                             }
@@ -619,7 +627,7 @@ fun DecileOCharla(vm: RobotViewModel, conectado: Boolean) {
                     delay(2500); aviso = null
                 }
             }, acabado = Acabado.NARANJA, chica = true,
-                habilitada = (conectado || charlando) && !diciendo && frase.isNotBlank() && (!charlando || (charla?.quedan ?: 0) > 0))
+                habilitada = (conectado || charlando) && !diciendo && frase.isNotBlank() && (!charlando || (charla?.quedan ?: -1) != 0))
         }
         aviso?.let { Grabado(it, color = C.brasa) }
     }
@@ -714,5 +722,36 @@ fun MusicaDelCelu(vm: RobotViewModel) {
             }
         }, Modifier.weight(1f))
         if (prendida && !permiso) Grabado("Sin permiso", color = SOBRE_PLACA)
+    }
+}
+
+private fun Modifier.descripcion(t: String) = this.semantics { contentDescription = t }
+
+/** Un link de la web que abrió la app: aceptar un amigo o la vuelta de Spotify. */
+@Composable
+fun LinkDeLaWeb(que: String, valor: String, alCerrar: () -> Unit) {
+    val contexto = LocalContext.current
+    val alcance = rememberCoroutineScope()
+    var texto by remember { mutableStateOf<String?>(if (que == "spotify") com.sinteticalabs.app.consola.LinksWeb.textoSpotify(valor) else null) }
+    androidx.compose.ui.window.Dialog(onDismissRequest = alCerrar) {
+        Chapa(Modifier.fillMaxWidth(), radio = 28.dp, relleno = 22.dp) {
+            if (que == "amigo" && texto == null) {
+                Text("🤗", style = T.nombre.copy(fontSize = 34.sp))
+                Grabado("Te invitaron de amigo", color = C.brasa)
+                Text("${valor.take(4)}-${valor.drop(4)}", style = T.digitosChicos.copy(fontSize = 26.sp))
+                Tecla("Aceptar", {
+                    alcance.launch {
+                        val cuenta = com.sinteticalabs.app.datos.Cuenta(contexto)
+                        val s = cuenta.actual()
+                        texto = if (!s.activa) "Primero entrá a tu cuenta" else runCatching { cuenta.api(s).aceptarAmigo(valor) }.fold(
+                            { "¡Ya son amigos con ${it.nombre}!" }, { if (it is ErrorApi && it.estado == 409) "Ya son amigos" else "Ese código no anda" })
+                    }
+                }, Modifier.fillMaxWidth(), acabado = Acabado.NARANJA)
+                Tecla("No", alCerrar, Modifier.fillMaxWidth(), acabado = Acabado.NEGRA)
+            } else {
+                Text(texto.orEmpty(), style = T.campoClaro)
+                Tecla("OK", alCerrar, Modifier.fillMaxWidth(), acabado = Acabado.NARANJA)
+            }
+        }
     }
 }
