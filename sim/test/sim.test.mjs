@@ -437,7 +437,7 @@ test('v1.10: charla sin IA (0x4C): entiende, hace la acción, contesta con su gl
   assert.equal(c.enMinutos, 5);
   assert.equal(c.noEntendi, false);
   correr(600);
-  assert.equal(sim.expresionVisible(), 'globo');
+  assert.equal(leerEstado(sim.bleLeerEstado()).expresion, 'globo');
   correr(4000);
   const muestras = audio.reduce((s, m) => s + m.length, 0);
   assert.ok(muestras > 8000, `la voz: ${muestras} muestras`);
