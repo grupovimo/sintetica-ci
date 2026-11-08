@@ -61,8 +61,9 @@ func (r Recordatorio) Toca(t time.Time) bool {
 
 // recordatorios: cada minuto, a los usuarios con Telegram les manda los
 // recordatorios de sus bichos que no están conectados (el bicho conectado
-// lo muestra él; si hay una automatización "recordatorio", esa avisa) y los
-// saludos de cumpleaños (de todos sus bichos).
+// lo muestra él; si hay una automatización "recordatorio", esa avisa), los
+// saludos de cumpleaños y lo de `cuidado` (el "¿Cómo estás?", el "te extraño"
+// y el resumen del día; ver cuidado.go), de todos sus bichos.
 func (i *Integraciones) recordatorios(ctx context.Context) {
 	porMinuto(ctx, func(m time.Time) { i.revisarRecordatorios(ctx, m) })
 }
@@ -85,6 +86,7 @@ func (i *Integraciones) revisarRecordatorios(ctx context.Context, m time.Time) {
 				continue
 			}
 			i.saludarCumples(ctx, v.ChatID, r, leerDatosConfig(cfg.Texto), m)
+			i.revisarCuidado(ctx, v.ChatID, r, cfg.Texto, m)
 			if r.conectado {
 				continue
 			}

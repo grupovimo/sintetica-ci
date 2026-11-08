@@ -18,6 +18,7 @@ var comandosBot = []map[string]string{
 	{"command": "cara", "description": "Cambiarle la cara a un robot"},
 	{"command": "decir", "description": "Que un robot diga algo en su pantalla"},
 	{"command": "clima", "description": "El clima donde está un robot"},
+	{"command": "jugar", "description": "Jugar con un robot (dado, moneda, ppt, reflejos, mirada)"},
 	{"command": "ayuda", "description": "Qué puedo hacer"},
 }
 
@@ -28,6 +29,7 @@ const textoAyuda = `Esto es lo que puedo hacer:
 /cara <expresión> [nombre]: le cambia la cara (por ejemplo: /cara contento)
 /decir <texto> [nombre]: tu robot lo dice en su pantalla (hasta 60 letras)
 /clima [nombre]: el clima donde está tu robot
+/jugar [dado|moneda|ppt|reflejos|mirada] [nombre]: juega con vos en su pantalla
 /ayuda: esto
 
 Si tenés un solo robot, el nombre no hace falta. Los avisos (batería baja, recordatorios…) se arman en la web, en Automatizaciones.`
@@ -344,6 +346,26 @@ func (i *Integraciones) atenderMensaje(ctx context.Context, m *mensaje) {
 			return
 		}
 		i.responder(ctx, chat, i.textoClima(ctx, *r), nil)
+	case "/jugar":
+		r, juego := elegir(rs, resto)
+		if juego == "" {
+			if r == nil {
+				i.responder(ctx, chat, "¿Con cuál jugás?", tecladoRobots(rs, "juegos:"))
+				return
+			}
+			i.responder(ctx, chat, "¿A qué jugamos con "+r.nombre+"?", tecladoJuegos(r.ID))
+			return
+		}
+		if _, ok := protocolo.NombreJuego(juego); !ok {
+			i.responder(ctx, chat, "No conozco ese juego. Los que hay: dado, moneda, ppt (piedra, papel o tijera), reflejos y mirada.", nil)
+			return
+		}
+		if r == nil {
+			i.guardarPendiente(chat, "jugar", juego)
+			i.responder(ctx, chat, "¿Con cuál?", tecladoRobots(rs, "jugar:"))
+			return
+		}
+		i.responder(ctx, chat, i.jugar(*r, juego), nil)
 	default:
 		i.responder(ctx, chat, "No entendí. "+textoAyuda, nil)
 	}
@@ -475,5 +497,31 @@ func (i *Integraciones) atenderBoton(ctx context.Context, c *callback) {
 			return
 		}
 		i.responder(ctx, chat, i.decir(*r, texto), nil)
+	case "juegos":
+		i.responder(ctx, chat, "¿A qué jugamos con "+r.nombre+"?", tecladoJuegos(r.ID))
+	case "jugar":
+		juego := ""
+		if len(partes) == 3 {
+			juego = partes[2]
+		} else if p, ok := i.tomarPendiente(chat, "jugar"); ok {
+			juego = p
+		}
+		if juego == "" {
+			i.responder(ctx, chat, "¿A qué jugamos con "+r.nombre+"?", tecladoJuegos(r.ID))
+			return
+		}
+		i.responder(ctx, chat, i.jugar(*r, juego), nil)
+	case "animo":
+		v, ok := -1, len(partes) == 3
+		if ok {
+			v, ok = map[string]int{"0": 0, "1": 1, "2": 2}[partes[2]]
+		}
+		if !ok {
+			return
+		}
+		// Se sacan los botones (ya contestó) y se contesta con empatía.
+		i.tg.llamar(ctx, "editMessageReplyMarkup", map[string]any{"chat_id": chat, "message_id": c.Message.MessageID, //nolint:errcheck
+			"reply_markup": map[string]any{"inline_keyboard": [][]Boton{}}}, nil)
+		i.responder(ctx, chat, i.contestarAnimo(ctx, *r, v), nil)
 	}
 }

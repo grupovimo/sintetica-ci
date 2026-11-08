@@ -77,6 +77,8 @@ type Integraciones struct {
 	clima         *clima.Cliente
 	climaEst      estadoClima
 	cambiarConfig CambiarConfig
+
+	cuid estadoCuidado // lo de la v1.7 (cuidado.go)
 }
 
 type entradaCache struct {
@@ -160,8 +162,13 @@ func (i *Integraciones) Correr(ctx context.Context) {
 
 // Evento lo llama la nube cuando le pasa algo a un bicho (no bloquea).
 func (i *Integraciones) Evento(bicho, evento string, datos map[string]any) {
-	if evento == "conectado" {
+	switch evento {
+	case "conectado":
 		i.ClimaYa(bicho)
+	case "juego":
+		i.anotarJuego(bicho, datos)
+	case "bicho-cerca":
+		go i.saludarEntreRobots(bicho)
 	}
 	if !i.tieneAutomatizacionPara(bicho, evento) {
 		return
@@ -174,14 +181,15 @@ func (i *Integraciones) Evento(bicho, evento string, datos map[string]any) {
 }
 
 // QuiereRegistro: si el bicho tiene automatizaciones activas con eventos que
-// salen del registro del motor de vida.
+// salen del registro del motor de vida, o si su dueño tiene otro robot
+// conectado (para que se saluden al verse: "bicho-cerca").
 func (i *Integraciones) QuiereRegistro(bicho string) bool {
 	for _, a := range i.automatizacionesDe(bicho) {
 		if a.Activa && nube.CuandoDelRegistro(a.Cuando) {
 			return true
 		}
 	}
-	return false
+	return i.tieneOtroConectado(bicho)
 }
 
 func (i *Integraciones) tieneAutomatizacionPara(bicho, evento string) bool {
@@ -291,8 +299,13 @@ func (i *Integraciones) Probar(ctx context.Context, usuario, bicho, n string) ([
 	if a.Cuando == "recordatorio" {
 		datos["texto"] = "esto es una prueba"
 	}
-	if a.Cuando == "hora" {
+	switch a.Cuando {
+	case "hora":
 		datos["hora"] = time.Now().In(nube.Zona()).Format("15:04")
+	case "juego":
+		datos["juego"], datos["resultado"] = "dado", "gano"
+	case "animo":
+		datos["valor"] = "bien"
 	}
 	return i.correr(ctx, usuario, bicho, *a, a.Cuando, datos)
 }
