@@ -1,4 +1,4 @@
-# Protocolo de SintéticaOS (v1.5)
+# Protocolo de SintéticaOS (v1.6)
 
 Un servicio GATT propio. Todos los enteros van en little-endian. La
 implementación de referencia es `firmware/nucleo/protocolo.*` y
@@ -153,6 +153,9 @@ veces más rápido.
 | `0x1D` Restaurar | memoria (112 bytes, con su CRC) | La reemplaza: la mudanza a otra placa (v1.4). |
 | `0x1E` Registro | — | Responde `[0x9E][0x00][n][n × (u32 segundos desde que arrancó, u8 tipo, u8 dato)]`: tipo 0 evento, 1 comportamiento, 2 dormir (1) / despertar (0), 3 hito (v1.4), 4 recordatorio (dato: su índice). |
 | `0x1F` Comportamiento | nombre | Empieza ese comportamiento ya (para probarlo desde un editor). `0x07` si no existe (v1.4). |
+| `0x40` Decir | `[n][expresión, n bytes (0 = ninguna)][texto UTF-8, 1 a 60 bytes]` | Lo muestra en un **globo** con la cara achicada arriba, con fundido; dura 2,5 s + 60 ms por byte (de 3 a 10 s) o hasta un toque. Con expresión, la pone ese rato; sin, mueve la boca (`hablando`). Si duerme, lo despierta. Si ya hay un globo, primero se va. `0x07` si la expresión no existe; `0x08` si el texto está vacío, es de más de 60 bytes o no es UTF-8 (v1.6). |
+| `0x41` Clima | `[i16 temperatura en décimas de °C][u8 código WMO][i8 máx °C][i8 mín °C][u8 flags: bit 0 es de día][n][ciudad, 0 a 24 bytes]` | El tiempo que trae la nube (Open-Meteo) para el modo clima y el despertador. Vale 3 h. `0x08` si está mal armado (v1.6). |
+| `0x42` Alarma | `[u8 acción]`: 0 apagar, 1 posponer, 2 sonar ya, 3 despertar | El despertador desde lejos. 2 lo hace sonar (para probarlo); 3 lo despierta sin alarma, con un "buen día". `0x07` si apagar o posponer y no está sonando (v1.6). |
 
 Eventos (el índice del comando `0x12`; los nombres son los de las reglas):
 
@@ -166,20 +169,23 @@ Eventos (el índice del comando `0x12`; los nombres son los de las reglas):
 | `20` llamada | `21` bateria-baja | `22` bateria-critica | `23` enchufado |
 | `24` desenchufado | `25` cargado | `26` sin-wifi | `27` cambio-de-cara |
 | `28` bicho-cerca | `29` volvio | `30` hito | `31` recordatorio |
-| `32` pomodoro | | | |
+| `32` pomodoro | `33` despertador | | |
 
 Los 8 primeros son de la v1; del 8 en adelante, del motor de vida (v1.4).
-`volvio` y `hito` los genera el motor; `recordatorio` y `pomodoro`, el sistema
-(mandarlos sirve para probar las reglas, pero no muestran nada).
+`volvio` y `hito` los genera el motor; `recordatorio`, `pomodoro` y
+`despertador` (v1.6: empezó a sonar a su hora), el sistema (mandarlos sirve
+para probar las reglas, pero no muestran nada). Los eventos nuevos van siempre
+al final.
 
 ### Eventos que avisa el bicho solo
 
-Cuando se dispara un recordatorio (`31`) o termina un tramo del pomodoro
-(`32`), además de anotarlo en el registro, el bicho lo avisa en el momento con
+Cuando se dispara un recordatorio (`31`), termina un tramo del pomodoro
+(`32`) o suena el despertador a su hora (`33`), además de anotarlo en el registro, el bicho lo avisa en el momento con
 una notificación en Comando, **por BLE y por la nube** (`bicho/{id}/resp`),
 con el mismo formato que la respuesta de Registro:
 
 - pomodoro: `[0x9E][0x00][0x01][u32 segundos][0x00 = evento][0x20]`
+- despertador: `[0x9E][0x00][0x01][u32 segundos][0x00][0x21]`
 - recordatorio: `[0x9E][0x00][0x02][u32 segundos][0x00][0x1F][u32 segundos][0x04 = recordatorio][u8 índice]`
 
 El registro (`0x1E`) guarda las mismas entradas: el tipo 4 es "mostró un
@@ -233,7 +239,9 @@ Lectura o notificación (se notifica cuando cambia algo que no sea el humor):
 
 (Textos en UTF-8. Mientras se ve una animación, la expresión visible es
 `animacion:<nombre>`; un recordatorio, `recordatorio:<n>`; en modo pomodoro,
-`pomodoro:trabajo|descanso|pausa`. La versión 3 no tenía la red, el firmware ni el CRC; la
+`pomodoro:trabajo|descanso|pausa`; mientras suena el despertador,
+`despertador`; con un globo (comando Decir o una frase suya), `globo`; en modo
+clima, `clima`. La versión 3 no tenía la red, el firmware ni el CRC; la
 2 tampoco la pantalla; la 1 tampoco el número de unidad, el id ni los bits 2 y
 3.)
 

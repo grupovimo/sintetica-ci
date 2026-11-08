@@ -49,8 +49,9 @@ porta sus parámetros, sus funciones de distancia y sus resortes tal cual.
   absoluta, así el resultado es el mismo dibujando de una vez o por franjas (hay
   un test). En la neutral de la 1.47B, menos del 10 % de los píxeles necesita la
   SDF fina.
-- **Partículas**: zzz, corazón, lágrima, gota, chispa, ?, !, nota, estrella y
-  burbuja, como SDF chiquitas; nacen, flotan, se balancean y se apagan. Nunca
+- **Partículas**: zzz, corazón, lágrima, gota, chispa, ?, !, nota, estrella,
+  burbuja y oveja, como SDF chiquitas (lo que sueña va adentro de la burbuja:
+  `Particula::enBurbuja`, sube con ella); nacen, flotan, se balancean y se apagan. Nunca
   más de 6 (si no hay lugar, reemplaza a la más vieja).
 - El broche no dibuja el resplandor (`VistaRostro::halo = false`), por costo.
 
@@ -86,8 +87,10 @@ porta sus parámetros, sus funciones de distancia y sus resortes tal cual.
   la cara entera a los 60 y la forma a los 90 ("primero mira, después siente").
   Un reflejo no se escalona.
 - **Prioridades**: fija > (reflejo > comportamiento/reacción > ánimo de fondo).
-  El reposo es: la fija, la cara de una regla de estado (`bateria<15`), la de la
-  lista, dormido o la neutral.
+  El reposo es: la fija, la cara de una regla de estado de humor, la de la
+  lista, dormido o la neutral. Las reglas de **batería** (`bateria<15`) no son
+  el reposo: son una **capa del ánimo** (35 %; enchufado, 12 %), la pantalla
+  baja al 85 % y, sin enchufar, la cara se asoma entera 2,5 s cada 1 a 2 min.
 - **Dibujos de formas** (las caras v1 propias del usuario): si la cara que toca
   es un dibujo, el `Sistema` lo dibuja encima del rostro con un fundido de
   200 ms, nunca con un corte (`MotorVida::dibujo`, `opacidadDibujo`).
@@ -160,7 +163,8 @@ van antes. Un evento sin regla prueba con su "padre" (sacudida-fuerte →
 sacudida, caricia → tacto, caída → levantado, nombre → voz), así las reglas v1
 siguen andando. Tocarlo dormido es `despertado`. Las acciones:
 `expresion:x` (3 s), `reflejo:x`, `comportamiento:x`, `estado.var±n`,
-`particula:x`, `sonido:x`, `led:#RRGGBB`, `animacion:x`.
+`particula:x`, `sonido:x`, `led:#RRGGBB`, `animacion:x` y `decir:<situación>`
+(pide una frase: ver "Habla").
 
 ### Ritmo diario
 
@@ -209,7 +213,9 @@ Una config v1 sigue siendo válida (su `personalidad.sueno` pasa al horario).
   solo, eligiendo comportamientos y reaccionando (encima de ella).
 - `comportamientos`: `tipo`, `cuando`, `necesidad`, `base`, `probabilidad`,
   `enfriamiento`, `interrumpible`, `afinidad` y hasta 6 `pasos` (`cara`, `dura`,
-  `veces`, `mirada`, `parpadeo`, `particula`, `cuantas`, `peso`, `sonido`, `estado`).
+  `veces`, `mirada`, `parpadeo`, `particula`, `cuantas`, `peso`, `sonido`, `estado`,
+  `decir`: una situación de frases.json, y `dentro`: con `"particula": "burbuja"`,
+  la partícula que va adentro, o `sueno` = al azar entre corazón, estrella, nota y oveja).
 - `reglas`: `si`, `y` (condiciones extra) y hasta 6 acciones.
 
 - `recordatorios` (hasta 12): `hora` `"HH:MM"` (obligatoria), `dias` (letras
@@ -227,9 +233,19 @@ Una config v1 sigue siendo válida (su `personalidad.sueno` pasa al horario).
 - `pomodoro`: `trabajo` (1 a 120 minutos, 25) y `descanso` (1 a 60, 5).
 - `protector`: `imagen` (el espacio, 0 a 7, obligatorio) y `espera` (3 a 3600
   segundos, 10).
-- `modo`: `mascota` (la cara), `reloj` y `pomodoro` (abajo). `clima` y
-  `notificaciones` necesitan datos de la nube que todavía no llegan: hasta
-  entonces se comportan como `mascota`.
+- `modo`: `mascota` (la cara), `reloj`, `pomodoro` y `clima` (abajo).
+  `notificaciones` necesita datos de la nube que todavía no llegan: hasta
+  entonces se comporta como `mascota`.
+- `habla` (v1.6): `frecuencia` 0 a 1 (0,5; 0 = nunca habla solo) y `propias`
+  `{situación: [frases de 1 a 60 bytes]}`, hasta 12 en total (`Habla`, 746 B).
+- `despertador` (v1.6): `hora` (obligatoria), `dias`, `activo`, `sonido`,
+  `texto` (1 a 60 bytes; sin texto, una frase de "despertador") y `posponer`
+  (1 a 30 min, 9). Uno solo (`Despertador`, 70 B). Se decidió una sección
+  propia y no `recordatorios` con `alarma: true`: el despertador despierta, suena
+  creciente y se pospone, tiene su visor en la consola (Su día) y no le saca
+  lugar ni el límite de 40 bytes a los recordatorios.
+- `ubicacion` (v1.6): `lat`, `lon`, `ciudad`: la usa la nube para el clima; el
+  núcleo solo la valida.
 
 Límites (iguales en todos lados porque valida el mismo núcleo): 48 expresiones
 paramétricas (8 de ellas pueden ser de imagen, con 12 sprites), 64
@@ -387,6 +403,109 @@ partes de ~45 × 45 que se ven de ~55 px).
   parte, perillas, la cara viva en el núcleo entero y "Siempre") y, en la
   consola, el módulo Cara elige la cara de siempre.
 
+## Habla, despertador, clima y la noche (v1.6)
+
+### El globo (`globo.cpp`, `Sistema::decir`)
+
+Lo que dice el bicho (el comando Decir, sus frases, el despertador) va en un
+**globo** claro, con la cara achicada arriba (el mismo panel del recordatorio:
+fundido de 400 ms, nunca un corte) y la colita hacia la boca. El texto (hasta
+60 bytes) se ajusta como el del recordatorio: Fraunces en 2 líneas (3 en la
+redonda, al ancho del círculo) y, si no entra, mono mayúscula. Dura 2,5 s +
+60 ms por byte (de 3 a 10 s) o hasta un toque (que no hace nada más). Un
+recordatorio y el despertador le ganan; uno nuevo espera que el anterior se
+vaya. La expresión visible del estado es `globo`.
+
+### Que hable solo (`habla.cpp`, `shared/formato/vida/frases.json`)
+
+- **Las frases son datos**: `frases.json` tiene 20 situaciones (`despertar`,
+  `buenas-noches`, `volviste`, `te-extrane`, `aburrido`, `sueno`,
+  `bateria-baja`, `cargando`, `caricia`, `saludo`, `hito`, `cumple-dueno`,
+  `cumple-robot`, `recordatorio-hecho`, `despertador`, `posponer`,
+  `clima-frio`, `clima-calor`, `clima-lluvia`, `clima-lindo`), cada una con
+  `probabilidad`, `enfriamiento` (s), `siempre` y frases para `todos` y por
+  preset; `{dueno}` y `{robot}` se reemplazan (sin dueño, "¡Hola, {dueno}!" →
+  "¡Hola!"). `embeber_caras.py` las pasa a una **tabla** en `vida_base.h`
+  (flash, sin parsear: no ocupan RAM).
+- **Quién las pide**: los datos. La acción `decir:<situación>` en las reglas y
+  el campo `"decir"` en los pasos: los comportamientos de fábrica la usan
+  (`despertar` → despertar, `contar-ovejas` → buenas-noches, `bostezar` →
+  sueno, `llamar-la-atencion` → aburrido, `saludar-al-volver` → volviste,
+  `volver-ofendido` → te-extrane, `cansancio` → bateria-baja, `alivio` →
+  cargando, `caricia` → caricia, `saludar` → saludo). Los hitos piden `hito`, o
+  `cumple-dueno`/`cumple-robot` si es el cumple; cerrar un recordatorio con un
+  toque, `recordatorio-hecho`; el clima en modo clima, `clima-*`.
+- **Quién decide** (`Hablador`): la probabilidad de la situación × la
+  frecuencia (0,5 = ×1), su enfriamiento, 15 min entre frases (÷ frecuencia) y
+  10 por día (× frecuencia). Las `siempre` (cumple, despertador, posponer) no
+  cuentan ni dependen de la frecuencia. Si ya hay algo en pantalla, la
+  espontánea no espera: no se dice.
+- **Elegir**: si el usuario tiene propias para la situación, solo esas; si no,
+  las de `todos` (peso 1) y las de su preset (peso 2), con el preset más
+  parecido a sus rasgos (`presetCercano`).
+
+### El cumple
+
+Al primer contacto del día del cumple (`dueno.cumple` o `cumple`, el hito de
+la memoria, una vez por año) festeja (comportamiento `festejar`, estrellas y
+corazones) y dice "¡Feliz cumple, {dueno}!" o "¡Hoy cumplo años!". La nube,
+además, le manda un Telegram al dueño (docs/nube.md).
+
+### El despertador (`Sistema::revisarDespertador`, `avanzarAlarma`)
+
+A su hora (hasta 1 min tarde, una vez por día, en sus días): si duerme, lo
+despierta con la rutina `despertar` (sin mal humor); si no, la empieza. El globo
+dice el `texto` o una frase de `despertador`, más el clima si hay ("¡Buen día,
+Nahuel! 11° y despejado"), y abajo cinco puntitos que laten con el volumen.
+Suena `despertador:1` cada 4 s y sube un nivel cada 10 s hasta `despertador:5`
+(el perfil elige el volumen de cada nivel; `voz.volumen` 0 lo silencia). Un
+toque (o el botón del broche) **pospone** `posponer` minutos (y dice una frase
+de `posponer`); mantenerlo 1,5 s, levantarlo o una sacudida fuerte lo
+**apagan**; a los 10 min se apaga solo. Evento `33 despertador` (al empezar a
+sonar a su hora), con aviso a la nube. El broche programa el despertador del
+sueño profundo también para la alarma y para la pospuesta. La expresión
+visible es `despertador`.
+
+### El modo clima (`clima.cpp`)
+
+Con `modo: clima`, el panel muestra el ícono (sol o luna, algo nublado,
+nublado, niebla, llovizna, lluvia, nieve, tormenta; dibujados con el lienzo y
+animados: las gotas caen, el sol gira, la niebla se corre), la temperatura en
+Fraunces grande y `MÁX · MÍN` en mono. Sin datos (o con más de 3 h), "--°". Un
+toque muestra la cara 15 s. La cara reacciona al llegar el dato y cada 40 s:
+tormenta → `miedo`; menos de 8° → `frio` (expresión nueva: tiembla); lluvia →
+`triste`; nieve → `emocionado`; niebla → `confundido`; nublado → `pensando`;
+más de 30° → `cansado`; sol de día → `contento`. La expresión visible es
+`clima`.
+
+### Una noche que se ve (`MotorVida::vidaDormido`)
+
+- **zzz** que suben cada 3,5 a 6,5 s (soñando, cada 8 a 14).
+- **Sueños** cada 10 a 25 min (`sonar`, o `pesadilla` con estrés): REM (la
+  mirada salta y los párpados tiemblan), burbujas de pensamiento con algo
+  adentro (corazón, estrella, nota u oveja; en la pesadilla, un "!").
+- **Postura**: cada 2 a 6 min gira de lado o se acomoda (por los resortes).
+- **Sonrisas y murmullos** en sueños cada tanto (más seguido soñando, más
+  sonrisas si te quiere), con `sonido("murmullo")`.
+- **Ronquido suave**: `sonido("ronquido")` cada 25 a 60 s (no mientras sueña).
+- **Lo que lo despierta de noche**: tocarlo, una sacudida fuerte o una caída;
+  su **nombre** lo despierta suave (sin mal humor). La **voz** (6 %) y el
+  **ruido** (3 %) casi nunca, y cada vez menos (se divide por 1 + 0,5 por cada
+  uno de esa noche); si no, la mitad de las veces se mueve o murmura en sueños.
+  La música y el silencio, nunca.
+
+### Sonidos (los nombres que recibe `Hal::sonido`)
+
+`despertador:1` a `despertador:5`, `ronquido`, `murmullo` (v1.6), más los de
+siempre (`recordatorio`, `pomodoro` y los `sonido` de los pasos). Todos pasan
+por `Sistema::sonar` (`voz.volumen` 0 = silencio).
+
+### RAM
+
+`Config` suma `Habla` (746 B) y `Despertador` (70 B); `Sistema`, el globo, el
+texto del despertador, `DatosClima` (40 B) y el `Hablador`: unos 2,3 KB en
+total. El broche quedó en 74 % de RAM (con las caras de imagen).
+
 ## Protocolo v1.4
 
 Ver [protocolo-ble.md](protocolo-ble.md): eventos nuevos (índices 8 a 30) y los
@@ -443,7 +562,7 @@ prueban en C++, JS, Go, Kotlin y Swift.
 - Micrófono y parlante (el cubito): voz, nombre, ruido, música y "hablando"
   existen como eventos y caras, pero hoy solo llegan por comando.
 - Bicho cerca por BLE y la "conversación" entre dos bichos.
-- Los modos `clima` y `notificaciones` (necesitan que la nube mande los datos).
+- El modo `notificaciones` (necesita que la nube mande los datos).
 - La app todavía no muestra el diario ni tiene los editores de expresiones y
   comportamientos (están en la web); sí la personalidad, los presets y el horario.
 - iOS sigue sin compilarse en este entorno (no hay Xcode): revisar en la Mac.
