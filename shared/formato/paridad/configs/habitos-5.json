@@ -1,0 +1,35 @@
+{
+ "version": 2,
+ "habitos": [
+  {
+   "nombre": "Hábito 0",
+   "icono": "gota",
+   "hora": "06:30",
+   "dias": "LMXJV"
+  },
+  {
+   "nombre": "Hábito 1",
+   "icono": "libro",
+   "hora": "07:30",
+   "dias": "LMXJV"
+  },
+  {
+   "nombre": "Hábito 2",
+   "icono": "pesa",
+   "hora": "08:30",
+   "dias": "LMXJV"
+  },
+  {
+   "nombre": "Hábito 3",
+   "icono": "zen",
+   "hora": "09:30",
+   "dias": "LMXJV"
+  },
+  {
+   "nombre": "Hábito 4",
+   "icono": "gota",
+   "hora": "010:30",
+   "dias": "LMXJV"
+  }
+ ]
+}

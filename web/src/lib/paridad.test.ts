@@ -23,6 +23,9 @@ describe('paridad con el núcleo', () => {
     expect(f.MAX_LISTA).toBe(l.lista);
     expect(f.MAX_REGLAS).toBe(l.reglasUsuario);
     expect(f.MAX_SPRITES).toBe(l.sprites);
+    expect(f.MAX_HABITOS).toBe(l.habitos);
+    expect(f.MAX_NOMBRE_HABITO).toBe(l.bytesHabito);
+    expect(f.MAX_TEXTO_PRESENCIA).toBe(l.bytesPresencia);
   });
 
   test('los cortes de bytes no parten letras', () => {

@@ -26,8 +26,8 @@ const limites = {
   expresionesBase: 16,
   carasVida: 48, // paramétricas en total (38 de base)
   carasVidaBase: 38,
-  comportamientos: 64, // en total (55 de base)
-  comportamientosBase: 55,
+  comportamientos: 67, // en total (58 de base)
+  comportamientosBase: 58,
   carasImagen: 8,
   sprites: 12,
   imagenes: 8,
@@ -42,6 +42,9 @@ const limites = {
   avisos: 8,
   bytesDecirAviso: 40,
   bytesAppAviso: 24, // app y contacto de un aviso
+  habitos: 4, // v1.9
+  bytesHabito: 16, // el nombre de un hábito
+  bytesPresencia: 40, // presencia.texto
   bytesPalabra: 16, // voz.palabra
   bytesCiudad: 40,
   bytesNombre: 24, // nombres de expresiones, comportamientos y animaciones
@@ -124,7 +127,7 @@ caso('imagen-tamano-sin-sprites.json', v2({ expresiones: { a: { tamano: 0.4, gx:
   [E.campo, 'expresion: tamano, boca_tamano, boca_y y espejar_der van solo en una cara de imagen']);
 caso('imagen-tamano-grande.json', v2({ expresiones: { a: { sprites: { ojo: 0 }, tamano: 0.9 } } }), [E.campo, 'expresion: tamano de 0,08 a 0,8']);
 
-// --- Comportamientos (64 en total, 55 de base) ---
+// --- Comportamientos (67 en total, 58 de base) ---
 const comp = (i) => ({ tipo: 'reaccion', pasos: [{ cara: 'contento', dura: 1 + i * 0.1 }] });
 caso('comportamientos-9.json', v2({ comportamientos: objeto(9, (i) => `propio-${i}`, comp) }), true);
 caso('comportamientos-10.json', v2({ comportamientos: objeto(10, (i) => `propio-${i}`, comp) }), [E.demasiadas, 'demasiados comportamientos'], { esquema: true });
@@ -205,6 +208,21 @@ caso('aviso-app-25.json', v2({ avisos: [{ tipo: 'notificacion', app: conTildes(2
 caso('aviso-decir-41.json', v2({ avisos: [{ tipo: 'notificacion', decir: conTildes(41) }] }), [E.campo, 'avisos: decir de 1 a 40 bytes'], { esquema: true });
 caso('aviso-tipo-malo.json', v2({ avisos: [{ tipo: 'mensaje' }] }), [E.campo, 'avisos: tipo es notificacion o llamada']);
 caso('aviso-expresion-inexistente.json', v2({ avisos: [{ tipo: 'llamada', expresion: 'no-existe' }] }), [E.campo, 'avisos: una expresion que no existe'], { esquema: true });
+
+// --- Hábitos (4; nombre de 16 bytes) y presencia (texto de 40), v1.9 ---
+const habito = (i) => ({ nombre: `Hábito ${i}`, icono: ['gota', 'libro', 'pesa', 'zen'][i % 4], hora: `0${i + 6}:30`, dias: 'LMXJV' });
+caso('habitos-4.json', v2({ habitos: n(4, habito) }), true);
+caso('habitos-5.json', v2({ habitos: n(5, habito) }), [E.campo, 'habitos: hasta 4']);
+caso('habito-borde.json', v2({ habitos: [{ nombre: conTildes(16), icono: 'estrella' }, { nombre: conEmoji(16) }] }), true);
+caso('habito-nombre-17.json', v2({ habitos: [{ nombre: conTildes(17) }] }), [E.campo, 'habitos: nombre de 1 a 16 bytes'], { esquema: true });
+caso('habito-sin-nombre.json', v2({ habitos: [{ icono: 'gota' }] }), [E.campo, 'habitos: nombre de 1 a 16 bytes']);
+caso('habito-icono-malo.json', v2({ habitos: [{ nombre: 'Agua', icono: 'perro' }] }), [E.campo, 'habitos: icono es gota']);
+caso('habito-hora-mala.json', v2({ habitos: [{ nombre: 'Agua', hora: '24:00' }] }), [E.campo, 'habitos: hora es HH:MM']);
+caso('habito-dias-repetidos.json', v2({ habitos: [{ nombre: 'Agua', dias: 'LL' }] }), [E.campo, 'habitos: dias son letras']);
+caso('presencia-borde.json', v2({ presencia: { preguntar: false, texto: conEmoji(40) } }), true);
+caso('presencia-vacia.json', v2({ presencia: { texto: '' } }), true);
+caso('presencia-texto-41.json', v2({ presencia: { texto: conTildes(41) } }), [E.campo, 'presencia: texto de hasta 40 bytes'], { esquema: true });
+caso('presencia-clave-mala.json', v2({ presencia: { preguntar: true, avisar: true } }), [E.campo, 'presencia: claves válidas']);
 
 // --- Voz, pomodoro, protector, cuidado, modo ---
 caso('voz-palabra-16.json', v2({ voz: { volumen: 0, tipo: 'robot', palabra: conTildes(16), conversar: true, microfono: 1 } }), true);

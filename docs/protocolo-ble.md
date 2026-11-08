@@ -1,4 +1,4 @@
-# Protocolo de SintéticaOS (v1.7)
+# Protocolo de SintéticaOS (v1.9)
 
 Un servicio GATT propio. Todos los enteros van en little-endian. La
 implementación de referencia es `firmware/nucleo/protocolo.*` y
@@ -151,15 +151,24 @@ veces más rápido.
 | `0x1B` Vida | — o `[u8 superposición]` | Responde el estado del motor de vida (abajo); con `1`/`0` prende o apaga la superposición de depuración en la pantalla (v1.4). |
 | `0x1C` Memoria | — | Responde `[0x9C][0x00][memoria, 112 bytes]` (v1.4). |
 | `0x1D` Restaurar | memoria (112 bytes, con su CRC) | La reemplaza: la mudanza a otra placa (v1.4). |
-| `0x1E` Registro | — | Responde `[0x9E][0x00][n][n × (u32 segundos desde que arrancó, u8 tipo, u8 dato)]`: tipo 0 evento, 1 comportamiento, 2 dormir (1) / despertar (0), 3 hito (v1.4), 4 recordatorio (dato: su índice). |
+| `0x1E` Registro | — | Responde `[0x9E][0x00][n][n × (u32 segundos desde que arrancó, u8 tipo, u8 dato)]`: tipo 0 evento, 1 comportamiento, 2 dormir (1) / despertar (0), 3 hito (v1.4), 4 recordatorio (dato: su índice), 5 juego, 6 ánimo (v1.7), 7 toque (dato: el tipo de toque), 8 hábito (dato: su índice) (v1.9). |
 | `0x1F` Comportamiento | nombre | Empieza ese comportamiento ya (para probarlo desde un editor). `0x07` si no existe (v1.4). |
 | `0x40` Decir | `[n][expresión, n bytes (0 = ninguna)][texto UTF-8, 1 a 60 bytes]` | Lo muestra en un **globo** con la cara achicada arriba, con fundido; dura 2,5 s + 60 ms por byte (de 3 a 10 s) o hasta un toque. Con expresión, la pone ese rato; sin, mueve la boca (`hablando`). Si duerme, lo despierta. Si ya hay un globo, primero se va. `0x07` si la expresión no existe; `0x08` si el texto está vacío, es de más de 60 bytes o no es UTF-8 (v1.6). |
 | `0x41` Clima | `[i16 temperatura en décimas de °C][u8 código WMO][i8 máx °C][i8 mín °C][u8 flags: bit 0 es de día][n][ciudad, 0 a 24 bytes]` | El tiempo que trae la nube (Open-Meteo) para el modo clima y el despertador. Vale 3 h. `0x08` si está mal armado (v1.6). |
 | `0x42` Alarma | `[u8 acción]`: 0 apagar, 1 posponer, 2 sonar ya, 3 despertar | El despertador desde lejos. 2 lo hace sonar (para probarlo); 3 lo despierta sin alarma, con un "buen día". `0x07` si apagar o posponer y no está sonando (v1.6). |
 | `0x43` Jugar | `[u8 juego]`: 0 piedra-papel-tijera, 1 reflejos, 2 seguí la mirada, 3 dado, 4 moneda; 255 = terminar | Empieza un juego (lo despierta; ver motor-de-vida.md, "Acompañar"). Mientras se juega, la expresión visible es `juego:<ppt|reflejos|mirada|dado|moneda>` y los toques son del juego. `0x07` si no existe (v1.7). |
-| `0x44` Aviso | `[u8 0 notificación, 1 llamada][n][app][n][contacto]` (cada texto de 0 a 24 bytes) | Una notificación o llamada del celu con su app y su contacto: dispara el evento `notificacion`/`llamada` y, si coincide uno de `avisos` de la config, su cara, comportamiento, sonido y globo (v1.7). |
+| `0x44` Aviso | `[u8 tipo][n][app][n][contacto]` (cada texto de 0 a 24 bytes) | Tipo `0` notificación o `1` llamada del celu con su app y su contacto: dispara el evento `notificacion`/`llamada` y, si coincide uno de `avisos` de la config, su cara, comportamiento, sonido y globo (v1.7). Tipos de afuera (v1.9): `2` pago, `3` mail, `4` github, `5` pedido, `6` otro; `app` es el título corto ("$12.000", "PR #12") y `contacto`, quién ("Ana"): el evento `notificacion`, el sonido (`pago` o `notificacion`) y el globo de su situación (`pago`, `mail`, `github`, `pedido`, `aviso`). |
 | `0x45` Ánimo | `[u8 0 bien, 1 más o menos, 2 mal]` | La respuesta al "¿cómo estás?" que llegó por otro lado (Telegram): queda en la memoria y reacciona con empatía (v1.7). |
 | `0x46` Mirar | `[i8 x][i8 y]` (−100 a 100) | De dónde viene un sonido (los modelos con dos micrófonos): mira hacia ahí unos segundos (v1.7; simulado hasta que haya hardware). |
+| `0x47` Toque | `[u8 tipo: 0 toque, 1 abrazo, 2 beso, 3 carita][n][de: 1 a 24 bytes][n][expresión, 0 a 24 bytes]` | Un toque de un amigo (v1.9): lo despierta suave, una cara según el tipo (abrazo: se achica y se pone colorado; beso: corazones; carita: esa expresión, o contento), su sonido y el globo de `toque-recibido` (`{de}`). Evento `39 toque-recibido` y registro tipo 7. Durante 30 s, un toque o una caricia **lo devuelve**: evento `40 devolver-toque`, que avisa solo (abajo). `0x07` si la expresión de la carita no existe. |
+| `0x48` Agenda | `[u16 minutos que faltan][u16 duración en minutos][n][título: 1 a 40 bytes]` | El próximo evento del calendario (v1.9). Con 0 a 15 minutos: evento `41 agenda`, comportamiento `apurado` y el globo de `agenda` (`{titulo}`, `{minutos}`); con más, nada. Con `minutos = 0xFFFF` es el **resumen de mañana**: la duración es cuántos eventos hay y el título, el del primero (globo de `agenda-manana`, `{titulo}` y `{cantidad}`). |
+| `0x49` Presencia | `[u8 0 llegaste, 1 te fuiste]` | Del celu (por cercanía de Bluetooth) o de la nube (v1.9). Llegaste: evento `42 llegaste` y el "¡volviste!" con el ánimo de cuánto tardaste. Te fuiste: evento `43 te-fuiste`, el globo de `presencia.texto` (o de `te-vas`) si `presencia.preguntar`, y un rato después se aburre y le da sueño. |
+| `0x4A` Hábito | `[u8 índice 0-3][u8 0 hecho, 1 deshacer][u8 racha en días]` | Marca un hábito de `habitos` (v1.9). Hecho: comportamiento `orgulloso`, evento `44 habito` (registro tipo 8) y el globo de `habito-hecho` o, con racha de 3 o más, `habito-racha` (`{racha}`). Deshacer: nada visible. Por este comando no avisa (ya lo sabe quien lo mandó). `0x07` si ese hábito no existe. |
+| `0x4B` Música | `[u8 bpm (0 = no se sabe)][u8 flags: bit 0 está sonando][n][título, 0 a 40 bytes][n][artista, 0 a 24 bytes]` | Lo que suena (v1.9). Sonando: mueve la cabeza al ritmo (el bpm, o 100), con notas; al cambiar de tema, `bailar-ritmo` y quizás un globo de `musica` (`{titulo}`, `{artista}`). Sin el bit (o sin otro marco en 20 min): deja de bailar, de a poco. |
+
+Los textos de la v1.9 se cortan por bytes UTF-8 sin partir letras (los
+armadores de Go y JS ya los cortan); el robot responde `0x08` si un largo no
+coincide o no es UTF-8.
 
 Eventos (el índice del comando `0x12`; los nombres son los de las reglas):
 
@@ -174,7 +183,9 @@ Eventos (el índice del comando `0x12`; los nombres son los de las reglas):
 | `24` desenchufado | `25` cargado | `26` sin-wifi | `27` cambio-de-cara |
 | `28` bicho-cerca | `29` volvio | `30` hito | `31` recordatorio |
 | `32` pomodoro | `33` despertador | `34` juego | `35` animo |
-| `36` cara-detectada | `37` oscuridad | `38` mano-cerca | |
+| `36` cara-detectada | `37` oscuridad | `38` mano-cerca | `39` toque-recibido |
+| `40` devolver-toque | `41` agenda | `42` llegaste | `43` te-fuiste |
+| `44` habito | | | |
 
 Los 8 primeros son de la v1; del 8 en adelante, del motor de vida (v1.4).
 `volvio` y `hito` los genera el motor; `recordatorio`, `pomodoro` y
@@ -183,7 +194,10 @@ y `animo` (respondió el "¿cómo estás?") (v1.7), el sistema (mandarlos sirve
 para probar las reglas, pero no muestran nada). `cara-detectada` (la cámara
 ve una cara después de un rato sin ver ninguna), `oscuridad` (se apagó la luz)
 y `mano-cerca` (el sensor de proximidad) son de los sentidos del bicho-celu
-(v1.8). Los eventos nuevos van siempre al final.
+(v1.8). `toque-recibido`, `devolver-toque`, `agenda`, `llegaste`,
+`te-fuiste` y `habito` (v1.9) los genera el sistema con los comandos `0x47`
+a `0x4A` (o con un toque, si es devolver un toque o marcar un hábito). Los
+eventos nuevos van siempre al final.
 
 ### Eventos que avisa el bicho solo
 
@@ -197,6 +211,8 @@ con el mismo formato que la respuesta de Registro:
 - juego (v1.7): `[0x9E][0x00][0x02][u32 s][0x00][0x22][u32 s][0x05 = juego][u8 juego·16 + resultado]` (resultado: 0 perdió el dueño, 1 ganó, 2 empate, 3 sin resultado)
 - ánimo (v1.7): `[0x9E][0x00][0x02][u32 s][0x00][0x23][u32 s][0x06 = ánimo][u8 0 bien, 1 más o menos, 2 mal]`
 - recordatorio: `[0x9E][0x00][0x02][u32 segundos][0x00][0x1F][u32 segundos][0x04 = recordatorio][u8 índice]`
+- devolver un toque (v1.9): `[0x9E][0x00][0x02][u32 s][0x00][0x28][u32 s][0x07 = toque][u8 tipo del toque que devuelve]` (la nube se lo manda al que tocó)
+- hábito marcado en el robot (v1.9, la pregunta de su hora): `[0x9E][0x00][0x02][u32 s][0x00][0x2C][u32 s][0x08 = hábito][u8 índice]`
 
 El registro (`0x1E`) guarda las mismas entradas: el tipo 4 es "mostró un
 recordatorio" y su dato, la posición en `recordatorios` (desde 0). Quien no
@@ -283,7 +299,8 @@ Para los modelos con micrófono y parlante (dos micrófonos, un parlante):
   alta** (la nube manda el audio del texto; sin nube, solo el sonido).
 - Sonidos (`Hal::sonido`): `escuchando`, `pensando`, `hablando`, además de
   `despertador:1` a `despertador:5`, `ronquido`, `murmullo`, `dado`,
-  `notificacion`, `llamada`, `recordatorio` y `pomodoro`.
+  `notificacion`, `llamada`, `recordatorio` y `pomodoro`; desde la v1.9,
+  `toque`, `abrazo`, `beso`, `agenda`, `pago` y `habito`.
 
 ## OTA (v1.3)
 

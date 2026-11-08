@@ -70,6 +70,9 @@ PRUEBA("paridad: los límites del índice son los del núcleo") {
   VERIFICAR(limite("bytesPalabra") == LARGO_PALABRA - 1);
   VERIFICAR(limite("bytesNombre") == LARGO_NOMBRE - 1);
   VERIFICAR(limite("bytesCiudad") == 40);
+  VERIFICAR(limite("habitos") == MAX_HABITOS);
+  VERIFICAR(limite("bytesHabito") == LARGO_HABITO - 1);
+  VERIFICAR(limite("bytesPresencia") == LARGO_PRESENCIA - 1);
   VERIFICAR(cargarBase(g_c).ok());
   VERIFICAR(limite("expresionesBase") == g_c.nExpresiones);
 }

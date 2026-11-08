@@ -1,0 +1,7 @@
+{
+ "version": 2,
+ "presencia": {
+  "preguntar": true,
+  "avisar": true
+ }
+}

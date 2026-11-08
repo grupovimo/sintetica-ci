@@ -148,7 +148,7 @@
         "properties": {
           "si": {
             "type": "string",
-            "description": "Un evento (tacto, toque, doble-toque, levantado, sacudida, boca-abajo, vinculado, app-abierta, despertado, caricia, muchos-toques, sacudida-suave, sacudida-fuerte, inclinado, caida, voz, nombre, ruido, musica, silencio, notificacion, llamada, bateria-baja, bateria-critica, enchufado, desenchufado, cargado, sin-wifi, cambio-de-cara, bicho-cerca, volvio, hito, recordatorio, pomodoro, despertador, juego, animo, cara-detectada, oscuridad, mano-cerca; también con _ o . en vez de -, como \"sacudida.fuerte\") o una condición de estado (bateria<15, humor>0.5).",
+            "description": "Un evento (tacto, toque, doble-toque, levantado, sacudida, boca-abajo, vinculado, app-abierta, despertado, caricia, muchos-toques, sacudida-suave, sacudida-fuerte, inclinado, caida, voz, nombre, ruido, musica, silencio, notificacion, llamada, bateria-baja, bateria-critica, enchufado, desenchufado, cargado, sin-wifi, cambio-de-cara, bicho-cerca, volvio, hito, recordatorio, pomodoro, despertador, juego, animo, cara-detectada, oscuridad, mano-cerca, toque-recibido, devolver-toque, agenda, llegaste, te-fuiste, habito; también con _ o . en vez de -, como \"sacudida.fuerte\") o una condición de estado (bateria<15, humor>0.5).",
             "pattern": "^([a-z][a-z._-]*|(bateria|humor)[<>]-?[0-9]+(\\.[0-9]+)?)$"
           },
           "entonces": {
@@ -754,6 +754,146 @@
                 "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
               },
               "maxItems": 12
+            },
+            "toque-recibido": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "toque-devuelto": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "agenda": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "agenda-manana": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "te-vas": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "habito-hecho": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "habito-racha": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "habito-cortado": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "musica": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "pago": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "mail": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "github": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "pedido": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "aviso": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
             }
           }
         }
@@ -940,6 +1080,66 @@
             "type": "boolean",
             "default": true
           }
+        }
+      }
+    },
+    "habitos": {
+      "type": "array",
+      "maxItems": 4,
+      "description": "Hábitos (v1.9): a su hora (si tiene) pregunta \"¿{habito}?\"; un toque lo marca hecho y mantener es \"todavía no\". También se marcan desde la consola, la app, Telegram o la IA.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nombre"
+        ],
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16,
+            "description": "Lo que ve el usuario, de 1 a 16 bytes en UTF-8 (una tilde ocupa 2)."
+          },
+          "icono": {
+            "enum": [
+              "gota",
+              "libro",
+              "pesa",
+              "zen",
+              "pastilla",
+              "cama",
+              "fruta",
+              "estrella"
+            ],
+            "default": "estrella"
+          },
+          "hora": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "description": "Hora local, HH:MM: a esa hora pregunta. Sin hora, no pregunta."
+          },
+          "dias": {
+            "type": "string",
+            "pattern": "^(?!.*(.).*\\1)[LMXJVSD]{0,7}$",
+            "description": "Como en los recordatorios. Vacío u omitido: todos los días."
+          }
+        }
+      }
+    },
+    "presencia": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Cuando te vas (v1.9: por la cercanía del celu o la nube).",
+      "properties": {
+        "preguntar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Si dice algo cuando te vas."
+        },
+        "texto": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "Lo que dice (de 0 a 40 bytes); vacío: las frases de te-vas (\"¿Llevás las llaves?\")."
         }
       }
     }
@@ -1654,7 +1854,8 @@
             "estrella",
             "burbuja",
             "oveja",
-            "ninguna"
+            "ninguna",
+            "reloj"
           ]
         },
         "parpadeo": {
@@ -2120,7 +2321,8 @@
             "nota",
             "estrella",
             "burbuja",
-            "oveja"
+            "oveja",
+            "reloj"
           ]
         },
         "cuantas": {
@@ -2182,7 +2384,21 @@
             "navidad",
             "dia-del-amigo",
             "dia-del-nino",
-            "aniversario"
+            "aniversario",
+            "toque-recibido",
+            "toque-devuelto",
+            "agenda",
+            "agenda-manana",
+            "te-vas",
+            "habito-hecho",
+            "habito-racha",
+            "habito-cortado",
+            "musica",
+            "pago",
+            "mail",
+            "github",
+            "pedido",
+            "aviso"
           ],
           "description": "Al empezar el paso, pide una frase de esa situación (frases.json): el bicho decide si la dice."
         },
@@ -2198,7 +2414,8 @@
             "exclamacion",
             "nota",
             "estrella",
-            "oveja"
+            "oveja",
+            "reloj"
           ],
           "description": "Con \"particula\": \"burbuja\": lo que va adentro (lo que sueña). sueno = al azar entre corazón, estrella, nota y oveja."
         }

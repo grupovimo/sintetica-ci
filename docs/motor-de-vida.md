@@ -543,10 +543,64 @@ Un bicho que es parte del día y no un accesorio. Las frases son de
 
 RAM: `Cuidado` 8 B, `Avisos` 769 B (8 avisos), el juego y la pregunta ~70 B.
 
+## Compañía (v1.9, `compania.cpp`)
+
+Lo que llega de afuera (los amigos, el calendario, el celu, Spotify) y los
+hábitos. Las frases son de `frases.json` (situaciones `toque-recibido`,
+`toque-devuelto`, `agenda`, `agenda-manana`, `te-vas`, `habito-hecho`,
+`habito-racha`, `habito-cortado`, `musica`, `pago`, `mail`, `github`,
+`pedido`, `aviso`, con variantes por preset) y las plantillas nuevas `{de}`,
+`{titulo}`, `{minutos}`, `{cantidad}`, `{racha}`, `{habito}` y `{artista}`
+(`Plantillas` en `completarFrase`/`elegirFrase`). Una frase que usa una
+plantilla que vino vacía no se elige ("Un mail de {de}." sin de quién). Son
+pedidos (de la nube o del dueño): no pasan por el Hablador (`decirFrase`),
+salvo la de la música.
+
+- **Toques** (`0x47`): lo despierta suave, una cara según el tipo (toque:
+  contento; abrazo: `verguenza`, que se achica y se pone colorado; beso:
+  `enamorado`, con corazones; carita: la expresión que vino), el sonido
+  (`toque`, `abrazo`, `beso`) y el globo con `{de}`. Durante 30 s, un toque (o
+  una caricia, aunque llegue como evento) **lo devuelve**: evento `40
+  devolver-toque` y el aviso `0x9E` con la entrada de tipo 7 (el tipo de
+  toque), que la nube le manda al que lo mandó. Registro: evento 39 + tipo 7.
+- **Agenda** (`0x48`): de 0 a 15 min, el comportamiento `apurado` (mira para
+  los costados, parpadea rápido, la partícula `reloj` y el sonido `agenda`),
+  evento `41 agenda` y el globo (`{titulo}` en `{minutos}`). Con más de 15 min,
+  nada. `minutos = 0xFFFF` es el resumen de mañana (`agenda-manana`, con
+  `{cantidad}` = la duración del marco).
+- **Presencia** (`0x49`): te fuiste → evento 43 y, si `presencia.preguntar`, el
+  globo de `presencia.texto` (o una frase de `te-vas`); 15 min después se
+  aburre y le da sueño (`MotorVida::empujarEstado`). Llegaste → evento 42 y el
+  "¡volviste!" de verdad (o "te extrañé" después de 20 h), con la cara según
+  cuánto tardaste (un ratito: guiño; horas: emocionado; un día: enamorado).
+- **Hábitos** (`habitos`, `0x4A`): a la hora del hábito (y sus días; si estaba
+  ocupado, hasta 10 min después) pregunta "¿{habito}?" con el sonido `habito`;
+  el globo se queda mientras espera (1 min). Un toque = hecho; mantener 0,8 s =
+  todavía no (pregunta una vez más en 1 h). Hecho: comportamiento `orgulloso`
+  (cara orgullosa, estrellas, sonido `habito`), evento `44 habito`, registro
+  tipo 8 (el índice) y, si fue en el robot, el aviso `0x9E`. Con racha de 3 o
+  más, `habito-racha`; si la racha se cortó (ayer no), la pregunta es la de
+  `habito-cortado`. La racha la manda la nube en el `0x4A`; marcado en el
+  robot, cuenta "ayer + 1".
+- **Música** (`0x4B`): mueve la cabeza al bpm (100 si no se sabe): de costado
+  cada dos pulsos y un saltito en cada uno, con notas. Es una capa del motor
+  (`MotorVida::musica`) con un peso que entra y sale en ~0,7 s, así que
+  nunca corta; dormido no baila. Al cambiar de tema, `bailar-ritmo` y quizás
+  un globo (`musica`). Sin el bit de sonando (o sin noticias en 20 min), deja
+  de bailar.
+- **Avisos de afuera** (`0x44` tipos 2 a 6): el evento `notificacion` (y su
+  regla), el sonido (`pago` o `notificacion`; con un pago, además, emocionado)
+  y el globo de su situación con `{titulo}` y `{de}`.
+
+RAM: `Habitos` 98 B y `Presencia` 42 B en `Config`; el estado en `Sistema`
+~60 B; el Hablador suma 14 situaciones (28 B). Los comportamientos de base
+pasaron a 58 (`MAX_COMPORTAMIENTOS` 67: el usuario sigue con 9 propios).
+
 ### Sonidos (los nombres que recibe `Hal::sonido`)
 
 `despertador:1` a `despertador:5`, `ronquido`, `murmullo` (v1.6), `dado`,
-`notificacion`, `llamada` (v1.7), más los de
+`notificacion`, `llamada` (v1.7), `toque`, `abrazo`, `beso`, `agenda`, `pago`,
+`habito` (v1.9), más los de
 siempre (`recordatorio`, `pomodoro` y los `sonido` de los pasos). Todos pasan
 por `Sistema::sonar` (`voz.volumen` 0 = silencio).
 

@@ -19,11 +19,17 @@ bool tieneGlifo(const Fuente& f, uint32_t cp) {
   return false;
 }
 
-std::string completar(const char* p, const char* dueno, const char* robot = "Lucho", size_t cap = LARGO_FRASE) {
+std::string completar(const char* p, const char* dueno, const char* robot = "Lucho", size_t cap = LARGO_FRASE,
+                      Plantillas extra = {}) {
   char s[128];
-  completarFrase(p, dueno, robot, s, cap);
+  completarFrase(p, dueno, robot, s, cap, nullptr, nullptr, nullptr, extra);
   return s;
 }
+
+// Las plantillas de la v1.9, en lo más largo que pueden venir.
+const Plantilla LARGAS[] = {{"de", "Maximiliano Bartolomeo X"}, {"titulo", "Reunión de directorio con todo el equipo"},
+                            {"minutos", "15"}, {"cantidad", "12"}, {"racha", "255"}, {"habito", "Meditar diez min"},
+                            {"artista", "Los Fabulosos Cadillacs"}};
 }  // namespace
 
 PRUEBA("habla: las situaciones del núcleo y las de frases.json son las mismas") {
@@ -46,7 +52,9 @@ PRUEBA("habla: cada frase de fábrica entra en el globo y tiene sus letras en la
     VERIFICAR(preset);
     VERIFICAR(std::strlen(f.texto) >= 1 && std::strlen(f.texto) < LARGO_FRASE);
     // Con el nombre más largo posible (24 bytes) sigue entrando: se corta sin partir una letra.
-    const std::string s = completar(f.texto, "Maximiliano Bartolomeo X", "Robotito de la Casa Azul");
+    const std::string s = completar(f.texto, "Maximiliano Bartolomeo X", "Robotito de la Casa Azul", LARGO_FRASE,
+                                    {LARGAS, static_cast<int>(sizeof LARGAS / sizeof LARGAS[0])});
+    VERIFICAR(s.find('{') == std::string::npos);
     VERIFICAR(s.size() < LARGO_FRASE);
     const char* p = s.c_str();
     while (*p) {
@@ -56,6 +64,24 @@ PRUEBA("habla: cada frase de fábrica entra en el globo y tiene sus letras en la
         VERIFICAR(false);
       }
     }
+  }
+}
+
+PRUEBA("habla: las plantillas de la v1.9 ({de}, {titulo}, {minutos}…); sin valor, esa frase no se elige") {
+  const Plantilla p[] = {{"de", "Ana"}, {"titulo", "Reunión"}, {"minutos", "10"}};
+  VERIFICAR(completar("{titulo} en {minutos} min.", "", "Lucho", LARGO_FRASE, {p, 3}) == "Reunión en 10 min.");
+  VERIFICAR(completar("¡{de} te manda un toque!", "", "Lucho", LARGO_FRASE, {p, 3}) == "¡Ana te manda un toque!");
+  // Una que no es plantilla queda como está.
+  VERIFICAR(completar("{otra} y {de}", "", "Lucho", LARGO_FRASE, {p, 3}) == "{otra} y Ana");
+  // Sin de quién, no elige las que lo usan ("Un mail de {de}." no queda bien).
+  Habla h;
+  Azar azar;
+  azar.sembrar(7);
+  const Plantilla sinDe[] = {{"titulo", "Factura"}, {"de", ""}};
+  for (int k = 0; k < 40; k++) {
+    char t[LARGO_FRASE];
+    VERIFICAR(elegirFrase(h, Situacion::Mail, "equilibrado", "", "Lucho", azar, t, sizeof t, nullptr, {sinDe, 2}));
+    VERIFICAR(std::strstr(t, " de.") == nullptr && std::strchr(t, '{') == nullptr);
   }
 }
 
