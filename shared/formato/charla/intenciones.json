@@ -1,6 +1,7 @@
 {
   "version": 1,
   "umbral": 0.6,
+  "umbral_accion": 0.9,
   "contexto": 90,
   "abreviaturas": {
     "q": "que", "k": "que", "ke": "que", "xq": "porque", "pq": "porque", "porq": "porque", "tmb": "tambien",
@@ -10,7 +11,8 @@
     "ola": "hola", "holis": "hola", "holi": "hola", "bue": "bueno", "nah": "no", "sip": "si", "sep": "si", "sii": "si",
     "ok": "dale", "okey": "dale", "okay": "dale", "oki": "dale", "tqm": "te quiero mucho", "tq": "te quiero",
     "ntp": "no te preocupes", "nose": "no se", "nc": "no se", "salu": "salud", "mñn": "manana", "mna": "manana",
-    "ud": "usted", "vo": "vos", "bb": "bebe", "msj": "mensaje", "cumpleanos": "cumple"
+    "ud": "usted", "vo": "vos", "bb": "bebe", "msj": "mensaje", "cumpleanos": "cumple",
+    "ora": "hora", "alas": "a las", "megusta": "me gusta", "megustan": "me gustan", "meencanta": "me encanta"
   },
   "relleno": [
     "che", "por", "favor", "eh", "ah", "oh", "uh", "bueno", "el", "la", "los", "las", "lo", "un", "una", "unos", "unas",
@@ -46,6 +48,11 @@
     "curioso": ["¡No sé qué es eso! ¿Me explicás?", "Mmm, eso no lo conozco. ¿Qué es?"],
     "grunon": ["No entendí. Y no me hagas repetir.", "¿Qué? Hablá claro."],
     "electrico": ["¡¿QUÉ?! ¡No entendí nada!", "¡Otra vez, más despacio!"]
+  },
+  "cancelado": {
+    "todos": ["Bueno, lo dejo como estaba.", "Ok, no toco nada.", "Dale, nada entonces."],
+    "grunon": ["Bueno. Nada."],
+    "carinoso": ["Ok, {dueno}, no hago nada."]
   },
   "intenciones": {
     "saludo": {
@@ -166,7 +173,7 @@
       "sin": {"todos": ["No tengo el pronóstico. ¿Me conectás a la nube?", "No sé, no veo por la ventana."]}
     },
     "alarma": {
-      "patrones": ["pone*|programa*|activa*|configura*|arma* alarma|despertador", "alarma|despertador", "despertame|despertarme|levantame", "me despertas|levantas", "quiero levantarme|despertarme", "nueva alarma"],
+      "patrones": ["pone*|ponme|programa*|activa*|configura*|arma* alarma|despertador", "alarma|despertador", "despertame|despertarme|levantame", "me despertas|levantas", "quiero levantarme|despertarme", "quiero|queres|necesito que? me despiertes|levantes", "me podes|podrias despertar|levantar", "nueva alarma"],
       "accion": "alarma",
       "necesita": ["hora"],
       "manana": true,
@@ -178,13 +185,15 @@
         "grunon": ["Ya está, {cuando}. No te quejes."],
         "electrico": ["¡Alarma {cuando}! ¡Arriba!"]
       },
-      "falta": {"todos": ["¿A qué hora te despierto?", "¿A qué hora suena?"]}
+      "falta": {"todos": ["¿A qué hora te despierto?", "¿A qué hora suena?"]},
+      "confirmar": {"todos": ["¿Te pongo una alarma {cuando}?", "¿Te despierto {cuando}?"]}
     },
     "cancelar-alarma": {
       "patrones": ["cancela*|saca*|borra*|quita*|desactiva* alarma|despertador", "no me despiertes", "sin alarma", "no quiero alarma"],
       "accion": "cancelar-alarma",
       "expresion": "contento",
-      "respuestas": {"todos": ["Listo, sin alarma.", "Alarma cancelada. A dormir tranqui."]}
+      "respuestas": {"todos": ["Listo, sin alarma.", "Alarma cancelada. A dormir tranqui."]},
+      "confirmar": {"todos": ["¿Saco la alarma?", "¿Cancelo la alarma?"]}
     },
     "posponer": {
       "patrones": ["posponer|pospone*", "cinco|5 minutos mas", "un rato|ratito mas", "dejame dormir", "otro ratito", "todavia no"],
@@ -203,7 +212,7 @@
       "sin": {"todos": ["No está sonando nada.", "Silencio total, no suena nada."]}
     },
     "recordatorio": {
-      "patrones": ["recordame|recorda|recordarme|acordame|acorda|recuerdame|recuerda", "avisame|avisarme", "no me dejes olvidar", "haceme acordar", "anota*|agenda* recordatorio?", "pone* recordatorio", "recordatorio"],
+      "patrones": ["recordame|recorda|recordarme|acordame|acorda|acordate|recordate|recuerdame|recuerda", "avisame|avisarme", "no me dejes olvidar", "haceme acordar", "anota*|agenda* recordatorio?", "pone* recordatorio", "recordatorio"],
       "accion": "recordatorio",
       "necesita": ["texto", "hora"],
       "mayuscula": true,
@@ -214,16 +223,18 @@
         "grunon": ["Ya fue: {texto}, {cuando}."],
         "electrico": ["¡Anotado! {texto}, {cuando}."]
       },
-      "falta": {"texto": ["¿Qué te recuerdo?", "¿Qué querés que te recuerde?"], "hora": ["¿A qué hora te aviso?", "¿Cuándo te lo recuerdo?"]}
+      "falta": {"texto": ["¿Qué te recuerdo?", "¿Qué querés que te recuerde?"], "hora": ["¿A qué hora te aviso?", "¿Cuándo te lo recuerdo?"]},
+      "confirmar": {"todos": ["¿Te recuerdo «{texto}» {cuando}?", "¿Te aviso {cuando}: {texto}?"]}
     },
     "temporizador": {
-      "patrones": ["temporizador|timer|cronometro", "conta*|cuenta minutos|minuto|segundos|horas", "avisame en|dentro"],
+      "patrones": ["temporizador|timer|cronometro", "pone*|arma*|programa*|activa* temporizador|timer|cronometro", "conta*|cuenta minutos|minuto|segundos|horas", "avisame en|dentro"],
       "accion": "recordatorio",
       "necesita": ["hora"],
       "texto": "¡Tiempo!",
       "expresion": "concentrado",
       "respuestas": {"todos": ["Listo, te aviso {cuando}.", "Cuento: {cuando}."]},
-      "falta": {"todos": ["¿Cuántos minutos?"]}
+      "falta": {"todos": ["¿Cuántos minutos?"]},
+      "confirmar": {"todos": ["¿Te aviso {cuando}?"]}
     },
     "habito-hecho": {
       "patrones": ["ya tome|hice|lei|medite|entrene|corri|fui", "marca*|anota* habito?", "habito hecho|cumplido|listo", "hecho|cumpli|termine"],
@@ -265,32 +276,36 @@
       "respuestas": {"todos": ["¡Sacudime y vemos!", "¿Cara o ceca? ¡Sacudime!"]}
     },
     "modo-reloj": {
-      "patrones": ["modo reloj", "pone*|mostra* reloj", "reloj", "mostrame la hora"],
+      "patrones": ["modo reloj", "pone*|mostra* reloj", "~reloj", "mostrame la hora"],
       "accion": "modo",
       "dato": "reloj",
       "expresion": "concentrado",
-      "respuestas": {"todos": ["Modo reloj.", "Dale, te muestro la hora."]}
+      "respuestas": {"todos": ["Modo reloj.", "Dale, te muestro la hora."]},
+      "confirmar": {"todos": ["¿Te muestro el reloj?", "¿Paso al modo reloj?"]}
     },
     "modo-pomodoro": {
       "patrones": ["pomodoro", "modo pomodoro|trabajo|estudio", "quiero|necesito concentrarme", "a trabajar|estudiar", "vamos a trabajar|estudiar"],
       "accion": "modo",
       "dato": "pomodoro",
       "expresion": "concentrado",
-      "respuestas": {"todos": ["Pomodoro listo. Tocame para arrancar.", "A concentrarse. Tocame y arrancamos."]}
+      "respuestas": {"todos": ["Pomodoro listo. Tocame para arrancar.", "A concentrarse. Tocame y arrancamos."]},
+      "confirmar": {"todos": ["¿Paso al modo pomodoro?", "¿Preparo un pomodoro?"]}
     },
     "modo-clima": {
       "patrones": ["modo clima", "pone*|mostra* clima|pronostico"],
       "accion": "modo",
       "dato": "clima",
       "expresion": "curioso",
-      "respuestas": {"todos": ["Modo clima.", "Te muestro el tiempo."]}
+      "respuestas": {"todos": ["Modo clima.", "Te muestro el tiempo."]},
+      "confirmar": {"todos": ["¿Te muestro el clima?", "¿Paso al modo clima?"]}
     },
     "modo-mascota": {
       "patrones": ["modo mascota|normal", "volve a la normalidad", "saca* reloj|pomodoro|clima", "mostrame tu cara|carita"],
       "accion": "modo",
       "dato": "mascota",
       "expresion": "contento",
-      "respuestas": {"todos": ["¡Acá estoy de nuevo!", "Volví. ¿Me extrañaste?"]}
+      "respuestas": {"todos": ["¡Acá estoy de nuevo!", "Volví. ¿Me extrañaste?"]},
+      "confirmar": {"todos": ["¿Vuelvo a mi cara?", "¿Saco el modo y vuelvo?"]}
     },
     "chiste": {
       "patrones": ["conta*|decime|tira* chiste", "chiste|chistes", "algo gracioso", "haceme reir", "sabes algun chiste"],
@@ -474,18 +489,20 @@
       "respuestas": {"todos": ["Shh. Me quedo calladito.", "Ok. Silencio."], "grunon": ["Bueno, bueno."]}
     },
     "volumen-subir": {
-      "patrones": ["habla mas fuerte|alto", "subi el? volumen", "mas fuerte|volumen", "no te escucho"],
+      "patrones": ["habla|hablame mas fuerte|alto", "subi|subile|subime|sube el? volumen", "mas fuerte|volumen", "~no te escucho"],
       "accion": "volumen",
       "dato": 1,
       "expresion": "contento",
-      "respuestas": {"todos": ["¡Así! ¿Ahora me escuchás?", "Subo el volumen."]}
+      "respuestas": {"todos": ["¡Así! ¿Ahora me escuchás?", "Subo el volumen."]},
+      "confirmar": {"todos": ["¿Subo el volumen?", "¿Hablo más fuerte?"]}
     },
     "volumen-bajar": {
-      "patrones": ["habla mas bajo|despacio", "baja el? volumen", "mas bajo|despacio", "no grites"],
+      "patrones": ["habla|hablame mas bajo|despacio", "baja|bajale|bajame el? volumen", "mas bajo|despacio", "no grites"],
       "accion": "volumen",
       "dato": -1,
       "expresion": "verguenza",
-      "respuestas": {"todos": ["Perdón. Hablo más bajito.", "Shh. Así está mejor."]}
+      "respuestas": {"todos": ["Perdón. Hablo más bajito.", "Shh. Así está mejor."]},
+      "confirmar": {"todos": ["¿Bajo el volumen?", "¿Hablo más bajito?"]}
     },
     "cumple-dueno": {
       "patrones": ["es mi cumple", "hoy cumplo anos", "cumplo anos", "es mi cumpleanos", "hoy es mi dia"],
@@ -538,12 +555,13 @@
       "sin": {"todos": ["No veo tu calendario. Conectalo en la consola.", "No tengo nada anotado."]}
     },
     "toque-amigo": {
-      "patrones": ["manda*|envia*|dale|pasale|mandale toque|abrazo|beso|saludo|carita|besito|abrazos|besos", "manda*|envia* a", "saluda* a", "toque|abrazo|beso para|a"],
+      "patrones": ["manda*|envia*|dale|pasale|mandale toque|abrazo|beso|saludo|carita|besito|abrazos|besos", "manda*|envia* a", "saluda* a", "~toque|abrazo|beso para|a"],
       "accion": "toque",
       "necesita": ["quien"],
       "expresion": "enamorado",
       "respuestas": {"todos": ["¡Listo! Le mando un {toque} a {quien}.", "Va un {toque} para {quien}."]},
-      "falta": {"todos": ["¿A quién se lo mando?"]}
+      "falta": {"todos": ["¿A quién se lo mando?"]},
+      "confirmar": {"todos": ["¿Le mando un {toque} a {quien}?", "¿Un {toque} para {quien}?"]}
     },
     "gusto": {
       "patrones": ["me gusta|gustan|encanta|encantan|copa|copan|fascina", "amo|adoro", "mi comida|color|banda|equipo|cuadro|pelicula|serie favorita|favorito es?", "soy fan de", "me gusta mucho"],
@@ -555,15 +573,29 @@
         "curioso": ["¿{texto}? ¡Contame más!"],
         "grunon": ["Ok. {texto}. Anotado."]
       },
-      "falta": {"todos": ["¿Qué te gusta?"]}
+      "falta": {"todos": ["¿Qué te gusta?"]},
+      "no_empieza": ["tu", "tus", "que", "cuando", "como", "si", "vos", "verte", "hablar", "hablarte", "estar", "eso", "esto", "ese", "esa"],
+      "confirmar": {"todos": ["¿Te gusta {texto}? ¿Lo anoto?", "¿Anoto que te gusta {texto}?"]}
     },
     "no-gusta": {
-      "patrones": ["no me gusta|gustan", "odio", "ya no me gusta", "no soporto"],
+      "patrones": ["no me gusta|gustan", "~odio", "~no soporto"],
       "accion": "olvidar-gusto",
       "necesita": ["texto"],
       "expresion": "sospecha",
       "respuestas": {"todos": ["Anotado: nada de {texto}.", "Ok, {texto} no. Lo tengo."]},
-      "falta": {"todos": ["¿Qué no te gusta?"]}
+      "falta": {"todos": ["¿Qué no te gusta?"]},
+      "no_empieza": ["tu", "tus", "que", "cuando", "como", "si", "vos", "eso", "esto", "ese", "esa"],
+      "confirmar": {"todos": ["¿Me olvido de {texto}?", "¿Saco {texto} de lo que te gusta?"]}
+    },
+    "olvidar-gusto": {
+      "patrones": ["olvida*|borra*|saca*|elimina*|tacha* que? me gusta|gustan|encanta|encantan", "ya no me gusta|gustan|encanta|encantan", "no me gusta|gustan mas", "deja* de recordar que? me gusta|gustan"],
+      "accion": "olvidar-gusto",
+      "necesita": ["texto"],
+      "expresion": "pensando",
+      "respuestas": {"todos": ["Listo, me olvido de {texto}.", "Borrado: {texto}.", "Ok, {texto} ya no está en tu lista."]},
+      "falta": {"todos": ["¿De qué gusto me olvido?"]},
+      "no_empieza": ["tu", "tus", "que", "cuando", "como", "si", "vos", "eso", "esto"],
+      "confirmar": {"todos": ["¿Me olvido de {texto}?", "¿Saco {texto} de tus gustos?"]}
     },
     "que-me-gusta": {
       "patrones": ["que me gusta", "que cosas me gustan", "sabes que me gusta", "te acordas que me gusta", "que sabes de mi", "mis gustos"],
@@ -572,12 +604,14 @@
       "sin": {"todos": ["Todavía no sé. Decime «me gusta…».", "Contame qué te gusta y me acuerdo."]}
     },
     "me-llamo": {
-      "patrones": ["me llamo", "mi nombre es", "llamame|decime", "me dicen"],
+      "patrones": ["me llamo", "mi nombre es", "~llamame|decime", "~me dicen"],
       "accion": "dueno",
       "necesita": ["texto"],
       "expresion": "contento",
       "respuestas": {"todos": ["¡Un gusto, {texto}!", "¡Hola, {texto}! Me lo acuerdo."]},
-      "falta": {"todos": ["¿Cómo te llamás?"]}
+      "falta": {"todos": ["¿Cómo te llamás?"]},
+      "no_empieza": ["si", "no", "cuando", "donde", "porque", "hola", "chau", "nada", "todo", "bien", "mal", "gracias", "dale", "hora", "chiste"],
+      "confirmar": {"todos": ["¿Te llamás {texto}?", "¿Te digo {texto}?"]}
     },
     "como-me-llamo": {
       "patrones": ["como me llamo", "sabes mi nombre", "quien soy", "te acordas de mi", "sabes quien soy"],
@@ -603,7 +637,7 @@
       "respuestas": {"todos": ["¡Ya estoy! ¿Qué pasó?", "¡Despierto! Bueno... casi."], "dormilon": ["Cinco minutitos más..."]}
     },
     "si": {
-      "patrones": ["si", "dale", "obvio", "claro", "bueno", "de una", "por supuesto", "si si"],
+      "patrones": ["si", "dale", "obvio", "claro", "bueno", "de una", "por supuesto", "si si", "si dale", "exacto|correcto|perfecto|joya|eso", "si por favor", "eso mismo"],
       "expresion": "contento",
       "respuestas": {"todos": ["¡Genial!", "¡Buenísimo!", "¡Eso!"]}
     },

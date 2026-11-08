@@ -54,6 +54,7 @@ type RespuestaCharla struct {
 	Confianza      int    // 0-100
 	NoEntendi      bool   // si hay IA, que conteste ella
 	Falta          bool   // preguntó lo que faltaba (la acción queda para la próxima)
+	Confirma       bool   // no estaba seguro y preguntó antes ("¿Te llamás Zoe?"): con "sí" la hace (también Falta)
 	Accion         string // "ninguna", "alarma", "recordatorio", "habito", "jugar", "modo", "gusto", "toque", ...
 	Dato           int    // el juego, el modo, el toque, el hábito, ±1 de volumen o el ánimo (-1 = nada)
 	Minuto         int    // del día (-1 = no dijo hora)
@@ -118,7 +119,7 @@ func Charlar(texto string, ctx ContextoCharla, estado *EstadoCharla) (RespuestaC
 	}
 	return RespuestaCharla{
 		Intencion: C.GoString(&s.intencion[0]), Confianza: int(s.confianza), NoEntendi: s.no_entendi != 0,
-		Falta: s.falta != 0, Accion: C.GoString(&s.accion_nombre[0]), Dato: int(s.dato), Minuto: int(s.minuto),
+		Falta: s.falta != 0, Confirma: s.confirma != 0, Accion: C.GoString(&s.accion_nombre[0]), Dato: int(s.dato), Minuto: int(s.minuto),
 		EnMinutos: int(s.en_minutos), Dia: int(s.dia), Semana: int(s.semana), Dias: int(s.dias),
 		Texto: C.GoString(&s.texto[0]), Frase: C.GoString(&s.frase[0]), Expresion: C.GoString(&s.expresion[0]),
 		Comportamiento: C.GoString(&s.comportamiento[0]),

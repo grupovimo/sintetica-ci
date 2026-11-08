@@ -126,6 +126,9 @@ PLANTILLAS_CHARLA = {"dueno", "robot", "hora", "fecha", "dia", "clima", "cuando"
                      "resultado"}
 PRESETS_CHARLA = {"todos", "timido", "picaro", "dormilon", "carinoso", "curioso", "grunon", "electrico"}
 ANIMOS_CHARLA = ["bien", "medio", "mal"]
+# Las acciones que cambian algo: si no está seguro, pregunta antes («confirmar»).
+CONFIRMAN_CHARLA = {"alarma", "cancelar-alarma", "recordatorio", "gusto", "olvidar-gusto", "toque", "modo", "volumen",
+                    "dueno"}
 
 
 def plegar(t: str) -> str:
@@ -137,7 +140,7 @@ def plegar(t: str) -> str:
 
 def patron_valido(p: str) -> bool:
     import re
-    toks = p.split(" ")
+    toks = p.removeprefix("~").split(" ")
     return all(re.fullmatch(r"[a-z0-9]+\*?(\|[a-z0-9]+\*?)*\??", t) for t in toks) and \
         any(not t.endswith("?") for t in toks) and len(toks) <= 8
 
@@ -192,6 +195,9 @@ def generar_charla() -> str:
     nombres = {"juegos": [g["nombre"] for g in datos["juegos"]], "modos": [g["nombre"] for g in datos["modos"]],
                "toques": [g["nombre"] for g in datos["toques"]]}
     ne = sumar_respuestas(datos["no_entendi"], "no_entendi")
+    ca = sumar_respuestas(datos.get("cancelado"), "cancelado")
+    if not ca[1]:
+        mal("cancelado", "no tiene respuestas")
     filas = []
     for nombre, it in datos["intenciones"].items():
         accion = it.get("accion", "ninguna")
@@ -230,9 +236,18 @@ def generar_charla() -> str:
         if necesita and not f[1]:
             mal(nombre, "necesita algo pero no tiene «falta»")
         s = sumar_respuestas(it.get("sin"), nombre)
+        co = sumar_respuestas(it.get("confirmar"), nombre)
+        if accion in CONFIRMAN_CHARLA and not co[1]:
+            mal(nombre, "cambia algo pero no tiene «confirmar»")
+        if co[1] and accion not in CONFIRMAN_CHARLA:
+            mal(nombre, "tiene «confirmar» pero no cambia nada")
+        no_empieza = [plegar(w) for w in it.get("no_empieza", [])]
+        if any(not re.fullmatch(r"[a-z0-9]+", w) for w in no_empieza):
+            mal(nombre, "no_empieza: palabras sueltas, sin tildes")
         filas.append(f'    {{"{nombre}", {ACCIONES_CHARLA.index(accion)}, {int(dato)}, {necesita}, '
                      f'{REQUIERE_CHARLA[requiere]}, {marcas}, {c_texto(expresion)}, {c_texto(comp)}, {c_texto(texto)}, '
-                     f'{pp}, {np_}, {{{{{r[0]}, {r[1]}}}, {{{f[0]}, {f[1]}}}, {{{s[0]}, {s[1]}}}}}}},')
+                     f'{c_texto("|".join(no_empieza))}, {pp}, {np_}, '
+                     f'{{{{{r[0]}, {r[1]}}}, {{{f[0]}, {f[1]}}}, {{{s[0]}, {s[1]}}}, {{{co[0]}, {co[1]}}}}}}},')
     relleno = sorted({plegar(w) for w in datos["relleno"]})
     abrev = [(plegar(k), plegar(v)) for k, v in datos["abreviaturas"].items()]
     partes = [
@@ -254,8 +269,9 @@ def generar_charla() -> str:
         "  const char* expresion;",
         "  const char* comportamiento;",
         "  const char* texto;     // el texto por defecto (temporizador)",
-        "  uint16_t patron, nPatrones;  // en PATRONES_CHARLA",
-        "  uint16_t grupo[3][2];  // respuestas, falta y sin: primera y cantidad en RESPUESTAS_CHARLA",
+        "  const char* noEmpieza; // tu|que|cuando: si el texto libre empieza así, no es esta",
+        "  uint16_t patron, nPatrones;  // en PATRONES_CHARLA (~ adelante: dudoso, pregunta antes)",
+        "  uint16_t grupo[4][2];  // respuestas, falta, sin y confirmar: primera y cantidad en RESPUESTAS_CHARLA",
         "};",
         "",
         "struct RespuestaCharlaBase {",
@@ -275,6 +291,8 @@ def generar_charla() -> str:
         "};",
         "",
         f"constexpr int CHARLA_UMBRAL = {round(float(datos['umbral']) * 100)};  // centésimos",
+        f"constexpr int CHARLA_UMBRAL_ACCION = {round(float(datos.get('umbral_accion', datos['umbral'])) * 100)};"
+        "  // para hacer sin preguntar lo que cambia algo",
         f"constexpr int CHARLA_CONTEXTO_S = {int(datos['contexto'])};",
         "",
         f"constexpr int CANTIDAD_ACCIONES_CHARLA = {len(ACCIONES_CHARLA)};",
@@ -291,6 +309,7 @@ def generar_charla() -> str:
         *respuestas,
         "};",
         f"constexpr int NO_ENTENDI_PRIMERA = {ne[0]}, NO_ENTENDI_CANTIDAD = {ne[1]};",
+        f"constexpr int CANCELADO_PRIMERA = {ca[0]}, CANCELADO_CANTIDAD = {ca[1]};",
         "",
         f"constexpr int CANTIDAD_INTENCIONES_CHARLA = {len(filas)};",
         "inline const IntencionCharla INTENCIONES_CHARLA[CANTIDAD_INTENCIONES_CHARLA] = {",

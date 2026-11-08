@@ -3,10 +3,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <sstream>
 #include <string>
 
 #include "charla.h"
 #include "charla_base.h"
+#include "json.h"
 #include "prueba.h"
 #include "voz_propia.h"
 
@@ -385,6 +388,131 @@ PRUEBA("charla: los gustos se suman sin repetir, se van los viejos y se sacan") 
   VERIFICAR(std::string(l) == "El Mate\nel rock\nlos perros\nel helado");
   sacarGusto(l, sizeof l, "perros");
   VERIFICAR(std::string(l) == "El Mate\nel rock\nel helado");
+}
+
+// ---------------------------------------------------------------- los casos
+
+namespace {
+
+struct ResultadoCasos {
+  int total = 0, bien = 0;
+  int accionesDeMas = 0;  // hizo algo que no tenía que hacer (lo peor)
+  int iaPerdida = 0;      // una pregunta difícil que no le pasó a la IA
+};
+
+// shared/formato/charla/casos.json: cada frase con lo que tiene que entender.
+ResultadoCasos correrCasos(bool mostrar) {
+  ResultadoCasos res;
+  std::ifstream archivo(std::string(RAIZ_REPO) + "/shared/formato/charla/casos.json");
+  std::stringstream ss;
+  ss << archivo.rdbuf();
+  const std::string texto = ss.str();
+  static TokenJson toks[12000];
+  Json j;
+  if (j.parsear(texto.data(), texto.size(), toks, 12000) <= 0) return res;
+  const int casos = j.buscar(0, "casos");
+  auto cadena = [&](int obj, const char* clave, std::string* v) {
+    const int t = j.buscar(obj, clave);
+    char b[256];
+    if (t < 0 || j.texto(t, b, sizeof b) < 0) return false;
+    *v = b;
+    return true;
+  };
+  auto numero = [&](int obj, const char* clave, int* v) {
+    const int t = j.buscar(obj, clave);
+    if (t < 0) return false;
+    *v = static_cast<int>(j.numero(t, 0));
+    return true;
+  };
+  for (int k = 0; k < j.cantidad(casos); k++) {
+    const int c = j.elemento(casos, k);
+    std::string di, s;
+    cadena(c, "di", &di);
+    Charla ch;
+    const int sonando = j.buscar(c, "sonando");
+    if (sonando >= 0) ch.ctx.alarmaSonando = j.booleano(sonando, false);
+    const int antes = j.buscar(c, "antes");
+    for (int a = 0; a < j.cantidad(antes); a++) {
+      char b[256];
+      j.texto(j.elemento(antes, a), b, sizeof b);
+      ch.decir(b);
+    }
+    const RespuestaCharla& r = ch.decir(di.c_str());
+    std::string mal;
+    int n;
+    if (cadena(c, "es", &s) && s != r.nombre()) mal += " es=" + std::string(r.nombre());
+    if (cadena(c, "accion", &s) && s != nombreAccionCharla(r.accion)) {
+      mal += " accion=" + std::string(nombreAccionCharla(r.accion));
+      if (s == "ninguna") res.accionesDeMas++;
+    }
+    const int conf = j.buscar(c, "confirma");
+    if (conf >= 0 && j.booleano(conf, false) != r.confirma) mal += r.confirma ? " confirma" : " no-confirma";
+    const int ia = j.buscar(c, "ia");
+    if (ia >= 0 && j.booleano(ia, false) != r.noEntendi) {
+      mal += r.noEntendi ? " no_entendi" : " entendio";
+      if (j.booleano(ia, false)) res.iaPerdida++;
+    }
+    if (cadena(c, "texto", &s) && s != r.e.texto) mal += " texto=«" + std::string(r.e.texto) + "»";
+    if (numero(c, "minuto", &n) && n != r.e.minuto) mal += " minuto=" + std::to_string(r.e.minuto);
+    if (numero(c, "en", &n) && n != r.e.enMinutos) mal += " en=" + std::to_string(r.e.enMinutos);
+    if (numero(c, "dia", &n) && n != r.e.dia) mal += " dia=" + std::to_string(r.e.dia);
+    if (numero(c, "dias", &n) && n != r.e.dias) mal += " dias=" + std::to_string(r.e.dias);
+    if (numero(c, "dato", &n) && n != r.dato) mal += " dato=" + std::to_string(r.dato);
+    res.total++;
+    if (mal.empty()) res.bien++;
+    else if (mostrar) std::printf("    «%s»:%s (%d) «%s»\n", di.c_str(), mal.c_str(), r.confianza, r.frase);
+  }
+  return res;
+}
+
+}  // namespace
+
+PRUEBA("charla: los casos de casos.json (frases reales): acierta, no hace lo que no le pidieron y deja a la IA lo difícil") {
+  const ResultadoCasos r = correrCasos(true);
+  std::printf("    casos: %d de %d (%d%%), acciones de más: %d, IA perdida: %d\n", r.bien, r.total,
+              r.total ? r.bien * 100 / r.total : 0, r.accionesDeMas, r.iaPerdida);
+  VERIFICAR(r.total >= 150);
+  // Antes de la v1.11 (sin confirmar ni no_empieza): 242 de 297 (81 %), 31 acciones de más.
+  VERIFICAR(r.bien * 100 >= r.total * 97);
+  VERIFICAR(r.accionesDeMas == 0);
+  VERIFICAR(r.iaPerdida == 0);
+}
+
+PRUEBA("charla: lo que cambia algo y es dudoso se pregunta antes; con «sí» se hace, con «no», nada") {
+  Charla c;
+  c.decir("decime Zoe");
+  VERIFICAR(es(c.r, "me-llamo") && c.r.confirma && c.r.falta && c.r.accion == AccionCharla::Ninguna &&
+            contiene(c.r.frase, "Zoe") && contiene(c.r.frase, "?"));
+  c.decir("si");
+  VERIFICAR(es(c.r, "me-llamo") && c.r.accion == AccionCharla::Dueno && !c.r.confirma && std::string(c.r.e.texto) == "Zoe");
+  // Con "no", no hace nada (y lo dice).
+  Charla d;
+  d.decir("llamame Nacho");
+  VERIFICAR(d.r.confirma);
+  d.decir("no");
+  VERIFICAR(d.r.accion == AccionCharla::Ninguna && !d.r.confirma && d.r.frase[0]);
+  d.decir("si");  // ya no espera nada
+  VERIFICAR(d.r.accion == AccionCharla::Ninguna);
+  // Una alarma dudosa guarda la hora para el "sí".
+  Charla a;
+  a.decir("mi alarma sono a las 6");
+  VERIFICAR(a.r.confirma && a.r.accion == AccionCharla::Ninguna && a.r.e.minuto == 6 * 60);
+  a.decir("dale");
+  VERIFICAR(es(a.r, "alarma") && a.r.accion == AccionCharla::Alarma && a.r.e.minuto == 6 * 60 && a.r.e.dia == 1);
+  // Pasado el contexto, el "sí" ya no confirma.
+  Charla v;
+  v.decir("decime Zoe");
+  v.ctx.segundos += 600;
+  v.decir("si");
+  VERIFICAR(v.r.accion == AccionCharla::Ninguna);
+  // "Decime de Zoe" no es un nombre: ni lo cambia ni pregunta (que conteste la IA).
+  RespuestaCharla r = una("decime de Zoe");
+  VERIFICAR(r.accion == AccionCharla::Ninguna && !r.confirma && r.noEntendi);
+  // Lo seguro se hace sin preguntar.
+  r = una("me llamo Zoe");
+  VERIFICAR(r.accion == AccionCharla::Dueno && !r.confirma);
+  r = una("olvidate que me gusta el mate");
+  VERIFICAR(r.accion == AccionCharla::OlvidarGusto && std::string(r.e.texto) == "el mate" && !r.confirma);
 }
 
 // ---------------------------------------------------------------- la voz

@@ -50,6 +50,28 @@ func TestCharlar(t *testing.T) {
 	}
 }
 
+// Lo dudoso que cambia algo: pregunta antes (Confirma y Falta, sin acción) y
+// con el "sí" (en el mismo EstadoCharla) lo hace.
+func TestCharlarConfirma(t *testing.T) {
+	var e EstadoCharla
+	ctx := ctxPrueba()
+	r, _ := Charlar("decime Zoe", ctx, &e)
+	if !r.Confirma || !r.Falta || r.Accion != "ninguna" || !strings.Contains(r.Frase, "Zoe") {
+		t.Fatalf("decime Zoe: %+v", r)
+	}
+	ctx.Segundos += 5
+	if r, _ = Charlar("sí", ctx, &e); r.Confirma || r.Accion != "dueno" || r.Texto != "Zoe" {
+		t.Fatalf("sí: %+v", r)
+	}
+	var e2 EstadoCharla
+	if r, _ = Charlar("decime de Zoe", ctx, &e2); r.Accion != "ninguna" || r.Confirma || !r.NoEntendi {
+		t.Fatalf("decime de Zoe: %+v", r)
+	}
+	if r, _ = Charlar("olvidate que me gusta el mate", ctx, &e2); r.Accion != "olvidar-gusto" || r.Texto != "el mate" {
+		t.Fatalf("olvidate que me gusta: %+v", r)
+	}
+}
+
 func TestCharlarConContextoYSinEntender(t *testing.T) {
 	var e EstadoCharla
 	ctx := ctxPrueba()

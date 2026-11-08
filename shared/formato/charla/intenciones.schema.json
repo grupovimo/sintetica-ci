@@ -2,12 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sinteticalabs.com/schema/charla/intenciones/v1.json",
   "title": "Las intenciones de la charla sin IA",
-  "description": "Lo que entiende el robot sin IA (firmware/nucleo/charla.cpp). Un patrón son palabras separadas por espacios, ya normalizadas (minúsculas, sin tildes); cada palabra puede tener alternativas con | , una raíz con * al final y ser opcional con ? al final. Las respuestas son de 1 a 60 bytes UTF-8 (el globo) y usan las plantillas {dueno} {robot} {hora} {fecha} {dia} {clima} {cuando} {cuando_dia} {a_las} {minutos} {texto} {quien} {toque} {juego} {habito} {habitos} {gustos} {agenda} {musica} {dias} {resultado}.",
+  "description": "Lo que entiende el robot sin IA (firmware/nucleo/charla.cpp). Un patrón son palabras separadas por espacios, ya normalizadas (minúsculas, sin tildes); cada palabra puede tener alternativas con | , una raíz con * al final y ser opcional con ? al final. Un patrón que empieza con ~ es dudoso: si cambia algo (una alarma, el nombre, un gusto), pregunta antes de hacerlo. Las respuestas son de 1 a 60 bytes UTF-8 (el globo) y usan las plantillas {dueno} {robot} {hora} {fecha} {dia} {clima} {cuando} {cuando_dia} {a_las} {minutos} {texto} {quien} {toque} {juego} {habito} {habitos} {gustos} {agenda} {musica} {dias} {resultado}.",
   "type": "object",
   "required": ["version", "umbral", "contexto", "abreviaturas", "relleno", "juegos", "modos", "toques", "no_entendi", "intenciones"],
   "additionalProperties": false,
   "$defs": {
-    "patron": {"type": "string", "pattern": "^[a-záéíóúüñ0-9|*?]+( [a-záéíóúüñ0-9|*?]+)*$"},
+    "patron": {"type": "string", "pattern": "^~?[a-záéíóúüñ0-9|*?]+( [a-záéíóúüñ0-9|*?]+)*$"},
     "frase": {"type": "string", "minLength": 1, "maxLength": 60},
     "respuestas": {
       "type": "object",
@@ -36,6 +36,8 @@
   "properties": {
     "version": {"const": 1},
     "umbral": {"type": "number", "minimum": 0, "maximum": 1, "description": "Desde qué puntaje entiende (0-1)."},
+    "umbral_accion": {"type": "number", "minimum": 0, "maximum": 1.2, "description": "Desde qué puntaje hace sin preguntar lo que cambia algo (alarmas, recordatorios, gustos, el nombre, toques, modo, volumen); más abajo, pregunta antes («confirmar»)."},
+    "cancelado": {"$ref": "#/$defs/respuestas", "description": "Lo que dice si le contestan que no a un «¿Te llamás Zoe?»."},
     "contexto": {"type": "integer", "minimum": 0, "description": "Segundos que recuerda la última intención."},
     "abreviaturas": {"type": "object", "additionalProperties": {"type": "string"}},
     "relleno": {"type": "array", "items": {"type": "string"}, "description": "Palabras que no cuentan para ver cuánto entendió."},
@@ -66,7 +68,9 @@
           "mayuscula": {"type": "boolean"},
           "respuestas": {"$ref": "#/$defs/respuestas"},
           "falta": {"$ref": "#/$defs/falta"},
-          "sin": {"$ref": "#/$defs/respuestas"}
+          "sin": {"$ref": "#/$defs/respuestas"},
+          "confirmar": {"$ref": "#/$defs/respuestas", "description": "La pregunta antes de hacer algo que cambia datos cuando no está seguro («¿Te llamás {texto}?»); con «sí», lo hace. Obligatoria en las que cambian algo."},
+          "no_empieza": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9]+$"}, "description": "Si el texto libre empieza con una de estas palabras, no es esta intención («me gusta tu voz» no es un gusto)."}
         }
       }
     }

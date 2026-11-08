@@ -618,7 +618,7 @@ app, Telegram) y sale una frase, una expresión y, si corresponde, una acción.
 La IA (si el dueño la conectó) es el último recurso: solo cuando el motor dice
 `no_entendi`.
 
-- **Los datos**: `shared/formato/charla/intenciones.json` (con su schema): 78
+- **Los datos**: `shared/formato/charla/intenciones.json` (con su schema): 79
   intenciones del día a día (saludo, buen día, cómo estás, cómo te llamás,
   quién te hizo, la hora, la fecha, el clima, alarmas, posponer, apagar,
   recordatorios, temporizador, hábitos, juegos, dado, moneda, modos, chistes,
@@ -638,6 +638,26 @@ La IA (si el dueño la conectó) es el último recurso: solo cuando el motor dic
   (`?`); tolera un error de tipeo (dos en las palabras largas; la primera letra
   tiene que estar) y puntúa por la calidad y por cuánto de la frase explica (sin
   el relleno: "che", "el", "que", el nombre del robot). Umbral 0,6.
+- **Lo que cambia algo, con cuidado** (v1.11): alarmas, recordatorios, gustos,
+  el nombre, toques, modo y volumen se hacen sin preguntar solo si está seguro
+  (puntaje de 0,9 para arriba, `umbral_accion`, o toda la frase explicada con a
+  lo sumo un error por palabra). Si no, o si el patrón es dudoso (`~` adelante:
+  "~llamame|decime", "~me dicen", "~reloj", "~no te escucho", "~odio"),
+  pregunta con su grupo `confirmar` ("¿Te llamás Zoe?", "¿Te pongo una alarma
+  mañana a las 6:00?") y guarda lo entendido en el `EstadoCharla` (`espera` =
+  confirmar): con "sí" lo hace, con "no" contesta `cancelado` y no toca nada.
+  `no_empieza` descarta la intención si el texto libre arranca así ("me gusta
+  tu voz", "me gusta que me hables" no son gustos) y un nombre no empieza con
+  relleno, un número ni es el del robot ("decime de Zoe", "decime la hora",
+  "me llamó mi mamá" no cambian el nombre); el nombre son hasta tres palabras
+  hasta el primer relleno ("me llamo Juan y tengo 30" → "Juan"). "Olvidate /
+  borrá / ya no me gusta X" saca el gusto (`olvidar-gusto`).
+- **Los casos** (`shared/formato/charla/casos.json`): ~300 frases reales
+  (rioplatense, errores de tipeo y de la voz, sin signos, con el nombre del
+  robot, charlas de dos pasos y frases que no tienen que hacer nada) con lo que
+  tiene que entender; el test pide 97 % de acierto, ninguna acción de más y
+  que las preguntas difíciles sigan yendo a la IA. Antes de la v1.11: 242 de
+  297 (81 %) y 31 acciones de más; ahora, 297 de 297.
 - **Entidades**: horas ("a las 7", "7 y media", "8 menos cuarto", "6:45", "a la
   una", "al mediodía", "de la tarde", "a la noche", "en 10 minutos", "en media
   hora", "en un rato"), días ("hoy", "mañana", "pasado mañana", "el sábado",
