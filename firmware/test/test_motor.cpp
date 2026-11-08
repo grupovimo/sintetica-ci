@@ -412,7 +412,9 @@ PRUEBA("vida: batería baja (regla de estado) y el rostro con poca luz de noche"
   Sim s(10);
   s.bateria = 10;
   s.correr(3000);
-  VERIFICAR(s.visible() == "bateria-baja");
+  // Una capa del ánimo: más apagado, pero no tapa la cara.
+  VERIFICAR(s.visible() != "bateria-baja");
+  VERIFICAR(s.m.brillo() < 0.9f);
   s.bateria = 80;
   s.epoch0 = DIA * 86400u + 23 * 3600u;  // 23:00, media hora antes de dormir
   s.correr(3000);

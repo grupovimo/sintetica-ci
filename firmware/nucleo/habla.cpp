@@ -298,6 +298,18 @@ bool Hablador::quiere(Situacion s, uint32_t segundos, uint32_t dia, uint8_t frec
   return true;
 }
 
+bool situacionSiempre(Situacion s) {
+  const SituacionBase* b = base(s);
+  return b && b->siempre;
+}
+
+bool textoUtf8Valido(const char* s, size_t n) {
+  char t[256];
+  if (n >= sizeof t) return false;
+  copiarTexto(t, sizeof t, s, n);
+  return largo(t) == n && utf8Valido(t);
+}
+
 uint32_t duracionGlobo(const char* texto) {
   const uint32_t ms = 2500 + 60 * static_cast<uint32_t>(largo(texto));
   return ms < 3000 ? 3000 : ms > 10000 ? 10000 : ms;

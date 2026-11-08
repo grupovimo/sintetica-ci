@@ -135,12 +135,19 @@ PRUEBA("sistema: el botón dispara las reglas del manual") {
   VERIFICAR(expresionActual() == "neutral");
 }
 
-PRUEBA("sistema: batería baja muestra su cara") {
+PRUEBA("sistema: batería baja apaga la cara y se asoma cada tanto (no gana siempre)") {
   g_flash.clear();
   arrancar();
   g_bateria = 10;
   correr(300);
-  VERIFICAR(expresionActual() == "bateria-baja");
+  VERIFICAR(expresionActual() != "bateria-baja");
+  // En unos minutos se asoma (un momento) y vuelve.
+  int veces = 0;
+  for (int i = 0; i < 300; i++) {
+    correr(1000);
+    veces += expresionActual() == "bateria-baja";
+  }
+  VERIFICAR(veces > 0 && veces < 60);
   g_bateria = 80;
   correr(300);
   VERIFICAR(expresionActual() == "neutral");

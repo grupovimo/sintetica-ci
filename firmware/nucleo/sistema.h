@@ -4,6 +4,8 @@
 #pragma once
 
 #include "cara.h"
+#include "clima.h"
+#include "globo.h"
 #include "formato.h"
 #include "gestos.h"
 #include "hal.h"
@@ -41,6 +43,11 @@ namespace tiemposPanel {
 constexpr uint32_t FUNDIDO_MS = 400;              // entrar y salir del panel (nunca un corte)
 constexpr uint32_t RECORDATORIO_MS = 120000;      // un recordatorio queda 2 min si no lo tocan
 constexpr uint32_t CARA_EN_RELOJ_MS = 15000;      // en modo reloj, un toque muestra la cara un rato
+constexpr uint32_t ALARMA_MAX_MS = 10u * 60000u;  // el despertador suena como mucho 10 min
+constexpr uint32_t ALARMA_TONO_MS = 4000;         // un tono cada 4 s,
+constexpr uint32_t ALARMA_SUBE_MS = 10000;        // cada 10 s más fuerte (despertador:1 a despertador:5)
+constexpr uint32_t ALARMA_APAGAR_MS = 1500;       // mantener apretado: apagar
+constexpr uint32_t CARA_CLIMA_MS = 40000;         // en modo clima, la cara reacciona al tiempo cada 40 s
 }  // namespace tiemposPanel
 
 namespace tiemposBroche {
@@ -113,13 +120,28 @@ class Sistema {
   int recordatorioVisible() const { return recVisible_; }
   // El panel (recordatorio, reloj o pomodoro): la cara se achica arriba y
   // abajo va el texto. 0 = solo la cara, 1 = el panel entero.
-  enum class Panel : uint8_t { Ninguno, Recordatorio, Reloj, Pomodoro };
+  enum class Panel : uint8_t { Ninguno, Recordatorio, Reloj, Pomodoro, Globo, Despertador, Clima };
   Panel panel() const { return panel_; }
   float fasePanel() const { return fasePanel_; }
   // Pomodoro: si corre, en qué tramo está y cuánto le falta.
   bool pomodoroCorriendo() const { return pomoCorriendo_; }
   bool pomodoroDescanso() const { return pomoDescanso_; }
   uint32_t pomodoroRestanteMs() const { return pomoRestanteMs_; }
+  // Lo que dice (comando Decir, sus frases): un globo con la cara achicada.
+  // `hablando`: mueve la boca un rato (el comando Decir sin expresión).
+  void decir(const char* texto, Config::Cara cara = {}, bool hablando = false);
+  // Una situación (las pide el motor): si el Hablador quiere, dice una frase.
+  void hablar(Situacion s);
+  // El texto del globo que se ve (o el del despertador).
+  const char* textoGlobo() const { return alarma_ ? alarmaTexto_ : globoTexto_; }
+  // El despertador.
+  bool alarmaSonando() const { return alarma_; }
+  void sonarAlarma(bool porHora);
+  void posponerAlarma();
+  void apagarAlarma();
+  // El clima que mandó la nube (vale 3 h).
+  const DatosClima& clima() const { return clima_; }
+  bool climaVigente() const { return clima_.hay && hal_.ahoraMs() - clima_.recibido < CLIMA_VALE_MS; }
   // El protector de pantalla: 0 = la cara, 1 = la imagen entera.
   float faseProtector() const { return faseProtector_; }
 
@@ -233,6 +255,10 @@ class Sistema {
   void dibujarPanel();
   const char* nombrePomodoro() const;
   void falla(uint32_t ahora);
+  void revisarDespertador(uint32_t ahora);
+  void avanzarAlarma(uint32_t ahora);
+  void mostrarGlobo(uint32_t ahora);
+  void dibujarClima(float cx, float W, float H, float alfa);
   void log(const char* m) {
     if (hal_.registrar) hal_.registrar(m);
   }
@@ -333,6 +359,20 @@ class Sistema {
   uint32_t caraHasta_ = 0;         // reloj: hasta cuándo se ve la cara por un toque
   bool pomoCorriendo_ = false, pomoDescanso_ = false;
   uint32_t pomoRestanteMs_ = 0;
+  // El globo (lo que dice), el despertador y el clima.
+  char globoTexto_[LARGO_TEXTO_AJUSTADO] = {};
+  char globoPendiente_[LARGO_TEXTO_AJUSTADO] = {};
+  Config::Cara caraPendiente_;
+  bool hayPendiente_ = false, globo_ = false, pendienteHablando_ = false;
+  uint32_t globoHasta_ = 0;
+  Hablador hablador_;
+  bool alarma_ = false, alarmaApretado_ = false, tragarAlarma_ = false;
+  uint32_t alarmaDesde_ = 0, alarmaTono_ = 0, alarmaToque_ = 0, pospuestaHasta_ = 0;
+  int16_t alarmaMinuto_ = -1;
+  uint16_t alarmaDia_ = 0;
+  char alarmaTexto_[LARGO_TEXTO_AJUSTADO] = {};
+  DatosClima clima_;
+  uint32_t proximaCaraClima_ = 0;
   // Protector de pantalla.
   uint32_t ultimaActividad_ = 0;
   float faseProtector_ = 0;

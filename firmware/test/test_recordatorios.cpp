@@ -279,7 +279,8 @@ PRUEBA("recordatorios: se dispara a la hora en el día que corresponde") {
 }
 
 PRUEBA("recordatorios: un toque lo cierra con un fundido y no se repite el mismo día") {
-  arrancar(UN_RECORDATORIO);
+  // Callado: si no, a veces festeja con un globo ("¡Bien ahí!").
+  arrancar("{\"version\":2,\"habla\":{\"frecuencia\":0},\"recordatorios\":[{\"hora\":\"08:30\",\"dias\":\"L\",\"texto\":\"Tomar la pastilla\"}]}");
   g_s.hora(LUNES_0829, 0);
   correr(35000);
   VERIFICAR(g_s.recordatorioVisible() == 0);
@@ -505,7 +506,8 @@ PRUEBA("protector: se valida") {
 }
 
 PRUEBA("protector: entra tras la espera, sale con un toque (con fundido) y vuelve") {
-  arrancarConImagen("{\"version\":2,\"protector\":{\"imagen\":0,\"espera\":5}}");
+  // (Callado: una frase suelta también cuenta como "que pase algo".)
+  arrancarConImagen("{\"version\":2,\"habla\":{\"frecuencia\":0},\"protector\":{\"imagen\":0,\"espera\":5}}");
   correr(4000);
   VERIFICAR(g_s.faseProtector() == 0);
   VERIFICAR(!centroAzul());

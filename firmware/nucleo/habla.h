@@ -89,6 +89,11 @@ class Hablador {
   uint8_t hoy_ = 0;
 };
 
+// Si la situación habla siempre (el cumple, el despertador: frases.json "siempre").
+bool situacionSiempre(Situacion s);
+// Un texto UTF-8 bien formado (sin terminador: n bytes).
+bool textoUtf8Valido(const char* s, size_t n);
+
 // La duración del globo según el largo: 2,5 s + 60 ms por byte, entre 3 y 10 s.
 uint32_t duracionGlobo(const char* texto);
 

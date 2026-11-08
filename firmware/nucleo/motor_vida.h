@@ -40,6 +40,8 @@ struct SalidasVida {
   void (*led)(void* ctx, uint32_t rgb) = nullptr;
   void (*animacion)(void* ctx, int indice) = nullptr;
   void (*guardar)(void* ctx, const uint8_t* datos, size_t n) = nullptr;
+  // Una situación para hablar (Situacion de habla.h): el sistema decide si dice algo.
+  void (*decir)(void* ctx, uint8_t situacion) = nullptr;
 };
 
 // Lo que recuerda (se guarda en flash y se sincroniza con la cuenta).
@@ -154,6 +156,8 @@ class MotorVida {
   int segundosHastaDespertar() const;
   // El brillo de la pantalla que pide el ritmo diario (0 a 1).
   float brillo() const { return cuadro_.brillo; }
+  // Dormido: hacia dónde está ladeado (-1, 0, 1) y si sonríe en sueños (tests).
+  int ladoDormido() const { return ladoSueno_; }
   // Para los tests.
   uint32_t parpadeos() const { return parpadeos_; }
   uint32_t parpadeosDobles() const { return dobles_; }
@@ -186,6 +190,11 @@ class MotorVida {
   void empujar(int var, float delta);
   void soltar(TipoParticula t, int cuantas = 1);
   void ritmo();
+  void vidaDormido();
+  void revolverseEnSuenos(bool murmurar);
+  void decir(Situacion s) {
+    if (salidas_.decir) salidas_.decir(salidas_.ctx, static_cast<uint8_t>(s));
+  }
   void anotar(uint8_t tipo, uint8_t dato);
   void memoriaInteraccion(Evento e);
   void revisarHitos();
@@ -283,6 +292,15 @@ class MotorVida {
   float guardadoEn_ = 0;
   bool hayVolvio_ = false;
   bool hitoPendiente_ = false;
+  int8_t hitoSituacion_ = -1;    // qué se dice al festejar el hito (el cumple gana)
+  // La batería baja va como una capa del ánimo (no gana sobre todo).
+  bool capaBateria_ = false;
+  float proximaBateria_ = 0;
+  // Dormido: zzz, postura, sonrisas y murmullos, ronquidos; lo que lo despierta de noche.
+  float proximoZzz_ = 0, proximaPosturaSueno_ = 0, proximoGestoSueno_ = 0, proximoRonquido_ = 0;
+  float sonrisaSuenoHasta_ = -10, murmulloHasta_ = -10;
+  int8_t ladoSueno_ = 0;
+  uint8_t vocesDormido_ = 0;
   float ausenciaHoras_ = 0;
 
   Memoria mem_;
