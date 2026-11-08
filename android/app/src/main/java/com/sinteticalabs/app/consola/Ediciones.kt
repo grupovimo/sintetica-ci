@@ -8,7 +8,7 @@ import kotlinx.serialization.json.put
 
 /**
  * Lo que cada módulo de la consola le cambia a la config (los mismos cambios
- * que web/src/lib/consola/modulos/*.svelte). Todo puro: config en, config afuera.
+ * que los módulos de web/src/lib/consola). Todo puro: config en, config afuera.
  */
 object Editar {
     // --- Carácter ---

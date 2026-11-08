@@ -144,11 +144,13 @@ fun PlacaNaranja(modifier: Modifier = Modifier, radio: Dp = 30.dp, relleno: Dp =
     Column(
         modifier.clip(RoundedCornerShape(radio)).drawWithCache {
             val paso = 7.dp.toPx()
+            val ancho = size.width
+            val alto = size.height
             val puntos = buildList {
                 var y = paso / 2
-                while (y < size.height) {
+                while (y < alto) {
                     var x = paso / 2
-                    while (x < size.width) { add(Offset(x, y)); x += paso }
+                    while (x < ancho) { add(Offset(x, y)); x += paso }
                     y += paso
                 }
             }
