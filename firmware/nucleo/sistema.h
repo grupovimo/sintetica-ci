@@ -36,6 +36,12 @@ constexpr uint32_t VUELTA_MAX_MS = 180000;  // vuelve la cara
 constexpr uint32_t VUELTA_DURA_MS = 2500;   // durante un par de segundos
 }  // namespace tiemposImagen
 
+namespace tiemposPanel {
+constexpr uint32_t FUNDIDO_MS = 400;              // entrar y salir del panel (nunca un corte)
+constexpr uint32_t RECORDATORIO_MS = 120000;      // un recordatorio queda 2 min si no lo tocan
+constexpr uint32_t CARA_EN_RELOJ_MS = 15000;      // en modo reloj, un toque muestra la cara un rato
+}  // namespace tiemposPanel
+
 namespace tiemposBroche {
 constexpr uint32_t TOQUE_MS = 600;
 constexpr uint32_t DORMIR_MS = 2000;
@@ -60,7 +66,10 @@ class Sistema {
   void imu(float ax, float ay, float az) { gestos_.imu(ax, ay, az, hal_.ahoraMs()); }
   void evento(Evento e);
   // Algo que mirar (un dedo en la pantalla táctil, la dirección del sonido), de -1 a 1.
-  void seguir(float x, float y) { motor_.seguir(x, y, hal_.ahoraMs()); }
+  void seguir(float x, float y) {
+    actividad();
+    motor_.seguir(x, y, hal_.ahoraMs());
+  }
   // La hora (lo que manda la app con el comando Hora): epoch UTC y la zona.
   void hora(uint32_t epochUtc, int zonaMinutos);
   // La hora local que conoce (0 si no sabe) y el minuto del día (-1).
@@ -69,8 +78,9 @@ class Sistema {
   // Cuántos cuadros por segundo conviene dibujar: despierto 30, tranquilo 15,
   // dormido 5 (los modos de energía). El perfil espera lo que falte.
   int fpsSugerido() const;
-  // El broche: de noche se apaga hasta la mañana (o hasta el botón).
-  int segundosHastaDespertar() const { return motor_.segundosHastaDespertar(); }
+  // El broche: de noche se apaga hasta la mañana (o hasta el botón, o hasta
+  // el próximo recordatorio).
+  int segundosHastaDespertar() const;
   // La superposición de depuración (comportamiento, estado, fps).
   void depurar(bool si) { depurar_ = si; }
   // Se conectó o desconectó un celu: cada conexión empieza sin autenticar.
@@ -98,6 +108,19 @@ class Sistema {
   // Reproduce una animación de la config (-1 para). unaVez: si no, repite.
   void reproducir(int animacion, bool unaVez);
   int animacionVisible() const { return animVisible_; }
+  // El recordatorio que se ve (-1 = ninguno). Un toque lo cierra.
+  int recordatorioVisible() const { return recVisible_; }
+  // El panel (recordatorio, reloj o pomodoro): la cara se achica arriba y
+  // abajo va el texto. 0 = solo la cara, 1 = el panel entero.
+  enum class Panel : uint8_t { Ninguno, Recordatorio, Reloj, Pomodoro };
+  Panel panel() const { return panel_; }
+  float fasePanel() const { return fasePanel_; }
+  // Pomodoro: si corre, en qué tramo está y cuánto le falta.
+  bool pomodoroCorriendo() const { return pomoCorriendo_; }
+  bool pomodoroDescanso() const { return pomoDescanso_; }
+  uint32_t pomodoroRestanteMs() const { return pomoRestanteMs_; }
+  // El protector de pantalla: 0 = la cara, 1 = la imagen entera.
+  float faseProtector() const { return faseProtector_; }
 
   const Config& config() const { return config_; }
   const MotorVida& motor() const { return motor_; }
@@ -171,13 +194,26 @@ class Sistema {
   void leerImagenes();
   void guardarImagenes();
   int imagenParaMostrar(uint32_t ahora);
-  bool dibujarImagen(int espacio);
+  bool dibujarImagen(int espacio, float alfa = 1);
+  void avanzarProtector(uint32_t ahora, uint32_t dt);
+  void actividad() { ultimaActividad_ = hal_.ahoraMs(); }
   bool leerArchivo(const char* clave, uint32_t desplazamiento, uint8_t* destino, size_t n);
   bool imagenValida(const char* clave, uint32_t largo, const char** porQue);
   bool prepararImagen(int espacio, uint32_t ahora);
   bool cargarCuadro(int espacio, int cuadro, uint32_t ahora);
   static int leerParaQoi(void* contexto, uint32_t desplazamiento, uint8_t* destino, size_t n);
   bool bloqueado(uint32_t ahora) const;
+  void sonar(const char* nombre);
+  // dato >= 0: además, una entrada de tipo 4 (recordatorio) con ese índice.
+  void notificarEvento(Evento e, int recordatorio = -1);
+  void revisarRecordatorios(uint32_t ahora);
+  void mostrarRecordatorio(int i, uint32_t ahora);
+  void cerrarRecordatorio();
+  void avanzarPanel(uint32_t ahora, uint32_t dt);
+  void avanzarPomodoro(uint32_t ahora, uint32_t dt);
+  void reiniciarPomodoro();
+  void dibujarPanel();
+  const char* nombrePomodoro() const;
   void falla(uint32_t ahora);
   void log(const char* m) {
     if (hal_.registrar) hal_.registrar(m);
@@ -258,6 +294,24 @@ class Sistema {
   int animVisible_ = -1;
   uint32_t animT_ = 0;
   char visible_[LARGO_NOMBRE + 12] = {};
+
+  // Recordatorios, reloj y pomodoro (el panel).
+  Panel panel_ = Panel::Ninguno;   // lo que se dibuja en el panel
+  float fasePanel_ = 0;
+  int8_t recVisible_ = -1;
+  uint32_t recDesde_ = 0;
+  uint16_t recPendientes_ = 0;     // bits: los que vencieron mientras se veía otro
+  uint16_t recDia_[MAX_RECORDATORIOS] = {};  // día (epoch / 86400 + 1) del último disparo
+  int16_t recMinuto_ = -1;         // el último minuto del día revisado
+  char recTexto_[LARGO_RECORDATORIO] = {};  // copia: sigue el fundido aunque cambie la config
+  char recNombre_[16] = {};        // "recordatorio:<n>", la expresión visible del estado
+  bool tragarSoltar_ = false;      // el toque que cerró un recordatorio no hace nada más
+  uint32_t caraHasta_ = 0;         // reloj: hasta cuándo se ve la cara por un toque
+  bool pomoCorriendo_ = false, pomoDescanso_ = false;
+  uint32_t pomoRestanteMs_ = 0;
+  // Protector de pantalla.
+  uint32_t ultimaActividad_ = 0;
+  float faseProtector_ = 0;
 
   uint8_t ultimoEstado_[protocolo::MAX_ESTADO] = {};
   size_t largoUltimoEstado_ = 0;

@@ -28,5 +28,12 @@
     { "si": "sacudida.fuerte", "entonces": ["reflejo:mareado", "estado.estres+0.4", "sonido:boing"] },
     { "si": "nombre_escuchado", "entonces": ["comportamiento:saludar-picaro", "estado.animo+0.2"] }
   ],
-  "limites_marca": { "color": "#FF6A33", "brillo_max": 0.9 }
+  "limites_marca": { "color": "#FF6A33", "brillo_max": 0.9 },
+  "recordatorios": [
+    { "hora": "08:30", "dias": "LMXJV", "texto": "Tomar la pastilla", "expresion": "sorpresa", "sonido": true, "activo": true },
+    { "hora": "20:00", "texto": "Regar las plantas" }
+  ],
+  "voz": { "volumen": 0.7, "tipo": "media", "palabra": "Lucho", "conversar": false, "microfono": 0.6 },
+  "pomodoro": { "trabajo": 25, "descanso": 5 },
+  "protector": { "imagen": 0, "espera": 10 }
 }

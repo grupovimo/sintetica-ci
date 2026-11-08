@@ -38,6 +38,7 @@ export const Eventos = [
   'caricia', 'muchos-toques', 'sacudida-suave', 'sacudida-fuerte', 'inclinado', 'caida', 'voz', 'nombre',
   'ruido', 'musica', 'silencio', 'notificacion', 'llamada', 'bateria-baja', 'bateria-critica', 'enchufado',
   'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito',
+  'recordatorio', 'pomodoro',
 ];
 // El estado interno y los rasgos, en el orden del protocolo (comando Vida).
 export const VariablesEstado = ['energia', 'animo', 'afecto', 'aburrimiento', 'curiosidad', 'sueno', 'estres'];
@@ -326,7 +327,7 @@ export function leerMemoria(m) {
 // El registro: [0x9E][0][n][n × (u32 segundos, u8 tipo, u8 dato)].
 export function leerRegistro(b) {
   const n = b[2];
-  const tipos = ['evento', 'comportamiento', 'sueño', 'hito'];
+  const tipos = ['evento', 'comportamiento', 'sueño', 'hito', 'recordatorio'];
   return Array.from({ length: n }, (_, k) => {
     const i = 3 + k * 6;
     return { segundos: leerU32(b, i), tipo: tipos[b[i + 4]] ?? String(b[i + 4]), dato: b[i + 5] };

@@ -69,6 +69,16 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
 
   // Configuración guardada.
   cargarGuardada();
+  panel_ = Panel::Ninguno;
+  fasePanel_ = 0;
+  recVisible_ = -1;
+  recPendientes_ = 0;
+  for (auto& d : recDia_) d = 0;
+  recMinuto_ = -1;
+  tragarSoltar_ = false;
+  caraHasta_ = 0;
+  reiniciarPomodoro();
+  faseProtector_ = 0;
 
   canal_ = Canal::Ble;
   wifi_ = nube_ = false;
@@ -83,8 +93,7 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
   SalidasVida sv;
   sv.ctx = this;
   sv.sonido = [](void* c, const char* n) {
-    auto* s = static_cast<Sistema*>(c);
-    if (s->hal_.sonido) s->hal_.sonido(n);
+    static_cast<Sistema*>(c)->sonar(n);
   };
   sv.led = [](void* c, uint32_t rgb) {
     auto* s = static_cast<Sistema*>(c);
@@ -105,6 +114,7 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
   imagenSucia_ = true;
   proximaVueltaCara_ = vueltaCaraHasta_ = 0;
   ultimaRotacion_ = ahora;
+  ultimaActividad_ = ahora;
   aplicarLista(ahora);
   log("SintéticaOS listo");
 }
@@ -237,7 +247,10 @@ void Sistema::leerMemoria() {
   if (n == static_cast<int>(LARGO_MEMORIA) && decodificarMemoria(b, LARGO_MEMORIA, &m)) motor_.restaurarMemoria(m);
 }
 
-void Sistema::evento(Evento e) { motor_.evento(e, hal_.ahoraMs()); }
+void Sistema::evento(Evento e) {
+  actividad();  // cualquier evento saca el protector de pantalla
+  motor_.evento(e, hal_.ahoraMs());
+}
 
 void Sistema::hora(uint32_t epochUtc, int zonaMinutos) {
   if (hal_.fijarHora) hal_.fijarHora(epochUtc, zonaMinutos);
@@ -403,7 +416,7 @@ bool Sistema::cargarCuadro(int espacio, int cuadro, uint32_t ahora) {
 }
 
 // Decodifica la imagen en la franja actual del lienzo. false si no se puede leer.
-bool Sistema::dibujarImagen(int espacio) {
+bool Sistema::dibujarImagen(int espacio, float alfa) {
   const int y0 = lienzo_.franja();
   if (y0 == 0) {
     imagenLeyendo_ = espacio;
@@ -413,14 +426,19 @@ bool Sistema::dibujarImagen(int espacio) {
   }
   for (int y = y0; y < y0 + lienzo_.filasFranja(); y++) {
     if (!qoi_.siguienteFila(g_filaImagen)) return false;
-    lienzo_.fila(y, g_filaImagen);
+    if (alfa >= 1) lienzo_.fila(y, g_filaImagen);
+    else lienzo_.filaMezclada(y, g_filaImagen, alfa);
   }
   return true;
 }
 
 // La imagen que corresponde mostrar ahora, o -1 si va una cara.
 int Sistema::imagenParaMostrar(uint32_t ahora) {
-  if (apagado_ || emparejando_ || motor_.hayFija() || animPedida_ >= 0 || largoLista() == 0) return -1;
+  // El protector de pantalla (mientras entra, está o sale).
+  if (faseProtector_ > 0 && !apagado_ && !emparejando_) return config_.protector.imagen;
+  if (apagado_ || emparejando_ || motor_.hayFija() || animPedida_ >= 0 || largoLista() == 0 ||
+      panel_ != Panel::Ninguno || recVisible_ >= 0 || config_.modo == Modo::Reloj || config_.modo == Modo::Pomodoro)
+    return -1;
   const ElementoLista e = elementoLista(posLista_);
   if (e.tipo != ElementoLista::Tipo::Imagen || imagenes_[e.indice].largo == 0 || subiendo_ == e.indice) return -1;
   // Cada tanto vuelve la cara un par de segundos: nunca una imagen quieta del todo.
@@ -582,6 +600,20 @@ void Sistema::dormir() {
 
 void Sistema::tacto(bool apretado) {
   const uint32_t ahora = hal_.ahoraMs();
+  actividad();
+  // Un toque cierra el recordatorio, y ese toque no hace nada más.
+  if (apretado && recVisible_ >= 0) {
+    cerrarRecordatorio();
+    motor_.interaccion(ahora);
+    tragarSoltar_ = true;
+    return;
+  }
+  if (!apretado && tragarSoltar_) {
+    tragarSoltar_ = false;
+    return;
+  }
+  // En modo reloj, tocarlo muestra la cara un rato.
+  if (apretado && config_.modo == Modo::Reloj) caraHasta_ = ahora + tiemposPanel::CARA_EN_RELOJ_MS;
   if (perfil_.boton == Perfil::Boton::Mascota) {
     gestos_.tacto(apretado, ahora);
     return;
@@ -612,7 +644,9 @@ void Sistema::botonBroche(bool apretado, uint32_t ahora) {
   if (qrPorBoton_) return;
   if (dur < tiemposBroche::TOQUE_MS) {
     motor_.interaccion(ahora);
-    siguiente();
+    // En pomodoro, el toque arranca o pausa; en reloj ya mostró la cara.
+    if (config_.modo == Modo::Pomodoro) pomoCorriendo_ = !pomoCorriendo_;
+    else if (config_.modo != Modo::Reloj) siguiente();
   } else if (dur >= tiemposBroche::DORMIR_MS) {
     dormir();
   }
@@ -626,6 +660,11 @@ void Sistema::dibujarPantalla(uint32_t ahora) {
   }
   if (emparejando_) {
     dibujarEmparejamiento(lienzo_, serie_, qr_, "ESPERANDO VÍNCULO", perfil_.redonda);
+    return;
+  }
+  if (panel_ != Panel::Ninguno && fasePanel_ > 0) {
+    dibujarPanel();
+    if (depurar_) dibujarDepuracion();
     return;
   }
   if (animVisible_ >= 0) {
@@ -690,14 +729,25 @@ void Sistema::tick() {
   if (dtCuadro > 0 && dtCuadro < 2000) fps_ = mezclar(fps_, 1000.0f / dtCuadro, 0.1f);
   gestos_.tick(ahora);
   Evento e;
-  while (gestos_.sacar(&e)) evento(e);
+  while (gestos_.sacar(&e)) {
+    // En pomodoro, un toque arranca o pausa (y el bicho igual reacciona).
+    if (e == Evento::Tacto && config_.modo == Modo::Pomodoro) pomoCorriendo_ = !pomoCorriendo_;
+    evento(e);
+  }
   // Inclinado: los ojos "caen" hacia donde está la gravedad.
   float gx, gy;
   if (gestos_.inclinacion(&gx, &gy)) motor_.seguir(-gx / 0.7f, -gy / 0.7f, ahora);
   vigilar(ahora);
+  revisarRecordatorios(ahora);
+  avanzarPomodoro(ahora, dtCuadro);
   motor_.tick(ahora, contexto());
-  // El broche, de noche y ya dormido, apaga la pantalla hasta la mañana.
-  if (perfil_.boton == Perfil::Boton::Broche && !apagado_ && !vistaPrevia_ && motor_.quiereSuenoProfundo()) dormir();
+  avanzarPanel(ahora, dtCuadro);
+  avanzarProtector(ahora, dtCuadro);
+  // El broche, de noche y ya dormido, apaga la pantalla hasta la mañana (no
+  // con un recordatorio en pantalla ni un pomodoro andando).
+  if (perfil_.boton == Perfil::Boton::Broche && !apagado_ && !vistaPrevia_ && motor_.quiereSuenoProfundo() &&
+      recVisible_ < 0 && !pomoCorriendo_)
+    dormir();
 
   // Manteniendo el botón del broche para dormirlo: se le cierran los ojos.
   if (perfil_.boton == Perfil::Boton::Broche && botonApretado_ && !ignorarSoltar_ &&
@@ -735,7 +785,9 @@ void Sistema::tick() {
     if (cargarCuadro(imagen, (animCuadro_ + 1) % animCuadros_, ahora)) imagenSucia_ = true;
   }
   if (imagen < 0) imagenPreparada_ = -1;
-  if (imagen >= 0 && imagen == mostrandoImagen_ && !imagenSucia_) {
+  // Entrando o saliendo del protector: la imagen sobre la cara, con fundido.
+  const float alfaImagen = imagen >= 0 && faseProtector_ > 0 ? suave(faseProtector_) : 1;
+  if (imagen >= 0 && imagen == mostrandoImagen_ && !imagenSucia_ && alfaImagen >= 1) {
     // La imagen ya está en la pantalla: no hace falta redibujarla.
     notificarEstadoSiCambio();
     return;
@@ -746,7 +798,8 @@ void Sistema::tick() {
   // De a una franja: en placas sin PSRAM no entra la pantalla entera.
   for (int y0 = 0; y0 < lienzo_.alto(); y0 += lienzo_.filasPorFranja()) {
     lienzo_.empezarFranja(y0);
-    if (imagenOk) imagenOk = dibujarImagen(imagen);
+    if (imagenOk && alfaImagen < 1) dibujarPantalla(ahora);
+    if (imagenOk) imagenOk = dibujarImagen(imagen, alfaImagen);
     if (!imagenOk) dibujarPantalla(ahora);
     if (hal_.presentarFranja) hal_.presentarFranja(lienzo_.pixeles(), lienzo_.ancho(), y0, lienzo_.filasFranja());
   }
@@ -761,6 +814,356 @@ void Sistema::tick() {
   notificarEstadoSiCambio();
 }
 
+// ---------------------------------------------------------------- recordatorios, reloj y pomodoro
+
+namespace {
+// Un texto partido en líneas: [ini, fin) de cada una, en bytes.
+constexpr int MAX_LINEAS = 4;
+struct Lineas {
+  int n = 0;
+  uint8_t ini[MAX_LINEAS], fin[MAX_LINEAS];
+};
+
+float anchoTramo(const Fuente& f, const char* s, int a, int b) {
+  char t[LARGO_RECORDATORIO];
+  copiarTexto(t, sizeof t, s + a, static_cast<size_t>(b - a));
+  return anchoTexto(f, t);
+}
+
+// Parte `s` en hasta `max` líneas, la i-ésima de `anchos[i]` píxeles como
+// mucho. Sin `cortar`, solo entre palabras. false si no entra.
+bool partir(const Fuente& f, const char* s, const float* anchos, int max, bool cortar, Lineas* l) {
+  const int n = static_cast<int>(largo(s));
+  int pos = 0;
+  l->n = 0;
+  while (true) {
+    while (pos < n && s[pos] == ' ') pos++;
+    if (pos >= n) break;
+    if (l->n >= max) return false;
+    const float w = anchos[l->n];
+    int fin = pos, k = pos;
+    while (k < n) {
+      int e = k;
+      while (e < n && s[e] != ' ') e++;
+      if (anchoTramo(f, s, pos, e) > w) break;
+      fin = e;
+      k = e;
+      while (k < n && s[k] == ' ') k++;
+    }
+    if (fin == pos) {
+      // Una palabra que no entra: se corta por letras (sin partir una tilde).
+      if (!cortar) return false;
+      int e = pos;
+      while (e < n) {
+        int sig = e + 1;
+        while (sig < n && (static_cast<uint8_t>(s[sig]) & 0xC0) == 0x80) sig++;
+        if (e > pos && anchoTramo(f, s, pos, sig) > w) break;
+        e = sig;
+      }
+      fin = e;
+    }
+    l->ini[l->n] = static_cast<uint8_t>(pos);
+    l->fin[l->n] = static_cast<uint8_t>(fin);
+    l->n++;
+    pos = fin;
+  }
+  return l->n > 0;
+}
+
+// Las fuentes mono solo tienen mayúsculas (con tildes y Ñ).
+void aMayusculas(char* s) {
+  for (; *s; s++) {
+    const uint8_t c = static_cast<uint8_t>(*s);
+    if (c >= 'a' && c <= 'z') *s = static_cast<char>(c - 32);
+    else if (c == 0xC3 && s[1] && static_cast<uint8_t>(s[1]) >= 0xA0 && static_cast<uint8_t>(s[1]) <= 0xBE &&
+             static_cast<uint8_t>(s[1]) != 0xB7)
+      s[1] = static_cast<char>(static_cast<uint8_t>(s[1]) - 0x20), s++;
+  }
+}
+
+int minutosEntre(int desde, int hasta) { return ((hasta - desde) % 1440 + 1440) % 1440; }
+}  // namespace
+
+void Sistema::sonar(const char* nombre) {
+  // "voz": volumen 0 silencia todo.
+  if (hal_.sonido && config_.voz.volumen > 0) hal_.sonido(nombre);
+}
+
+// Un evento que genera el sistema (recordatorio, pomodoro): además del
+// registro, se avisa ya, como una respuesta de Registro, por BLE y por la
+// nube: [evento] o, un recordatorio, [evento 31][tipo 4 con su índice].
+void Sistema::notificarEvento(Evento e, int recordatorio) {
+  using namespace protocolo;
+  EntradaRegistro r[1];
+  const uint32_t seg = motor_.registro(r, 1) == 1 ? r[0].segundos : 0;
+  uint8_t b[3 + 2 * 6];
+  size_t n = 3;
+  b[0] = static_cast<uint8_t>(CmdRegistro | Respuesta);
+  b[1] = Ok;
+  b[2] = recordatorio >= 0 ? 2 : 1;
+  escribir32(b + n, seg);
+  b[n + 4] = 0;
+  b[n + 5] = static_cast<uint8_t>(e);
+  n += 6;
+  if (recordatorio >= 0) {
+    escribir32(b + n, seg);
+    b[n + 4] = 4;
+    b[n + 5] = static_cast<uint8_t>(recordatorio);
+    n += 6;
+  }
+  if (hal_.notificar) hal_.notificar(CarComando, b, n);
+  if (hal_.notificarNube) hal_.notificarNube(CarComando, b, n);
+}
+
+int Sistema::segundosHastaDespertar() const {
+  int s = motor_.segundosHastaDespertar();
+  const int m = minutoDelDia();
+  if (m < 0) return s;
+  const uint32_t e = epoch();
+  const int seg = e ? static_cast<int>(e % 60u) : 0;
+  for (int i = 0; i < config_.nRecordatorios; i++) {
+    const Recordatorio& r = config_.recordatorios[i];
+    if (!r.activo) continue;
+    int d = minutosEntre(m, r.minuto);
+    if (d == 0) d = 1440;
+    const int x = maxi(1, d * 60 - seg);
+    if (s < 0 || x < s) s = x;
+  }
+  return s;
+}
+
+void Sistema::revisarRecordatorios(uint32_t ahora) {
+  if (vistaPrevia_ || config_.nRecordatorios == 0) return;
+  const int m = minutoDelDia();
+  if (m < 0 || m == recMinuto_) return;
+  recMinuto_ = static_cast<int16_t>(m);
+  const uint32_t e = epoch();
+  for (int i = 0; i < config_.nRecordatorios; i++) {
+    const Recordatorio& r = config_.recordatorios[i];
+    if (!r.activo) continue;
+    // Hasta un minuto tarde (el broche se despierta del sueño profundo justo a la hora).
+    const int tarde = minutosEntre(r.minuto, m);
+    if (tarde > 1) continue;
+    if (e) {
+      // Con fecha: el día de la semana y una vez por día.
+      const uint32_t dia = (e - static_cast<uint32_t>(tarde) * 60u) / 86400u;
+      const int semana = static_cast<int>((dia + 3) % 7);  // el 1/1/1970 fue jueves; 0 = lunes
+      if (!(r.dias & (1u << semana))) continue;
+      const uint16_t clave = static_cast<uint16_t>(dia + 1);
+      if (recDia_[i] == clave) continue;
+      recDia_[i] = clave;
+    } else {
+      // Solo con el minuto del día: no se sabe qué día es (solo los de todos
+      // los días) y se dispara al entrar en el minuto.
+      if (r.dias != 0x7F || tarde != 0) continue;
+    }
+    if (recVisible_ >= 0 || (panel_ == Panel::Recordatorio && fasePanel_ > 0)) recPendientes_ |= static_cast<uint16_t>(1u << i);
+    else mostrarRecordatorio(i, ahora);
+  }
+}
+
+void Sistema::mostrarRecordatorio(int i, uint32_t ahora) {
+  const Recordatorio& r = config_.recordatorios[i];
+  recVisible_ = static_cast<int8_t>(i);
+  recDesde_ = ahora;
+  copiarTexto(recTexto_, sizeof recTexto_, r.texto);
+  size_t k = copiarTexto(recNombre_, sizeof recNombre_, "recordatorio:");
+  if (i >= 10) recNombre_[k++] = static_cast<char>('0' + i / 10);
+  recNombre_[k++] = static_cast<char>('0' + i % 10);
+  recNombre_[k] = 0;
+  if (motor_.dormido()) motor_.despertar(ahora, false);
+  Config::Cara c;
+  c.vida = r.caraVida, c.dibujo = r.caraDibujo;
+  motor_.fijar(c);  // por los resortes: la cara cambia sin corte
+  if (r.sonido) sonar("recordatorio");
+  evento(Evento::Recordatorio);
+  motor_.anotarRegistro(4, static_cast<uint8_t>(i));
+  notificarEvento(Evento::Recordatorio, i);
+  log("recordatorio");
+}
+
+void Sistema::cerrarRecordatorio() {
+  if (recVisible_ < 0) return;
+  recVisible_ = -1;
+  motor_.fijar(fijaGuardada_);
+}
+
+void Sistema::reiniciarPomodoro() {
+  pomoCorriendo_ = false;
+  pomoDescanso_ = false;
+  pomoRestanteMs_ = config_.pomodoro.trabajo * 60000u;
+}
+
+const char* Sistema::nombrePomodoro() const {
+  if (!pomoCorriendo_) return "pomodoro:pausa";
+  return pomoDescanso_ ? "pomodoro:descanso" : "pomodoro:trabajo";
+}
+
+void Sistema::avanzarPomodoro(uint32_t ahora, uint32_t dt) {
+  if (config_.modo != Modo::Pomodoro || !pomoCorriendo_) return;
+  if (dt < pomoRestanteMs_) {
+    pomoRestanteMs_ -= dt;
+    return;
+  }
+  // Terminó el tramo: avisa y pasa solo al siguiente (uno por cuadro, aunque
+  // haya pasado mucho tiempo).
+  dt -= pomoRestanteMs_;
+  const bool eraTrabajo = !pomoDescanso_;
+  pomoDescanso_ = eraTrabajo;
+  pomoRestanteMs_ = (pomoDescanso_ ? config_.pomodoro.descanso : config_.pomodoro.trabajo) * 60000u;
+  pomoRestanteMs_ -= dt < pomoRestanteMs_ ? dt : pomoRestanteMs_ - 1;
+  motor_.reaccionar(config_.resolverCara(eraTrabajo ? "sorpresa" : "contento"), ahora);
+  sonar("pomodoro");
+  evento(Evento::Pomodoro);
+  notificarEvento(Evento::Pomodoro);
+}
+
+void Sistema::avanzarPanel(uint32_t ahora, uint32_t dt) {
+  if (recVisible_ >= 0 && ahora - recDesde_ >= tiemposPanel::RECORDATORIO_MS) cerrarRecordatorio();
+  // Los que vencieron mientras se veía otro, cuando ese ya se fue.
+  if (recVisible_ < 0 && recPendientes_ && (panel_ != Panel::Recordatorio || fasePanel_ <= 0)) {
+    int i = 0;
+    while (!(recPendientes_ & (1u << i))) i++;
+    recPendientes_ = static_cast<uint16_t>(recPendientes_ & ~(1u << i));
+    if (i < config_.nRecordatorios) mostrarRecordatorio(i, ahora);
+  }
+  Panel deseado = Panel::Ninguno;
+  if (recVisible_ >= 0) deseado = Panel::Recordatorio;
+  else if (config_.modo == Modo::Reloj && static_cast<int32_t>(ahora - caraHasta_) >= 0) deseado = Panel::Reloj;
+  else if (config_.modo == Modo::Pomodoro) deseado = Panel::Pomodoro;
+  // Nunca un corte: si cambia lo que se muestra, primero se va lo que había.
+  const float paso = static_cast<float>(dt < 200 ? dt : 200) / tiemposPanel::FUNDIDO_MS;
+  if (deseado != panel_) {
+    fasePanel_ -= paso;
+    if (fasePanel_ <= 0) {
+      fasePanel_ = 0;
+      panel_ = deseado;
+    }
+  } else if (panel_ != Panel::Ninguno) {
+    fasePanel_ = minf(1, fasePanel_ + paso);
+  }
+}
+
+// El protector de pantalla: después de `espera` segundos sin que pase nada,
+// la imagen elegida con un fundido; cualquier cosa vuelve a la cara.
+void Sistema::avanzarProtector(uint32_t ahora, uint32_t dt) {
+  const int img = config_.protector.imagen;
+  // Una reacción o un reflejo también es "que pase algo".
+  if (motor_.reaccionando(ahora)) ultimaActividad_ = ahora;
+  const bool hay = img >= 0 && img < MAX_IMAGENES && imagenes_[img].largo > 0 && subiendo_ != img;
+  if (!hay) {
+    faseProtector_ = 0;  // sin imagen (o se está subiendo otra): no hay protector
+    return;
+  }
+  const bool quiere = !apagado_ && !emparejando_ && !motor_.dormido() && recVisible_ < 0 && animPedida_ < 0 &&
+                      ahora - ultimaActividad_ >= config_.protector.espera * 1000u;
+  const float paso = static_cast<float>(dt < 200 ? dt : 200) / tiemposPanel::FUNDIDO_MS;
+  const float antes = faseProtector_;
+  faseProtector_ = quiere ? minf(1, faseProtector_ + paso) : maxf(0, faseProtector_ - paso);
+  // Al terminar de entrar, un último cuadro con la imagen entera.
+  if (faseProtector_ >= 1 && antes < 1) imagenSucia_ = true;
+}
+
+void Sistema::dibujarPanel() {
+  const float f = suave(fasePanel_);
+  const float W = static_cast<float>(lienzo_.ancho()), H = static_cast<float>(lienzo_.alto());
+  const bool redonda = perfil_.redonda;
+  // La cara se achica y sube; abajo aparece el texto.
+  VistaRostro v = vistaRostro_;
+  v.unidad = mezclar(v.unidad, v.unidad * 0.45f, f);
+  v.origenY = mezclar(v.origenY, H * 0.27f, f);
+  dibujarRostro(lienzo_, v, motor_.cuadro());
+  const int dibujo = motor_.dibujo();
+  const float op = motor_.opacidadDibujo() * (1 - f);
+  if (dibujo >= 0 && op > 0.001f) {
+    lienzo_.opacidad(op);
+    dibujarExpresion(lienzo_, vista_, config_.expresiones[dibujo], motor_.estado());
+  }
+  lienzo_.opacidad(f);
+  const float cx = W / 2;
+  if (panel_ == Panel::Recordatorio) {
+    // Centrado y, si hace falta, en varias líneas que entren en la pantalla
+    // (en la redonda, en el ancho del círculo a esa altura).
+    const float cy = H * 0.66f;
+    struct Intento {
+      const Fuente* f;
+      int max;
+      bool cortar, mayus;
+    };
+    const Intento intentos[] = {{&fuentes::VOZ_20, redonda ? 3 : 2, false, false},
+                                {&fuentes::VOZ_20, redonda ? 3 : 2, true, false},
+                                {&fuentes::MONO_13, 3, true, true},
+                                {&fuentes::MONO_9, 4, true, true}};
+    char t[LARGO_RECORDATORIO];
+    Lineas l;
+    const Fuente* fu = &fuentes::MONO_9;
+    float top = 0, lh = 0;
+    for (const Intento& in : intentos) {
+      copiarTexto(t, sizeof t, recTexto_);
+      if (in.mayus) aMayusculas(t);
+      fu = in.f;
+      lh = static_cast<float>(fu->ascenso + fu->descenso);
+      bool ok = false;
+      for (int n = 1; n <= in.max && !ok; n++) {
+        float anchos[MAX_LINEAS];
+        top = cy - n * lh / 2;
+        for (int i = 0; i < n; i++) {
+          if (!redonda) {
+            anchos[i] = W - 32;
+            continue;
+          }
+          const float y0 = top + i * lh, y1 = y0 + lh, r = W / 2 - 10;
+          const float dy = maxf(absf(y0 - H / 2), absf(y1 - H / 2));
+          anchos[i] = 2 * raiz(r * r - dy * dy) - 8;
+        }
+        ok = partir(*fu, t, anchos, n, in.cortar, &l);
+      }
+      if (ok) break;
+    }
+    for (int i = 0; i < l.n; i++) {
+      char linea[LARGO_RECORDATORIO];
+      copiarTexto(linea, sizeof linea, t + l.ini[i], l.fin[i] - l.ini[i]);
+      dibujarTexto(lienzo_, *fu, linea, cx - anchoTexto(*fu, linea) / 2, top + i * lh + fu->ascenso, paleta::TINTA);
+    }
+  } else if (panel_ == Panel::Reloj) {
+    char t[6] = "--:--";
+    const int m = minutoDelDia();
+    if (m >= 0) {
+      t[0] = static_cast<char>('0' + m / 600), t[1] = static_cast<char>('0' + (m / 60) % 10);
+      t[3] = static_cast<char>('0' + (m % 60) / 10), t[4] = static_cast<char>('0' + m % 10);
+    }
+    const Fuente& fu = fuentes::VOZ_20;
+    const float esc = redonda ? 2.4f : 2.8f;
+    const float alto = fu.ascenso * 0.72f * esc;
+    dibujarTextoEscalado(lienzo_, fu, t, cx - anchoTexto(fu, t) * esc / 2, H * (redonda ? 0.64f : 0.68f) + alto / 2, esc,
+                         paleta::TINTA);
+  } else if (panel_ == Panel::Pomodoro) {
+    // La cuenta regresiva, una barra de progreso y en qué tramo va.
+    const uint32_t s = (pomoRestanteMs_ + 999) / 1000;
+    const uint32_t mm = s / 60, ss = s % 60;
+    char t[8];
+    int k = 0;
+    if (mm >= 100) t[k++] = static_cast<char>('0' + mm / 100);
+    t[k++] = static_cast<char>('0' + (mm / 10) % 10), t[k++] = static_cast<char>('0' + mm % 10), t[k++] = ':';
+    t[k++] = static_cast<char>('0' + ss / 10), t[k++] = static_cast<char>('0' + ss % 10), t[k] = 0;
+    const Fuente& fu = fuentes::VOZ_20;
+    const float esc = redonda ? 2.0f : 2.4f;
+    const float alto = fu.ascenso * 0.72f * esc;
+    const float base = H * (redonda ? 0.60f : 0.62f) + alto / 2;
+    dibujarTextoEscalado(lienzo_, fu, t, cx - anchoTexto(fu, t) * esc / 2, base, esc, paleta::TINTA);
+    const float total = (pomoDescanso_ ? config_.pomodoro.descanso : config_.pomodoro.trabajo) * 60000.0f;
+    const float progreso = limitar(1 - pomoRestanteMs_ / total, 0, 1);
+    const float bw = W * (redonda ? 0.5f : 0.6f), by = base + 12, bh = 5;
+    lienzo_.pildora(cx, by, bw, bh, bh / 2, paleta::LINEA);
+    const float pw = bw * progreso;
+    if (pw >= 1) lienzo_.pildora(cx - bw / 2 + pw / 2, by, pw, bh, minf(bh / 2, pw / 2), paleta::NARANJA);
+    const char* etiqueta = !pomoCorriendo_ ? "PAUSA" : (pomoDescanso_ ? "DESCANSO" : "TRABAJO");
+    dibujarTexto(lienzo_, fuentes::MONO_9, etiqueta, cx - anchoTexto(fuentes::MONO_9, etiqueta) / 2, by + 18,
+                 paleta::TINTA_SUAVE);
+  }
+  lienzo_.opacidad(1);
+}
+
 size_t Sistema::estadoBle(uint8_t* salida, size_t cap) const {
   protocolo::EstadoPublico p;
   const int bat = hal_.bateria ? hal_.bateria() : -1;
@@ -771,7 +1174,11 @@ size_t Sistema::estadoBle(uint8_t* salida, size_t cap) const {
   p.fija = motor_.hayFija();
   p.emparejando = emparejando_;
   p.autenticado = autenticado_;
-  p.expresion = animVisible_ >= 0 ? visible_ : motor_.nombreVisible();
+  // Un recordatorio en pantalla es "recordatorio:<n>"; el pomodoro,
+  // "pomodoro:trabajo", "pomodoro:descanso" o "pomodoro:pausa".
+  if (recVisible_ >= 0) p.expresion = recNombre_;
+  else if (config_.modo == Modo::Pomodoro) p.expresion = nombrePomodoro();
+  else p.expresion = animVisible_ >= 0 ? visible_ : motor_.nombreVisible();
   p.nombre = nombre();
   p.serie = serie_;
   p.id = id_;
@@ -1157,6 +1564,7 @@ void Sistema::nubeEscribir(uint8_t car, const uint8_t* d, size_t n) {
 void Sistema::procesar(uint8_t car, const uint8_t* d, size_t n) {
   using namespace protocolo;
   if (n < 1) return;
+  actividad();  // un comando de la app (una expresión fija, la hora...) saca el protector
   const uint8_t op = d[0];
   const uint32_t ahora = hal_.ahoraMs();
 
@@ -1227,6 +1635,8 @@ void Sistema::procesar(uint8_t car, const uint8_t* d, size_t n) {
       case ConfigFin: {
         Codigo c = receptor_.fin();
         if (c != Ok) return responder(car, op, c);
+        const Modo modoAntes = config_.modo;
+        const TramosPomodoro tramosAntes = config_.pomodoro;
         ResultadoConfig r = cargarConfig(config_, receptor_.texto(), receptor_.largo());
         if (!r.ok()) {
           // config_ quedó con la base: se vuelve a la que estaba guardada.
@@ -1244,6 +1654,14 @@ void Sistema::procesar(uint8_t car, const uint8_t* d, size_t n) {
         guardarAjustes();
         // El motor sigue con su estado y su memoria: solo cambian los datos.
         motor_.reconfigurar(&config_);
+        // Los recordatorios cambiaron: el que se veía se va con un fundido
+        // (su texto quedó copiado) y se revisa de nuevo el minuto actual.
+        recVisible_ = -1;
+        recPendientes_ = 0;
+        recMinuto_ = -1;
+        if (config_.modo != modoAntes || config_.pomodoro.trabajo != tramosAntes.trabajo ||
+            config_.pomodoro.descanso != tramosAntes.descanso)
+          reiniciarPomodoro();
         motor_.fijar(fijaGuardada_);
         aplicarLista(hal_.ahoraMs());
         evento(Evento::CambioDeCara);

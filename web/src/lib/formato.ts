@@ -10,7 +10,7 @@ export const EVENTOS = [
   'tacto', 'doble-toque', 'levantado', 'sacudida', 'boca-abajo', 'vinculado', 'app-abierta', 'despertado',
   'caricia', 'muchos-toques', 'sacudida-suave', 'sacudida-fuerte', 'inclinado', 'caida', 'voz', 'nombre',
   'ruido', 'musica', 'silencio', 'notificacion', 'llamada', 'bateria-baja', 'bateria-critica', 'enchufado',
-  'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito',
+  'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito', 'recordatorio', 'pomodoro',
 ] as const;
 export const NOMBRES_EVENTO: Record<string, string> = {
   tacto: 'Lo tocan', 'doble-toque': 'Doble toque', levantado: 'Lo levantan', sacudida: 'Lo sacuden (cualquiera)',
@@ -21,8 +21,19 @@ export const NOMBRES_EVENTO: Record<string, string> = {
   llamada: 'Una llamada', 'bateria-baja': 'Batería baja (20 %)', 'bateria-critica': 'Batería crítica (5 %)',
   enchufado: 'Lo enchufan', desenchufado: 'Lo desenchufan', cargado: 'Carga completa', 'sin-wifi': 'Se queda sin WiFi',
   'cambio-de-cara': 'Le cambian la cara', 'bicho-cerca': 'Otro bicho cerca', volvio: 'Volvés después de un rato',
-  hito: 'Un hito (días juntos, caricias, cumpleaños)',
+  hito: 'Un hito (días juntos, caricias, cumpleaños)', recordatorio: 'Muestra un recordatorio', pomodoro: 'Termina una tanda',
 };
+
+// El robot cuenta los textos en bytes UTF-8 (una tilde ocupa 2): se corta sin partir una letra.
+export function cortarBytes(t: string, max: number): string {
+  const c = new TextEncoder();
+  let r = '';
+  for (const letra of t) {
+    if (c.encode(r + letra).length > max) break;
+    r += letra;
+  }
+  return r;
+}
 
 // --- Motor de vida (config v2) ---
 export const RASGOS = ['energia', 'sociabilidad', 'picardia', 'timidez', 'curiosidad', 'malGenio'] as const;

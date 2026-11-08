@@ -208,8 +208,66 @@ Una config v1 sigue siendo válida (su `personalidad.sueno` pasa al horario).
   `veces`, `mirada`, `parpadeo`, `particula`, `cuantas`, `peso`, `sonido`, `estado`).
 - `reglas`: `si`, `y` (condiciones extra) y hasta 6 acciones.
 
+- `recordatorios` (hasta 12): `hora` `"HH:MM"` (obligatoria), `dias` (letras
+  de `L M X J V S D`, lunes a domingo, sin repetir y en cualquier orden; vacío
+  u omitido = todos los días), `texto` (obligatorio, de 1 a 40 **bytes** UTF-8:
+  una tilde ocupa 2, como el nombre del dueño), `expresion` (una que exista; por
+  defecto `sorpresa`), `sonido` y `activo` (por defecto `true`). En la RAM van
+  compactos (`Recordatorio`: minuto del día en `uint16`, días en una máscara
+  `uint8`, el texto en `char[41]`, la cara ya resuelta).
+- `voz` (todo opcional): `volumen` y `microfono` de 0 a 1 (por defecto 0,7 y
+  0,6; se guardan en centésimos), `tipo` `grave|media|aguda|robot` (`media`),
+  `palabra` de 1 a 16 bytes (vacía = su nombre) y `conversar` (`false`). Hoy
+  solo se guarda y se valida (los modelos con parlante llegan después);
+  `volumen` 0 silencia todos los sonidos (`Sistema::sonar`).
+- `pomodoro`: `trabajo` (1 a 120 minutos, 25) y `descanso` (1 a 60, 5).
+- `protector`: `imagen` (el espacio, 0 a 7, obligatorio) y `espera` (3 a 3600
+  segundos, 10).
+- `modo`: `mascota` (la cara), `reloj` y `pomodoro` (abajo). `clima` y
+  `notificaciones` necesitan datos de la nube que todavía no llegan: hasta
+  entonces se comportan como `mascota`.
+
 Límites (iguales en todos lados porque valida el mismo núcleo): 48 expresiones
-paramétricas, 64 comportamientos, 24 reglas propias (+ las base), 16 KB.
+paramétricas, 64 comportamientos, 24 reglas propias (+ las base), 12
+recordatorios, 16 KB.
+
+### Recordatorios, reloj y pomodoro en el bicho (`Sistema`)
+
+Los tres usan el mismo **panel**: la cara se achica (al 45 %) y sube, y abajo
+aparece el texto, con un fundido de 400 ms (`tiemposPanel::FUNDIDO_MS`). Si
+cambia lo que se muestra (llega un recordatorio en modo reloj), primero se va
+lo que había y después entra lo nuevo: nunca un corte. El texto usa las fuentes
+de `texto.h`: el del recordatorio va centrado en Fraunces 20 en hasta 2 líneas
+(3 en la redonda, con el ancho del círculo a esa altura) y, si no entra, en mono
+mayúscula; la hora y la cuenta del pomodoro, en Fraunces agrandada
+(`dibujarTextoEscalado`).
+
+- **Recordatorio**: con la hora local (la del motor: `Hal::minutoDelDia`/`epoch`
+  o la del comando Hora), cuando entra el minuto de uno activo de un día que
+  corresponde (hasta 1 minuto tarde) y no se disparó hoy: muestra el texto,
+  fija la expresión pedida (por los resortes), `sonido("recordatorio")` si
+  `sonido`, y el evento `recordatorio` (registro, reglas y aviso a la nube,
+  ver protocolo-ble.md). Queda hasta que lo tocan (ese toque no hace nada más)
+  o 2 minutos. Si estaba dormido, se despierta; el broche programa el
+  despertador del sueño profundo para el próximo. Sin fecha (solo el minuto del
+  día) se disparan solo los de todos los días. Dos a la vez: el segundo espera.
+- **Reloj**: `HH:MM` grande (`--:--` sin hora) con los ojos chiquitos arriba,
+  que siguen vivos. Un toque muestra la cara 15 s y vuelve al reloj.
+- **Pomodoro**: `MM:SS`, una barra de progreso y `TRABAJO`/`DESCANSO`/`PAUSA`.
+  Empieza en pausa; un toque arranca o pausa (en el broche, el botón). Al
+  terminar cada tramo: `sorpresa` (terminó el trabajo) o `contento` (terminó el
+  descanso), `sonido("pomodoro")`, el evento `pomodoro` y sigue solo con el
+  otro tramo. Cambiar el modo o los tramos lo reinicia.
+- **Protector de pantalla** (`Sistema::avanzarProtector`): si la imagen del
+  espacio existe, después de `espera` segundos sin que pase nada se muestra en
+  pantalla completa (QOI o animación, en loop: la misma vía de las imágenes de
+  la lista, sin las "vueltas de la cara") con un fundido de 400 ms
+  (`Lienzo::filaMezclada` sobre la cara). Cualquier toque, evento (movimiento,
+  levantado, sacudida, pomodoro, recordatorio…), comando de la app o reacción
+  del motor vuelve a la cara con fundido, y la cuenta empieza de nuevo. Dormido
+  duerme normal; un recordatorio siempre le gana; sin la imagen, se ignora.
+  Pensado para la joyería: una animación que se ve siempre y, al tocarla, la
+  carita.
 
 Los datos base se embeben con `npm run caras` (`firmware/herramientas/embeber_caras.py`
 genera `vida_base.h`); cada uno se parsea por separado al arrancar.
@@ -270,6 +328,7 @@ prueban en C++, JS, Go, Kotlin y Swift.
 - Micrófono y parlante (el cubito): voz, nombre, ruido, música y "hablando"
   existen como eventos y caras, pero hoy solo llegan por comando.
 - Bicho cerca por BLE y la "conversación" entre dos bichos.
+- Los modos `clima` y `notificaciones` (necesitan que la nube mande los datos).
 - La app todavía no muestra el diario ni tiene los editores de expresiones y
   comportamientos (están en la web); sí la personalidad, los presets y el horario.
 - iOS sigue sin compilarse en este entorno (no hay Xcode): revisar en la Mac.

@@ -3,7 +3,7 @@
   // un sonido) hasta que lo tocás. Si está apagado y tenés Telegram vinculado,
   // te llega por ahí.
   import { usarBicho } from '$lib/bicho.svelte';
-  import { MAX_RECORDATORIOS, type Recordatorio } from '$lib/formato';
+  import { cortarBytes, MAX_RECORDATORIOS, type Recordatorio } from '$lib/formato';
   import { usarGuardado } from '../guardado.svelte';
   import type { Modelo } from '../modelo';
 
@@ -66,7 +66,8 @@
         <label class="visor texto-r">
           <span class="grabado">Te dice</span>
           <input class="campo claro" type="text" maxlength="40" value={r.texto} placeholder="Tomar la pastilla"
-            onchange={(e) => { const v = e.currentTarget.value.trim(); if (v) cambiar(i, (x) => (x.texto = v)); else e.currentTarget.value = r.texto; }} />
+            oninput={(e) => { const v = cortarBytes(e.currentTarget.value, 40); if (v !== e.currentTarget.value) e.currentTarget.value = v; }}
+            onchange={(e) => { const v = cortarBytes(e.currentTarget.value.trim(), 40); if (v) cambiar(i, (x) => (x.texto = v)); else e.currentTarget.value = r.texto; }} />
         </label>
         <div class="dias" role="group" aria-label="Días">
           {#each DIAS as [l, n]}

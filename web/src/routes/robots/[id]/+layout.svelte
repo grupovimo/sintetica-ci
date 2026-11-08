@@ -31,7 +31,7 @@
     { ruta: '/historial', nombre: 'Historial', icono: 'M12 7v5l3 2 M3 12a9 9 0 1 0 3-6.7L3 8 M3 3v5h5' },
   ];
   // Las herramientas ya rehechas en el lenguaje de la consola (las demás, en el monitor de siempre).
-  const NUEVAS = ['/expresiones'];
+  const NUEVAS = ['/expresiones', '/comportamientos', '/reglas'];
   const nueva = $derived(NUEVAS.some((r) => page.url.pathname === base + r));
   const nombre = $derived(b.bicho?.apodo || b.bicho?.estado?.nombre || b.config.nombre || 'Tu robot');
   const modelo = $derived(b.bicho ? modeloDe(b.bicho) : null);

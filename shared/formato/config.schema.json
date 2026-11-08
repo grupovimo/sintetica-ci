@@ -141,7 +141,7 @@
         "properties": {
           "si": {
             "type": "string",
-            "description": "Un evento (tacto, toque, doble-toque, levantado, sacudida, boca-abajo, vinculado, app-abierta, despertado, caricia, muchos-toques, sacudida-suave, sacudida-fuerte, inclinado, caida, voz, nombre, ruido, musica, silencio, notificacion, llamada, bateria-baja, bateria-critica, enchufado, desenchufado, cargado, sin-wifi, cambio-de-cara, bicho-cerca, volvio, hito; también con _ o . en vez de -, como \"sacudida.fuerte\") o una condición de estado (bateria<15, humor>0.5).",
+            "description": "Un evento (tacto, toque, doble-toque, levantado, sacudida, boca-abajo, vinculado, app-abierta, despertado, caricia, muchos-toques, sacudida-suave, sacudida-fuerte, inclinado, caida, voz, nombre, ruido, musica, silencio, notificacion, llamada, bateria-baja, bateria-critica, enchufado, desenchufado, cargado, sin-wifi, cambio-de-cara, bicho-cerca, volvio, hito, recordatorio, pomodoro; también con _ o . en vez de -, como \"sacudida.fuerte\") o una condición de estado (bateria<15, humor>0.5).",
             "pattern": "^([a-z][a-z._-]*|(bateria|humor)[<>]-?[0-9]+(\\.[0-9]+)?)$"
           },
           "entonces": {
@@ -162,6 +162,7 @@
       }
     },
     "modo": {
+      "description": "Qué muestra: mascota (la cara), reloj (la hora grande con los ojos chiquitos arriba), pomodoro (cuenta regresiva; ver \"pomodoro\"). clima y notificaciones necesitan datos de la nube: hasta que lleguen, se comporta como mascota.",
       "enum": [
         "mascota",
         "reloj",
@@ -250,9 +251,127 @@
       "additionalProperties": {
         "$ref": "#/$defs/comportamiento"
       }
+    },
+    "recordatorios": {
+      "type": "array",
+      "maxItems": 12,
+      "description": "Avisos a una hora: el bicho muestra el texto con una expresión hasta que lo toquen (o 2 minutos) y avisa a la nube (evento recordatorio).",
+      "items": {
+        "$ref": "#/$defs/recordatorio"
+      }
+    },
+    "voz": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "La voz y el oído (los modelos con parlante y micrófono). Hoy el bicho la guarda y la valida; volumen 0 silencia los sonidos.",
+      "properties": {
+        "volumen": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.7
+        },
+        "tipo": {
+          "enum": ["grave", "media", "aguda", "robot"],
+          "default": "media"
+        },
+        "palabra": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "description": "La palabra para llamarlo (de 1 a 16 bytes en UTF-8: una tilde ocupa 2). Si no está, su nombre."
+        },
+        "conversar": {
+          "type": "boolean",
+          "default": false
+        },
+        "microfono": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.6,
+          "description": "Sensibilidad del micrófono."
+        }
+      }
+    },
+    "protector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["imagen"],
+      "description": "Protector de pantalla: después de `espera` segundos sin que pase nada, muestra esa imagen (o animación) en pantalla completa, con un fundido; cualquier interacción, evento o comando vuelve a la cara. Si la imagen no está, no hace nada. Dormido o con un recordatorio, no aparece.",
+      "properties": {
+        "imagen": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7,
+          "description": "El espacio de la imagen (0 a 7)."
+        },
+        "espera": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 3600,
+          "default": 10,
+          "description": "Segundos sin que pase nada."
+        }
+      }
+    },
+    "pomodoro": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Los tramos del modo pomodoro, en minutos.",
+      "properties": {
+        "trabajo": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120,
+          "default": 25
+        },
+        "descanso": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "default": 5
+        }
+      }
     }
   },
   "$defs": {
+    "recordatorio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hora", "texto"],
+      "properties": {
+        "hora": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+          "description": "Hora local, HH:MM."
+        },
+        "dias": {
+          "type": "string",
+          "pattern": "^(?!.*(.).*\\1)[LMXJVSD]{0,7}$",
+          "description": "Letras de L M X J V S D (lunes a domingo), sin repetir y en cualquier orden. Vacío u omitido: todos los días."
+        },
+        "texto": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "description": "Lo que muestra, de 1 a 40 bytes en UTF-8 (una tilde ocupa 2: el bicho cuenta bytes)."
+        },
+        "expresion": {
+          "$ref": "#/$defs/nombreExpresion",
+          "default": "sorpresa",
+          "description": "Una expresión que exista (base o propia)."
+        },
+        "sonido": {
+          "type": "boolean",
+          "default": true
+        },
+        "activo": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
     "colorHex": {
       "type": "string",
       "pattern": "^#[0-9A-Fa-f]{6}$"

@@ -130,7 +130,7 @@ veces más rápido.
 | `0x1B` Vida | — o `[u8 superposición]` | Responde el estado del motor de vida (abajo); con `1`/`0` prende o apaga la superposición de depuración en la pantalla (v1.4). |
 | `0x1C` Memoria | — | Responde `[0x9C][0x00][memoria, 112 bytes]` (v1.4). |
 | `0x1D` Restaurar | memoria (112 bytes, con su CRC) | La reemplaza: la mudanza a otra placa (v1.4). |
-| `0x1E` Registro | — | Responde `[0x9E][0x00][n][n × (u32 segundos desde que arrancó, u8 tipo, u8 dato)]`: tipo 0 evento, 1 comportamiento, 2 dormir (1) / despertar (0), 3 hito (v1.4). |
+| `0x1E` Registro | — | Responde `[0x9E][0x00][n][n × (u32 segundos desde que arrancó, u8 tipo, u8 dato)]`: tipo 0 evento, 1 comportamiento, 2 dormir (1) / despertar (0), 3 hito (v1.4), 4 recordatorio (dato: su índice). |
 | `0x1F` Comportamiento | nombre | Empieza ese comportamiento ya (para probarlo desde un editor). `0x07` si no existe (v1.4). |
 
 Eventos (el índice del comando `0x12`; los nombres son los de las reglas):
@@ -144,10 +144,31 @@ Eventos (el índice del comando `0x12`; los nombres son los de las reglas):
 | `16` ruido | `17` musica | `18` silencio | `19` notificacion |
 | `20` llamada | `21` bateria-baja | `22` bateria-critica | `23` enchufado |
 | `24` desenchufado | `25` cargado | `26` sin-wifi | `27` cambio-de-cara |
-| `28` bicho-cerca | `29` volvio | `30` hito | |
+| `28` bicho-cerca | `29` volvio | `30` hito | `31` recordatorio |
+| `32` pomodoro | | | |
 
 Los 8 primeros son de la v1; del 8 en adelante, del motor de vida (v1.4).
-`volvio` y `hito` los genera el motor (mandarlos sirve para probar).
+`volvio` y `hito` los genera el motor; `recordatorio` y `pomodoro`, el sistema
+(mandarlos sirve para probar las reglas, pero no muestran nada).
+
+### Eventos que avisa el bicho solo
+
+Cuando se dispara un recordatorio (`31`) o termina un tramo del pomodoro
+(`32`), además de anotarlo en el registro, el bicho lo avisa en el momento con
+una notificación en Comando, **por BLE y por la nube** (`bicho/{id}/resp`),
+con el mismo formato que la respuesta de Registro:
+
+- pomodoro: `[0x9E][0x00][0x01][u32 segundos][0x00 = evento][0x20]`
+- recordatorio: `[0x9E][0x00][0x02][u32 segundos][0x00][0x1F][u32 segundos][0x04 = recordatorio][u8 índice]`
+
+El registro (`0x1E`) guarda las mismas entradas: el tipo 4 es "mostró un
+recordatorio" y su dato, la posición en `recordatorios` (desde 0). Quien no
+pidió el registro y recibe un `0x9E` lo toma como un aviso.
+Además, mientras el recordatorio está en pantalla la expresión visible del
+estado es `recordatorio:<n>` (n = su posición en `recordatorios`, desde 0), así
+que el estado también se notifica al empezar y al terminar. En modo pomodoro la
+expresión visible es `pomodoro:trabajo`, `pomodoro:descanso` o
+`pomodoro:pausa`.
 
 ### Vida (v1.4)
 
@@ -190,7 +211,8 @@ Lectura o notificación (se notifica cuando cambia algo que no sea el humor):
 (Ni el humor ni los segundos encendido disparan notificaciones solos.)
 
 (Textos en UTF-8. Mientras se ve una animación, la expresión visible es
-`animacion:<nombre>`. La versión 3 no tenía la red, el firmware ni el CRC; la
+`animacion:<nombre>`; un recordatorio, `recordatorio:<n>`; en modo pomodoro,
+`pomodoro:trabajo|descanso|pausa`. La versión 3 no tenía la red, el firmware ni el CRC; la
 2 tampoco la pantalla; la 1 tampoco el número de unidad, el id ni los bits 2 y
 3.)
 
