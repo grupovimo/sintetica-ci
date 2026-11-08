@@ -40,6 +40,8 @@ android {
     buildFeatures { compose = true }
     // Lo de fábrica (reglas, los dibujos del manual y las animaciones de ejemplo), tal cual.
     sourceSets { getByName("main") { assets.srcDir("../../shared/formato") } }
+    // Los casos de paridad son para los tests (los leen del repo), no van en la app.
+    androidResources { ignoreAssetsPattern = "!paridad:!.*:!*~" }
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 
