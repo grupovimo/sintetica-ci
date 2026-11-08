@@ -175,6 +175,14 @@ pantalla en vivo los carga en su núcleo).
   hora aparecés): la API se la pide cada 5 minutos mientras está conectado y la
   guarda (`memorias`, migración `002_memoria.sql`).
   `GET /v1/bichos/{id}/memoria` la devuelve decodificada (el diario de la web).
+  Desde la v1.7 suma `juegosGanados`, `juegosJugados`, `mejorReflejo` (ms, 0
+  = nunca), `juegosHoy`, `suenosHoy`, `sonoConHoy` (`corazon`, `estrella`,
+  `nota`, `oveja`, `pesadilla`), `animoHoy` (0 sin respuesta, 1 bien, 2 más o
+  menos, 3 mal), `esperoHoy` (la hora a la que te esperó, o `null`),
+  `diaContadores`, `anioFechas`, `fechas` (`anio-nuevo`, `navidad`,
+  `dia-del-amigo`, `dia-del-nino`, `aniversario`) y `aguaHoy`. Lo "de hoy" de
+  una memoria de otro día (el día de los contadores no es hoy en la zona de
+  los bichos) sale en 0, y las fechas de otro año, vacías.
 - **La mudanza** (cambio de placa): `POST /v1/bichos/{id}/mudar {desde}` copia
   la memoria y la config de otro bicho de la cuenta a este; la memoria queda
   pendiente (`deseada`) hasta que el bicho la confirma con el comando
@@ -208,8 +216,10 @@ pantalla en vivo los carga en su núcleo).
 Lo que hace que el bicho sirva fuera de su pantalla (`api/internal/integraciones`,
 migración `005_integraciones.sql`): el bot de Telegram, las automatizaciones
 por bicho (y las rutinas a una hora), los recordatorios que la nube manda
-cuando el bicho no está, los cumpleaños, el clima (`api/internal/clima`) y que
-el robot diga algo o lo despierten desde afuera (protocolo v1.6).
+cuando el bicho no está, los cumpleaños, el clima (`api/internal/clima`), que
+el robot diga algo o lo despierten desde afuera (protocolo v1.6) y lo de un
+bicho que acompaña el día (v1.7: el "¿Cómo estás?", el "te extraño", su día
+contado, los juegos y el saludo entre robots).
 
 ### Telegram (@sinteticalabs_bot)
 
@@ -239,7 +249,8 @@ el robot diga algo o lo despierten desde afuera (protocolo v1.6).
   (el robot lo dice en un globo en su pantalla: el marco `0x40`, hasta 60 bytes;
   si es más largo, el bot pide acortarlo), `/clima [nombre]` (el clima donde
   está el robot, si tiene `ubicacion`: "En Buenos Aires: 18° y nublado (máx.
-  22°, mín. 12°)."), `/ayuda`. Con un solo robot el nombre no hace falta; con varios, si no se
+  22°, mín. 12°)."), `/jugar [dado|moneda|ppt|reflejos|mirada] [nombre]` (el
+  marco `0x43`; sin juego, un teclado con los cinco), `/ayuda`. Con un solo robot el nombre no hace falta; con varios, si no se
   dice, aparece un teclado para elegirlo. El nombre es el apodo (o el nombre
   del bicho, o su id), sin importar mayúsculas ni tildes.
 ### Automatizaciones
@@ -277,7 +288,9 @@ el robot diga algo o lo despierten desde afuera (protocolo v1.6).
   clima del lugar del robot: `{clima}` ("18° y nublado"), `{temp}` ("18°"),
   `{max}`, `{min}` (sin `ubicacion` o si Open-Meteo no contesta: "sin datos
   del clima" y "?"). El clima solo se pide si el texto lo usa (con el caché de
-  30 min).
+  30 min). Con `cuando: juego`, `{juego}` (`ppt`, `reflejos`, `mirada`,
+  `dado`, `moneda`) y `{resultado}` (`gano`, `perdio`, `empate`,
+  `sin-resultado`); con `cuando: animo`, `{animo}` (`bien`, `medio`, `mal`).
 - **`telegram`**: le escribe al chat vinculado del dueño (texto de 1 a 1000 bytes).
 - **`robot`**: solo a bichos de la misma cuenta (se valida al guardar y al
   correr); le pone esa expresión (el mismo comando que la web).
@@ -322,15 +335,18 @@ el robot diga algo o lo despierten desde afuera (protocolo v1.6).
 | `bateria-baja` | el estado: la batería cruza de ≥ 15 % a < 15 % |
 | `expresion` (opcional `valor`) | el estado: cambió la cara visible (`datos.valor`, `datos.antes`) |
 | `duerme`, `despierta` | el estado: el bit de dormido |
-| `tacto`, `doble-toque`, `caricia`, `muchos-toques`, `levantado`, `sacudida`, `sacudida-suave`, `sacudida-fuerte`, `boca-abajo`, `inclinado`, `caida`, `voz`, `nombre`, `ruido`, `musica`, `cargando` (= `enchufado`), `desenchufado`, `cargado`, `volvio` | el registro del motor de vida (`0x1E`, tipo 0) |
+| `tacto`, `doble-toque`, `caricia`, `muchos-toques`, `levantado`, `sacudida`, `sacudida-suave`, `sacudida-fuerte`, `boca-abajo`, `inclinado`, `caida`, `voz`, `nombre`, `ruido`, `musica`, `cargando` (= `enchufado`), `desenchufado`, `cargado`, `volvio`, `bicho-cerca` | el registro del motor de vida (`0x1E`, tipo 0) |
 | `hito` | el registro (tipo 3) |
 | `recordatorio` | el aviso que el bicho manda solo al mostrar uno (ver abajo) |
 | `pomodoro` | el aviso que el bicho manda solo al terminar un tramo del pomodoro |
 | `despertador` | el aviso que el bicho manda solo al empezar a sonar la alarma (evento `33`: `[0x9E][0x00][0x01][u32 s][0x00][0x21]`) |
 | `hora` (con `hora` y `dias`) | el reloj de la nube, cada minuto (ver "Rutinas") |
+| `juego` | v1.7: el aviso que el bicho manda solo al terminar una partida (evento `34` + registro **tipo 5**, dato juego·16 + resultado: `datos.juego`, `datos.resultado`) |
+| `animo` | v1.7: el aviso que el bicho manda solo cuando le contestan el "¿Cómo estás?" (evento `35` + registro **tipo 6**, dato 0 bien, 1 más o menos, 2 mal: `datos.valor`) |
 
 Los del registro: la API le pide el registro (`0x1E`) cada 10 s **solo** a los
-bichos conectados que tienen alguna automatización activa que lo necesita, y
+bichos conectados que tienen alguna automatización activa que lo necesita (o
+cuyo dueño tiene otro robot conectado: para el saludo entre robots), y
 avisa cada entrada nueva una vez (la primera lectura después de conectarse o
 de un reinicio solo marca el punto de partida). Los avisos (un `0x9E` que el
 bicho manda solo por `bicho/{id}/resp`, ver protocolo-ble.md, "Eventos que avisa
@@ -427,6 +443,62 @@ si se acaba de conectar (también apenas llega el evento `conectado`) o si
 cambió la ubicación (se nota en la vuelta siguiente; el MCP, al ubicar, lo
 manda ya). El robot lo da por bueno 3 h.
 
+### Un bicho que acompaña el día (protocolo v1.7)
+
+Código: `api/internal/integraciones/cuidado.go` (y `servidor/cuidado.go`,
+`servidor/mcp_cuidado.go`); los marcos, en `api/internal/protocolo/cuidado.go`.
+Todo lo de Telegram lo revisa el trabajador de los recordatorios (cada minuto,
+solo con Telegram prendido y para los dueños que lo vincularon), en la zona de
+los bichos (`nube.Zona()`), con la **última memoria** que mandó el bicho (sin
+memoria no se manda nada) y respetando `cuidado` de su última config (por
+defecto: `animo` y `extranar` prendidos, `extranarDias` 2, `resumen`
+apagado; `horario` de 08:00 a 23:30). Para no repetir, cada envío queda en el
+historial de automatizaciones (con el nombre de abajo) y se mira ahí antes de
+mandar.
+
+- **"¿Cómo estás?"**: con `cuidado.animo`, si la memoria dice que hoy no
+  contestó (`animoHoy == 0`) y pasaron 2 h desde `horario.despierta` (y
+  todavía no es `horario.duerme`), una vez por día: "{robot} pregunta: ¿Cómo
+  estás hoy?" con tres botones (😀 Bien / 😐 Más o menos / 😞 Mal; datos
+  `animo:<id>:0|1|2`). Historial `como-estas`. Al tocar uno, se sacan los
+  botones, se le manda al bicho `0x45` con la respuesta (historial `animo`,
+  acción `robot`) y el bot contesta con empatía ("¡Qué bueno! {robot} se puso
+  contento de saberlo 😊", "Bueno, hay días así. {robot} te manda un abrazo
+  🤗", "Uh, lo siento mucho. {robot} está con vos 💛" y, con "mal", una frase
+  linda). Si el robot no está conectado, lo dice.
+- **Te extraño**: con `cuidado.extranar`, si la última interacción de la
+  memoria fue hace `extranarDias` días o más (y menos de 30: después se deja de
+  insistir), en horario despierto, "Te extraño 🥺 — {robot}", como mucho una
+  vez cada `extranarDias` días (historial `te-extrano`).
+- **Su día contado**: con `cuidado.resumen`, a la hora de `horario.duerme`
+  (si duerme antes de las 06:00, a las 23:59), si la memoria es de hoy, un
+  Telegram con lo de hoy: "Hoy {robot} jugó 3 veces (ganó 2), soñó con ovejas,
+  te esperó a las 19, te recordó tomar agua 4 veces y le dijiste que estabas
+  bien." (sin nada: "Hoy {robot} tuvo un día tranquilo."). Una vez por día
+  (historial `resumen`). Cuántas ganó no está en la memoria: la nube cuenta
+  los avisos `juego` del día (en memoria; si se reinició y no las vio todas,
+  no lo dice).
+- `GET /v1/bichos/{id}/resumen` → `{"texto", "juegos", "ganados" (null si no
+  se sabe), "suenos", "sonoCon": [...], "animo": "bien"|"medio"|"mal"|null,
+  "espero": 19|null, "agua", "actualizada": ISO|null}` para la consola (Vida,
+  el diario). Sin memoria: `texto` lo dice y lo demás en cero.
+- **Entre robots**: cuando un robot avisa `bicho-cerca` (registro) y el dueño
+  tiene otro robot conectado, los dos hacen el comportamiento `saludar`
+  (`0x1F`) y dicen "¡Hola, {otro}!" (`0x40`, cara `contento`), como mucho una
+  vez cada 10 min por par (en memoria y en el historial: `entre-<id del
+  otro>`, evento `bicho-cerca`, acción `saludar`).
+- `POST /v1/bichos/{id}/jugar {"juego": "dado"|"moneda"|"ppt"|"reflejos"|"mirada"|"terminar"}`
+  → `{"ok": true}`: el marco `0x43` (0 ppt, 1 reflejos, 2 mirada, 3 dado, 4
+  moneda, 255 terminar). 400 si no existe; 409 si no está conectado; 30 por
+  minuto por robot.
+- `POST /v1/bichos/{id}/aviso {"tipo": "notificacion"|"llamada", "app"?, "contacto"?}`
+  → `{"ok": true}`: el marco `0x44` (`[u8 tipo][n][app][n][contacto]`; la app
+  y el contacto se cortan a 24 bytes sin partir una letra). El robot reacciona
+  según `avisos` de su config. 409 si no está conectado; 60 por minuto.
+- Los marcos `0x45` Ánimo (`[u8 0 bien, 1 más o menos, 2 mal]`) y `0x46` Mirar
+  (`[i8 x][i8 y]`, −100 a 100) están en `protocolo` (`Animo`, `Mirar`); el
+  primero lo usa el bot, el segundo es para los modelos con dos micrófonos.
+
 ## MCP: que una IA maneje los robots
 
 La API es un **servidor MCP remoto**: cada usuario conecta su Claude
@@ -518,7 +590,11 @@ conectan desde sus servidores: necesitan **HTTPS público**; en local
 | `despertador` | `ver` / `poner` (`hora`, `dias`, `texto`, `posponer`, `sonido`, `activo`; en `despertador` de la config) / `sacar`; y, conectado, `probar` / `apagar` / `posponer` (marco `0x42`) |
 | `clima` | `ver` (ubicación y clima de ahora) / `buscar` (`q`, sin robot) / `ubicar` (`lat`, `lon`, `ciudad`, o `q` y el primer lugar): guarda `ubicacion` y le manda el clima ya |
 | `rutinas` | Las automatizaciones `cuando: hora`: `listar` / `crear` (`hora`, `dias`, `hacer[]`, `id` opcional: `rutina-HHMM`) / `borrar` (`id`) |
-| `habla` | `ver` / `frecuencia` (0 a 1) / `agregar` (`situacion`, `texto` ≤ 60 bytes; hasta 12 frases propias en total) / `borrar` (`situacion` y, opcional, `texto`), en `habla` de la config |
+| `habla` | `ver` / `frecuencia` (0 a 1) / `agregar` (`situacion`, `texto` ≤ 60 bytes; hasta 12 frases propias en total; también las situaciones de la v1.7: `buen-dia`, `comiste`, `a-dormir`, `tardaste`, `agua`, `pausa`, `como-estas`, `animo-bien`, `animo-medio`, `animo-mal`, `jugar`, `gane`, `perdi`, `empate`, `anio-nuevo`, `navidad`, `dia-del-amigo`, `dia-del-nino`, `aniversario`) / `borrar` (`situacion` y, opcional, `texto`), en `habla` de la config |
+| `jugar` | `{robot, juego}`: `ppt`, `reflejos`, `mirada`, `dado`, `moneda` o `terminar` (marco `0x43`) — conectado |
+| `cuidado` | `ver` (lo de la config y los valores por defecto) / `poner` (`agua` 0 a 8 h, `pausa` 0 o 30 a 240 min, `trabajo {desde, hasta, dias}`, `animo`, `extranar`, `extranarDias` 1 a 7, `resumen`), en `cuidado` de la config |
+| `avisos` | `listar` / `agregar` (`tipo` notificacion o llamada, `app` y `contacto` ≤ 24 bytes, `expresion` y `comportamiento` que existan, `decir` ≤ 40 bytes con `{app}` y `{contacto}`, `sonido`; hasta 8) / `borrar` (`indice`), en `avisos` de la config |
+| `resumen` | Cómo fue su día (lo mismo que `GET /v1/bichos/{id}/resumen`) |
 
 Además, el recurso **`sintetica://guia/caras`** (qué hace cada parámetro, sus
 límites, consejos y ejemplos, armado desde el schema, y la sección "Caras de
