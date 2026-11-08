@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.opengl.GLSurfaceView
 import android.os.Bundle
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.Gravity
@@ -64,10 +65,16 @@ class Bicho : Activity() {
         sentidos.sordo = voz::ocupada
         datos = Datos(texto, lienzo, sentidos, depuracion)
         var cuadro = 0
+        var comportamiento = ""
         lienzo.alDibujar = {
             datos.leerNucleo()
             if (cuadro % 30 == 0) voz.config = Nucleo.voz()
             if (cuadro % 5 == 0) voz.globo(Nucleo.globo())
+            // Cada comportamiento nuevo al registro (para contar cuántos distintos hace en el día).
+            if (cuadro % 15 == 0) Nucleo.comportamiento().takeIf { it.isNotEmpty() && it != comportamiento }?.let {
+                comportamiento = it
+                Log.i("Bicho", "comportamiento: $it")
+            }
             cuadro++
         }
         Avisos.alAviso = { comando -> vista.queueEvent { Nucleo.nubeEscribir(2, comando) } }
