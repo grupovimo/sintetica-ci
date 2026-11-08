@@ -2,14 +2,14 @@
   import { onMount } from 'svelte';
   import { api, ErrorApi } from '$lib/api';
 
-  type Reserva = { id: number; nombre: string; contacto: string; color: string; mensaje: string; creada: string; atendida: boolean };
+  type Reserva = { id: number; nombre: string; pieza: string; contacto: string; color: string; mensaje: string; creada: string; atendida: boolean };
 
   let { data } = $props();
   let reservas = $state<Reserva[]>([]);
   let error = $state('');
   let soloPendientes = $state(true);
 
-  const COLORES: Record<string, string> = { naranja: 'Naranja', carbon: 'Carbón', hueso: 'Hueso' };
+  const COLORES: Record<string, string> = { naranja: 'Naranja', negro: 'Negro', blanco: 'Blanco', carbon: 'Carbón', hueso: 'Hueso' };
   const visibles = $derived(soloPendientes ? reservas.filter((r) => !r.atendida) : reservas);
 
   async function cargar() {
@@ -51,7 +51,7 @@
         <div>
           <h2>{r.nombre}</h2>
           <p><a href={r.contacto.includes('@') ? `mailto:${r.contacto}` : `https://wa.me/${r.contacto.replace(/\D/g, '')}`} target="_blank" rel="noopener">{r.contacto}</a></p>
-          <p class="etiqueta">{COLORES[r.color] ?? r.color} · {new Date(r.creada).toLocaleString('es-AR')}</p>
+          <p class="etiqueta">{r.pieza === 'broche' ? 'Broche' : 'Unidad'} · {COLORES[r.color] ?? r.color} · {new Date(r.creada).toLocaleString('es-AR')}</p>
           {#if r.mensaje}<p>{r.mensaje}</p>{/if}
         </div>
         <button class="chico" onclick={() => marcar(r)}>{r.atendida ? 'Volver a pendiente' : 'Atendida'}</button>

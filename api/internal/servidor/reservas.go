@@ -11,15 +11,19 @@ import (
 	"sintetica/api/internal/almacen"
 )
 
-// Los colores de carcasa de la landing.
-var coloresCarcasa = map[string]bool{"naranja": true, "carbon": true, "hueso": true}
+// Las piezas y los colores de carcasa de la landing.
+var (
+	piezas         = map[string]bool{"unidad": true, "broche": true}
+	coloresCarcasa = map[string]bool{"naranja": true, "negro": true, "blanco": true}
+)
 
-// POST /v1/reservas {nombre, contacto, color, mensaje, sitio}: "Reservá el
+// POST /v1/reservas {nombre, pieza, contacto, color, mensaje, sitio}: "Reservá el
 // tuyo" de la landing, sin cuenta. "sitio" es una trampa para bots (un campo
 // que la persona no ve): si viene lleno se contesta bien y no se guarda.
 func (s *Servidor) reservar(w http.ResponseWriter, r *http.Request) {
 	var p struct {
 		Nombre   string `json:"nombre"`
+		Pieza    string `json:"pieza"`
 		Contacto string `json:"contacto"`
 		Color    string `json:"color"`
 		Mensaje  string `json:"mensaje"`
@@ -29,7 +33,7 @@ func (s *Servidor) reservar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res := almacen.Reserva{
-		Nombre: strings.TrimSpace(p.Nombre), Contacto: strings.TrimSpace(p.Contacto),
+		Nombre: strings.TrimSpace(p.Nombre), Pieza: strings.TrimSpace(p.Pieza), Contacto: strings.TrimSpace(p.Contacto),
 		Color: strings.TrimSpace(p.Color), Mensaje: strings.TrimSpace(p.Mensaje),
 	}
 	switch {
@@ -39,8 +43,11 @@ func (s *Servidor) reservar(w http.ResponseWriter, r *http.Request) {
 	case utf8.RuneCountInString(res.Contacto) < 5 || utf8.RuneCountInString(res.Contacto) > 120:
 		fallar(w, http.StatusBadRequest, "dejanos un email o un WhatsApp para escribirte")
 		return
+	case !piezas[res.Pieza]:
+		fallar(w, http.StatusBadRequest, "la pieza es unidad o broche")
+		return
 	case !coloresCarcasa[res.Color]:
-		fallar(w, http.StatusBadRequest, "el color es naranja, carbon o hueso")
+		fallar(w, http.StatusBadRequest, "el color es naranja, negro o blanco")
 		return
 	case utf8.RuneCountInString(res.Mensaje) > 500:
 		fallar(w, http.StatusBadRequest, "el mensaje es de hasta 500 letras")
@@ -67,7 +74,7 @@ func (s *Servidor) reservar(w http.ResponseWriter, r *http.Request) {
 		s.interno(w, err)
 		return
 	}
-	s.log.Info("reserva nueva", "id", id, "color", res.Color)
+	s.log.Info("reserva nueva", "id", id, "pieza", res.Pieza, "color", res.Color)
 	responder(w, http.StatusCreated, map[string]any{"ok": true})
 }
 

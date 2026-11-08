@@ -11,7 +11,7 @@ const SIN_FOTO = new Set(['sin-conexion', 'ko', 'pesadilla']);
 
 export const NOMBRES: string[] = Object.keys(expresiones).filter((n) => !SIN_FOTO.has(n));
 
-export async function fotos(): Promise<{ nombre: string; url: string }[]> {
+export async function fotos(nombres: string[] = NOMBRES): Promise<{ nombre: string; url: string }[]> {
   const r = await fetch('/sinteticaos.wasm');
   if (!r.ok) throw new Error('No encontré el núcleo');
   let reloj = 0;
@@ -32,7 +32,7 @@ export async function fotos(): Promise<{ nombre: string; url: string }[]> {
   };
   avanzar(500);
   const salida: { nombre: string; url: string }[] = [];
-  for (const nombre of NOMBRES) {
+  for (const nombre of nombres) {
     sim.bleEscribir(Car.comando, comando.expresion(nombre));
     avanzar(1400);
     const u = ultimo as { rgba: Uint8ClampedArray; w: number; h: number } | null;

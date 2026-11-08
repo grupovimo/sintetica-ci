@@ -9,6 +9,7 @@ import (
 type Reserva struct {
 	ID       int64     `json:"id"`
 	Nombre   string    `json:"nombre"`
+	Pieza    string    `json:"pieza"`
 	Contacto string    `json:"contacto"`
 	Color    string    `json:"color"`
 	Mensaje  string    `json:"mensaje"`
@@ -19,8 +20,8 @@ type Reserva struct {
 // CrearReserva guarda una reserva y devuelve su id.
 func (a *Almacen) CrearReserva(ctx context.Context, r Reserva, ip string) (int64, error) {
 	var id int64
-	err := a.db.QueryRow(ctx, `insert into reservas (nombre, contacto, color, mensaje, ip) values ($1, $2, $3, $4, $5) returning id`,
-		r.Nombre, r.Contacto, r.Color, r.Mensaje, ip).Scan(&id)
+	err := a.db.QueryRow(ctx, `insert into reservas (nombre, pieza, contacto, color, mensaje, ip) values ($1, $2, $3, $4, $5, $6) returning id`,
+		r.Nombre, r.Pieza, r.Contacto, r.Color, r.Mensaje, ip).Scan(&id)
 	return id, err
 }
 
@@ -33,7 +34,7 @@ func (a *Almacen) ReservasDeIP(ctx context.Context, ip string, desde time.Time) 
 
 // Reservas: las últimas, primero las más nuevas.
 func (a *Almacen) Reservas(ctx context.Context, limite int) ([]Reserva, error) {
-	filas, err := a.db.Query(ctx, `select id, nombre, contacto, color, mensaje, creada, atendida from reservas order by creada desc limit $1`, limite)
+	filas, err := a.db.Query(ctx, `select id, nombre, pieza, contacto, color, mensaje, creada, atendida from reservas order by creada desc limit $1`, limite)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +42,7 @@ func (a *Almacen) Reservas(ctx context.Context, limite int) ([]Reserva, error) {
 	l := []Reserva{}
 	for filas.Next() {
 		var r Reserva
-		if err := filas.Scan(&r.ID, &r.Nombre, &r.Contacto, &r.Color, &r.Mensaje, &r.Creada, &r.Atendida); err != nil {
+		if err := filas.Scan(&r.ID, &r.Nombre, &r.Pieza, &r.Contacto, &r.Color, &r.Mensaje, &r.Creada, &r.Atendida); err != nil {
 			return nil, err
 		}
 		l = append(l, r)

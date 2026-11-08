@@ -193,7 +193,7 @@ func TestReservas(t *testing.T) {
 	a := abrirPrueba(t)
 	ctx := context.Background()
 	antes := time.Now().Add(-time.Minute)
-	id, err := a.CrearReserva(ctx, Reserva{Nombre: "Nahuel", Contacto: "n@ejemplo.com", Color: "naranja"}, "1.2.3.4")
+	id, err := a.CrearReserva(ctx, Reserva{Nombre: "Nahuel", Pieza: "broche", Contacto: "n@ejemplo.com", Color: "naranja"}, "1.2.3.4")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +210,7 @@ func TestReservas(t *testing.T) {
 		t.Fatalf("inexistente: %v", err)
 	}
 	l, err := a.Reservas(ctx, 10)
-	if err != nil || len(l) != 1 || !l[0].Atendida || l[0].Color != "naranja" {
+	if err != nil || len(l) != 1 || !l[0].Atendida || l[0].Color != "naranja" || l[0].Pieza != "broche" {
 		t.Fatalf("lista: %+v %v", l, err)
 	}
 }
