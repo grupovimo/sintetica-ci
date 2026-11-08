@@ -61,6 +61,7 @@ class Bicho : Activity() {
         red.alAudio = voz.nube::recibir
         red.alConversacion = charla::respuesta
         sentidos.alOir = charla::oir
+        sentidos.sordo = voz::ocupada
         datos = Datos(texto, lienzo, sentidos, depuracion)
         var cuadro = 0
         lienzo.alDibujar = {

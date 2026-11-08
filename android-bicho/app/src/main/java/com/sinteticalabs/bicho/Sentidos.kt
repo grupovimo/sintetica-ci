@@ -50,6 +50,8 @@ class Sentidos(
         private set
     @Volatile var nivelOido = 0f
         private set
+    /** Si el bicho está hablando: entonces no se oye (ni su palabra ni su voz como "voz"). */
+    @Volatile var sordo: () -> Boolean = { false }
     /** Cada tramo del micrófono, antes de borrarlo (la charla). */
     @Volatile var alOir: ((ShortArray, Int) -> Unit)? = null
     @Volatile var lux = -1f
@@ -182,8 +184,9 @@ class Sentidos(
             while (escuchar) {
                 val n = mic.read(tramo, 0, tramo.size)
                 if (n <= 0) continue
-                val oyo = oido.tramo(tramo, n)
-                alOir?.invoke(tramo, n)
+                val propio = sordo()
+                val oyo = oido.tramo(tramo, n).takeUnless { propio }
+                if (!propio) alOir?.invoke(tramo, n)
                 tramo.fill(0)
                 nivelOido = oido.nivel
                 if (oyo != null) {

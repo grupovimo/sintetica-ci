@@ -45,6 +45,16 @@ class Voz(private val contexto: Context) {
     @Volatile private var habla: TextToSpeech? = null
     @Volatile private var hablaLista = false
     private var ultimoGlobo = ""
+    // Hasta cuándo suena algo suyo (el oído no se escucha a sí mismo).
+    @Volatile private var ocupadaHasta = 0L
+
+    /** Si está hablando o sonando (más un margen por el eco de la pieza). */
+    fun ocupada() = SystemClock.elapsedRealtime() < ocupadaHasta || habla?.isSpeaking == true
+
+    private fun ocupar(ms: Long) {
+        ocupadaHasta = maxOf(ocupadaHasta, SystemClock.elapsedRealtime() + ms + ECO_MS)
+    }
+
     /** Cuándo apareció el último globo (la charla mira si le contestaron). */
     @Volatile var ultimoGloboEn = 0L
         private set
@@ -116,6 +126,7 @@ class Voz(private val contexto: Context) {
                 setVolume(config[0] / 100f, config[0] / 100f)
                 setOnCompletionListener { it.release(); if (reproductor === it) reproductor = null }
                 start()
+                ocupar(duration.toLong())
             }
         }.onFailure { Log.w("Bicho", "voz de la nube: no sonó", it) }.getOrNull()
     }
@@ -189,6 +200,7 @@ class Voz(private val contexto: Context) {
             .setBufferSizeInBytes(pcm.size * 2)
             .build()
         pista.write(pcm, 0, pcm.size)
+        ocupar(pcm.size * 1000L / Sintesis.TASA)
         pista.setVolume(volumen)
         pista.play()
         // Suena solo; se suelta cuando termina (el hilo de la voz espera).
@@ -198,6 +210,7 @@ class Voz(private val contexto: Context) {
 
     companion object {
         const val ESPERA_NUBE_MS = 3000L
+        const val ECO_MS = 400L
         private val ESPANOLES = listOf(Locale("es", "AR"), Locale("es", "US"), Locale("es", "MX"), Locale("es", "ES"), Locale("es"))
 
         /**
