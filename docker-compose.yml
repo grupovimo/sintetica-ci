@@ -51,6 +51,8 @@ services:
 
   emqx:
     image: emqx/emqx:5.8.6
+    # En la Mac, Erlang se queda dando vueltas aunque no haya tráfico: con medio núcleo le sobra.
+    cpus: 0.5
     environment:
       EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_CLAVE_PANEL:-sintetica}
     volumes:
