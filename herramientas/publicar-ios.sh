@@ -10,17 +10,21 @@ token="$(gh auth token -u grupovimo)"
 if [ ! -d "$destino/.git" ]; then
   git clone -q "https://x-access-token:$token@github.com/grupovimo/sintetica-ios.git" "$destino"
 fi
+# Se publica lo commiteado (HEAD), nunca lo que haya a medio hacer en el disco.
+foto="$(mktemp -d)"
+trap 'rm -rf "$foto"' EXIT
+git -C "$raiz" archive HEAD ios firmware/nucleo firmware/api shared/protocolo shared/formato herramientas/ios-ci | tar -x -C "$foto"
 cd "$destino"
 git pull -q --rebase 2>/dev/null || true
 rm -rf ios firmware shared .github
 mkdir -p firmware shared/protocolo shared/formato/vida .github/workflows
-rsync -a --exclude 'Sintetica.xcodeproj' --exclude '.DS_Store' "$raiz/ios/" ios/
-rsync -a --exclude '*.md' "$raiz/firmware/nucleo/" firmware/nucleo/
-rsync -a --exclude 'cgo' "$raiz/firmware/api/" firmware/api/
-cp "$raiz/shared/protocolo/vectores.json" shared/protocolo/
-cp "$raiz/shared/formato/config-ejemplo.json" shared/formato/
+rsync -a --exclude 'Sintetica.xcodeproj' --exclude '.DS_Store' "$foto/ios/" ios/
+rsync -a --exclude '*.md' "$foto/firmware/nucleo/" firmware/nucleo/
+rsync -a --exclude 'cgo' "$foto/firmware/api/" firmware/api/
+cp "$foto/shared/protocolo/vectores.json" shared/protocolo/
+cp "$foto/shared/formato/config-ejemplo.json" shared/formato/
 cp "$raiz"/shared/formato/vida/*.json shared/formato/vida/
-cp "$raiz/herramientas/ios-ci/testflight.yml" .github/workflows/
+cp "$foto/herramientas/ios-ci/testflight.yml" .github/workflows/
 printf '# Sintética · iOS\n\nCopia de la app de iOS para compilarla y subirla a TestFlight. No se edita acá.\n' > README.md
 git add -A
 origen="$(git -C "$raiz" rev-parse --short HEAD)"
