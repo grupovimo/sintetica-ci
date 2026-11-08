@@ -30,7 +30,8 @@ class Bicho : Activity() {
         super.onCreate(estado)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val red = Red(filesDir)
-        val lienzo = Lienzo(ANCHO, ALTO, red.id, Guardado(filesDir, red))
+        val archivos = java.io.File(filesDir, "archivos").apply { mkdirs() }.path
+        val lienzo = Lienzo(ANCHO, ALTO, red.id, archivos, Guardado(filesDir, red))
         vista = GLSurfaceView(this).apply {
             setEGLContextClientVersion(2)
             setRenderer(lienzo)

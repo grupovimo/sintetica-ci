@@ -6,9 +6,12 @@
 #include <jni.h>
 
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <random>
+#include <cstdio>
 #include <cstring>
+#include <string>
 
 #include "formato.h"
 #include "sintetica_c.h"
@@ -18,6 +21,31 @@ JNIEnv* g_env = nullptr;
 jobject g_anfitrion = nullptr;  // referencia global
 jmethodID g_guardar, g_leer, g_registrar, g_notificar, g_notificarNube, g_redCambio;
 char g_id[13] = "000000000000";
+std::string g_carpeta;  // archivos grandes (imágenes, sprites): <filesDir>/archivos
+
+// --- Archivos grandes por partes (imágenes y sprites), en archivos comunes ---
+std::string rutaArchivo(const char* clave) {
+  std::string r = g_carpeta + "/";
+  for (const char* c = clave; *c; c++) r += (isalnum(static_cast<unsigned char>(*c)) || *c == '-') ? *c : '_';
+  return r;
+}
+int escribirTrozo(void*, const char* clave, uint32_t off, const uint8_t* d, size_t n) {
+  FILE* f = fopen(rutaArchivo(clave).c_str(), off == 0 ? "wb" : "r+b");
+  if (!f) return 0;
+  bool ok = fseek(f, static_cast<long>(off), SEEK_SET) == 0 && fwrite(d, 1, n, f) == n;
+  return fclose(f) == 0 && ok ? 1 : 0;
+}
+int leerTrozo(void*, const char* clave, uint32_t off, uint8_t* d, size_t n) {
+  FILE* f = fopen(rutaArchivo(clave).c_str(), "rb");
+  if (!f) return -1;
+  int r = fseek(f, static_cast<long>(off), SEEK_SET) == 0 ? static_cast<int>(fread(d, 1, n, f)) : 0;
+  fclose(f);
+  return r;
+}
+int borrar(void*, const char* clave) {
+  remove(rutaArchivo(clave).c_str());
+  return 1;
+}
 std::mt19937 g_azar{std::random_device{}()};
 const auto g_inicio = std::chrono::steady_clock::now();
 std::atomic<int> g_bateria{-1};  // la escribe el hilo principal
@@ -106,7 +134,7 @@ void registrar(void*, const char* m) {
 
 extern "C" {
 
-void JNI(iniciarNativo)(JNIEnv* env, jobject, jint ancho, jint alto, jstring id, jobject anfitrion) {
+void JNI(iniciarNativo)(JNIEnv* env, jobject, jint ancho, jint alto, jstring id, jstring carpeta, jobject anfitrion) {
   g_env = env;
   if (g_anfitrion) env->DeleteGlobalRef(g_anfitrion);
   g_anfitrion = env->NewGlobalRef(anfitrion);
@@ -117,6 +145,9 @@ void JNI(iniciarNativo)(JNIEnv* env, jobject, jint ancho, jint alto, jstring id,
   g_notificar = env->GetMethodID(k, "notificar", "(I[B)V");
   g_notificarNube = env->GetMethodID(k, "notificarNube", "(I[B)V");
   g_redCambio = env->GetMethodID(k, "redCambio", "()V");
+  const char* cp = env->GetStringUTFChars(carpeta, nullptr);
+  g_carpeta = cp;
+  env->ReleaseStringUTFChars(carpeta, cp);
   const char* t = env->GetStringUTFChars(id, nullptr);
   if (strlen(t) == 12) memcpy(g_id, t, 13);
   env->ReleaseStringUTFChars(id, t);
@@ -133,6 +164,9 @@ void JNI(iniciarNativo)(JNIEnv* env, jobject, jint ancho, jint alto, jstring id,
   h.notificar_nube = notificarNube;
   h.red_cambio = redCambio;
   h.identificador = g_id;
+  h.escribir_trozo = escribirTrozo;
+  h.leer_trozo = leerTrozo;
+  h.borrar = borrar;
   h.perfil = "celu";
   sintetica_iniciar(&h, ancho, alto);
   g_listo = true;

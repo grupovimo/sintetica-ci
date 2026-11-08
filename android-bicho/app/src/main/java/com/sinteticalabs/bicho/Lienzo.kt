@@ -16,6 +16,7 @@ class Lienzo(
     private val ancho: Int,
     private val alto: Int,
     private val id: String,
+    private val carpeta: String,
     private val anfitrion: Nucleo.Anfitrion,
 ) :
     GLSurfaceView.Renderer {
@@ -34,7 +35,7 @@ class Lienzo(
     var alDibujar: (() -> Unit)? = null
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        Nucleo.iniciar(ancho, alto, id, anfitrion)
+        Nucleo.iniciar(ancho, alto, id, carpeta, anfitrion)
         Log.i("Bicho", "núcleo ${Nucleo.version()} a ${Nucleo.ancho()}×${Nucleo.alto()}")
         programa = programa(VERTICES, FRAGMENTOS)
         val t = IntArray(1)

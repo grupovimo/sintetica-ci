@@ -213,6 +213,8 @@ class Red(private val raiz: File) {
     }
 
     private fun mantenerNube() {
+        // El núcleo arranca con la superficie de GL: hasta entonces no sabe su nube.
+        while (!Nucleo.listo()) Thread.sleep(200)
         while (true) {
             synchronized(cambio) {
                 while (!hayCambio) cambio.wait()

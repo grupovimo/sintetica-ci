@@ -23,11 +23,12 @@ object Nucleo {
     }
 
     /** Una sola vez por proceso: si GL recrea la superficie, el núcleo sigue igual. */
-    fun iniciar(ancho: Int, alto: Int, id: String, anfitrion: Anfitrion) {
-        if (!listo()) iniciarNativo(ancho, alto, id, anfitrion)
+    /** [carpeta]: donde el núcleo guarda los archivos grandes (imágenes y sprites), por partes. */
+    fun iniciar(ancho: Int, alto: Int, id: String, carpeta: String, anfitrion: Anfitrion) {
+        if (!listo()) iniciarNativo(ancho, alto, id, carpeta, anfitrion)
     }
     external fun listo(): Boolean
-    private external fun iniciarNativo(ancho: Int, alto: Int, id: String, anfitrion: Anfitrion)
+    private external fun iniciarNativo(ancho: Int, alto: Int, id: String, carpeta: String, anfitrion: Anfitrion)
 
     external fun tick()
     /** Sube el cuadro a la textura ligada; [crear] la primera vez. */
