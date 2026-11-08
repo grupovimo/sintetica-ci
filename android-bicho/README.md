@@ -40,8 +40,17 @@ Por wifi (para dejarlo en el cargador de pared): con el cable puesto,
 2. `adb shell dpm set-device-owner com.sinteticalabs.bicho/.Admin`
 3. `./herramientas/vaciar.sh`: apaga (no borra) todo lo que no hace falta,
    lanzador incluido. `./herramientas/vaciar.sh --volver` lo prende de nuevo.
-4. Vincularlo: `adb shell am broadcast -a sintetica.EVENT --es tipo vincular`
+4. `./herramientas/ajustar.sh`: celu dedicado (sin chip): modo avión con wifi,
+   wifi siempre prendido, sin animaciones, sin ubicación ni sonidos del
+   sistema, hora automática, el bicho fuera del ahorro de batería. La app
+   además sostiene la hora automática, el wifi, el bluetooth apagado, el
+   silencio y posterga las actualizaciones del sistema.
+5. Vincularlo: `adb shell am broadcast -a sintetica.EVENT --es tipo vincular`
    (provisorio, hasta que hable con la nube).
+
+Con el celu enchufado las 24 h, conviene un enchufe con horario (que cargue
+unas horas y descanse otras): sin root no se puede limitar la carga, y una
+batería vieja siempre al 100 % se gasta y se puede hinchar.
 
 ## Salida secreta
 

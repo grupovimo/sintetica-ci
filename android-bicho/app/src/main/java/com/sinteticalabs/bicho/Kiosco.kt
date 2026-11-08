@@ -3,6 +3,9 @@ package com.sinteticalabs.bicho
 import android.app.Activity
 import android.app.admin.DeviceAdminReceiver
 import android.app.admin.DevicePolicyManager
+import android.app.admin.SystemUpdatePolicy
+import android.bluetooth.BluetoothAdapter
+import android.media.AudioManager
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -55,9 +58,27 @@ object Kiosco {
             val siempre = BatteryManager.BATTERY_PLUGGED_AC or BatteryManager.BATTERY_PLUGGED_USB or
                 BatteryManager.BATTERY_PLUGGED_WIRELESS
             d.setGlobalSetting(adm, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, siempre.toString())
+            celuDedicado(a, d, adm)
             a.startLockTask()
         }.onFailure { Log.w("Bicho", "kiosco: ${it.message}") }
         a.getSharedPreferences(PREFS, 0).edit().putBoolean("activo", true).apply()
+    }
+
+    /**
+     * El celu es solo el bicho (ver herramientas/ajustar.sh para lo que va por
+     * adb): hora automática, wifi siempre prendido, sin actualizaciones del
+     * sistema que lo reinicien, bluetooth apagado y sin sonidos del sistema.
+     */
+    @Suppress("DEPRECATION")
+    private fun celuDedicado(a: Activity, d: DevicePolicyManager, adm: ComponentName) {
+        d.setGlobalSetting(adm, Settings.Global.AUTO_TIME, "1")
+        d.setGlobalSetting(adm, Settings.Global.AUTO_TIME_ZONE, "1")
+        d.setGlobalSetting(adm, Settings.Global.WIFI_SLEEP_POLICY, Settings.Global.WIFI_SLEEP_POLICY_NEVER.toString())
+        d.setSystemUpdatePolicy(adm, SystemUpdatePolicy.createPostponeInstallPolicy())
+        runCatching { BluetoothAdapter.getDefaultAdapter()?.takeIf { it.isEnabled }?.disable() }
+        val audio = a.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        for (canal in intArrayOf(AudioManager.STREAM_RING, AudioManager.STREAM_NOTIFICATION, AudioManager.STREAM_SYSTEM))
+            runCatching { audio.setStreamVolume(canal, 0, 0) }
     }
 
     /** La salida secreta: suelta todo y abre los ajustes. */
