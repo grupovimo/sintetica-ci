@@ -486,8 +486,8 @@
   /* 4 y 5 */
   .opcion { margin: 0; display: flex; flex-direction: column; gap: 16px; padding: 16px; border-radius: 40px; background: #1d1d1d; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); }
   .opcion figcaption { padding: 0 8px 8px; }
-  .caras { aspect-ratio: 16 / 10; border-radius: 28px; background: #000; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 8px; }
-  .caras img { width: 100%; height: 100%; object-fit: cover; border-radius: 20px; }
+  .caras { aspect-ratio: 16 / 10; border-radius: 28px; background: #000; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 8px; overflow: hidden; }
+  .caras img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: cover; border-radius: 20px; }
   .personalidad { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap: 48px; align-items: center; padding-top: 128px; border-top: 1px solid #2a2a2a; }
   .vivo { position: relative; padding: 16px; border-radius: 40px; background: #1d1d1d; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); }
   .vivo :global(.placa) { width: 100% !important; max-width: none; }
