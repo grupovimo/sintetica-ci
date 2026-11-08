@@ -1,9 +1,10 @@
 <script lang="ts">
-  // Modos: qué es el robot ahora. Mascota (se maneja solo), reloj o pomodoro.
-  // Clima y notificaciones llegan con las integraciones de la nube.
+  // Modos: qué es el robot ahora. Mascota (se maneja solo), reloj, pomodoro
+  // o el clima de su ciudad. Las notificaciones llegan con la nube.
   import { usarBicho } from '$lib/bicho.svelte';
   import { usarGuardado } from '../guardado.svelte';
   import type { Modelo } from '../modelo';
+  import Ubicacion from '../Ubicacion.svelte';
 
   let { modelo }: { modelo: Modelo } = $props();
   const b = usarBicho();
@@ -13,7 +14,7 @@
     { clave: 'mascota', nombre: 'Compañía', dice: 'Vive su vida: duerme, juega, te busca.', listo: true },
     { clave: 'reloj', nombre: 'Reloj', dice: 'La hora grande, y él mirando de reojo.', listo: true },
     { clave: 'pomodoro', nombre: 'Pomodoro', dice: 'Tandas de foco y descanso. Un toque arranca o pausa.', listo: true },
-    { clave: 'clima', nombre: 'Clima', dice: 'El tiempo de tu ciudad, con su cara.', listo: false },
+    { clave: 'clima', nombre: 'Clima', dice: 'El tiempo de tu ciudad, con su cara.', listo: true },
     { clave: 'notificaciones', nombre: 'Avisos', dice: 'Lo que le mandes desde tus integraciones.', listo: false },
   ];
   const modo = $derived(b.config.modo ?? 'mascota');
@@ -34,12 +35,16 @@
   <div class="teclas" role="radiogroup" aria-label="Modo">
     {#each MODOS as m}
       <button role="radio" aria-checked={modo === m.clave} class="modo" class:elegido={modo === m.clave} disabled={!m.listo} onclick={() => ponerModo(m.clave)}>
-        <span class="arriba"><span class="led" class:on={modo === m.clave}></span>{#if !m.listo}<span class="pronto">Pronto</span>{/if}</span>
+        <span class="arriba"><span class="led" class:on={modo === m.clave}></span>{#if !m.listo}<span class="pronto">Pronto</span>{:else if m.clave === 'clima' && !b.config.ubicacion}<span class="pronto">Sin ciudad</span>{/if}</span>
         <b>{m.nombre}</b>
         <small>{m.dice}</small>
       </button>
     {/each}
   </div>
+
+  {#if modo === 'clima'}
+    <Ubicacion />
+  {/if}
 
   {#if modo === 'pomodoro'}
     <div class="visores">

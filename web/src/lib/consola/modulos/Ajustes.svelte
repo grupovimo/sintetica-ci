@@ -1,11 +1,12 @@
 <script lang="ts">
-  // Ajustes: su nombre, el brillo, y lo de fondo (firmware, historial, sacarlo de la cuenta).
+  // Ajustes: su nombre, el brillo, dónde vive (para el clima) y lo de fondo (firmware, historial, sacarlo de la cuenta).
   import { goto } from '$app/navigation';
   import { api, ErrorApi } from '$lib/api';
   import { usarBicho } from '$lib/bicho.svelte';
   import { usarGuardado } from '../guardado.svelte';
   import { numeroDe, type Modelo } from '../modelo';
   import Perilla from '../Perilla.svelte';
+  import Ubicacion from '../Ubicacion.svelte';
 
   let { modelo }: { modelo: Modelo } = $props();
   const b = usarBicho();
@@ -53,6 +54,8 @@
         mostrar={(v) => `${Math.round(v * 100)}%`} />
     </div>
   </div>
+
+  <Ubicacion />
 
   <div class="placa-datos">
     {#each [['Modelo', `${modelo.nombre} ${numeroDe(b.id)}`], ['Firmware', e?.version ?? '—'], ['Config', `v${b.versionConfig} · ${b.bicho?.sincro?.config ?? '—'}`], ['Batería', e?.bateria != null ? `${e.bateria}%` : '—'], ['WiFi', e?.wifi ? 'Conectado' : 'No'], ['Serie', b.id]] as [k, v]}
