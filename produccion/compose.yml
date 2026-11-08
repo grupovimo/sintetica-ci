@@ -80,7 +80,7 @@ services:
     restart: unless-stopped
 
   api:
-    image: ghcr.io/nawesan12/sintetica-api:${VERSION:-latest}
+    image: ghcr.io/nawesan12/sintetica-api:${VERSION:?falta VERSION (un sha)}
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,7 +95,7 @@ services:
     restart: unless-stopped
 
   web:
-    image: ghcr.io/nawesan12/sintetica-web:${VERSION:-latest}
+    image: ghcr.io/nawesan12/sintetica-web:${VERSION:?falta VERSION (un sha)}
     depends_on:
       api:
         condition: service_started

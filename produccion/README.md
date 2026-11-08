@@ -28,8 +28,10 @@ del VPS (Caddy, UFW, puertos, copias) está anotado en `/opt/VPS.md`.
 
 ## Primera vez
 
-1. `docker login ghcr.io` con un token de solo lectura de paquetes
-   (`read:packages`): el repo es privado.
+1. `docker login ghcr.io` (como `deploy`, queda en
+   `/home/deploy/.docker/config.json`) con un token que crea Nahuel con **solo**
+   `read:packages` (PAT clásico o fine-grained): el repo es privado.
+   `mkdir -p pg emqx-datos claves secretos` como `deploy`.
 2. Copiar `compose.yml`, `emqx.conf` y armar `.env` y `secretos/` con claves
    nuevas (ver `.env.ejemplo`).
 3. La clave de firma de las OTA, una sola vez:
@@ -38,8 +40,9 @@ del VPS (Caddy, UFW, puertos, copias) está anotado en `/opt/VPS.md`.
      --entrypoint sintetica-api ghcr.io/nawesan12/sintetica-api claves /claves
    chown -R 10001 claves && chmod 600 claves/ota-privada.pem
    ```
-   **Perderla obliga a reflashear por USB todos los bichos**: guardar una copia
-   fuera del VPS. La pública (`ota-publica.pem`) es la que se embebe en el
+   **Perderla obliga a reflashear por USB todos los bichos**: hay una copia en
+   la Mac de Nahuel (`~/Trabajo/vimo/credenciales-sintetica/`) y otra cifrada
+   en el backup de `vimo-copia`. La pública (`ota-publica.pem`) es la que se embebe en el
    firmware de producción.
 4. `docker compose pull && docker compose up -d`.
 5. `curl -s https://api-sintetica.grupovimo.com.ar/salud`.
@@ -52,8 +55,11 @@ docker compose exec postgres pg_dump -U sintetica sintetica | gzip > ~/sintetica
 VERSION=<sha> docker compose pull && VERSION=<sha> docker compose up -d
 ```
 
-Cuando el timer renueva el certificado de MQTT deja `certs/renovado`:
-`docker compose restart emqx` y borrar el archivo.
+El certificado de MQTT lo renueva el timer `sintetica-cert`, que reinicia EMQX
+solo (deja `certs/renovado` únicamente si EMQX no está corriendo).
+
+`VERSION` en el `.env` va siempre fijada a un sha probado (nunca `latest`), así
+un `pull` no sube nada sin querer y volver atrás es cambiar el sha.
 
 ## Caddy (lo maneja `/etc/caddy/sitios/sintetica.caddy`)
 
