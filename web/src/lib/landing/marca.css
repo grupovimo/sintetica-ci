@@ -64,7 +64,10 @@
 @media (max-width: 720px) {
   .landing .contenedor { padding: 0 16px; }
   .landing .seccion { padding: 96px 0; }
-  .landing .nav nav .ficha:not(:last-child) { display: none; }
+  /* En el celu: la marca y Reservar, en un solo renglón y con aire arriba (y el área segura del iPhone). */
+  .landing .nav { flex-wrap: nowrap; justify-content: space-between; padding-top: max(28px, env(safe-area-inset-top)); padding-bottom: 20px; }
+  .landing .nav nav { display: none; }
+  .landing .nav .inflado { min-height: 46px; padding: 0 20px; font-size: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .landing .grano, .landing .cromo { animation: none; }
