@@ -140,6 +140,9 @@ func (a *Almacen) GuardarTokenMP(ctx context.Context, usuarioID string, cifrado 
 // limpiarV19: las invitaciones vencidas, las presencias viejas y los hábitos
 // de hace más de un año.
 func (a *Almacen) limpiarV19(ctx context.Context) error {
+	if err := a.limpiarElevenLabs(ctx); err != nil {
+		return err
+	}
 	if err := a.limpiarAmigos(ctx); err != nil {
 		return err
 	}

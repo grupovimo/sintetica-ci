@@ -123,6 +123,7 @@ func (s *Servidor) Rutas() http.Handler {
 	m.HandleFunc("GET /v1/bichos/{id}/resumen", s.conBicho(s.resumenDelDia)) // v1.7
 	s.rutasCompania(m)                                                       // v1.9: amigos, presencia, hábitos y entrantes (amigos.go)
 	s.rutasAgendaMusicaCharla(m)                                             // v1.9: agenda.go, musica.go y charla.go
+	s.rutasVoz(m)                                                            // ElevenLabs (voz.go)
 
 	m.HandleFunc("GET /v1/telegram", s.conSesion(s.verTelegram))
 	m.HandleFunc("POST /v1/telegram/vincular", s.conSesion(s.vincularTelegram))

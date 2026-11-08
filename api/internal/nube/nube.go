@@ -63,7 +63,18 @@ type Nube struct {
 	cancelar context.CancelFunc
 
 	oyente Oyente
+	voz    Voz
 }
+
+// Voz puede quedarse con un 0x40 Decir para mandarlo junto con su audio
+// (ElevenLabs, en integraciones/voz.go). TomarDecir no puede bloquear: si
+// devuelve true, se encarga de llamar a mandar (después del audio).
+type Voz interface {
+	TomarDecir(bicho string, marco []byte, mandar func() error) bool
+}
+
+// UsarVoz suma la voz (antes de Conectar).
+func (n *Nube) UsarVoz(v Voz) { n.voz = v }
 
 // Oyente se entera de lo que les pasa a los bichos (las automatizaciones).
 // Evento no puede bloquear: lo llama el trabajador del bicho.
@@ -244,6 +255,10 @@ func (n *Nube) enviar(id string, car byte, marco []byte) error {
 func (n *Nube) Enviar(id string, car byte, marco []byte) error {
 	if !n.Conectado(id) {
 		return ErrDesconectado
+	}
+	if n.voz != nil && car == protocolo.CarComando && len(marco) > 0 && marco[0] == protocolo.CmdDecir &&
+		n.voz.TomarDecir(id, append([]byte(nil), marco...), func() error { return n.enviar(id, car, marco) }) {
+		return nil
 	}
 	return n.enviar(id, car, marco)
 }

@@ -156,6 +156,7 @@ func (s *Servidor) sumarHerramientas(srv *mcp.Server) {
 	s.sumarHerramientasCuidado(srv)      // mcp_cuidado.go
 	s.sumarHerramientasCompania(srv)     // mcp_compania.go (v1.9)
 	s.sumarHerramientasAgendaMusica(srv) // mcp_agenda.go
+	s.sumarHerramientaVoz(srv)           // mcp_voz.go
 }
 
 func jsonDe(v any) string { b, _ := json.Marshal(v); return string(b) }

@@ -63,9 +63,14 @@ nube, revoca sus claves y lo echa del broker.
 | `bicho/{id}/resp` | el bicho | `[característica][respuesta]` (QoS 0) |
 | `bicho/{id}/state` | el bicho | el estado v4, retenido (QoS 1) |
 | `bicho/{id}/conexion` | el bicho | `1` al conectarse; `0` es su testamento (retenido); el broker también publica el `0` cuando se va con DISCONNECT o lo echan |
+| `bicho/{id}/charla`, `…/presencia` | el robot-celu | lo que le dijeron y la presencia (v1.9, abajo) |
+| `bicho/{id}/conversacion` | el robot-celu | `{"pedir": true, "modo"?: "webrtc"}`: quiere hablar en tiempo real (ElevenLabs, abajo) |
+| `bicho/{id}/conversacion/url` | la API | la respuesta: la URL firmada (o el token) o `{"error"}` |
+| `bicho/{id}/audio` | la API | la voz: los paquetes de `docs/protocolo-ble.md`, "Voz" (QoS 1) |
 
 Cada bicho entra con usuario = client id = su id y su clave; solo puede
-publicar en sus tres tópicos y suscribirse a su `cmd`
+publicar en sus tópicos (`state`, `resp`, `conexion`, `charla`, `presencia`,
+`conversacion`) y suscribirse a su `cmd`, su `audio` y su `conversacion/url`
 (`servidor.AutorizarMQTT`; lo que no está, no). La API publica y se suscribe
 en el mismo proceso; `MQTT_USUARIO`/`MQTT_CLAVE` es un superusuario para mirar
 de afuera (`mosquitto_sub -u api -P … -t 'bicho/#'`).
@@ -732,6 +737,122 @@ el tope de 60 por día por usuario es el mismo. Sin ninguno, `GET /v1/charla` �
   `{"llegaste": bool}` y la nube solo la anota para los horarios y corre los
   cuandos (no le reenvía el `0x49`: ya se lo dijo a su núcleo).
 - SSE `charla` (`{texto, expresion, de, enviado}`).
+
+### Voz con ElevenLabs (cada usuario con su cuenta)
+
+Código: `api/internal/integraciones/elevenlabs.go` (el cliente y la cuenta),
+`voz.go` (leer en voz alta) y `conversacion.go` (en tiempo real); las rutas en
+`servidor/voz.go`, el MCP en `servidor/mcp_voz.go`; migración
+`013_elevenlabs.sql`. **No hay clave del servidor**: cada usuario pega la suya
+(elevenlabs.io → API Keys, con permisos de Voces, Texto a voz y Agentes) y la
+factura le llega a él. Sin clave, todo sigue igual: el robot-celu usa su voz
+local y los demás no hablan. Todo verificado en elevenlabs.io/docs.
+
+- **La clave** va **cifrada** en `elevenlabs_cuentas` (`api/internal/cifra`,
+  como Spotify, con su derivación `elevenlabs`; si `SECRETO` cambia, hay que
+  volver a pegarla). Nunca se devuelve, ni se loguea, ni va a un cliente: solo
+  sale en el encabezado `xi-api-key` hacia `api.elevenlabs.io`. Una clave
+  nueva olvida las herramientas y los agentes de la anterior.
+- `PUT /v1/voz/elevenlabs {"clave"?, "voz"?, "leer"?, "tope"?, "tope_minutos"?}`:
+  con `clave`, la valida leyendo sus voces (`GET /v2/voices`; 400 si
+  ElevenLabs no la acepta o le faltan permisos) y la guarda con la voz pedida
+  o la primera. Sin `clave`, cambia la voz (400 si no está en su cuenta), la
+  llave **leer en voz alta** (`leer`, prendida por defecto) o los topes (404
+  sin cuenta). 30 cambios por hora. Responde lo mismo que el `GET`.
+- `GET /v1/voz/elevenlabs` → `{"conectado", "voz", "voz_nombre", "voces":
+  [{id, nombre, muestra?}]` (las de su cuenta; `muestra`, el mp3 de ejemplo)`,
+  "leer", "usados_hoy", "tope", "segundos_hoy", "tope_minutos"}`.
+- `POST /v1/voz/elevenlabs/probar {"texto"?}` (hasta 200 bytes; si no, "¡Hola!
+  Así suena mi voz.") → `audio/mpeg`, para escucharlo en la web. Cuenta para
+  el tope; 10 por minuto. `DELETE /v1/voz/elevenlabs` borra la clave y los
+  agentes que se crearon en su cuenta.
+- **La factura**: `tope` = caracteres por día que se leen en voz alta (por
+  defecto 5000, de 0 a 200 000; `elevenlabs_uso`, día de Argentina) y
+  `tope_minutos` = minutos de conversación por día (por defecto 10, de 0 a
+  240; 0 la apaga). Con el tope lleno, el globo sale igual, sin voz.
+- SSE `voz` `{conectado}` cuando cambia. MCP **`voz`** (`ver`: si está
+  conectado, la voz y lo usado hoy; `probar`: el robot lo dice con su voz).
+  Nunca ve ni cambia la clave.
+
+**Leer en voz alta.** Con la cuenta conectada y `leer` prendido, en los robots
+con parlante (hoy el perfil `celu`, `integraciones.PerfilesConParlante`):
+
+- Todo 0x40 Decir que la nube le manda (charla, `POST decir`, automatizaciones
+  `decir`, Telegram, MCP `decir` y `voz`) pasa por `nube.Enviar`, que se lo
+  da a `integraciones.TomarDecir`: una cola por robot (en orden, hasta 8) pide
+  el audio (`POST /v1/text-to-speech/{voz}?output_format=mp3_22050_32`, modelo
+  **`eleven_flash_v2_5`**: ~100 ms y multilingüe, el que sirve en el texto a
+  voz común —`eleven_v4_turbo` va solo por su websocket de diálogo— y la mitad
+  de precio por carácter), lo publica en `bicho/{id}/audio` y **enseguida**
+  manda el 0x40: llegan juntos. Si ElevenLabs falla o tarda más de 8 s, el
+  0x40 sale solo.
+- Los globos que el robot muestra solo y la nube conoce: el **recordatorio**
+  (evento `recordatorio`: el texto de `recordatorios[i]`) y el
+  **despertador** (`despertador.texto`, también cuando lo despierta la nube),
+  con `{dueno}` y `{robot}` reemplazados; cada uno, una vez (no se repite en 3
+  minutos). Las frases propias (`habla`) no: el estado solo dice `globo`, sin
+  el texto.
+- El formato: mp3 mono de 22,05 kHz a 32 kbps (4 KB por segundo: un globo de
+  10 s son unos 40 KB, un solo paquete) en el paquete **tipo 2** de
+  `docs/protocolo-ble.md`, "Voz". Al conectarse (y cuando cambia la cuenta),
+  el robot recibe el **tipo 3** (si la nube lee sus globos): así el
+  robot-celu espera el audio de sus recordatorios en vez de usar su voz local.
+
+**Conversación en tiempo real** (ElevenAgents, la plataforma de agentes de
+ElevenLabs, con la cuenta del dueño):
+
+- **Un agente por robot** (`elevenlabs_agentes`): el prompt sale de lo mismo
+  que la charla (`datosCharla`: nombre, personalidad, dueño, hora, ciudad,
+  clima y memoria de **ese** robot, nada de otros), con la voz elegida,
+  `language: "es"`, `eleven_flash_v2_5`, audio `pcm_16000` de ida y de vuelta,
+  el primer mensaje "¡Acá estoy! ¿Qué contás?", `enable_auth` (solo con URL
+  firmada o token) y la herramienta de sistema `end_call` (se despide y
+  corta). Se crea (`POST /v1/convai/agents/create`) la primera vez y se
+  actualiza (`PATCH /v1/convai/agents/{id}`) cuando cambia lo que se le manda
+  (una huella: nombre, personalidad, voz, memoria, la hora, el tope); si lo
+  borraron allá, se crea otro.
+- **Client tools** (`POST /v1/convai/tools`, una vez por cuenta):
+  `poner_expresion {nombre}` (una de las expresiones del robot: las lista el
+  prompt y la respuesta de abajo) y `mirar {x, y}` (−100 a 100). No esperan
+  respuesta. Las ejecuta el cliente contra **su** robot (0x10 Expresión y 0x46
+  Mirar).
+- `GET /v1/bichos/{id}/conversacion[?modo=webrtc]` (con sesión del dueño; 30
+  por hora) → `{"url": "wss://api.elevenlabs.io/v1/convai/conversation?…"`
+  (o `"token"` con `modo=webrtc`, para el SDK de Android)`, "agente",
+  "vence"` (unix: se puede **empezar** durante 15 minutos; la charla puede
+  durar más)`, "segundos"` (lo más que dura esta)`, "silencio", "quedan"`
+  (segundos de hoy)`, "expresiones"}`. 429 con el tope lleno, 404 sin cuenta.
+- **El tope**: los segundos de hoy salen de ElevenLabs (`GET
+  /v1/convai/conversations?agent_id&call_start_after_unix=<medianoche>`; las
+  abiertas cuentan lo que van; cache de 20 s). Cada conversación dura como
+  mucho lo que queda (`max_duration_seconds`, de 60 —el mínimo que aceptan, así
+  que la última se puede pasar un poco— a 600) y se corta sola tras **20 s sin
+  que hable nadie** (`turn.silence_end_call_timeout`; el robot retoma a los
+  7 s, `turn_timeout`).
+- **El robot-celu** publica en `bicho/{id}/conversacion` `{"pedir": true,
+  "modo"?: "webrtc"}` (solo después de oír su palabra y con `voz.conversar`;
+  30 por hora) y recibe lo mismo en `bicho/{id}/conversacion/url` (o
+  `{"error": "…"}`).
+- **Desde el navegador** (la consola), con el SDK de JS `@elevenlabs/client`:
+
+  ```js
+  const c = await api(`/v1/bichos/${id}/conversacion`); // {url, expresiones, …}
+  const conv = await Conversation.startSession({
+    signedUrl: c.url,
+    clientTools: {
+      poner_expresion: ({ nombre }) => { /* 0x10 al robot (o a la cara en vivo) */ },
+      mirar: ({ x, y }) => { /* 0x46 */ },
+    },
+    onModeChange: ({ mode }) => { /* "speaking" | "listening": la cara */ },
+    onDisconnect: () => { /* soltar la expresión (0x10 vacío) */ },
+  });
+  // conv.endSession() al cerrar
+  ```
+
+  Pide el micrófono del navegador y el audio va directo a ElevenLabs (la nube
+  no lo ve). Si el robot está conectado, las herramientas le mandan los
+  comandos (`POST /v1/bichos/{id}/marcos`); si no, mueven la cara en vivo de
+  la web.
 
 ## MCP: que una IA maneje los robots
 

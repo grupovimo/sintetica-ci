@@ -32,6 +32,9 @@ type OpcionesV19 struct {
 	// Un servicio compatible con la API de chat de OpenAI (Groq, OpenRouter,
 	// Gemini, uno propio): con CharlaURL y un modelo, se usa en vez de Anthropic.
 	CharlaURL, CharlaClave string
+	// ElevenLabsURL: vacía, la de siempre (los tests ponen un servidor falso).
+	// La clave de ElevenLabs es de cada usuario (voz.go).
+	ElevenLabsURL string
 }
 
 type estadoV19 struct {
@@ -56,6 +59,7 @@ func (i *Integraciones) iniciarV19() {
 		musica: map[string]sonando{}, tokens: map[string]tokenAcceso{}, bpms: map[string]int{},
 		charlas: make(chan struct{}, 8),
 	}
+	i.iniciarVoz(sec)
 }
 
 func (i *Integraciones) ahora() time.Time { return i.v19.ahora() }

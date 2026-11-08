@@ -84,6 +84,7 @@ type Integraciones struct {
 
 	toques estadoToques // los últimos toques, para devolverlos (amigos.go)
 	v19    estadoV19    // lo de la v1.9 (v19.go)
+	voz    estadoVoz    // ElevenLabs (voz.go)
 }
 
 type entradaCache struct {
@@ -174,6 +175,9 @@ func (i *Integraciones) Evento(bicho, evento string, datos map[string]any) {
 	case "conectado":
 		i.ClimaYa(bicho)
 		i.musicaYa(bicho)
+		go func() { time.Sleep(3 * time.Second); i.avisarVoz(bicho) }() // cuando ya mandó su estado
+	case "recordatorio", "despertador": // lo lee en voz alta (voz.go) y sigue
+		go i.leerGloboPropio(bicho, evento, datos)
 	case "juego":
 		i.anotarJuego(bicho, datos)
 	case "bicho-cerca":

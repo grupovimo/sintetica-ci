@@ -23,3 +23,22 @@ func (n *Nube) AlPublicar(sufijo string, f func(bicho string, datos []byte)) err
 		f(partes[1], append([]byte(nil), datos...))
 	})
 }
+
+// PublicarAudio manda un paquete a bicho/{id}/audio (QoS 1; ver
+// protocolo/voz.go). Solo si está conectado.
+func (n *Nube) PublicarAudio(id string, paquete []byte) error {
+	return n.PublicarEn(id, "audio", paquete)
+}
+
+// PublicarEn manda algo a bicho/{id}/{sufijo} (QoS 1), si está conectado:
+// "audio" y "conversacion/url" (la ACL deja que cada bicho se suscriba a los
+// suyos).
+func (n *Nube) PublicarEn(id, sufijo string, datos []byte) error {
+	if !n.Conectado(id) {
+		return ErrDesconectado
+	}
+	if !n.listo.Load() {
+		return errors.New("la API no está conectada al broker")
+	}
+	return n.op.Broker.Publicar("bicho/"+id+"/"+sufijo, datos, false, 1)
+}

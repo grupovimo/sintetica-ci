@@ -35,6 +35,15 @@ func TestAutorizarMQTT(t *testing.T) {
 		{a, "bicho/" + a + "/charla", false, false},
 		{a, "bicho/" + a + "/presencia", true, true}, // v1.9: el robot-celu te vio llegar
 		{a, "bicho/" + b + "/presencia", true, false},
+		{a, "bicho/" + a + "/conversacion", true, true}, // ElevenLabs: pide la URL firmada
+		{a, "bicho/" + b + "/conversacion", true, false},
+		{a, "bicho/" + a + "/conversacion/url", false, true}, // y la recibe acá
+		{a, "bicho/" + b + "/conversacion/url", false, false},
+		{a, "bicho/" + a + "/conversacion/url", true, false},
+		{a, "bicho/" + a + "/audio", false, true}, // el audio de la voz
+		{a, "bicho/" + b + "/audio", false, false},
+		{a, "bicho/" + a + "/audio", true, false}, // el micrófono, cuando haya (M7): todavía no
+		{a, "bicho/+/audio", false, false},
 		{a, "bicho/" + a + "/cmd", true, false}, // no se manda comandos a sí mismo
 		{a, "bicho/" + a + "/otro", true, false},
 		{a, "bicho/" + b + "/state", true, false},

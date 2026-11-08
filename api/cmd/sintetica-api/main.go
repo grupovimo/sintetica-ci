@@ -191,6 +191,8 @@ func correr(log *slog.Logger) error {
 		},
 	}, alm, n, hub, log)
 	n.Escuchar(integ)
+	// Leer en voz alta con el ElevenLabs de cada usuario (integraciones/voz.go).
+	n.UsarVoz(integ)
 	// Lo que le dicen al robot-celu por voz (bicho/{id}/charla).
 	if err := n.AlPublicar("charla", integ.CharlaMQTT); err != nil {
 		return fmt.Errorf("charla por MQTT: %w", err)
@@ -198,6 +200,10 @@ func correr(log *slog.Logger) error {
 	// Lo que el robot-celu sabe por su cuenta (bicho/{id}/presencia).
 	if err := n.AlPublicar("presencia", integ.PresenciaMQTT); err != nil {
 		return fmt.Errorf("presencia por MQTT: %w", err)
+	}
+	// El robot-celu pide una conversación en tiempo real (bicho/{id}/conversacion).
+	if err := n.AlPublicar("conversacion", integ.ConversacionMQTT); err != nil {
+		return fmt.Errorf("conversación por MQTT: %w", err)
 	}
 	srv = servidor.Nuevo(op, alm, n, integ, hub, c, firmador, log)
 

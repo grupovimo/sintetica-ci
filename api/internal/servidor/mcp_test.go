@@ -187,7 +187,7 @@ func TestMCPHerramientas(t *testing.T) {
 		nombres[x.(map[string]any)["name"].(string)] = true
 	}
 	for _, n := range []string{"listar_robots", "ver_robot", "poner_cara", "disparar_evento", "reproducir_comportamiento", "crear_expresion",
-		"listar_expresiones", "dibujar_cara", "poner_imagen", "recordatorios", "personalidad", "horario", "modo", "reflejos", "automatizaciones", "mandar_telegram", "agenda", "musica"} {
+		"listar_expresiones", "dibujar_cara", "poner_imagen", "recordatorios", "personalidad", "horario", "modo", "reflejos", "automatizaciones", "mandar_telegram", "agenda", "musica", "voz"} {
 		if !nombres[n] {
 			t.Errorf("falta la herramienta %s", n)
 		}

@@ -297,6 +297,33 @@ Para los modelos con micrófono y parlante (dos micrófonos, un parlante):
   el globo se ve mientras habla, con la cara `hablando`.
 - Con parlante, el globo, los recordatorios y el despertador se **leen en voz
   alta** (la nube manda el audio del texto; sin nube, solo el sonido).
+- **Audio entero** (desde la voz con ElevenLabs, ver `docs/nube.md`, "Voz con
+  ElevenLabs"): la nube manda por `bicho/{id}/audio` (QoS 1) un mp3 entero en
+  uno o más paquetes **tipo 2**, todo en little endian
+  (`protocolo.TrozosAudio`, `api/internal/protocolo/voz.go`):
+
+  ```
+  [u8 2][u16 id del audio][u8 formato: 1 = mp3 mono 22,05 kHz 32 kbps]
+  [u8 origen: 0 Decir, 1 recordatorio, 2 despertador][u32 CRC-32 del texto (UTF-8)]
+  [u8 índice del trozo][u8 cantidad de trozos][bytes del mp3, hasta 48 KB]
+  ```
+
+  Con todos los trozos de un `id`, se juntan en orden y se reproducen. Un
+  globo dura de 3 a 10 s: son de 12 a 40 KB, casi siempre un solo paquete
+  (tope del audio: 512 KB). **Origen 0**: llega justo **antes** del 0x40
+  Decir cuyo texto tiene ese CRC: el robot lo reproduce mientras muestra el
+  globo y no usa su voz local para ese globo; un 0x40 sin audio antes se dice
+  como siempre. **Origen 1 y 2**: acompaña a un recordatorio o al despertador
+  que el robot ya está mostrando (la nube se entera por el aviso 0x9E y tarda
+  ~1 s): se reproduce si ese globo sigue en pantalla.
+- **Tipo 3** `[u8 3][u8 flags: bit 0 = la nube lee los globos en voz alta]`:
+  llega unos segundos después de conectarse y cada vez que el dueño cambia la
+  cuenta. Con el bit, para sus recordatorios y el despertador el robot espera
+  hasta 3 s el audio de origen 1 o 2 antes de usar su voz local.
+- **Conversación en tiempo real** (la plataforma de agentes de ElevenLabs): no
+  pasa por este tópico. El robot-celu pide la URL por
+  `bicho/{id}/conversacion` y habla directo con ElevenLabs (ver
+  `docs/nube.md`).
 - Sonidos (`Hal::sonido`): `escuchando`, `pensando`, `hablando`, además de
   `despertador:1` a `despertador:5`, `ronquido`, `murmullo`, `dado`,
   `notificacion`, `llamada`, `recordatorio` y `pomodoro`; desde la v1.9,
