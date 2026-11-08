@@ -210,6 +210,7 @@ export type Ubicacion = { lat: number; lon: number; ciudad: string };
 export const SITUACIONES = [
   'despertar', 'buenas-noches', 'volviste', 'te-extrane', 'aburrido', 'sueno', 'bateria-baja', 'cargando', 'caricia', 'saludo', 'hito',
   'cumple-dueno', 'cumple-robot', 'recordatorio-hecho', 'despertador', 'posponer', 'clima-frio', 'clima-calor', 'clima-lluvia', 'clima-lindo',
+  'buen-dia', 'comiste', 'a-dormir', 'tardaste', 'agua', 'pausa', 'como-estas', 'animo-bien', 'animo-medio', 'animo-mal', 'jugar', 'gane', 'perdi', 'empate', 'anio-nuevo', 'navidad', 'dia-del-amigo', 'dia-del-nino', 'aniversario',
 ] as const;
 export type Situacion = (typeof SITUACIONES)[number];
 export const NOMBRES_SITUACION: Record<Situacion, string> = {
@@ -217,6 +218,7 @@ export const NOMBRES_SITUACION: Record<Situacion, string> = {
   sueno: 'Con sueño', 'bateria-baja': 'Sin pila', cargando: 'Cargando', caricia: 'Caricia', saludo: 'Saludo', hito: 'Un hito',
   'cumple-dueno': 'Tu cumple', 'cumple-robot': 'Su cumple', 'recordatorio-hecho': 'Recordatorio hecho', despertador: 'Despertador',
   posponer: 'Posponer', 'clima-frio': 'Hace frío', 'clima-calor': 'Hace calor', 'clima-lluvia': 'Llueve', 'clima-lindo': 'Día lindo',
+  'buen-dia': 'Buen día', comiste: '¿Comiste?', 'a-dormir': 'A dormir', tardaste: 'Tardaste', agua: 'Agua', pausa: 'Pausa', 'como-estas': '¿Cómo estás?', 'animo-bien': 'Estás bien', 'animo-medio': 'Más o menos', 'animo-mal': 'Estás mal', jugar: 'Jugar', gane: 'Ganó', perdi: 'Perdió', empate: 'Empate', 'anio-nuevo': 'Año nuevo', navidad: 'Navidad', 'dia-del-amigo': 'Día del amigo', 'dia-del-nino': 'Día del niño', aniversario: 'Aniversario',
 };
 export const MAX_FRASES = 12;
 export const MAX_TEXTO = 60;

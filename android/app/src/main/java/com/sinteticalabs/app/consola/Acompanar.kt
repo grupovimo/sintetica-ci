@@ -26,6 +26,7 @@ object Acompanar {
         "saludo" to "Saludo", "hito" to "Un hito", "cumple-dueno" to "Tu cumple", "cumple-robot" to "Su cumple",
         "recordatorio-hecho" to "Recordatorio hecho", "despertador" to "Despertador", "posponer" to "Posponer",
         "clima-frio" to "Hace frío", "clima-calor" to "Hace calor", "clima-lluvia" to "Llueve", "clima-lindo" to "Día lindo",
+        "buen-dia" to "Buen día", "comiste" to "¿Comiste?", "a-dormir" to "A dormir", "tardaste" to "Tardaste", "agua" to "Agua", "pausa" to "Pausa", "como-estas" to "¿Cómo estás?", "animo-bien" to "Estás bien", "animo-medio" to "Más o menos", "animo-mal" to "Estás mal", "jugar" to "Jugar", "gane" to "Ganó", "perdi" to "Perdió", "empate" to "Empate", "anio-nuevo" to "Año nuevo", "navidad" to "Navidad", "dia-del-amigo" to "Día del amigo", "dia-del-nino" to "Día del niño", "aniversario" to "Aniversario",
     )
     val EJEMPLO = mapOf(
         "despertar" to "¡Arriba, {dueno}!", "buenas-noches" to "Hasta mañana, {dueno}", "volviste" to "¡Volviste!", "te-extrane" to "Te extrañé",

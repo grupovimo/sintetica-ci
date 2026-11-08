@@ -3,7 +3,7 @@
   // propias para cada situación. No hace falta parlante.
   import { api, ErrorApi } from '$lib/api';
   import { usarBicho } from '$lib/bicho.svelte';
-  import { bytes, cortarBytes, MAX_FRASES, MAX_TEXTO, NOMBRES_SITUACION, SITUACIONES, type Situacion } from '$lib/formato';
+  import { bytes, cortarBytes, MAX_FRASES, MAX_TEXTO, NOMBRES_SITUACION, type Situacion } from '$lib/formato';
   import { usarGuardado } from '../guardado.svelte';
   import type { Modelo } from '../modelo';
   import Perilla from '../Perilla.svelte';
@@ -16,6 +16,16 @@
     despertar: '¡Arriba, {dueno}!', 'buenas-noches': 'Hasta mañana, {dueno}', volviste: '¡Volviste!', 'te-extrane': 'Te extrañé',
     aburrido: 'Qué embole...', caricia: 'Más, más', saludo: 'Hola, soy {robot}', despertador: '¡Arriba!', 'clima-lluvia': 'Llevá paraguas',
   };
+
+  // Agrupadas, así la lista se lee de un vistazo.
+  const GRUPOS: [string, Situacion[]][] = [
+    ['Su día', ['despertar', 'buen-dia', 'comiste', 'tardaste', 'a-dormir', 'buenas-noches', 'despertador', 'posponer', 'sueno']],
+    ['Con vos', ['saludo', 'volviste', 'te-extrane', 'caricia', 'aburrido', 'como-estas', 'animo-bien', 'animo-medio', 'animo-mal']],
+    ['Cuidarte', ['agua', 'pausa', 'recordatorio-hecho', 'bateria-baja', 'cargando']],
+    ['Clima', ['clima-frio', 'clima-calor', 'clima-lluvia', 'clima-lindo']],
+    ['Jugar', ['jugar', 'gane', 'perdi', 'empate']],
+    ['Fechas', ['cumple-dueno', 'cumple-robot', 'aniversario', 'anio-nuevo', 'navidad', 'dia-del-amigo', 'dia-del-nino', 'hito']],
+  ];
 
   const frecuencia = $derived(b.config.habla?.frecuencia ?? 0.5);
   const propias = $derived(b.config.habla?.propias ?? {});
@@ -57,7 +67,7 @@
 
   let oido = $state('');
   async function probar(t: string) {
-    const texto = cortarBytes(t.replaceAll('{dueno}', b.config.dueno?.nombre ?? '').replaceAll('{robot}', nombre).replace(/\s+/g, ' ').trim(), MAX_TEXTO);
+    const texto = cortarBytes(t.replaceAll('{dueno}', b.config.dueno?.nombre ?? '').replaceAll('{robot}', nombre).replaceAll('{clima}', '').replace(/\s+/g, ' ').trim(), MAX_TEXTO);
     try {
       await api(`/v1/bichos/${b.id}/decir`, { cuerpo: { texto } });
       oido = 'Lo dijo';
@@ -76,7 +86,11 @@
     <label class="visor situacion">
       <span class="grabado">Cuando</span>
       <select class="campo claro" value={situacion} onchange={(e) => (situacion = e.currentTarget.value as Situacion)}>
-        {#each SITUACIONES as s}<option value={s}>{NOMBRES_SITUACION[s]}{propias[s]?.length ? ` · ${propias[s]!.length}` : ''}</option>{/each}
+        {#each GRUPOS as [titulo, lista]}
+          <optgroup label={titulo}>
+            {#each lista as s}<option value={s}>{NOMBRES_SITUACION[s]}{propias[s]?.length ? ` · ${propias[s]!.length}` : ''}</option>{/each}
+          </optgroup>
+        {/each}
       </select>
       <span class="total" class:lleno={total >= MAX_FRASES}>{total}/{MAX_FRASES}</span>
     </label>
@@ -103,7 +117,7 @@
       <button class="tecla naranja chica" disabled={!nueva.trim() || total >= MAX_FRASES}>+ Sumar</button>
     </div>
     <div class="fichas">
-      {#each ['{dueno}', '{robot}'] as f}<button type="button" class="ficha" onclick={() => ficha(f)}>{f}</button>{/each}
+      {#each ['{dueno}', '{robot}', '{clima}'] as f}<button type="button" class="ficha" onclick={() => ficha(f)}>{f}</button>{/each}
     </div>
   </form>
 </div>
