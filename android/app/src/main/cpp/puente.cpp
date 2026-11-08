@@ -197,8 +197,10 @@ jintArray JNI(dibujarNativo)(JNIEnv* env, jobject, jbyteArray json, jstring nomb
   const char* nom = env->GetStringUTFChars(nombre, nullptr);
   std::string rgba(static_cast<size_t>(ancho) * alto * 4, '\0');
   char detalle[128] = {0};
-  int r = sintetica_dibujar_expresion_cierre(n > 0 ? reinterpret_cast<const char*>(d) : nullptr, static_cast<size_t>(n), nom, ancho, alto,
-                                             redonda ? 1 : 0, t, cierre, reinterpret_cast<uint8_t*>(&rgba[0]), detalle, sizeof detalle);
+  // `cierre` (el parpadeo) queda para cuando el núcleo traiga sintetica_dibujar_expresion_cierre.
+  (void)cierre;
+  int r = sintetica_dibujar_expresion(n > 0 ? reinterpret_cast<const char*>(d) : nullptr, static_cast<size_t>(n), nom, ancho, alto,
+                                      redonda ? 1 : 0, t, reinterpret_cast<uint8_t*>(&rgba[0]), detalle, sizeof detalle);
   env->ReleaseStringUTFChars(nombre, nom);
   if (d) env->ReleaseByteArrayElements(json, d, JNI_ABORT);
   if (r != 0) return nullptr;
