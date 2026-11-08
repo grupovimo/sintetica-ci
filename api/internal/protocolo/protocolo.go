@@ -113,6 +113,9 @@ var Eventos = []string{
 	"juego",                                     // v1.7: terminó una partida (lo avisa solo, con una entrada de tipo 5)
 	"animo",                                     // v1.7: respondió el "¿Cómo estás?" (lo avisa solo, con una entrada de tipo 6)
 	"cara-detectada", "oscuridad", "mano-cerca", // v1.8: los sentidos del bicho-celu (cámara, luz, proximidad)
+	// v1.9: llegó un toque de un amigo, lo devolvió (lo avisa solo), llegó la
+	// agenda (0 a 15 min), presencia y se marcó un hábito (lo avisa solo).
+	"toque-recibido", "devolver-toque", "agenda", "llegaste", "te-fuiste", "habito",
 }
 
 // VariablesEstado y Rasgos: el estado interno y la personalidad, en el orden del protocolo.
@@ -729,7 +732,7 @@ const (
 	RegistroDormir         = 2 // dato 1 = se durmió, 0 = se despertó
 	RegistroHito           = 3
 	RegistroRecordatorio   = 4 // el bicho mostró un recordatorio (dato: su índice en la config)
-	// 5 (juego) y 6 (ánimo), de la v1.7: en cuidado.go.
+	// 5 (juego) y 6 (ánimo), de la v1.7: en cuidado.go; 7 (toque) y 8 (hábito), de la v1.9: en compania.go.
 )
 
 // EntradaRegistro es una entrada del registro del motor de vida.

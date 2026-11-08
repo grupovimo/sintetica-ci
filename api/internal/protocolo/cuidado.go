@@ -84,24 +84,29 @@ func Jugar(juego string) ([]byte, error) {
 // MaxCampoAviso: los bytes de la app y del contacto de un aviso.
 const MaxCampoAviso = 24
 
-// Aviso arma el marco 0x44: tipo "notificacion" o "llamada"; la app y el
-// contacto se cortan a 24 bytes sin partir una letra.
+// Aviso arma el marco 0x44: tipo "notificacion" o "llamada" (v1.7), o "pago",
+// "mail", "github", "pedido" u "otro" (v1.9: entonces app es el título corto,
+// como "$12.000" o "PR #12", y contacto quién); la app y el contacto se cortan
+// a 24 bytes sin partir una letra.
 func Aviso(tipo, app, contacto string) ([]byte, error) {
-	var t byte
-	switch tipo {
-	case "notificacion", "":
-		t = 0
-	case "llamada":
-		t = 1
-	default:
-		return nil, errors.New("el tipo es notificacion o llamada")
+	if tipo == "" {
+		tipo = "notificacion"
+	}
+	t := -1
+	for i, x := range TiposAviso {
+		if x == tipo {
+			t = i
+		}
+	}
+	if t < 0 {
+		return nil, errors.New("el tipo es notificacion, llamada, pago, mail, github, pedido u otro")
 	}
 	if !utf8.ValidString(app) || !utf8.ValidString(contacto) {
 		return nil, errors.New("la app y el contacto son texto (UTF-8)")
 	}
 	app = CortarUTF8(strings.TrimSpace(app), MaxCampoAviso)
 	contacto = CortarUTF8(strings.TrimSpace(contacto), MaxCampoAviso)
-	m := []byte{CmdAviso, t, byte(len(app))}
+	m := []byte{CmdAviso, byte(t), byte(len(app))}
 	m = append(m, app...)
 	m = append(m, byte(len(contacto)))
 	return append(m, contacto...), nil

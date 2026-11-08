@@ -26,7 +26,7 @@ func TestMarcosV17(t *testing.T) {
 	if m[1] != 1 || m[2] != 0 || m[3] != 24 || len(m) != 4+24 {
 		t.Fatalf("llamada: %x", m)
 	}
-	if _, err := Aviso("mail", "", ""); err == nil {
+	if _, err := Aviso("fax", "", ""); err == nil {
 		t.Fatal("tipo raro")
 	}
 	for k, n := range []string{"bien", "más o menos", "mal"} {
@@ -45,7 +45,7 @@ func TestMarcosV17(t *testing.T) {
 	if j, r := LeerJuego(3*16 + 1); j != "dado" || r != "gano" {
 		t.Fatalf("juego: %s %s", j, r)
 	}
-	if Eventos[33] != "despertador" || Eventos[34] != "juego" || Eventos[35] != "animo" || len(Eventos) != 39 {
+	if Eventos[33] != "despertador" || Eventos[34] != "juego" || Eventos[35] != "animo" || len(Eventos) != 45 {
 		t.Fatalf("eventos: %v", Eventos[33:])
 	}
 }

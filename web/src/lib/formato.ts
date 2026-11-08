@@ -12,6 +12,7 @@ export const EVENTOS = [
   'ruido', 'musica', 'silencio', 'notificacion', 'llamada', 'bateria-baja', 'bateria-critica', 'enchufado',
   'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito', 'recordatorio', 'pomodoro', 'despertador',
   'juego', 'animo', 'cara-detectada', 'oscuridad', 'mano-cerca',
+  'toque-recibido', 'devolver-toque', 'agenda', 'llegaste', 'te-fuiste', 'habito',
 ] as const;
 export const NOMBRES_EVENTO: Record<string, string> = {
   tacto: 'Lo tocan', 'doble-toque': 'Doble toque', levantado: 'Lo levantan', sacudida: 'Lo sacuden (cualquiera)',
@@ -25,6 +26,8 @@ export const NOMBRES_EVENTO: Record<string, string> = {
   hito: 'Un hito (días juntos, caricias, cumpleaños)', recordatorio: 'Muestra un recordatorio', pomodoro: 'Termina una tanda', despertador: 'Suena el despertador',
   juego: 'Termina un juego', animo: 'Le contás cómo estás', 'cara-detectada': 'Te ve', oscuridad: 'Se apaga la luz',
   'mano-cerca': 'Una mano cerca',
+  'toque-recibido': 'Le llega un toque', 'devolver-toque': 'Devolvés un toque', agenda: 'Se viene un evento',
+  llegaste: 'Llegás', 'te-fuiste': 'Te vas', habito: 'Marcás un hábito',
 };
 
 // El robot cuenta los textos en bytes UTF-8 (una tilde ocupa 2): se corta sin partir una letra.
@@ -168,7 +171,26 @@ export type Config = {
   ubicacion?: Ubicacion;
   cuidado?: Cuidado;
   avisos?: Aviso[];
+  // Hasta 4 hábitos (v1.9): a su hora pregunta "¿{habito}?" y un toque lo marca hecho.
+  habitos?: Habito[];
+  // Cuando te vas (v1.9): si pregunta y qué (vacío = las frases de te-vas).
+  presencia?: Presencia;
 };
+
+// Un hábito: nombre (1 a 16 bytes), su ícono, la hora a la que pregunta (opcional) y los días.
+export type Habito = { nombre: string; icono: IconoHabito; hora?: string; dias?: string };
+export const ICONOS_HABITO = ['gota', 'libro', 'pesa', 'zen', 'pastilla', 'cama', 'fruta', 'estrella'] as const;
+export type IconoHabito = (typeof ICONOS_HABITO)[number];
+export const MAX_HABITOS = 4;
+export const MAX_NOMBRE_HABITO = 16;
+export type Presencia = { preguntar?: boolean; texto?: string };
+export const PRESENCIA_BASE: Required<Presencia> = { preguntar: true, texto: '' };
+export const MAX_TEXTO_PRESENCIA = 40;
+// Los toques de los amigos (protocolo 0x47) y los tipos de aviso que llegan de afuera (0x44, v1.9).
+export const TIPOS_TOQUE = ['toque', 'abrazo', 'beso', 'carita'] as const;
+export type TipoToque = (typeof TIPOS_TOQUE)[number];
+export const TIPOS_ENTRANTE = ['pago', 'mail', 'github', 'pedido', 'otro'] as const;
+export type TipoEntrante = (typeof TIPOS_ENTRANTE)[number];
 
 // Cuidarte: agua cada X horas, pausa activa en horario de trabajo, "¿Cómo estás?"
 // una vez por día, y por Telegram "te extraño" y cómo fue su día.
@@ -211,6 +233,8 @@ export const SITUACIONES = [
   'despertar', 'buenas-noches', 'volviste', 'te-extrane', 'aburrido', 'sueno', 'bateria-baja', 'cargando', 'caricia', 'saludo', 'hito',
   'cumple-dueno', 'cumple-robot', 'recordatorio-hecho', 'despertador', 'posponer', 'clima-frio', 'clima-calor', 'clima-lluvia', 'clima-lindo',
   'buen-dia', 'comiste', 'a-dormir', 'tardaste', 'agua', 'pausa', 'como-estas', 'animo-bien', 'animo-medio', 'animo-mal', 'jugar', 'gane', 'perdi', 'empate', 'anio-nuevo', 'navidad', 'dia-del-amigo', 'dia-del-nino', 'aniversario',
+  'toque-recibido', 'toque-devuelto', 'agenda', 'agenda-manana', 'te-vas', 'habito-hecho', 'habito-racha', 'habito-cortado',
+  'musica', 'pago', 'mail', 'github', 'pedido', 'aviso',
 ] as const;
 export type Situacion = (typeof SITUACIONES)[number];
 export const NOMBRES_SITUACION: Record<Situacion, string> = {
@@ -219,6 +243,9 @@ export const NOMBRES_SITUACION: Record<Situacion, string> = {
   'cumple-dueno': 'Tu cumple', 'cumple-robot': 'Su cumple', 'recordatorio-hecho': 'Recordatorio hecho', despertador: 'Despertador',
   posponer: 'Posponer', 'clima-frio': 'Hace frío', 'clima-calor': 'Hace calor', 'clima-lluvia': 'Llueve', 'clima-lindo': 'Día lindo',
   'buen-dia': 'Buen día', comiste: '¿Comiste?', 'a-dormir': 'A dormir', tardaste: 'Tardaste', agua: 'Agua', pausa: 'Pausa', 'como-estas': '¿Cómo estás?', 'animo-bien': 'Estás bien', 'animo-medio': 'Más o menos', 'animo-mal': 'Estás mal', jugar: 'Jugar', gane: 'Ganó', perdi: 'Perdió', empate: 'Empate', 'anio-nuevo': 'Año nuevo', navidad: 'Navidad', 'dia-del-amigo': 'Día del amigo', 'dia-del-nino': 'Día del niño', aniversario: 'Aniversario',
+  'toque-recibido': 'Le llega un toque', 'toque-devuelto': 'Devolvés el toque', agenda: 'Se viene un evento', 'agenda-manana': 'Mañana',
+  'te-vas': 'Te vas', 'habito-hecho': 'Hábito hecho', 'habito-racha': 'Racha', 'habito-cortado': 'Se cortó la racha',
+  musica: 'Música', pago: 'Te pagaron', mail: 'Un mail', github: 'GitHub', pedido: 'Un pedido', aviso: 'Un aviso',
 };
 export const MAX_FRASES = 12;
 export const MAX_TEXTO = 60;

@@ -1,4 +1,4 @@
-// Protocolo de SintéticaOS v1.7 (BLE y nube), del lado de quien controla el bicho (app,
+// Protocolo de SintéticaOS v1.9 (BLE y nube), del lado de quien controla el bicho (app,
 // web, simulador). Ver docs/protocolo-ble.md. Sin dependencias: sirve en el
 // navegador y en Node.
 
@@ -20,6 +20,7 @@ export const Op = {
   cmdRed: 0x16, cmdNube: 0x17, cmdOlvidarRed: 0x18, cmdReproducir: 0x19,
   cmdHora: 0x1a, cmdVida: 0x1b, cmdMemoria: 0x1c, cmdRestaurar: 0x1d, cmdRegistro: 0x1e, cmdComportamiento: 0x1f,
   cmdDecir: 0x40, cmdClima: 0x41, cmdAlarma: 0x42, cmdJugar: 0x43, cmdAviso: 0x44, cmdAnimo: 0x45, cmdMirar: 0x46,
+  cmdToque: 0x47, cmdAgenda: 0x48, cmdPresencia: 0x49, cmdHabito: 0x4a, cmdMusica: 0x4b,
   imgInicio: 0x20, imgBloque: 0x21, imgFin: 0x22, imgBorrar: 0x23, imgListar: 0x24, imgPedir: 0x25, imgListarSprites: 0x26,
   otaInicio: 0x30, otaBloque: 0x31, otaFin: 0x32, otaDescargar: 0x33, otaProgreso: 0x34, otaCancelar: 0x35,
   respuesta: 0x80, configTrozo: 0x84, configCierre: 0x85, imgTrozo: 0xa7, imgCierre: 0xa8,
@@ -40,7 +41,13 @@ export const Eventos = [
   'ruido', 'musica', 'silencio', 'notificacion', 'llamada', 'bateria-baja', 'bateria-critica', 'enchufado',
   'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito',
   'recordatorio', 'pomodoro', 'despertador', 'juego', 'animo', 'cara-detectada', 'oscuridad', 'mano-cerca',
+  'toque-recibido', 'devolver-toque', 'agenda', 'llegaste', 'te-fuiste', 'habito', // v1.9
 ];
+// Los tipos del comando Toque y del comando Aviso (v1.9), en orden.
+export const TiposToque = ['toque', 'abrazo', 'beso', 'carita'];
+export const TiposAviso = ['notificacion', 'llamada', 'pago', 'mail', 'github', 'pedido', 'otro'];
+// Los tipos de las entradas del registro, en orden.
+export const TiposRegistro = ['evento', 'comportamiento', 'sueño', 'hito', 'recordatorio', 'juego', 'animo', 'toque', 'habito'];
 // Los juegos del comando Jugar (v1.7), en orden, y los ánimos del comando Ánimo.
 export const Juegos = ['ppt', 'reflejos', 'mirada', 'dado', 'moneda'];
 export const Animos = ['bien', 'medio', 'mal'];
@@ -53,6 +60,9 @@ export const Situaciones = [
   'clima-frio', 'clima-calor', 'clima-lluvia', 'clima-lindo', 'buen-dia', 'comiste', 'a-dormir', 'tardaste',
   'agua', 'pausa', 'como-estas', 'animo-bien', 'animo-medio', 'animo-mal', 'jugar', 'gane',
   'perdi', 'empate', 'anio-nuevo', 'navidad', 'dia-del-amigo', 'dia-del-nino', 'aniversario',
+  // v1.9
+  'toque-recibido', 'toque-devuelto', 'agenda', 'agenda-manana', 'te-vas', 'habito-hecho', 'habito-racha',
+  'habito-cortado', 'musica', 'pago', 'mail', 'github', 'pedido', 'aviso',
 ];
 // El estado interno y los rasgos, en el orden del protocolo (comando Vida).
 export const VariablesEstado = ['energia', 'animo', 'afecto', 'aburrimiento', 'curiosidad', 'sueno', 'estres'];
@@ -81,6 +91,22 @@ export function crc32(bytes) {
 
 function u16(v) {
   return [v & 0xff, (v >>> 8) & 0xff];
+}
+
+// Texto cortado a max bytes de UTF-8 sin partir una letra, con su largo adelante (u8).
+function cortado(s, max) {
+  let b = texto.encode((s ?? '').trim());
+  if (b.length > max) {
+    b = b.slice(0, max);
+    // Si quedó una letra a medias, se va entera.
+    let i = b.length;
+    while (i > 0 && (b[i - 1] & 0xc0) === 0x80) i--;
+    if (i > 0 && b[i - 1] >= 0xc0) {
+      const largo = b[i - 1] >= 0xf0 ? 4 : b[i - 1] >= 0xe0 ? 3 : 2;
+      if (b.length - (i - 1) < largo) b = b.slice(0, i - 1);
+    }
+  }
+  return [b.length, ...b];
 }
 
 // Texto con su largo adelante (u8).
@@ -154,9 +180,44 @@ export const comando = {
     if (i < 0) throw new Error(`juego desconocido: ${juego}`);
     return Uint8Array.from([Op.cmdJugar, i]);
   },
-  // Una notificación o llamada del celu con su app y su contacto (v1.7).
-  aviso: ({ llamada = false, app = '', contacto = '' }) =>
-    Uint8Array.from([Op.cmdAviso, llamada ? 1 : 0, ...corto(app, 24), ...corto(contacto, 24)]),
+  // Una notificación o llamada del celu con su app y su contacto (v1.7); con
+  // tipo (v1.9) 'pago', 'mail', 'github', 'pedido' u 'otro', app es el título corto y contacto quién.
+  aviso: ({ llamada = false, tipo, app = '', contacto = '' }) => {
+    const t = tipo === undefined ? (llamada ? 1 : 0) : TiposAviso.indexOf(tipo);
+    if (t < 0) throw new Error(`aviso desconocido: ${tipo}`);
+    return Uint8Array.from([Op.cmdAviso, t, ...corto(app, 24), ...corto(contacto, 24)]);
+  },
+  // Un toque de un amigo (v1.9): tipo 'toque', 'abrazo', 'beso' o 'carita', de quién (1 a 24 bytes) y la expresión.
+  toque: (tipo, de, expresion = '') => {
+    const t = TiposToque.indexOf(tipo || 'toque');
+    if (t < 0) throw new Error(`toque desconocido: ${tipo}`);
+    const d = cortado(de, 24);
+    if (d[0] === 0) throw new Error('falta de quién es el toque');
+    return Uint8Array.from([Op.cmdToque, t, ...d, ...cortado(expresion, 24)]);
+  },
+  // El próximo evento de la agenda (v1.9): en cuántos minutos, cuánto dura y el título (1 a 40 bytes).
+  agenda: (minutos, duracion, titulo) => {
+    const t = cortado(titulo, 40);
+    if (t[0] === 0) throw new Error('falta el título');
+    const m = Math.max(0, Math.min(0xfffe, Math.round(minutos)));
+    return Uint8Array.from([Op.cmdAgenda, ...u16(m), ...u16(Math.max(0, Math.min(0xffff, Math.round(duracion)))), ...t]);
+  },
+  // El resumen de mañana (v1.9): el 0x48 con minutos = 0xFFFF y la cantidad de eventos en la duración.
+  resumenManana: (cantidad, titulo) => {
+    const t = cortado(titulo, 40);
+    if (t[0] === 0) throw new Error('falta el título');
+    return Uint8Array.from([Op.cmdAgenda, 0xff, 0xff, ...u16(Math.max(0, Math.min(0xffff, cantidad))), ...t]);
+  },
+  // Llegaste (true) o te fuiste (false) (v1.9).
+  presencia: (llegaste) => Uint8Array.from([Op.cmdPresencia, llegaste ? 0 : 1]),
+  // Un hábito (v1.9): índice 0 a 3, hecho o deshecho y la racha en días.
+  habito: (indice, hecho = true, racha = 0) => {
+    if (!(indice >= 0 && indice < 4)) throw new Error('el hábito es del 0 al 3');
+    return Uint8Array.from([Op.cmdHabito, indice, hecho ? 0 : 1, Math.max(0, Math.min(255, racha))]);
+  },
+  // Lo que suena (v1.9): bpm (0 = no se sabe), si suena, el título (0 a 40 bytes) y el artista (0 a 24).
+  musica: ({ bpm = 0, sonando = true, titulo = '', artista = '' }) =>
+    Uint8Array.from([Op.cmdMusica, Math.max(0, Math.min(255, Math.round(bpm))), sonando ? 1 : 0, ...cortado(titulo, 40), ...cortado(artista, 24)]),
   // La respuesta al "¿cómo estás?" (v1.7): 'bien', 'medio' o 'mal'.
   animo: (a) => {
     const i = Animos.indexOf(a);
@@ -407,7 +468,7 @@ export function leerMemoria(m) {
 // El registro: [0x9E][0][n][n × (u32 segundos, u8 tipo, u8 dato)].
 export function leerRegistro(b) {
   const n = b[2];
-  const tipos = ['evento', 'comportamiento', 'sueño', 'hito', 'recordatorio', 'juego', 'animo'];
+  const tipos = TiposRegistro;
   return Array.from({ length: n }, (_, k) => {
     const i = 3 + k * 6;
     return { segundos: leerU32(b, i), tipo: tipos[b[i + 4]] ?? String(b[i + 4]), dato: b[i + 5] };

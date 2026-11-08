@@ -131,6 +131,18 @@ const vectores = {
     { nombre: 'aviso whatsapp', tipo: 'notificacion', app: 'WhatsApp', contacto: 'Mamá', hex: hex(comando.aviso({ app: 'WhatsApp', contacto: 'Mamá' })) },
     { nombre: 'animo medio', hex: hex(comando.animo('medio')) },
     { nombre: 'mirar derecha', x: 0.5, y: -0.2, hex: hex(comando.mirar(0.5, -0.2)) },
+    // v1.9
+    { nombre: 'toque abrazo', tipo: 'abrazo', de: 'Ana', expresion: '', hex: hex(comando.toque('abrazo', 'Ana')) },
+    { nombre: 'toque carita', tipo: 'carita', de: 'Martín', expresion: 'contento', hex: hex(comando.toque('carita', 'Martín', 'contento')) },
+    { nombre: 'agenda', minutos: 10, duracion: 30, titulo: 'Reunión', hex: hex(comando.agenda(10, 30, 'Reunión')) },
+    { nombre: 'agenda manana', cantidad: 3, titulo: 'Dentista', hex: hex(comando.resumenManana(3, 'Dentista')) },
+    { nombre: 'presencia llegaste', llegaste: true, hex: hex(comando.presencia(true)) },
+    { nombre: 'presencia te fuiste', llegaste: false, hex: hex(comando.presencia(false)) },
+    { nombre: 'habito hecho', indice: 1, hecho: true, racha: 4, hex: hex(comando.habito(1, true, 4)) },
+    { nombre: 'musica', bpm: 120, sonando: true, titulo: 'Muchachos', artista: 'La Mosca', hex: hex(comando.musica({ bpm: 120, sonando: true, titulo: 'Muchachos', artista: 'La Mosca' })) },
+    { nombre: 'musica parar', bpm: 0, sonando: false, titulo: '', artista: '', hex: hex(comando.musica({ sonando: false })) },
+    { nombre: 'aviso pago', tipo: 'pago', app: '$12.000', contacto: 'Ana', hex: hex(comando.aviso({ tipo: 'pago', app: '$12.000', contacto: 'Ana' })) },
+    { nombre: 'aviso github', tipo: 'github', app: 'PR #12', contacto: 'octocat', hex: hex(comando.aviso({ tipo: 'github', app: 'PR #12', contacto: 'octocat' })) },
     { nombre: 'ota cancelar', hex: hex(ota.cancelar()) },
   ],
   ota: {
