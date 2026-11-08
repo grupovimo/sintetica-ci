@@ -21,7 +21,7 @@ export class BichoAbierto {
   vida = $state<ReturnType<typeof leerVida> | null>(null);
   vidaEn = $state(0);
   // Lo que el robot acaba de avisar solo (un recordatorio, el fin de un pomodoro), para mostrarlo al toque.
-  aviso = $state<{ texto: string; cuando: number; icono: string } | null>(null);
+  aviso = $state<{ texto: string; cuando: number; icono: string; despertador?: boolean } | null>(null);
   private dejar: (() => void) | null = null;
 
   constructor(public id: string) {}
@@ -65,6 +65,7 @@ export class BichoAbierto {
               for (const x of leerRegistro(b)) {
                 if (x.tipo === 'recordatorio') this.avisar(this.config.recordatorios?.[x.dato]?.texto ?? 'Recordatorio');
                 else if (x.tipo === 'evento' && x.dato === 32) this.avisar(this.bicho?.estado?.expresion === 'pomodoro:trabajo' ? 'A trabajar' : 'Tanda terminada');
+                else if (x.tipo === 'evento' && x.dato === 33) this.avisar(this.config.despertador?.texto || 'Suena el despertador', '⏰', true);
               }
             } catch { /* un registro raro */ }
           }
@@ -81,9 +82,9 @@ export class BichoAbierto {
     });
   }
 
-  private avisar(texto: string, icono = '⏰') {
+  private avisar(texto: string, icono = '⏰', despertador = false) {
     const cuando = Date.now();
-    this.aviso = { texto, cuando, icono };
+    this.aviso = { texto, cuando, icono, despertador };
     setTimeout(() => { if (this.aviso?.cuando === cuando) this.aviso = null; }, icono === '⏰' ? 120000 : 5000);
   }
 

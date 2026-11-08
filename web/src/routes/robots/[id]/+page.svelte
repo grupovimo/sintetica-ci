@@ -18,6 +18,9 @@
   import Reflejos from '$lib/consola/modulos/Reflejos.svelte';
   import Integraciones from '$lib/consola/modulos/Integraciones.svelte';
   import Voz from '$lib/consola/modulos/Voz.svelte';
+  import Habla from '$lib/consola/modulos/Habla.svelte';
+  import { api, ErrorApi } from '$lib/api';
+  import { bytes, cortarBytes, MAX_TEXTO } from '$lib/formato';
   import Ajustes from '$lib/consola/modulos/Ajustes.svelte';
 
   const b = usarBicho();
@@ -32,6 +35,7 @@
     { clave: 'modos', nombre: 'Modos', modulo: Modos },
     { clave: 'reflejos', nombre: 'Reflejos', modulo: Reflejos },
     { clave: 'integraciones', nombre: 'Integraciones', modulo: Integraciones },
+    { clave: 'habla', nombre: 'Habla', modulo: Habla },
     { clave: 'voz', nombre: 'Voz', modulo: Voz, necesita: ['microfono', 'parlante'] as Capacidad[] },
     { clave: 'ajustes', nombre: 'Ajustes', modulo: Ajustes },
   ];
@@ -54,6 +58,29 @@
     const e = await b.comando(c);
     aviso = e ?? texto;
     setTimeout(() => (aviso = ''), 2500);
+  }
+
+  // Decile algo: lo muestra en un globo con su cara.
+  let frase = $state('');
+  let diciendo = $state(false);
+  const usados = $derived(bytes(frase));
+  async function decir() {
+    const t = frase.trim();
+    if (!t || diciendo || !conectado) return;
+    diciendo = true;
+    try {
+      await api(`/v1/bichos/${b.id}/decir`, { cuerpo: { texto: t } });
+      frase = '';
+      aviso = 'Lo dijo';
+    } catch (e) {
+      aviso = e instanceof ErrorApi ? (e.estado === 409 ? 'No está conectado' : e.estado === 404 ? 'Todavía no sabe hablar' : e.detalle || e.message) : 'No pude mandarlo';
+    }
+    diciendo = false;
+    setTimeout(() => (aviso = ''), 2500);
+  }
+  async function alarma(accion: 'apagar' | 'posponer') {
+    b.aviso = null;
+    try { await api(`/v1/bichos/${b.id}/alarma`, { cuerpo: { accion } }); } catch { /* ya se apagó o no está */ }
   }
 
   // La primera vez que se abre un robot sin bautizar, se enciende (onboarding).
@@ -83,7 +110,9 @@
 {:else if b.bicho && modelo}
   <main class="caja">
     {#if b.aviso}
-      <div class="aviso-robot" role="status"><span class="campana" aria-hidden="true">{b.aviso.icono}</span><b>{b.aviso.texto}</b><button class="tecla negra chica" onclick={() => (b.aviso = null)}>OK</button></div>
+      <div class="aviso-robot" role="status"><span class="campana" aria-hidden="true">{b.aviso.icono}</span><b>{b.aviso.texto}</b>
+        {#if b.aviso.despertador && conectado}<button class="tecla chica" onclick={() => alarma('posponer')}>Posponer</button><button class="tecla negra chica" onclick={() => alarma('apagar')}>Apagar</button>
+        {:else}<button class="tecla negra chica" onclick={() => (b.aviso = null)}>OK</button>{/if}</div>
     {/if}
     <section class="heroe">
       <div class="foto">
@@ -108,6 +137,15 @@
           <button class="tecla naranja" disabled={!conectado} onclick={() => hacer({ evento: 'muchos-toques' }, 'Se rió')}>Cosquillas</button>
           {#if b.bicho.estado?.fija && !/^(recordatorio|pomodoro|reloj):/.test(b.bicho.estado.expresion)}<button class="tecla negra" disabled={!conectado} onclick={() => hacer({ expresion: '' }, 'Vuelve a ser él')}>Soltar la cara</button>{/if}
         </div>
+        <form class="decir visor" onsubmit={(e) => { e.preventDefault(); decir(); }}>
+          <span class="grabado">Decile algo</span>
+          <div class="linea">
+            <input class="campo" aria-label="Decile algo" placeholder={conectado ? '¡Hola!' : 'Desconectado'} disabled={!conectado} value={frase}
+              oninput={(e) => { const v = cortarBytes(e.currentTarget.value, MAX_TEXTO); if (v !== e.currentTarget.value) e.currentTarget.value = v; frase = v; }} />
+            <span class="cuenta" class:lleno={usados >= MAX_TEXTO} aria-label="{usados} de {MAX_TEXTO}">{usados}/{MAX_TEXTO}</span>
+            <button class="tecla naranja chica" disabled={!conectado || diciendo || !frase.trim()}>Decir</button>
+          </div>
+        </form>
         {#if aviso}<p class="aviso" aria-live="polite"><span class="led on"></span>{aviso}</p>{/if}
         {#if !conectado}<p class="texto chico">Le llega cuando vuelva.</p>{/if}
       </div>
@@ -153,6 +191,12 @@
   .cap.no { color: #5a524a; background: transparent; box-shadow: inset 0 0 0 1px #2c2925; }
   .acciones { display: flex; flex-wrap: wrap; gap: 12px; padding-top: 4px; }
   .chico { font-size: 14px; }
+  .decir { padding: 12px 12px 12px 18px; gap: 8px; max-width: 520px; }
+  .decir .linea { display: flex; align-items: center; gap: 12px; }
+  .decir .campo { font-size: 22px; }
+  .decir .campo:disabled { cursor: not-allowed; }
+  .cuenta { flex: none; font: 800 11px/1 var(--marca); color: #5a524a; font-variant-numeric: tabular-nums; }
+  .cuenta.lleno { color: var(--brasa); }
 
   .tablero { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 28px; align-items: start; padding: 24px; }
   .teclado { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }

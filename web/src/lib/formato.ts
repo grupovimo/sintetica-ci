@@ -10,7 +10,7 @@ export const EVENTOS = [
   'tacto', 'doble-toque', 'levantado', 'sacudida', 'boca-abajo', 'vinculado', 'app-abierta', 'despertado',
   'caricia', 'muchos-toques', 'sacudida-suave', 'sacudida-fuerte', 'inclinado', 'caida', 'voz', 'nombre',
   'ruido', 'musica', 'silencio', 'notificacion', 'llamada', 'bateria-baja', 'bateria-critica', 'enchufado',
-  'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito', 'recordatorio', 'pomodoro',
+  'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito', 'recordatorio', 'pomodoro', 'despertador',
 ] as const;
 export const NOMBRES_EVENTO: Record<string, string> = {
   tacto: 'Lo tocan', 'doble-toque': 'Doble toque', levantado: 'Lo levantan', sacudida: 'Lo sacuden (cualquiera)',
@@ -21,7 +21,7 @@ export const NOMBRES_EVENTO: Record<string, string> = {
   llamada: 'Una llamada', 'bateria-baja': 'Batería baja (20 %)', 'bateria-critica': 'Batería crítica (5 %)',
   enchufado: 'Lo enchufan', desenchufado: 'Lo desenchufan', cargado: 'Carga completa', 'sin-wifi': 'Se queda sin WiFi',
   'cambio-de-cara': 'Le cambian la cara', 'bicho-cerca': 'Otro robot cerca', volvio: 'Volvés después de un rato',
-  hito: 'Un hito (días juntos, caricias, cumpleaños)', recordatorio: 'Muestra un recordatorio', pomodoro: 'Termina una tanda',
+  hito: 'Un hito (días juntos, caricias, cumpleaños)', recordatorio: 'Muestra un recordatorio', pomodoro: 'Termina una tanda', despertador: 'Suena el despertador',
 };
 
 // El robot cuenta los textos en bytes UTF-8 (una tilde ocupa 2): se corta sin partir una letra.
@@ -143,7 +143,32 @@ export type Config = {
   pomodoro?: { trabajo?: number; descanso?: number };
   // Protector de pantalla: tras `espera` segundos sin que pase nada, muestra esa imagen; cualquier cosa vuelve a la cara.
   protector?: { imagen: number; espera?: number };
+  // Cuánto habla solo (0 a 1) y sus frases propias por situación (hasta 12 en total).
+  habla?: { frecuencia?: number; propias?: Partial<Record<Situacion, string[]>> };
+  despertador?: Despertador;
+  // Para el clima (la usa la nube).
+  ubicacion?: Ubicacion;
 };
+
+// Un solo despertador por robot: suena creciente y se pospone.
+export type Despertador = { hora: string; dias?: string; activo?: boolean; sonido?: boolean; texto?: string; posponer?: number };
+export type Ubicacion = { lat: number; lon: number; ciudad: string };
+
+// Las situaciones en las que habla solo (las frases de fábrica: shared/formato/vida/frases.json).
+export const SITUACIONES = [
+  'despertar', 'buenas-noches', 'volviste', 'te-extrane', 'aburrido', 'sueno', 'bateria-baja', 'cargando', 'caricia', 'saludo', 'hito',
+  'cumple-dueno', 'cumple-robot', 'recordatorio-hecho', 'despertador', 'posponer', 'clima-frio', 'clima-calor', 'clima-lluvia', 'clima-lindo',
+] as const;
+export type Situacion = (typeof SITUACIONES)[number];
+export const NOMBRES_SITUACION: Record<Situacion, string> = {
+  despertar: 'Al despertar', 'buenas-noches': 'Buenas noches', volviste: 'Volviste', 'te-extrane': 'Te extrañó', aburrido: 'Aburrido',
+  sueno: 'Con sueño', 'bateria-baja': 'Sin pila', cargando: 'Cargando', caricia: 'Caricia', saludo: 'Saludo', hito: 'Un hito',
+  'cumple-dueno': 'Tu cumple', 'cumple-robot': 'Su cumple', 'recordatorio-hecho': 'Recordatorio hecho', despertador: 'Despertador',
+  posponer: 'Posponer', 'clima-frio': 'Hace frío', 'clima-calor': 'Hace calor', 'clima-lluvia': 'Llueve', 'clima-lindo': 'Día lindo',
+};
+export const MAX_FRASES = 12;
+export const MAX_TEXTO = 60;
+export const bytes = (t: string) => new TextEncoder().encode(t).length;
 
 // Un recordatorio: a la hora, el robot lo muestra en su pantalla hasta que lo tocan.
 // dias: letras de L M X J V S D (vacío = todos los días).
