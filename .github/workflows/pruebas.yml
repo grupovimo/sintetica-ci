@@ -98,6 +98,8 @@ jobs:
   android:
     name: Android (tests)
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -109,11 +111,23 @@ jobs:
       - run: ./gradlew assembleDebug
         working-directory: android
       - uses: actions/upload-artifact@v4
+        # Si se llena la cuota de artifacts de la cuenta, queda el release de abajo.
+        continue-on-error: true
         with:
           name: sintetica-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
+      # El último APK de la rama, siempre en el mismo lugar (un prerelease que se pisa).
+      - if: github.event_name == 'push'
+        working-directory: android
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk sintetica-debug.apk
+          gh release view android-debug >/dev/null 2>&1 || \
+            gh release create android-debug --prerelease --target "$GITHUB_SHA" --title "Android (debug)" --notes "El último APK de la rama."
+          gh release upload android-debug sintetica-debug.apk --clobber
+          gh release edit android-debug --notes "El último APK de la rama: ${GITHUB_SHA::7}."
 
   firmware:
     name: Firmware (las dos placas)
