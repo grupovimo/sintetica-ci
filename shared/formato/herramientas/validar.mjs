@@ -54,5 +54,23 @@ revisar('vida/reglas.json (de a 24)', validarConfig, { version: 2, reglas: vida(
 revisar('vida/reglas.json (el resto)', validarConfig, { version: 2, reglas: vida('reglas.json').slice(24) });
 const per = vida('personalidades.json');
 for (const [n, p] of Object.entries(per)) revisar(`vida/personalidades: ${n}`, validarConfig, { version: 2, personalidad: { preset: n, ...p } });
+// Una cara de imagen (sprites) como la cara de siempre.
+const conImagen = {
+  version: 2,
+  cara: { expresion: 'anime' },
+  expresiones: { anime: { sprites: { ojo: 0, ojo_cerrado: 1, boca: 2 }, tamano: 0.4, boca_y: -0.3, sep: 0.32, ojo: { lt: 0.1 }, movimiento: 'rebote' } },
+};
+revisar('config con una cara de imagen', validarConfig, conImagen);
+const malas = [
+  { version: 2, expresiones: { a: { sprites: { boca: 1 } } } },
+  { version: 2, expresiones: { a: { sprites: { ojo: 12 } } } },
+  { version: 2, expresiones: { a: { tamano: 0.4, gx: 0.1 } } },
+];
+for (const m of malas) {
+  if (validarConfig(m)) {
+    errores++;
+    console.log(`MAL  una cara de imagen inválida pasó: ${JSON.stringify(m)}`);
+  } else console.log(`ok   rechaza ${JSON.stringify(m.expresiones)}`);
+}
 revisar('config-ejemplo-v2.json', validarConfig, JSON.parse(fs.readFileSync(path.join(formato, 'config-ejemplo-v2.json'), 'utf8')));
 process.exit(errores ? 1 : 0);

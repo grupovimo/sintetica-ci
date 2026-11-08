@@ -113,3 +113,61 @@ func TestVidaBase(t *testing.T) {
 		}
 	}
 }
+
+// Un QOI de 4 canales de w × h, todo de un color (con transparencia afuera del óvalo).
+func qoiOvalo(w, h int, r, g, b byte) []byte {
+	o := []byte{'q', 'o', 'i', 'f', 0, 0, 0, byte(w), 0, 0, 0, byte(h), 4, 0}
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			dx, dy := (float64(x)+0.5-float64(w)/2)/(float64(w)/2), (float64(y)+0.5-float64(h)/2)/(float64(h)/2)
+			if dx*dx+dy*dy < 0.9 {
+				o = append(o, 0xFF, r, g, b, 255)
+			} else {
+				o = append(o, 0xFF, 0, 0, 0, 0)
+			}
+		}
+	}
+	return append(o, 0, 0, 0, 0, 0, 0, 0, 1)
+}
+
+func TestDibujarCaraDeImagen(t *testing.T) {
+	contar := func(px []byte, r, g, b int) (n int) {
+		for i := 0; i < len(px); i += 4 {
+			if abs(int(px[i])-r) < 90 && abs(int(px[i+1])-g) < 90 && abs(int(px[i+2])-b) < 90 {
+				n++
+			}
+		}
+		return
+	}
+	cfg := []byte(`{"version":2,"expresiones":{"anime":{"sprites":{"ojo":0,"ojo_cerrado":1},"tamano":0.4}}}`)
+	sprites := map[int][]byte{0: qoiOvalo(40, 40, 0, 255, 255), 1: qoiOvalo(40, 8, 255, 0, 255)}
+	abierta, err := DibujarCara(cfg, "anime", sprites, 320, 172, false, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cerrada, err := DibujarCara(cfg, "anime", sprites, 320, 172, false, 0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := contar(abierta, 0, 255, 255); n < 3000 {
+		t.Fatalf("abierta: %d píxeles cian", n)
+	}
+	if contar(cerrada, 255, 0, 255) < 300 || contar(cerrada, 0, 255, 255) > 300 {
+		t.Fatalf("parpadeando: %d magenta, %d cian", contar(cerrada, 255, 0, 255), contar(cerrada, 0, 255, 255))
+	}
+	// Sin los sprites: la SDF (naranja). DibujarExpresion no usa los de antes.
+	sin, err := DibujarExpresion(cfg, "anime", 320, 172, false, 0)
+	if err != nil || contar(sin, 255, 106, 51) < 2000 || contar(sin, 0, 255, 255) > 0 {
+		t.Fatalf("sin sprites: %v", err)
+	}
+	if _, err := DibujarCara(cfg, "anime", map[int][]byte{0: []byte("no")}, 320, 172, false, 0, 0); err == nil {
+		t.Fatal("un sprite inválido tiene que fallar")
+	}
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}

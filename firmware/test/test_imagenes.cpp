@@ -233,7 +233,7 @@ PRUEBA("imagen: errores (sin autenticar, CRC, tamaño, orden, espacio)") {
   VERIFICAR(g_notis.back()[0] == (ImgBloque | Respuesta) && g_notis.back()[1] == FueraDeOrden);
   escribir({ImgFin});
   VERIFICAR(g_notis.back()[1] == SinInicio);
-  escribir({ImgInicio, 9, 100, 0, 0, 0, 0, 0, 0, 0});
+  escribir({ImgInicio, 20, 100, 0, 0, 0, 0, 0, 0, 0});  // 8 a 19 son los sprites
   VERIFICAR(g_notis.back()[1] == Malformado);
   escribir({ImgInicio, 1, 0, 0, 0x10, 0, 0, 0, 0, 0});  // 1 MB
   VERIFICAR(g_notis.back()[1] == MuyGrande);

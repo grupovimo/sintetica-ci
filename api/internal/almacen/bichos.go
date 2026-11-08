@@ -355,7 +355,8 @@ type Imagen struct {
 	Datos       []byte    `json:"-"`
 }
 
-// Imagenes lista las imágenes que se quieren en el bicho.
+// Imagenes lista las imágenes que se quieren en el bicho (las de los
+// espacios 0 a 7 y los sprites, 8 a 19: ver SoloImagenes y SoloSprites).
 func (a *Almacen) Imagenes(ctx context.Context, bichoID string) ([]Imagen, error) {
 	filas, err := a.db.Query(ctx, `select espacio, length(datos), crc, actualizada from imagenes where bicho_id = $1 order by espacio`, bichoID)
 	if err != nil {
@@ -397,4 +398,26 @@ func (a *Almacen) GuardarImagen(ctx context.Context, bichoID string, espacio int
 func (a *Almacen) BorrarImagen(ctx context.Context, bichoID string, espacio int) error {
 	_, err := a.db.Exec(ctx, `delete from imagenes where bicho_id = $1 and espacio = $2`, bichoID, espacio)
 	return err
+}
+
+// SoloImagenes: las de las bahías (espacios 0 a 7).
+func SoloImagenes(l []Imagen) []Imagen {
+	var r []Imagen
+	for _, i := range l {
+		if i.Espacio < 8 {
+			r = append(r, i)
+		}
+	}
+	return r
+}
+
+// SoloSprites: los sprites de las caras de imagen (espacios 8 a 19).
+func SoloSprites(l []Imagen) []Imagen {
+	var r []Imagen
+	for _, i := range l {
+		if i.Espacio >= 8 {
+			r = append(r, i)
+		}
+	}
+	return r
 }

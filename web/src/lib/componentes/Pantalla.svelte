@@ -2,7 +2,8 @@
   // La pantalla de un robot, viva: el mismo núcleo del firmware, con su config.
   // Si se pasa `visible`, muestra eso (así copia lo que se ve en el robot real).
   import { onDestroy, onMount } from 'svelte';
-  import { fijar, pintar, vistaPrevia, type VistaPrevia } from '$lib/nucleo';
+  import { fijar, pintar, ponerSprites, vistaPrevia, type VistaPrevia } from '$lib/nucleo';
+  import { quizasBicho } from '$lib/bicho.svelte';
 
   let {
     config = { version: 1 },
@@ -23,6 +24,9 @@
     alError?: (e: string | null) => void;
   } = $props();
 
+  // En las páginas de un robot, sus sprites (las caras de imagen) van al núcleo de la vista previa.
+  const bicho = quizasBicho();
+  let enviados = new Map<number, number>();
   let canvas = $state<HTMLCanvasElement>();
   let sim: VistaPrevia | null = null;
   let cuadro: number | null = null;
@@ -34,6 +38,7 @@
     sim = await vistaPrevia({ redonda, alCuadro: (rgba, w, h) => canvas && pintar(canvas, rgba, w, h) });
     aplicado = '';
     fijado = '';
+    enviados = new Map();
     sincronizar();
     let ultimo = 0;
     const vuelta = (t: number) => {
@@ -48,6 +53,7 @@
 
   function sincronizar() {
     if (!sim) return;
+    if (bicho) ponerSprites(sim, $state.snapshot(bicho.sprites) as typeof bicho.sprites, enviados);
     const texto = typeof config === 'string' ? config : JSON.stringify(config);
     if (texto !== aplicado) {
       aplicado = texto;
@@ -69,6 +75,7 @@
   $effect(() => {
     void config;
     void visible;
+    void bicho?.sprites;
     sincronizar();
   });
 

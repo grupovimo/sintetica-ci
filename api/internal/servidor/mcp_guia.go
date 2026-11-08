@@ -187,8 +187,78 @@ Coordenadas: el centro de la pantalla es (0, 0) y hacia arriba es positivo. La u
 		}
 	}
 	b.WriteString("\nTodas las de fábrica, con sus parámetros: herramienta `listar_expresiones`.\n")
+	b.WriteString(guiaImagen)
 	return b.String()
 }
+
+// guiaImagen: cómo dibujar una cara de imagen (dibujar_cara).
+const guiaImagen = `
+## Caras de imagen (dibujar_cara): la cara que quieras
+
+Si la cara no sale con parámetros (ojitos de anime, de gato, de pixel art, un visor de robot, corazones…), dibujala: ` + "`dibujar_cara`" + ` recibe cada parte como **SVG** (lo mejor), una URL https o base64 (PNG, JPEG o GIF) y el robot la anima **viva**, igual que a sus caras: parpadea, mira para los costados, respira, tiembla, se inclina, suelta partículas, se apaga de noche y entra y sale con un fundido (nunca un corte). Las otras expresiones la siguen moviendo: sorpresa agranda los ojos, dormido los cierra, hablar abre la boca.
+
+Partes (solo ` + "`ojo`" + ` es obligatoria):
+
+| Parte | Qué es |
+| --- | --- |
+| ` + "`ojo`" + ` | El ojo **izquierdo abierto, mirando al frente**. El derecho es este espejado (salvo que mandes ` + "`ojo_der`" + ` o ` + "`espejar_der: false`" + `). |
+| ` + "`ojo_cerrado`" + ` | El ojo cerrado (una rayita, un arco ^ ^): para parpadear y dormir. Sin él, el parpadeo aplasta el ojo. |
+| ` + "`boca`" + ` | La boca (se estira y se abre cuando habla). Opcional. |
+| ` + "`ojo_der`" + `, ` + "`ojo_der_cerrado`" + ` | Solo si el derecho no es el izquierdo espejado (un guiño, ojos distintos). |
+
+Cómo dibujar para su pantalla:
+
+- **Fondo transparente** (o negro): la pantalla es casi negra y todo lo oscuro se funde con ella. No dibujes el fondo ni la cara: solo los ojos y la boca sueltos.
+- **Colores que brillan**: la pantalla es de noche. Celestes, rosas, violetas, naranja (#FF6A33, el de la marca), blanco para los brillos. Los oscuros (pupila, contorno) se ven como fondo: sirven para recortar.
+- **El ojo izquierdo** (el de la izquierda de la pantalla): las pestañas y los detalles de afuera van a la izquierda; el derecho sale espejado.
+- **Mirando al frente**: el robot mueve los ojos solo (con la mirada, ` + "`gx`/`gy`" + `); no dibujes la pupila corrida. Tampoco hace falta animar nada.
+- **Todas las partes con el mismo viewBox y a la misma escala**: se recortan a lo dibujado y la boca y el ojo cerrado quedan del tamaño que tenían al lado del ojo. El más grande se achica a 128 × 128 px: con formas simples y trazos de 4 o más (en un viewBox de 100) se ve nítido.
+- Formas que se rasterizan bien: ` + "`path`, `ellipse`, `circle`, `rect`, `polygon`" + `, colores sólidos y gradientes lineales o radiales. Sin texto, filtros, máscaras ni imágenes adentro.
+- ` + "`tamano`" + ` es el ancho de cada ojo (0,36 por defecto; 0,45 a 0,55 para ojos grandes de anime), ` + "`sep`" + ` la separación (0,15 a 0,45), ` + "`ey`" + ` la altura y ` + "`boca_y`" + ` dónde va la boca (-0,36). También valen ` + "`movimiento`, `particula`, `parpadeo`, `blush`, `ftilt`" + `.
+- Usá ` + "`solo_ver: true`" + ` y mirá las dos imágenes (abierta y parpadeando). Con ` + "`reposo: true`" + ` queda como su cara de siempre; ` + "`poner_cara`" + ` con ` + "`siempre: true`" + ` elige otra (o la neutral con ` + "`soltar`" + `).
+- Hay lugar para 12 sprites (un ojo, un ojo cerrado y una boca son 3) y 8 caras de imagen; ` + "`borrar_expresion`" + ` libera los suyos.
+
+### Ejemplo: ojitos de chica de anime
+
+` + "`ojo`" + `:
+
+` + "```svg" + `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="iris" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b2bff"/><stop offset="0.6" stop-color="#9b6bff"/><stop offset="1" stop-color="#ff9be8"/>
+    </linearGradient>
+  </defs>
+  <path d="M12 34 Q50 14 88 30" stroke="#f5f2ec" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M20 30 L8 24" stroke="#f5f2ec" stroke-width="4" stroke-linecap="round"/>
+  <ellipse cx="50" cy="58" rx="27" ry="33" fill="url(#iris)"/>
+  <ellipse cx="50" cy="62" rx="12" ry="17" fill="#120a2a"/>
+  <ellipse cx="40" cy="46" rx="9" ry="11" fill="#ffffff"/>
+  <circle cx="60" cy="74" r="5" fill="#ffffff" opacity="0.85"/>
+</svg>
+` + "```" + `
+
+` + "`ojo_cerrado`" + ` (un arco feliz, en el mismo viewBox):
+
+` + "```svg" + `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <path d="M18 62 Q50 40 82 62" stroke="#f5f2ec" stroke-width="7" fill="none" stroke-linecap="round"/>
+  <path d="M24 56 L10 50" stroke="#f5f2ec" stroke-width="4" stroke-linecap="round"/>
+</svg>
+` + "```" + `
+
+` + "`boca`" + ` (chiquita, como en el anime):
+
+` + "```svg" + `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <path d="M40 50 Q50 60 60 50" stroke="#ff8fb8" stroke-width="5" fill="none" stroke-linecap="round"/>
+</svg>
+` + "```" + `
+
+Con ` + "`tamano: 0.46`, `sep: 0.3`, `boca_y: -0.42`, `blush: 0.5`" + ` y ` + "`reposo: true`" + ` queda una carita de anime que vive todo el día.
+
+Otras ideas: ojos de gato (una almendra verde con la pupila vertical), un visor de robot (una franja cian con líneas), corazones (` + "`ojo`" + ` un corazón rosa, ` + "`ojo_cerrado`" + ` una rayita), pixel art (rectángulos de 10 × 10).
+`
 
 func contiene(l []string, s string) bool {
 	for _, x := range l {

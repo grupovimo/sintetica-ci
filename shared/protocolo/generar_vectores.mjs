@@ -85,7 +85,7 @@ const desdeHex = (h) => Uint8Array.from(h.split(' ').map((x) => parseInt(x, 16))
 const manifiestoPrueba = { tamano: binarioPrueba.length, sha256: shaPrueba, firma: desdeHex(firmaPrueba.firma), version: '0.2.1', perfil: 'dev-147b' };
 
 const vectores = {
-  version: '1.4',
+  version: '1.5',
   nota: 'Generado por shared/protocolo/generar_vectores.mjs. No editar a mano. Bytes en hex separados por espacios.',
   comandos: [
     { nombre: 'expresion enamorado', hex: hex(comando.expresion('enamorado')) },
@@ -100,6 +100,8 @@ const vectores = {
     { nombre: 'imagen borrar 3', hex: hex(imagen.borrar(3)) },
     { nombre: 'imagen listar', hex: hex(imagen.listar()) },
     { nombre: 'imagen pedir 5', hex: hex(imagen.pedir(5)) },
+    { nombre: 'imagen listar sprites', hex: hex(imagen.listarSprites()) },
+    { nombre: 'imagen borrar sprite 0', hex: hex(imagen.borrar(8)) },
     { nombre: 'red', ssid: 'Casa Ñandú', clave: 'secreta123', hex: hex(comando.red('Casa Ñandú', 'secreta123')) },
     { nombre: 'red abierta', ssid: 'Bar', clave: '', hex: hex(comando.red('Bar', '')) },
     { nombre: 'nube', url: 'mqtt://192.168.1.10:1883', usuario: 'A1B2C3D4E5F6', clave: 'k3y', hex: hex(comando.nube('mqtt://192.168.1.10:1883', 'A1B2C3D4E5F6', 'k3y')) },

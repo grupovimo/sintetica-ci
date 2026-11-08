@@ -22,6 +22,7 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"unsafe"
 )
@@ -379,6 +380,17 @@ var ErrSinExpresion = errors.New("no hay una expresión paramétrica con ese nom
 // (segundos), y devuelve los píxeles RGBA (ancho × alto × 4). No toca el
 // bicho de este proceso. Si la config no es válida, el error es *ErrorConfig.
 func DibujarExpresion(config []byte, nombre string, ancho, alto int, redonda bool, t float32) ([]byte, error) {
+	return DibujarCara(config, nombre, nil, ancho, alto, redonda, t, 0)
+}
+
+// MaxSprites: cuántos sprites puede tener un bicho (los de las caras de imagen).
+const MaxSprites = 12
+
+// DibujarCara es DibujarExpresion con los sprites de las caras de imagen
+// (sprites[n] = el QOI del sprite n, nil = no está) y un parpadeo: cierre de 0
+// (abierto) a 1 (cerrado). Una cara de imagen sin el sprite de su ojo se
+// dibuja con la SDF, como en el robot.
+func DibujarCara(config []byte, nombre string, sprites map[int][]byte, ancho, alto int, redonda bool, t, cierre float32) ([]byte, error) {
 	if ancho < 16 || alto < 16 || ancho > 640 || alto > 640 {
 		return nil, errors.New("el dibujo es de 16 a 640 píxeles por lado")
 	}
@@ -396,8 +408,21 @@ func DibujarExpresion(config []byte, nombre string, ancho, alto int, redonda boo
 		cjson = C.CBytes(config)
 		defer C.free(cjson)
 	}
-	c := C.sintetica_dibujar_expresion((*C.char)(cjson), C.size_t(len(config)), cnombre, C.int(ancho), C.int(alto), b2i(redonda),
-		C.float(t), (*C.uint8_t)(unsafe.Pointer(&px[0])), &detalle[0], C.size_t(len(detalle)))
+	for n := 0; n < MaxSprites; n++ {
+		d := sprites[n]
+		if len(d) == 0 {
+			C.sintetica_sprite_suelto(C.int(n), nil, 0)
+			continue
+		}
+		cd := C.CBytes(d)
+		r := C.sintetica_sprite_suelto(C.int(n), (*C.uint8_t)(cd), C.size_t(len(d)))
+		C.free(cd)
+		if r != 0 {
+			return nil, fmt.Errorf("el sprite %d no es un QOI de hasta 128 × 128", n)
+		}
+	}
+	c := C.sintetica_dibujar_expresion_cierre((*C.char)(cjson), C.size_t(len(config)), cnombre, C.int(ancho), C.int(alto), b2i(redonda),
+		C.float(t), C.float(cierre), (*C.uint8_t)(unsafe.Pointer(&px[0])), &detalle[0], C.size_t(len(detalle)))
 	switch {
 	case c == 0:
 		return px, nil

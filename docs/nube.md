@@ -75,7 +75,8 @@ publica fuera de Docker.
 La config y las imágenes que el dueño quiere están en Postgres (la config, con
 todas sus versiones). Un trabajador por bicho (`api/internal/nube`) las
 mantiene iguales a las del bicho con **tres vías**: compara lo que tiene el
-bicho (el CRC de su config en el estado; sus imágenes con `0x24`), lo que
+bicho (el CRC de su config en el estado; sus imágenes con `0x24` y sus
+sprites con `0x26`, si el firmware los tiene), lo que
 quiere la API y lo último en lo que estuvieron de acuerdo:
 
 - Iguales: nada.
@@ -98,8 +99,30 @@ núcleo), no se reintenta hasta que cambie.
   desde la base; los comandos van al bicho y su respuesta llega por los eventos.
 - **Eventos en vivo** (SSE): `GET /v1/eventos` (todos los bichos de la cuenta) o
   `GET /v1/bichos/{id}/eventos`: `estado` (con los bytes crudos en `crudo`),
-  `conexion`, `sincro`, `config`, `imagenes`, `ota`, `marco`, `memoria`, `bicho`,
+  `conexion`, `sincro`, `config`, `imagenes`, `sprites`, `ota`, `marco`, `memoria`, `bicho`,
   `automatizacion`, `telegram` (ver "Integraciones") y `mcp` (ver "MCP").
+
+## Sprites de las caras de imagen (v1.5)
+
+Las caras de imagen (ver [motor-de-vida.md](motor-de-vida.md#caras-de-imagen))
+usan hasta 12 sprites por robot, aparte de las 8 bahías de imágenes. En
+Postgres van en la misma tabla `imagenes`, en los espacios 8 a 19 (el sprite
+`n` es el espacio `8 + n`, como en el protocolo), y se sincronizan igual.
+
+- `GET /v1/bichos/{id}/sprites`: `{sprites: [{sprite, largo, crc}], max: 12, sincro}`.
+- `GET /v1/bichos/{id}/sprites/{n}`: el QOI (con `?png=1`, en PNG para mostrarlo).
+- `PUT /v1/bichos/{id}/sprites/{n}`: el cuerpo es un **SVG**, PNG, JPEG o GIF
+  (el primer cuadro) o un QOI ya listo. La API (`api/internal/imagenes/sprites.go`)
+  rasteriza el SVG en Go puro (`oksvg` + `rasterx`), lo recorta a lo dibujado
+  (lo no transparente; en una imagen sin transparencia, lo que no es casi
+  negro) y lo achica a 128 × 128 como mucho, con la transparencia
+  premultiplicada (bordes sin halo), en QOI de 4 canales. Responde
+  `{sprite, largo, crc, ancho, alto}`.
+- `DELETE /v1/bichos/{id}/sprites/{n}`.
+- `GET /v1/bichos/{id}/imagenes` sigue mostrando solo las bahías 0 a 7.
+
+Cada cambio sale por el evento `sprites` (la web vuelve a pedir la lista y la
+pantalla en vivo los carga en su núcleo).
 
 ## El motor de vida (v1.4)
 
@@ -342,12 +365,13 @@ conectan desde sus servidores: necesitan **HTTPS público**; en local
 | --- | --- |
 | `listar_robots` | Los robots: conectado, batería, cara, ánimo, pantalla |
 | `ver_robot` | Estado, capacidades y resumen de la config (personalidad, horario, expresiones y comportamientos propios, recordatorios, reflejos, imágenes, protector) |
-| `poner_cara` | Fija una expresión (o `soltar`) — robot conectado |
+| `poner_cara` | Fija una expresión (o `soltar`) — robot conectado. Con `siempre: true` la deja como su cara de siempre (`cara.expresion` en la config; con `soltar`, vuelve la neutral) |
 | `disparar_evento` | Un evento del protocolo (caricia, sacudida, nombre…) — conectado |
 | `reproducir_comportamiento` | Empieza un comportamiento (de fábrica o propio) — conectado |
 | `listar_expresiones` | De fábrica y propias, con sus parámetros |
 | `crear_expresion` | Expresión paramétrica (ojo/izq/der y los globales del schema, con sus límites); la valida el núcleo, la guarda y devuelve un **PNG** de cómo queda (dibujado por el núcleo: `sintetica_dibujar_expresion`). `solo_ver` para iterar sin guardar; `mostrar` para ponerla ya |
-| `borrar_expresion` | Saca una propia |
+| `dibujar_cara` | Una **cara de imagen**, la que sea: `ojo` (obligatorio), `ojo_cerrado`, `boca`, `ojo_der`, `ojo_der_cerrado`, cada una como SVG (`<svg …>`), URL https (anti-SSRF) o base64. Las convierte juntas (misma escala: la más grande entra en 128 × 128), las guarda en sprites libres (o los que ya tenía esa cara), crea la expresión con `sprites` (+ `tamano`, `boca_tamano`, `boca_y`, `espejar_der`, `sep`, `ey`, `movimiento`…) y, con `reposo: true`, la deja como su cara de siempre. Devuelve **dos PNG** dibujados por el núcleo (`sintetica_dibujar_expresion_cierre`): abierta y parpadeando. `solo_ver` para iterar; `mostrar` para fijarla ya |
+| `borrar_expresion` | Saca una propia (si es de imagen, también sus sprites que no use otra; si era la de siempre, vuelve la neutral) |
 | `poner_imagen` | URL https (bajada con las protecciones anti-SSRF de los webhooks, 8 MB, 15 s, hasta 3 redirecciones validadas) o base64; PNG/JPEG/GIF → recortada llenando la pantalla, redonda en el broche, QOI de 3 canales o animación `sani` (≤ 64 cuadros); en una bahía 0–7; opcional `lista` y `protector` |
 | `borrar_imagen` | Vacía una bahía (y la saca de la lista y el protector) |
 | `recordatorios` | listar / crear / borrar (máx. 12; `{hora, dias, texto ≤ 40 bytes, expresion, sonido, activo}`) |
@@ -359,8 +383,9 @@ conectan desde sus servidores: necesitan **HTTPS público**; en local
 | `mandar_telegram` | Le escribe al usuario si vinculó Telegram |
 
 Además, el recurso **`sintetica://guia/caras`** (qué hace cada parámetro, sus
-límites, consejos y ejemplos, armado desde el schema) y el prompt
-`inventar_cara`.
+límites, consejos y ejemplos, armado desde el schema, y la sección "Caras de
+imagen": cómo dibujar para la pantalla, con un ejemplo de ojitos de anime en
+SVG) y el prompt `inventar_cara`.
 
 ## Variables de la API
 

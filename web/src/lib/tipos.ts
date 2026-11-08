@@ -64,6 +64,7 @@ export type Evento =
   | { tipo: 'sincro'; bicho: string; datos: Sincro }
   | { tipo: 'config'; bicho: string; datos: VersionConfig }
   | { tipo: 'imagenes'; bicho: string }
+  | { tipo: 'sprites'; bicho: string }
   | { tipo: 'ota'; bicho: string; datos: Actualizacion }
   | { tipo: 'marco'; bicho: string; datos: { car: number; datos: string } }
   | { tipo: 'bicho'; bicho: string; datos: { accion: 'sumado' | 'quitado' | 'actual'; bicho?: Bicho } }

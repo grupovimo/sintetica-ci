@@ -456,6 +456,7 @@ func (s *Servidor) listarImagenes(w http.ResponseWriter, r *http.Request) {
 		s.interno(w, err)
 		return
 	}
+	l = almacen.SoloImagenes(l)
 	if l == nil {
 		l = []almacen.Imagen{}
 	}

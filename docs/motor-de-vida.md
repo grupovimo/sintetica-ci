@@ -198,11 +198,15 @@ Una config v1 sigue siendo válida (su `personalidad.sueno` pasa al horario).
 
 - `semilla`, `personalidad` (rasgos o `preset`), `horario {despierta, duerme}`,
   `dueno {nombre, cumple}`, `cumple` (el del bicho), `limites_marca {color, brillo_max}`.
-- `expresiones`: con `formas` es un **dibujo** (v1); si no, una **expresión
+- `expresiones`: con `formas` es un **dibujo** (v1); con `sprites`, una **cara
+  de imagen** (abajo); si no, una **expresión
   paramétrica**: `ojo` (los dos), `izq`, `der`, los parámetros de la cara,
   `movimiento`, `particula`, `parpadeo` y `extiende`. Una con el nombre de una
   base se aplica **encima** de la base (se guarda solo lo que cambia); una
   nueva parte de la neutral (o de la que extiende).
+- `cara.expresion`: la **cara de siempre** (en vez de la neutral): una
+  paramétrica o de imagen que exista. No es una cara fija: sigue durmiéndose
+  solo, eligiendo comportamientos y reaccionando (encima de ella).
 - `comportamientos`: `tipo`, `cuando`, `necesidad`, `base`, `probabilidad`,
   `enfriamiento`, `interrumpible`, `afinidad` y hasta 6 `pasos` (`cara`, `dura`,
   `veces`, `mirada`, `parpadeo`, `particula`, `cuantas`, `peso`, `sonido`, `estado`).
@@ -228,8 +232,8 @@ Una config v1 sigue siendo válida (su `personalidad.sueno` pasa al horario).
   entonces se comportan como `mascota`.
 
 Límites (iguales en todos lados porque valida el mismo núcleo): 48 expresiones
-paramétricas, 64 comportamientos, 24 reglas propias (+ las base), 12
-recordatorios, 16 KB.
+paramétricas (8 de ellas pueden ser de imagen, con 12 sprites), 64
+comportamientos, 24 reglas propias (+ las base), 12 recordatorios, 16 KB.
 
 ### Recordatorios, reloj y pomodoro en el bicho (`Sistema`)
 
@@ -271,6 +275,117 @@ mayúscula; la hora y la cuenta del pomodoro, en Fraunces agrandada
 
 Los datos base se embeben con `npm run caras` (`firmware/herramientas/embeber_caras.py`
 genera `vida_base.h`); cada uno se parsea por separado al arrancar.
+
+## Caras de imagen
+
+"La cara tiene que ser cualquiera que quiera crear la IA": unos ojitos de
+anime, de gato, un visor… Una **cara de imagen** es una expresión v2 que arma
+los ojos y la boca con **sprites** en vez de con la SDF, y el motor la anima
+como a cualquier cara.
+
+### El contrato (config)
+
+```json
+"cara": { "expresion": "anime" },
+"expresiones": {
+  "anime": {
+    "sprites": { "ojo": 0, "ojo_cerrado": 1, "boca": 2 },
+    "tamano": 0.46, "boca_y": -0.42, "espejar_der": true,
+    "sep": 0.3, "ey": 0.02, "blush": 0.5, "movimiento": "rebote"
+  }
+}
+```
+
+- `sprites` (obligatorio, con `ojo`): qué sprite (0 a 11) va en cada parte:
+  `ojo` (el izquierdo abierto, mirando al frente), `ojo_cerrado`, `ojo_der`,
+  `ojo_der_cerrado` y `boca`. Sin `ojo_der`, el derecho es el izquierdo
+  espejado (`espejar_der: false` para no espejarlo).
+- `tamano` (0,08 a 0,8; 0,36): el ancho de cada ojo en unidades del rostro.
+  Las otras partes van **a la misma escala** que el ojo (en píxeles del
+  archivo), salvo la boca con `boca_tamano` (0,04 a 0,9). `boca_y` (−0,7 a 0,3;
+  −0,36): la altura de la boca, como la de la SDF.
+- Valen todos los parámetros de una expresión paramétrica (`sep`, `ey`, `gx`,
+  `ftilt`, `blush`, `ojo.lt`…, `movimiento`, `particula`, `parpadeo`,
+  `extiende`): mueven los sprites igual que a los ojos de la SDF. Una que
+  extiende una de imagen hereda sus sprites.
+- Límites (los valida el mismo núcleo en la placa, la API por cgo y la web por
+  wasm): 12 sprites, 8 caras de imagen por config. Los sprites viajan aparte de
+  la config (protocolo: espacios 8 a 19 de la característica Imagen, ver
+  [protocolo-ble.md](protocolo-ble.md#sprites-v15)); si falta el del ojo, la cara
+  se ve con la SDF hasta que llegue.
+
+### Cómo la anima el motor
+
+Es una `CaraVida` más (con `imagen` = su índice en `DatosVida::imagenes`), así
+que sirve en todos lados: `reflejo:anime`, `expresion:anime`, un paso
+`"cara": "anime"`, la lista (`cara:anime`), un recordatorio, la fija y la de
+siempre. `MotorVida::caraImagen()` dice cuál se dibuja: la de la capa (un
+reflejo o un paso) si es de imagen; si no, la de la "persona" (fija > estado >
+base de la lista > `cara.expresion`; una fija o una base paramétrica la corta).
+Las demás caras **la mueven con sus parámetros**: sorpresa agranda los ojos,
+dormido los cierra, hablar abre la boca. En `nombreVisible()` gana la de imagen.
+
+`dibujarSprites` (`nucleo/sprites.cpp`) toma la geometría de cada cuadro:
+
+| Del rostro | En los sprites |
+| --- | --- |
+| `sep`, `gx`, `gy`, `ey`, órbita | dónde va cada ojo (la mirada los desplaza; no hace falta pupila) |
+| `w`, `h`, `squash`, latido, pulso | el tamaño (relativo a la neutral) |
+| `lt`, `lb` (y el parpadeo, que los lleva a 0,5) | cuánto está abierto: con `ojo_cerrado`, el abierto se aplasta un poco y se funde con el cerrado (entre 22 % y 50 % abierto); sin él, se aplasta hasta una rayita. `smile` también lo cierra (los ojitos felices ^ ^) |
+| `tilt`, `ftilt`, `fscale`, respiración, anticipación, deriva, `shake` | el giro y la escala (la misma transformación que la SDF) |
+| `glitch` | las bandas corridas |
+| `dim`, `hue`, el brillo de la noche y del ritmo | el brillo y el tinte |
+| `mw`, `mo` | el ancho y la apertura de la boca |
+
+Los cachetes y las partículas se dibujan igual que siempre (las partículas,
+encima). El dibujo es un muestreo inverso afín con interpolación bilineal en
+punto fijo (16.16, sin FPU), recortado a la franja: da lo mismo por franjas
+que de una vez (test).
+
+### Nunca un corte
+
+`Sistema::avanzarSprites` funde la SDF y los sprites en 200 ms: de la SDF a una
+de imagen, los ojos de la SDF se apagan (`ocultarOjos`) mientras los sprites se
+prenden; de una de imagen a otra, la vieja se apaga, se cargan los sprites de la
+nueva y se prende. Cada cara de imagen tiene una firma (sus partes, su
+geometría y los CRC de sus sprites): si se sube un sprite nuevo para la cara
+que se ve, se va y vuelve con un fundido (los sprites viejos siguen en la RAM
+mientras se va). Si no se pueden leer, vuelve la SDF (también con fundido).
+
+### La memoria (medida)
+
+No se decodifica nada por cuadro: al empezar a mostrar una cara de imagen, sus
+partes se decodifican **una vez**, achicadas a lo que se ven en esa pantalla
+(nunca más grandes que el archivo), en un buffer fijo (`CacheSprites`). Se
+guardan en **RGB565 premultiplicado** por la transparencia y se dibujan
+"aclarando" (el máximo por canal): sobre la pantalla casi negra (`#0B0A09`) da
+lo mismo que mezclar con la transparencia y ocupa **2 bytes por píxel en vez
+de 3** (RGB565 + alfa). Medido (`sizeof`, test "sprites: entran en el buffer
+fijo…"):
+
+| | Bytes |
+| --- | --- |
+| `CacheSprites` (1.47B, simulador, apps, API: 16 384 píxeles) | 32 852 |
+| `CacheSprites` en el broche (`-DSINTETICA_CACHE_SPRITES_PX=6144`) | 12 372 |
+| Decodificar (`sprites.cpp`: el decodificador QOI, una fila RGBA, las sumas de una fila) | ~3 100 |
+| `CaraImagen` × 8 en `Config` + `nImagenes` + `reposo` | 98 |
+| `CaraVida` (el índice de imagen entró en el relleno) | +0 (144) |
+| Los metadatos de los 12 sprites en `Sistema` + la firma y el fundido | 108 |
+
+En la 1.47B el `Sistema` está en la PSRAM. En el broche suman ~15,6 KB de RAM
+interna (del 68 % a ~73 %, a confirmar con `pio run -e broche-c3` en CI); si una
+cara no entra, sus partes se achican por igual hasta entrar (con 12 KB, tres
+partes de ~45 × 45 que se ven de ~55 px).
+
+### La IA y la web
+
+- MCP `dibujar_cara` (ver [nube.md](nube.md#herramientas)): cada parte en SVG,
+  URL o base64 → sprites a la misma escala → la expresión; devuelve la cara
+  abierta y parpadeando dibujada por el núcleo. La guía (`sintetica://guia/caras`)
+  explica cómo dibujar para la pantalla, con un ejemplo de ojitos de anime.
+- Web: Laboratorio → Expresiones → **De imagen** (subir o pegar el SVG de cada
+  parte, perillas, la cara viva en el núcleo entero y "Siempre") y, en la
+  consola, el módulo Cara elige la cara de siempre.
 
 ## Protocolo v1.4
 

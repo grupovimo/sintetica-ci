@@ -197,13 +197,16 @@ func (r *Relevo) imagen(ctx context.Context, conexion, bichoID string, op byte, 
 	rc := &r.de(conexion).imagen
 	switch op {
 	case protocolo.ImgInicio:
-		if len(m) != 10 || m[1] > 7 {
+		if len(m) != 10 || !espacioValido(int(m[1])) {
 			return []Marco{resp(car, op, protocolo.Malformado, "")}, nil
 		}
 		largo := binary.LittleEndian.Uint32(m[2:])
 		limite := uint32(640*640*4 + 22)
 		if est, ok := r.n.EstadoDe(bichoID); ok {
 			limite = uint32(est.Pantalla.Ancho*est.Pantalla.Alto*4 + 22)
+		}
+		if protocolo.EsSprite(int(m[1])) {
+			limite = protocolo.LimiteSprite
 		}
 		if largo < 22 || largo > limite {
 			*rc = recepcion{}
@@ -225,25 +228,52 @@ func (r *Relevo) imagen(ctx context.Context, conexion, bichoID string, op byte, 
 		if protocolo.Crc32(datos) != crc {
 			return []Marco{resp(car, op, protocolo.CrcDistinto, "")}, nil
 		}
-		if err := r.n.GuardarImagen(ctx, bichoID, espacio, datos); err != nil {
+		guardar := r.n.GuardarImagen
+		if protocolo.EsSprite(espacio) {
+			guardar = func(ctx context.Context, id string, e int, d []byte) error {
+				return r.n.GuardarSprite(ctx, id, e-protocolo.PrimerSprite, d)
+			}
+		}
+		if err := guardar(ctx, bichoID, espacio, datos); err != nil {
 			return []Marco{resp(car, op, protocolo.ImagenInvalida, err.Error())}, nil
 		}
 		return []Marco{resp(car, op, protocolo.Ok, "")}, nil
 	case protocolo.ImgBorrar:
-		if len(m) != 2 || m[1] > 7 {
+		if len(m) != 2 || !espacioValido(int(m[1])) {
 			return []Marco{resp(car, op, protocolo.Malformado, "")}, nil
 		}
-		if err := r.n.BorrarImagen(ctx, bichoID, int(m[1])); err != nil {
+		borrar := r.n.BorrarImagen
+		if protocolo.EsSprite(int(m[1])) {
+			borrar = func(ctx context.Context, id string, e int) error {
+				return r.n.BorrarSprite(ctx, id, e-protocolo.PrimerSprite)
+			}
+		}
+		if err := borrar(ctx, bichoID, int(m[1])); err != nil {
 			return nil, err
 		}
 		return []Marco{resp(car, op, protocolo.Ok, "")}, nil
+	case protocolo.ImgListarSprites:
+		l, err := r.n.alm.Imagenes(ctx, bichoID)
+		if err != nil {
+			return nil, err
+		}
+		b := []byte{protocolo.ImgListarSprites | protocolo.Respuesta, protocolo.Ok, 0, 0}
+		var mascara uint16
+		for _, i := range almacen.SoloSprites(l) {
+			mascara |= 1 << (i.Espacio - protocolo.PrimerSprite)
+			b = append(b, byte(i.Espacio))
+			b = binary.LittleEndian.AppendUint32(b, uint32(i.Largo))
+			b = binary.LittleEndian.AppendUint32(b, i.Crc)
+		}
+		binary.LittleEndian.PutUint16(b[2:], mascara)
+		return []Marco{{Car: car, Datos: b}}, nil
 	case protocolo.ImgListar:
 		l, err := r.n.alm.Imagenes(ctx, bichoID)
 		if err != nil {
 			return nil, err
 		}
 		b := []byte{protocolo.ImgListar | protocolo.Respuesta, protocolo.Ok, 0}
-		for _, i := range l {
+		for _, i := range almacen.SoloImagenes(l) {
 			b[2] |= 1 << i.Espacio
 			b = append(b, byte(i.Espacio))
 			b = binary.LittleEndian.AppendUint32(b, uint32(i.Largo))
@@ -251,7 +281,7 @@ func (r *Relevo) imagen(ctx context.Context, conexion, bichoID string, op byte, 
 		}
 		return []Marco{{Car: car, Datos: b}}, nil
 	case protocolo.ImgPedir:
-		if len(m) != 2 || m[1] > 7 {
+		if len(m) != 2 || !espacioValido(int(m[1])) {
 			return []Marco{resp(car, op, protocolo.Malformado, "")}, nil
 		}
 		img, err := r.n.alm.LeerImagen(ctx, bichoID, int(m[1]))
@@ -303,6 +333,37 @@ func (n *Nube) GuardarImagen(ctx context.Context, bichoID string, espacio int, q
 		return err
 	}
 	n.publicar(bichoID, eventos.Evento{Tipo: "imagenes"})
+	n.CambioDeseado(bichoID)
+	return nil
+}
+
+func espacioValido(e int) bool { return (e >= 0 && e < 8) || protocolo.EsSprite(e) }
+
+// ErrSprite: no es un QOI de hasta 128 × 128.
+var ErrSprite = errors.New("un sprite tiene que ser un QOI (con o sin transparencia) de hasta 128 × 128")
+
+// GuardarSprite guarda el sprite n (0 a 11: el espacio 8 + n) y lo manda a sincronizar.
+func (n *Nube) GuardarSprite(ctx context.Context, bichoID string, sprite int, qoi []byte) error {
+	if sprite < 0 || sprite >= protocolo.MaxSprites {
+		return ErrSprite
+	}
+	if _, _, ok := protocolo.TamanoSprite(qoi); !ok {
+		return ErrSprite
+	}
+	if err := n.alm.GuardarImagen(ctx, bichoID, protocolo.PrimerSprite+sprite, qoi, protocolo.Crc32(qoi)); err != nil {
+		return err
+	}
+	n.publicar(bichoID, eventos.Evento{Tipo: "sprites"})
+	n.CambioDeseado(bichoID)
+	return nil
+}
+
+// BorrarSprite vacía el sprite n y lo manda a sincronizar.
+func (n *Nube) BorrarSprite(ctx context.Context, bichoID string, sprite int) error {
+	if err := n.alm.BorrarImagen(ctx, bichoID, protocolo.PrimerSprite+sprite); err != nil {
+		return err
+	}
+	n.publicar(bichoID, eventos.Evento{Tipo: "sprites"})
 	n.CambioDeseado(bichoID)
 	return nil
 }

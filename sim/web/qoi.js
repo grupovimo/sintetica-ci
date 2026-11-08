@@ -5,19 +5,20 @@
 
 const hash = (r, g, b, a) => (r * 3 + g * 5 + b * 7 + a * 11) % 64;
 
-// rgba: Uint8Array/Uint8ClampedArray de ancho × alto × 4. Se codifica con 3 canales.
-export function codificarQoi(rgba, ancho, alto) {
+// rgba: Uint8Array/Uint8ClampedArray de ancho × alto × 4. Se codifica con 3
+// canales; con canales = 4, con la transparencia (los sprites de las caras de imagen).
+export function codificarQoi(rgba, ancho, alto, canales = 3) {
   const salida = [];
   const u32 = (v) => salida.push((v >>> 24) & 255, (v >>> 16) & 255, (v >>> 8) & 255, v & 255);
   salida.push(0x71, 0x6f, 0x69, 0x66);  // "qoif"
   u32(ancho);
   u32(alto);
-  salida.push(3, 0);
+  salida.push(canales === 4 ? 4 : 3, 0);
   const indice = new Uint8Array(64 * 4);
   let pr = 0, pg = 0, pb = 0, pa = 255, racha = 0;
   const total = ancho * alto;
   for (let i = 0; i < total; i++) {
-    const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2], a = 255;
+    const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2], a = canales === 4 ? rgba[i * 4 + 3] : 255;
     if (r === pr && g === pg && b === pb && a === pa) {
       racha++;
       if (racha === 62 || i === total - 1) { salida.push(0xc0 | (racha - 1)); racha = 0; }
@@ -31,7 +32,9 @@ export function codificarQoi(rgba, ancho, alto) {
       indice[h * 4] = r; indice[h * 4 + 1] = g; indice[h * 4 + 2] = b; indice[h * 4 + 3] = a;
       const vr = ((r - pr) << 24) >> 24, vg = ((g - pg) << 24) >> 24, vb = ((b - pb) << 24) >> 24;
       const vgr = vr - vg, vgb = vb - vg;
-      if (vr > -3 && vr < 2 && vg > -3 && vg < 2 && vb > -3 && vb < 2) {
+      if (a !== pa) {
+        salida.push(0xff, r, g, b, a);
+      } else if (vr > -3 && vr < 2 && vg > -3 && vg < 2 && vb > -3 && vb < 2) {
         salida.push(0x40 | ((vr + 2) << 4) | ((vg + 2) << 2) | (vb + 2));
       } else if (vgr > -9 && vgr < 8 && vg > -33 && vg < 32 && vgb > -9 && vgb < 8) {
         salida.push(0x80 | (vg + 32), ((vgr + 8) << 4) | (vgb + 8));

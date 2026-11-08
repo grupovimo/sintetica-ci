@@ -1,4 +1,4 @@
-// Protocolo de SintéticaOS v1.3 (BLE y nube), del lado de quien controla el bicho (app,
+// Protocolo de SintéticaOS v1.5 (BLE y nube), del lado de quien controla el bicho (app,
 // web, simulador). Ver docs/protocolo-ble.md. Sin dependencias: sirve en el
 // navegador y en Node.
 
@@ -19,7 +19,7 @@ export const Op = {
   cmdVincular: 0x13, cmdAutenticar: 0x14, cmdDesvincular: 0x15,
   cmdRed: 0x16, cmdNube: 0x17, cmdOlvidarRed: 0x18, cmdReproducir: 0x19,
   cmdHora: 0x1a, cmdVida: 0x1b, cmdMemoria: 0x1c, cmdRestaurar: 0x1d, cmdRegistro: 0x1e, cmdComportamiento: 0x1f,
-  imgInicio: 0x20, imgBloque: 0x21, imgFin: 0x22, imgBorrar: 0x23, imgListar: 0x24, imgPedir: 0x25,
+  imgInicio: 0x20, imgBloque: 0x21, imgFin: 0x22, imgBorrar: 0x23, imgListar: 0x24, imgPedir: 0x25, imgListarSprites: 0x26,
   otaInicio: 0x30, otaBloque: 0x31, otaFin: 0x32, otaDescargar: 0x33, otaProgreso: 0x34, otaCancelar: 0x35,
   respuesta: 0x80, configTrozo: 0x84, configCierre: 0x85, imgTrozo: 0xa7, imgCierre: 0xa8,
 };
@@ -132,7 +132,13 @@ export function escriturasDeConfig(config, tamanoBloque = 180) {
 
 export const pedirConfig = () => Uint8Array.from([Op.configPedir]);
 
-// Una imagen QOI (del tamaño de la pantalla) partida en las escrituras de la característica Imagen.
+// Los sprites de las caras de imagen (v1.5): espacios 8 a 19 de la característica
+// Imagen (el sprite n es el espacio 8 + n), QOI de 3 o 4 canales de hasta 128 × 128.
+export const PRIMER_SPRITE = 8;
+export const MAX_SPRITES = 12;
+export const LADO_SPRITE = 128;
+
+// Una imagen QOI (del tamaño de la pantalla, o un sprite) partida en las escrituras de la característica Imagen.
 export function escriturasDeImagen(espacio, qoi, tamanoBloque = 180) {
   const escrituras = [Uint8Array.from([Op.imgInicio, espacio, ...u32(qoi.length), ...u32(crc32(qoi))])];
   const porBloque = tamanoBloque - 5;
@@ -147,6 +153,8 @@ export const imagen = {
   borrar: (espacio) => Uint8Array.from([Op.imgBorrar, espacio]),
   listar: () => Uint8Array.from([Op.imgListar]),
   pedir: (espacio) => Uint8Array.from([Op.imgPedir, espacio]),
+  // Los sprites ocupados (v1.5): responde [0xA6][0][máscara u16] + por cada uno [espacio][u32 largo][u32 crc].
+  listarSprites: () => Uint8Array.from([Op.imgListarSprites]),
 };
 
 // Arma la imagen que el bicho manda en trozos después de imagen.pedir().
@@ -205,6 +213,13 @@ export function leerListaImagenes(b) {
   const espacios = [];
   for (let i = 3; i + 9 <= b.length; i += 9) espacios.push({ espacio: b[i], largo: leerU32(b, i + 1), crc: leerU32(b, i + 5) });
   return { mascara: b[2], espacios };
+}
+
+// La respuesta a imagen.listarSprites(): los sprites ocupados (sprite = espacio - 8).
+export function leerListaSprites(b) {
+  const sprites = [];
+  for (let i = 4; i + 9 <= b.length; i += 9) sprites.push({ espacio: b[i], sprite: b[i] - PRIMER_SPRITE, largo: leerU32(b, i + 1), crc: leerU32(b, i + 5) });
+  return { mascara: b[2] | (b[3] << 8), sprites };
 }
 
 // El QR del bicho: "SINTETICA:V1/<id de 12>/<código de 6>".

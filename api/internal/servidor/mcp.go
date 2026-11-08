@@ -134,6 +134,7 @@ func (s *Servidor) manejadorMCP() http.Handler {
 const instruccionesMCP = `Manejás los robots de Sintética del usuario: bichos con una cara animada en su pantalla.
 - Empezá con listar_robots. Con un solo robot, "robot" se puede omitir; si no, va su id o su nombre.
 - Para inventar caras usá crear_expresion: devuelve una imagen de cómo queda; mirala y ajustá. Con solo_ver: true probás sin guardar. La guía de parámetros está en el recurso sintetica://guia/caras.
+- Si la cara no sale con parámetros (ojitos de anime, de gato, pixel art, cualquier dibujo), dibujala con dibujar_cara: cada parte en SVG; sigue viva (parpadea, mira, reacciona). Con reposo: true queda como su cara de siempre.
 - Los cambios de config (expresiones, recordatorios, personalidad, horario, modo, reflejos) se guardan y le llegan al robot apenas está conectado. Poner caras y disparar eventos necesita que esté conectado.
 - Hablale al usuario en español rioplatense.`
 
@@ -263,7 +264,7 @@ func (s *Servidor) servidorMCP() *mcp.Server {
 	s.sumarHerramientas(srv)
 	srv.AddResource(&mcp.Resource{
 		URI: uriGuia, Name: "guia-caras", Title: "Guía para inventar caras",
-		Description: "Qué hace cada parámetro del rostro, sus límites y ejemplos de las caras de fábrica.",
+		Description: "Qué hace cada parámetro del rostro, sus límites, ejemplos de las caras de fábrica y cómo dibujar caras de imagen (SVG) para la pantalla.",
 		MIMEType:    "text/markdown",
 	}, func(context.Context, *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
 		return &mcp.ReadResourceResult{Contents: []*mcp.ResourceContents{{URI: uriGuia, MIMEType: "text/markdown", Text: guiaCaras()}}}, nil

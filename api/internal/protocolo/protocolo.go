@@ -49,6 +49,7 @@ const (
 	ImgBorrar         = 0x23
 	ImgListar         = 0x24
 	ImgPedir          = 0x25
+	ImgListarSprites  = 0x26 // v1.5: los sprites de las caras de imagen (espacios 8 a 19)
 	OtaInicio         = 0x30
 	OtaBloque         = 0x31
 	OtaFin            = 0x32
@@ -374,6 +375,43 @@ func BorrarImagen(espacio int) []byte { return []byte{ImgBorrar, byte(espacio)} 
 func ListarImagenes() []byte          { return []byte{ImgListar} }
 func PedirImagen(espacio int) []byte  { return []byte{ImgPedir, byte(espacio)} }
 
+// Los sprites de las caras de imagen (v1.5): los espacios 8 a 19 de la
+// característica Imagen (el sprite n es el espacio 8 + n), QOI de 3 o 4
+// canales de hasta 128 × 128.
+const (
+	PrimerSprite = 8
+	MaxSprites   = 12
+	LadoSprite   = 128
+	// LimiteSprite: el peor caso de un QOI de 4 canales de 128 × 128.
+	LimiteSprite = LadoSprite*LadoSprite*5 + 22
+)
+
+// EsSprite dice si un espacio de la característica Imagen es de un sprite.
+func EsSprite(espacio int) bool { return espacio >= PrimerSprite && espacio < PrimerSprite+MaxSprites }
+
+// ListarSprites pide los sprites ocupados.
+func ListarSprites() []byte { return []byte{ImgListarSprites} }
+
+// LeerListaSprites interpreta la respuesta a ListarSprites: [0xA6][0][máscara
+// u16] + por sprite [espacio][u32 largo][u32 crc]. Los espacios son los de la
+// característica (8 a 19).
+func LeerListaSprites(b []byte) []EspacioImagen {
+	var l []EspacioImagen
+	for i := 4; i+9 <= len(b); i += 9 {
+		l = append(l, EspacioImagen{int(b[i]), binary.LittleEndian.Uint32(b[i+1:]), binary.LittleEndian.Uint32(b[i+5:])})
+	}
+	return l
+}
+
+// TamanoSprite: el tamaño de un sprite (un QOI de 3 o 4 canales de 1 a 128 por lado).
+func TamanoSprite(b []byte) (ancho, alto int, ok bool) {
+	if len(b) < 22 || len(b) > LimiteSprite || string(b[:4]) != "qoif" || (b[12] != 3 && b[12] != 4) {
+		return 0, 0, false
+	}
+	w, h := binary.BigEndian.Uint32(b[4:]), binary.BigEndian.Uint32(b[8:])
+	return int(w), int(h), w >= 1 && h >= 1 && w <= LadoSprite && h <= LadoSprite
+}
+
 // EspacioImagen es un espacio ocupado.
 type EspacioImagen struct {
 	Espacio int    `json:"espacio"`
@@ -468,7 +506,7 @@ func LeerResultado(b []byte) (Resultado, bool) {
 	r.Ok, r.Mensaje = r.Codigo == Ok, Mensaje(r.Codigo)
 	if r.Op == CmdVincular && r.Ok && len(b) >= 18 {
 		r.Clave = append([]byte(nil), b[2:18]...)
-	} else if len(b) > 2 && r.Op != ImgListar && r.Op != OtaProgreso {
+	} else if len(b) > 2 && r.Op != ImgListar && r.Op != ImgListarSprites && r.Op != OtaProgreso {
 		r.Detalle = string(b[2:])
 	}
 	return r, true

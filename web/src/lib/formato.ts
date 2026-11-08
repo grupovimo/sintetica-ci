@@ -94,6 +94,21 @@ export const EXPRESIONES_BASE = expresionesBase as unknown as Record<string, Exp
 export const COMPORTAMIENTOS_BASE = comportamientosBase as unknown as Record<string, Comportamiento>;
 export const REGLAS_BASE = reglasBase as unknown as Regla[];
 export const esDibujo = (e: Expresion | ExpresionVida): e is Expresion => Array.isArray((e as Expresion).formas);
+// Una cara de imagen (docs/motor-de-vida.md, "Caras de imagen"): ojos y boca con sprites (0 a 11).
+export const PARTES_SPRITE = ['ojo', 'ojo_cerrado', 'boca', 'ojo_der', 'ojo_der_cerrado'] as const;
+export type ParteSprite = (typeof PARTES_SPRITE)[number];
+export type ExpresionImagen = ExpresionVida & {
+  sprites: Partial<Record<ParteSprite, number>>; tamano?: number; boca_tamano?: number; boca_y?: number; espejar_der?: boolean;
+};
+export const MAX_SPRITES = 12;
+export const esImagen = (e: Expresion | ExpresionVida | undefined): e is ExpresionImagen =>
+  !!e && typeof (e as ExpresionImagen).sprites === 'object' && !Array.isArray((e as ExpresionImagen).sprites);
+// Los sprites que usa cada cara de imagen de la config.
+export function spritesEnUso(c: Config, menos = ''): Set<number> {
+  const l = new Set<number>();
+  for (const [n, e] of Object.entries(c.expresiones ?? {})) if (n !== menos && esImagen(e)) for (const x of Object.values(e.sprites)) if (typeof x === 'number') l.add(x);
+  return l;
+}
 export const MODOS = ['mascota', 'reloj', 'pomodoro', 'clima', 'notificaciones'] as const;
 export const CURVAS = ['suave', 'lineal', 'entrada', 'salida', 'rebote', 'paso'] as const;
 export const NOMBRES_CURVA: Record<string, string> = {
@@ -125,7 +140,7 @@ export type Config = {
   version: 1 | 2;
   nombre?: string;
   semilla?: number;
-  cara?: { color?: string; tamano?: number; ojos?: string };
+  cara?: { color?: string; tamano?: number; ojos?: string; expresion?: string };
   personalidad?: Personalidad;
   horario?: { despierta?: string; duerme?: string };
   dueno?: { nombre?: string; cumple?: string };

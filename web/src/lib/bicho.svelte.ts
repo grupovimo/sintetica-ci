@@ -22,6 +22,9 @@ export class BichoAbierto {
   vidaEn = $state(0);
   // Lo que el robot acaba de avisar solo (un recordatorio, el fin de un pomodoro), para mostrarlo al toque.
   aviso = $state<{ texto: string; cuando: number; icono: string; despertador?: boolean } | null>(null);
+  // Los sprites de las caras de imagen (QOI, por número 0 a 11) y su CRC: la
+  // pantalla en vivo de la web los carga en su núcleo.
+  sprites = $state<Record<number, { qoi: Uint8Array; crc: number }>>({});
   private dejar: (() => void) | null = null;
 
   constructor(public id: string) {}
@@ -30,6 +33,7 @@ export class BichoAbierto {
     try {
       this.bicho = await api<Bicho>(`/v1/bichos/${this.id}`);
       await this.cargarConfig();
+      this.cargarSprites();
       this.error = '';
     } catch (e) {
       this.error = e instanceof ErrorApi ? e.message : 'No pude cargar el robot.';
@@ -43,6 +47,20 @@ export class BichoAbierto {
     this.autorConfig = c.autor ?? '';
   }
 
+  async cargarSprites() {
+    try {
+      const l = await api<{ sprites: { sprite: number; crc: number }[] }>(`/v1/bichos/${this.id}/sprites`);
+      const nuevos: Record<number, { qoi: Uint8Array; crc: number }> = {};
+      for (const s of l.sprites) {
+        const ya = this.sprites[s.sprite];
+        if (ya && ya.crc === s.crc) { nuevos[s.sprite] = ya; continue; }
+        const r = await fetch(`/api/v1/bichos/${this.id}/sprites/${s.sprite}`, { headers: { 'X-Sintetica': '1' } });
+        if (r.ok) nuevos[s.sprite] = { qoi: new Uint8Array(await r.arrayBuffer()), crc: s.crc };
+      }
+      this.sprites = nuevos;
+    } catch { /* sin sprites: las caras de imagen se ven con la de siempre */ }
+  }
+
   escucharEventos() {
     this.dejar = escuchar((e) => {
       if (e.bicho !== this.id || !this.bicho) return;
@@ -51,6 +69,7 @@ export class BichoAbierto {
         case 'conexion': this.bicho.conectado = e.datos.conectado; break;
         case 'sincro': this.bicho.sincro = e.datos; break;
         case 'config': if (e.datos.version !== this.versionConfig) this.cargarConfig(); break;
+        case 'sprites': this.cargarSprites(); break;
         case 'ota': this.ota = e.datos; break;
         case 'mcp': this.avisar(`${e.datos.cliente || 'Tu IA'}: ${e.datos.herramienta.replaceAll('_', ' ')}`, '✦'); break;
         case 'marco': {
@@ -146,3 +165,5 @@ export const BASE = ['neutral', 'contento', 'sospecha', 'sorpresa', 'dormido', '
 const CLAVE = Symbol('bicho');
 export const darBicho = (b: BichoAbierto) => setContext(CLAVE, b);
 export const usarBicho = () => getContext<BichoAbierto>(CLAVE);
+// Fuera de las páginas de un robot (la portada) no hay: undefined.
+export const quizasBicho = () => getContext<BichoAbierto | undefined>(CLAVE);

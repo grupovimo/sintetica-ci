@@ -2,14 +2,15 @@
   // Expresiones: una galería con las caras de verdad (las dibuja el núcleo), la
   // elegida grande y viva, y perillas agrupadas por parte de la cara. Se guarda
   // solo lo que cambia respecto de la original.
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { usarBicho } from '$lib/bicho.svelte';
   import { foto } from '$lib/foto.svelte';
   import { nucleoEditor, pintar, type Simulador } from '$lib/nucleo';
   import {
-    clonar, EXPRESIONES_BASE, esDibujo, MOVIMIENTOS, nombreValido, PARAMS_CARA, PARAMS_OJO, PARPADEOS, PARTICULAS,
+    clonar, EXPRESIONES_BASE, esDibujo, esImagen, MOVIMIENTOS, nombreValido, PARAMS_CARA, PARAMS_OJO, PARPADEOS, PARTICULAS,
     type Config, type ExpresionVida,
   } from '$lib/formato';
+  import DeImagen from './DeImagen.svelte';
   import { pantallaDe } from '$lib/tipos';
   import Perilla from '$lib/consola/Perilla.svelte';
   import Pad from '$lib/consola/Pad.svelte';
@@ -31,6 +32,15 @@
   let guardando = $state(false);
   let canvas = $state<HTMLCanvasElement>();
   let indices: Record<string, number> = {};
+  // Una cara de imagen abierta: null = el editor de perillas; '' = una nueva.
+  let imagen = $state<string | null>(null);
+  const deImagen = (n: string) => esImagen(b.config.expresiones?.[n] as ExpresionVida | undefined);
+  // La miniatura de una cara de imagen: su ojo.
+  function miniImagen(n: string): string {
+    const e = b.config.expresiones?.[n];
+    const s = esImagen(e) ? e.sprites.ojo : undefined;
+    return s !== undefined && b.sprites[s] ? `/api/v1/bichos/${b.id}/sprites/${s}?png=1&v=${b.sprites[s].crc}` : '';
+  }
   const POR_OJO = PARAMS_OJO.length;
 
   const propias = $derived(Object.entries(b.config.expresiones ?? {}).filter(([, e]) => !esDibujo(e)).map(([n]) => n));
@@ -114,9 +124,25 @@
     return () => { vivo = false; };
   });
 
+  // La config llega (o cambia) después de abrir la página: el editor la vuelve a cargar.
+  $effect(() => {
+    void b.versionConfig;
+    const s = sim;
+    if (!s) return;
+    untrack(() => {
+      const r = s.editor.config(configDelEditor());
+      if (r.ok) {
+        nombres = s.editor.caras();
+        hacerMiniaturas();
+      }
+    });
+  });
+
   function elegir(n: string) {
     error = aviso = '';
     elegida = nombre = n;
+    imagen = deImagen(n) ? n : null;
+    if (imagen !== null) return;
     valores = vectorDe(n);
     const base = EXPRESIONES_BASE[n];
     if (base && sim) {
@@ -215,6 +241,17 @@
     elegir(nombres.includes(elegida) ? elegida : 'neutral');
   }
 
+  function nuevaImagen() {
+    elegida = '';
+    imagen = '';
+  }
+  function imagenLista(n: string) {
+    sim?.editor.config(configDelEditor());
+    nombres = sim?.editor.caras() ?? nombres;
+    hacerMiniaturas();
+    if (n) { elegida = n; imagen = n; } else elegir('neutral');
+  }
+
   async function probarEnRobot() {
     error = (await b.comando({ expresion: elegida })) ?? '';
     if (!error) setTimeout(() => b.comando({ expresion: '' }), 4000);
@@ -224,14 +261,22 @@
 <div class="expresiones">
   <aside class="galeria" aria-label="Caras">
     <button class="cara nueva" onclick={nueva} disabled={!sim}><span class="mas">+</span><span class="n">Nueva</span></button>
+    <button class="cara nueva" class:elegida={imagen === ''} onclick={nuevaImagen} disabled={!sim} title="Una cara dibujada: SVG, PNG, JPEG o GIF">
+      <span class="mas"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v14H4Z M4 16l5-5 4 4 3-3 4 4 M15.5 8.5h.01" /></svg></span>
+      <span class="n">De imagen</span>
+    </button>
     {#each nombres as n}
+      {@const img = deImagen(n)}
       <button class="cara" class:elegida={n === elegida} aria-pressed={n === elegida} onclick={() => elegir(n)} title={n}>
-        <span class="mini" class:redonda={pantalla.redonda}>{#if miniaturas[n]}<img src={miniaturas[n]} alt="" />{/if}</span>
+        <span class="mini" class:redonda={pantalla.redonda} class:dibujo={img}>{#if img}{#if miniImagen(n)}<img src={miniImagen(n)} alt="" />{/if}{:else if miniaturas[n]}<img src={miniaturas[n]} alt="" />{/if}</span>
         <span class="n">{n}{#if propias.includes(n)}<span class="tuya" title="Tuya o cambiada"></span>{/if}</span>
       </button>
     {/each}
   </aside>
 
+  {#if imagen !== null}
+    {#key imagen}<DeImagen inicial={imagen} alListo={imagenLista} />{/key}
+  {:else}
   <section class="mesa">
     <div class="pantalla" class:redonda={pantalla.redonda}><canvas bind:this={canvas} aria-label="La cara, en vivo"></canvas></div>
 
@@ -300,6 +345,7 @@
       {/if}
     </div>
   </section>
+  {/if}
 </div>
 
 <style>
@@ -312,6 +358,8 @@
   .mini { display: block; aspect-ratio: 320 / 172; border-radius: 9px; overflow: hidden; background: #050505; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
   .mini.redonda { aspect-ratio: 1; border-radius: 50%; }
   .mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .mini.dibujo { display: grid; place-items: center; }
+  .mini.dibujo img { width: auto; height: auto; max-width: 70%; max-height: 80%; object-fit: contain; }
   .n { display: flex; align-items: center; gap: 6px; font: 700 11.5px/1.1 var(--marca); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tuya { width: 7px; height: 7px; border-radius: 50%; background: var(--led); box-shadow: 0 0 6px var(--led); flex: none; }
   .nueva .mas { display: grid; place-items: center; aspect-ratio: 320 / 172; border-radius: 9px; border: 2px dashed #3a3632; font: 700 26px/1 var(--marca); color: var(--brasa); }

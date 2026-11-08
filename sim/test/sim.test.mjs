@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { crearSimulador, memoriaVolatil } from '../web/sim.js';
 import {
   ArmadorDeConfig, Car, comando, escriturasDeConfig, escriturasDeImagen, idDeAnuncio, imagen, leerEstado, leerListaImagenes,
-  leerQr, leerRespuesta, pedirConfig,
+  leerListaSprites, leerQr, leerRespuesta, pedirConfig, PRIMER_SPRITE,
 } from '../web/protocolo.js';
 import { codificarAnimacion, codificarQoi, cuadrosDe, decodificarQoi, esAnimacion } from '../web/qoi.js';
 import { decodificarGif } from '../web/gif.js';
@@ -354,4 +354,42 @@ test('imagen animada: se sube al núcleo y pasa de cuadro', async () => {
   correr(140);
   const despues = pantalla[(120 * 240 + 120) * 4];
   assert.ok(rojo > 200 && despues < 60, `pasa de cuadro (${rojo} → ${despues})`);
+});
+
+test('cara de imagen: los sprites van a los espacios 8 a 19 y la cara de siempre vive (parpadea y mira)', async () => {
+  const reloj = { t: 0 };
+  let pantalla = null;
+  const notis = [];
+  const sim = await crearSimulador({
+    wasm, perfil: 'mascota', ahora: () => reloj.t, semilla: () => 7, minutoDelDia: () => 12 * 60,
+    alPresentar: (rgba) => { pantalla = rgba.slice(); }, alNotificar: (c, b) => notis.push({ c, b }),
+  });
+  sim.vistaPrevia();
+  const correr = (ms) => { for (let i = 0; i < ms; i += 16) { reloj.t += 16; sim.tick(); } };
+  // Un ojo cian redondo con transparencia alrededor (QOI de 4 canales).
+  const ojo = new Uint8Array(48 * 48 * 4);
+  for (let y = 0; y < 48; y++) for (let x = 0; x < 48; x++) {
+    const dx = (x + 0.5 - 24) / 24, dy = (y + 0.5 - 24) / 24;
+    if (dx * dx + dy * dy < 0.9) ojo.set([0, 255, 255, 255], (y * 48 + x) * 4);
+  }
+  const qoi = codificarQoi(ojo, 48, 48, 4);
+  assert.equal(qoi[12], 4);
+  for (const e of escriturasDeImagen(PRIMER_SPRITE, qoi)) sim.bleEscribir(Car.imagen, e);
+  assert.equal(notis.at(-1).b[0], 0xa2);
+  assert.equal(notis.at(-1).b[1], 0, 'el sprite entró');
+  sim.bleEscribir(Car.imagen, imagen.listarSprites());
+  const l = leerListaSprites(notis.at(-1).b);
+  assert.equal(l.mascara, 1);
+  assert.deepEqual(l.sprites.map((s) => [s.sprite, s.largo]), [[0, qoi.length]]);
+  const cian = () => { let n = 0; for (let i = 0; i < pantalla.length; i += 4) if (pantalla[i] < 60 && pantalla[i + 1] > 150 && pantalla[i + 2] > 150) n++; return n; };
+  correr(100);
+  assert.equal(cian(), 0);
+  for (const e of escriturasDeConfig({ version: 2, cara: { expresion: 'anime' }, expresiones: { anime: { sprites: { ojo: 0 }, tamano: 0.4 } } }))
+    sim.bleEscribir(Car.config, e);
+  correr(400);
+  assert.equal(sim.expresionVisible(), 'anime');
+  let maximo = 0, minimo = Infinity;
+  for (let i = 0; i < 400; i++) { correr(16); const n = cian(); maximo = Math.max(maximo, n); minimo = Math.min(minimo, n); }
+  assert.ok(maximo > 3000, `se ven los dos ojos (${maximo} px)`);
+  assert.ok(minimo < maximo / 3, `parpadea (${minimo} de ${maximo})`);
 });

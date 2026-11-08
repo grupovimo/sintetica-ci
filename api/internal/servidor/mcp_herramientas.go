@@ -44,9 +44,10 @@ func (s *Servidor) sumarHerramientas(srv *mcp.Server) {
 		esquemaDe(`{"type":"object","additionalProperties":false,"properties":{`+propRobot+`}}`), lee, s.hVerRobot)
 
 	herramienta(s, srv, "poner_cara", "Poner una cara",
-		"Le deja fija una expresión (de fábrica o propia) al robot conectado, o con soltar: true vuelve a manejar sus caras solo.",
+		"Le deja fija una expresión (de fábrica, propia o de imagen) al robot conectado, o con soltar: true vuelve a manejar sus caras solo. Con siempre: true la deja como su cara de siempre (se guarda en la config).",
 		esquemaDe(`{"type":"object","additionalProperties":false,"properties":{`+propRobot+`,
 		 "expresion":{"type":"string","pattern":"`+patronNombre+`","description":"El nombre de la expresión (ver listar_expresiones)."},
+		 "siempre":{"type":"boolean","description":"true: en vez de fijarla un rato, la deja como su cara de siempre (en la config: sigue reaccionando y durmiendo con ella). Con soltar, vuelve a la neutral."},
 		 "soltar":{"type":"boolean","description":"true: deja de forzar una cara."}}}`), cambia, s.hPonerCara)
 
 	herramienta(s, srv, "disparar_evento", "Disparar un evento",
@@ -68,6 +69,13 @@ func (s *Servidor) sumarHerramientas(srv *mcp.Server) {
 			"Solo poné lo que cambia respecto de la neutral (o de \"extiende\"); los rangos están en el esquema y la guía en el recurso "+uriGuia+". "+
 			"solo_ver: true la dibuja sin guardar (para iterar); mostrar: true además se la pone al robot.",
 		esquemaCrearExpresion(), cambia, s.hCrearExpresion)
+
+	herramienta(s, srv, "dibujar_cara", "Dibujar una cara",
+		"Dibuja una cara de IMAGEN, la que sea (ojitos de anime, de gato, pixel art, un robot…): mandás cada parte como SVG (lo mejor), URL o base64 "+
+			"(ojo, y si querés ojo_cerrado, boca, ojo_der) y el robot la anima viva como a sus caras: parpadea (con ojo_cerrado o aplastando el ojo), mira, respira, "+
+			"tiembla, reacciona y se duerme. Se guarda como una expresión con sprites; reposo: true la deja como su cara de siempre. Devuelve dos IMÁGENES dibujadas por "+
+			"su núcleo: abierta y parpadeando. Cómo dibujar para su pantalla: recurso "+uriGuia+" (sección \"Caras de imagen\"). solo_ver: true la dibuja sin guardar.",
+		esquemaDibujarCara(), cambia, s.hDibujarCara)
 
 	herramienta(s, srv, "borrar_expresion", "Borrar una expresión propia",
 		"Saca una expresión propia de la config (si reemplazaba a una de fábrica, vuelve la de fábrica).",
@@ -239,8 +247,12 @@ func (s *Servidor) hVerRobot(ctx context.Context, q quien, in enRobot) (*mcp.Cal
 		return nil, err
 	}
 	var bahias []map[string]any
-	for _, i := range imgs {
+	for _, i := range almacen.SoloImagenes(imgs) {
 		bahias = append(bahias, map[string]any{"bahia": i.Espacio, "bytes": i.Largo})
+	}
+	caras := map[string]any{}
+	for k, m := range spritesUsados(o) {
+		caras[k] = m
 	}
 	versionCfg := 0
 	if v.Config != nil {
@@ -252,10 +264,13 @@ func (s *Servidor) hVerRobot(ctx context.Context, q quien, in enRobot) (*mcp.Cal
 		"capacidades": map[string]any{
 			"pantalla": r.Pantalla, "perfil": r.Perfil, "firmware": versionDe(v), "bahiasImagen": 8,
 			"maxRecordatorios": 12, "maxReflejos": 24, "maxExpresionesParametricas": 48,
+			"sprites": protocolo.MaxSprites, "maxCarasDeImagen": 8,
 		},
 		"config":         cfg,
 		"versionConfig":  versionCfg,
 		"imagenes":       bahias,
+		"carasDeImagen":  caras,
+		"sprites":        listaSprites(imgs),
 		"sincronizacion": v.Sincro,
 	}
 	estado := "desconectado"
@@ -277,11 +292,49 @@ func versionDe(v VistaBicho) string {
 func (s *Servidor) hPonerCara(ctx context.Context, q quien, in struct {
 	Robot     string `json:"robot"`
 	Expresion string `json:"expresion"`
+	Siempre   bool   `json:"siempre"`
 	Soltar    bool   `json:"soltar"`
 }) (*mcp.CallToolResult, error) {
 	v, err := s.elegirRobot(ctx, q.usuario, in.Robot)
 	if err != nil {
 		return nil, err
+	}
+	if in.Siempre {
+		// La cara de siempre va en la config ("cara": {"expresion": …}).
+		if !in.Soltar {
+			if in.Expresion == "" {
+				return nil, problemaf("Decime cuál expresión, o soltar: true para volver a la neutral.")
+			}
+			if ok, err := s.existeExpresion(ctx, v.ID, in.Expresion); err != nil {
+				return nil, err
+			} else if !ok {
+				return nil, problemaf("%s no tiene la expresión %q: mirá listar_expresiones.", nombreRobot(v), in.Expresion)
+			}
+		}
+		c, err := s.cambiarConfig(ctx, q, v, func(o *objeto) error {
+			cara := o.objetoEn("cara")
+			if in.Soltar {
+				cara.quitar("expresion")
+			} else {
+				cara.poner("expresion", in.Expresion)
+			}
+			if len(cara.claves) == 0 {
+				o.quitar("cara")
+			} else {
+				o.poner("cara", cara)
+			}
+			if _, ok := o.crudo("version"); !ok {
+				o.poner("version", 2)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		if in.Soltar {
+			return resultado("Listo: vuelve a su cara neutral de siempre. "+s.guardada(v, c), nil), nil
+		}
+		return resultado(fmt.Sprintf("Listo: %s es su cara de siempre. %s", in.Expresion, s.guardada(v, c)), nil), nil
 	}
 	if in.Soltar || in.Expresion == "" {
 		if !in.Soltar {
@@ -392,6 +445,7 @@ func (s *Servidor) hListarExpresiones(ctx context.Context, q quien, in enRobot) 
 		Parametros json.RawMessage `json:"parametros,omitempty"`
 		Reemplaza  bool            `json:"reemplazaUnaDeFabrica,omitempty"`
 		Dibujo     bool            `json:"dibujo,omitempty"` // de formas (v1): no se edita con crear_expresion
+		Imagen     bool            `json:"imagen,omitempty"` // de imagen (sprites): se rehace con dibujar_cara
 	}
 	var base, mias []expr
 	deFabrica := map[string]bool{}
@@ -405,10 +459,11 @@ func (s *Servidor) hListarExpresiones(ctx context.Context, q quien, in enRobot) 
 	for _, k := range propias.claves {
 		c, _ := propias.crudo(k)
 		var f struct {
-			Formas json.RawMessage `json:"formas"`
+			Formas  json.RawMessage `json:"formas"`
+			Sprites json.RawMessage `json:"sprites"`
 		}
 		json.Unmarshal(c, &f) //nolint:errcheck
-		e := expr{Nombre: k, Reemplaza: deFabrica[k]}
+		e := expr{Nombre: k, Reemplaza: deFabrica[k], Imagen: f.Sprites != nil}
 		if f.Formas != nil {
 			e.Dibujo = true
 		} else {
@@ -558,22 +613,37 @@ func (s *Servidor) hBorrarExpresion(ctx context.Context, q quien, in struct {
 	if err != nil {
 		return nil, err
 	}
+	var antes map[string]int
 	c, err := s.cambiarConfig(ctx, q, v, func(o *objeto) error {
 		ex := o.objetoEn("expresiones")
 		if _, ok := ex.crudo(in.Nombre); !ok {
 			return problemaf("%s no tiene una expresión propia %q.", nombreRobot(v), in.Nombre)
 		}
+		antes = spritesUsados(o)[in.Nombre]
 		ex.quitar(in.Nombre)
 		if len(ex.claves) == 0 {
 			o.quitar("expresiones")
 		} else {
 			o.poner("expresiones", ex)
 		}
+		// Si era la cara de siempre, vuelve la neutral.
+		cara := o.objetoEn("cara")
+		var e string
+		if cara.leer("expresion", &e) && e == in.Nombre {
+			cara.quitar("expresion")
+			if len(cara.claves) == 0 {
+				o.quitar("cara")
+			} else {
+				o.poner("cara", cara)
+			}
+		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
+	// Una cara de imagen: sus sprites, si no los usa otra.
+	s.borrarSpritesSueltos(ctx, v.ID, antes, mustObjeto(c.Texto))
 	return resultado(fmt.Sprintf("Borré «%s». %s", in.Nombre, s.guardada(v, c)), nil), nil
 }
 

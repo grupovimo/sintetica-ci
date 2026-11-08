@@ -1,4 +1,4 @@
-# Protocolo de SintéticaOS (v1.4)
+# Protocolo de SintéticaOS (v1.5)
 
 Un servicio GATT propio. Todos los enteros van en little-endian. La
 implementación de referencia es `firmware/nucleo/protocolo.*` y
@@ -92,7 +92,8 @@ borra el nombre puesto por comando (gana el de la config).
 
 ## Imagen (v1.2)
 
-El bicho guarda hasta 8 imágenes (espacios 0 a 7), en
+El bicho guarda hasta 8 imágenes (espacios 0 a 7; los espacios 8 a 19 son los
+sprites de las caras de imagen, abajo), en
 [QOI](https://qoiformat.org) con 3 canales y **exactamente del tamaño de su
 pantalla** (lo dice el estado v3). Pesan como mucho ancho × alto × 4 + 22
 bytes, el peor caso de QOI (en el broche, 230 KB; una foto común, 80 a 130 KB). La app recorta la imagen
@@ -108,6 +109,26 @@ a la forma de la pantalla (en el broche, redonda: lo de afuera del círculo en
 | `0x23` Borrar | u8 espacio | Responde. |
 | `0x24` Listar | — | Responde `[0xA4][0x00][máscara de ocupados]` + por cada espacio ocupado `[espacio][u32 largo][u32 CRC-32]`. |
 | `0x25` Pedir | u8 espacio | Responde `[0xA5][0x00]` (o `[0xA5][0x07]` si está vacío), varios `[0xA7][u32 desplazamiento][bytes]` y `[0xA8][espacio][u32 largo][u32 CRC-32]` (v1.3). |
+| `0x26` Listar sprites | — | Responde `[0xA6][0x00][u16 máscara de ocupados]` + por cada sprite ocupado `[espacio 8-19][u32 largo][u32 CRC-32]` (v1.5). Un firmware anterior responde `[0xA6][0x08]`. |
+
+### Sprites (v1.5)
+
+Las **caras de imagen** (ver [motor-de-vida.md](motor-de-vida.md#caras-de-imagen))
+usan sprites: hasta **12** (0 a 11), aparte de las 8 imágenes, en los
+**espacios 8 a 19** de esta misma característica (el sprite `n` es el espacio
+`8 + n`) y con los mismos marcos: `0x20` Inicio, `0x21` Bloque, `0x22` Fin,
+`0x23` Borrar y `0x25` Pedir. Lo que cambia:
+
+- Un sprite es un **QOI de 3 o 4 canales** (con transparencia) de **1 a 128 por
+  lado**, de cualquier tamaño dentro de eso (no el de la pantalla): pesa como
+  mucho 128 × 128 × 5 + 22 = 81 942 bytes (si no, `0x01` Muy grande; si no es
+  un QOI así, `0x0B` Imagen inválida).
+- `0x24` Listar no los muestra (sigue siendo la máscara de un byte de las
+  imágenes); se listan con `0x26`.
+- En la flash van como `spr0` a `spr11` y sus largos y CRC en `sprites`.
+- Si se sube o se borra el sprite de una cara que se está viendo, la cara se va
+  con un fundido (los sprites ya decodificados siguen en la RAM) y vuelve
+  cuando llega el nuevo: nunca un corte.
 
 Los bloques conviene mandarlos sin respuesta (write without response): es varias
 veces más rápido.

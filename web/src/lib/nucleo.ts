@@ -1,7 +1,7 @@
 // El núcleo de SintéticaOS en WebAssembly: el mismo C++ que corre en el robot.
 // Las vistas previas y los editores dibujan con él, así se ve igual.
 import { crearSimulador } from '$compartido/sim.js';
-import { Car, escriturasDeConfig, comando } from '$compartido/protocolo.js';
+import { Car, escriturasDeConfig, escriturasDeImagen, comando, imagen, PRIMER_SPRITE } from '$compartido/protocolo.js';
 
 let bytesWasm: Promise<ArrayBuffer> | null = null;
 
@@ -67,4 +67,21 @@ export function pintar(canvas: HTMLCanvasElement, rgba: Uint8ClampedArray, ancho
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   ctx.putImageData(new ImageData(new Uint8ClampedArray(rgba), ancho, alto), 0, 0);
+}
+
+// Carga los sprites de las caras de imagen en una vista previa (como la app por
+// BLE, espacios 8 a 19) y borra los que ya no están. `enviados` recuerda qué
+// CRC tiene cada uno para no mandarlo de nuevo.
+export function ponerSprites(sim: Simulador, sprites: Record<number, { qoi: Uint8Array; crc: number }>, enviados: Map<number, number>) {
+  for (const [k, s] of Object.entries(sprites)) {
+    const n = Number(k);
+    if (enviados.get(n) === s.crc) continue;
+    for (const e of escriturasDeImagen(PRIMER_SPRITE + n, s.qoi, 4096)) sim.bleEscribir(Car.imagen, e);
+    enviados.set(n, s.crc);
+  }
+  for (const n of [...enviados.keys()]) {
+    if (sprites[n]) continue;
+    sim.bleEscribir(Car.imagen, imagen.borrar(PRIMER_SPRITE + n));
+    enviados.delete(n);
+  }
 }

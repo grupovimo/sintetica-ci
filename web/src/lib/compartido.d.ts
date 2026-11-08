@@ -10,6 +10,10 @@ declare module '$compartido/protocolo.js' {
   export const Modos: string[];
   export const comando: Record<string, (...a: any[]) => Uint8Array>;
   export function escriturasDeConfig(config: unknown, tamanoBloque?: number): Uint8Array[];
+  export function escriturasDeImagen(espacio: number, qoi: Uint8Array, tamanoBloque?: number): Uint8Array[];
+  export const imagen: { borrar: (e: number) => Uint8Array; listar: () => Uint8Array; pedir: (e: number) => Uint8Array; listarSprites: () => Uint8Array };
+  export const PRIMER_SPRITE: number;
+  export const MAX_SPRITES: number;
   export function leerEstado(b: Uint8Array): any;
   export function leerRespuesta(b: Uint8Array): any;
   export function leerQr(t: string): { id: string; codigo: string } | null;
@@ -24,7 +28,7 @@ declare module '$compartido/protocolo.js' {
   export function leerMemoria(b: Uint8Array): any;
 }
 declare module '$compartido/qoi.js' {
-  export function codificarQoi(rgba: Uint8ClampedArray | Uint8Array, ancho: number, alto: number): Uint8Array;
+  export function codificarQoi(rgba: Uint8ClampedArray | Uint8Array, ancho: number, alto: number, canales?: 3 | 4): Uint8Array;
   export function decodificarQoi(b: Uint8Array): { ancho: number; alto: number; rgba: Uint8Array };
   export function codificarAnimacion(cuadros: { rgba: Uint8ClampedArray | Uint8Array; ms: number }[], ancho: number, alto: number): Uint8Array;
   export function esAnimacion(b: Uint8Array): boolean;

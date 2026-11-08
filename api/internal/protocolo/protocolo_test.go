@@ -86,7 +86,7 @@ func TestComandos(t *testing.T) {
 		"nombre Toto": Nombre("Toto"), "nombre con tilde": Nombre("Ñandú"), "evento sacudida": ev,
 		"vincular": Vincular("K7Q2XM"), "autenticar": Autenticar(dehex(s("autenticar", "clave"))),
 		"desvincular": Desvincular(), "pedir config": PedirConfig(), "imagen borrar 3": BorrarImagen(3),
-		"imagen listar": ListarImagenes(), "imagen pedir 5": PedirImagen(5), "red": red, "red abierta": abierta,
+		"imagen listar": ListarImagenes(), "imagen pedir 5": PedirImagen(5), "imagen listar sprites": ListarSprites(), "imagen borrar sprite 0": BorrarImagen(PrimerSprite), "red": red, "red abierta": abierta,
 		"nube": nube, "olvidar red": OlvidarRed(), "reproducir saludo": Reproducir("saludo"), "reproducir parar": Reproducir(""),
 		"ota cancelar": {OtaCancelar},
 		"hora":         Hora(1793000000, -180), "vida": Vida(nil), "memoria": PedirMemoria(), "registro": PedirRegistro(),

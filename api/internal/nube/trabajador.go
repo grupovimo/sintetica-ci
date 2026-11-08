@@ -483,6 +483,21 @@ func (t *trabajador) sincronizarImagenes() error {
 	for _, e := range protocolo.LeerListaImagenes(r) {
 		enBicho[e.Espacio] = e.Crc
 	}
+	// Los sprites (v1.5). Un firmware anterior responde "malformado": no tiene sprites.
+	espacios := 8
+	if err := t.n.enviar(t.id, protocolo.CarImagen, protocolo.ListarSprites()); err != nil {
+		return err
+	}
+	r, err = t.esperar(respuestaA(protocolo.CarImagen, protocolo.ImgListarSprites), 15*time.Second)
+	if err != nil {
+		return err
+	}
+	if len(r) >= 4 && r[1] == protocolo.Ok {
+		espacios = protocolo.PrimerSprite + protocolo.MaxSprites
+		for _, e := range protocolo.LeerListaSprites(r) {
+			enBicho[e.Espacio] = e.Crc
+		}
+	}
 	lista, err := t.n.alm.Imagenes(ctx, t.id)
 	if err != nil {
 		return err
@@ -495,8 +510,8 @@ func (t *trabajador) sincronizarImagenes() error {
 	if err != nil {
 		return err
 	}
-	cambio := false
-	for e := 0; e < 8; e++ {
+	cambio, cambioSprites := false, false
+	for e := 0; e < espacios; e++ {
 		d, s, a := enBicho[e], deseadas[e], sin.Imagenes[e]
 		switch {
 		case d == s:
@@ -515,11 +530,18 @@ func (t *trabajador) sincronizarImagenes() error {
 			if err := t.traerImagen(e, d); err != nil {
 				return err
 			}
-			cambio = true
+			if protocolo.EsSprite(e) {
+				cambioSprites = true
+			} else {
+				cambio = true
+			}
 		}
 	}
 	if cambio {
 		t.n.publicar(t.id, eventos.Evento{Tipo: "imagenes"})
+	}
+	if cambioSprites {
+		t.n.publicar(t.id, eventos.Evento{Tipo: "sprites"})
 	}
 	t.avisarProgreso("", "al-dia", "")
 	return nil
