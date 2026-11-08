@@ -16,7 +16,8 @@ class CharlaTest {
     @Test fun laFraseSinLaPalabra() {
         assertEquals("qué hora es", Charla.sinPalabra("lucho qué hora es", "lucho"))
         assertEquals("", Charla.sinPalabra("lucho", "lucho"))
-        assertEquals("che lucho", Charla.sinPalabra("che lucho", "lucho"))
+        assertEquals("qué hora es", Charla.sinPalabra("che lucho qué hora es", "lucho"))
+        assertEquals("hola", Charla.sinPalabra("hola", "lucho"))
         val larga = Charla.sinPalabra("lucho " + "ñ".repeat(150), "lucho")
         assertEquals(200, larga.toByteArray().size)
         assertEquals("ñ".repeat(100), larga)

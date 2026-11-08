@@ -46,9 +46,13 @@ class Charla(
         var model: Model? = null
         var espera: Recognizer? = null
         var palabra = ""
+        // El último segundo: lo que se dijo pegado a la palabra ("coco qué hora es") no se pierde.
+        val previo = ArrayDeque<ShortArray>()
         try {
             while (andando) {
                 val tramo = cola.poll(1, TimeUnit.SECONDS) ?: continue
+                previo.addLast(tramo)
+                if (previo.size > PREVIO) previo.removeFirst()
                 if (model == null) {
                     model = cargar()
                     // Sin modelo: prueba de nuevo en un minuto.
@@ -65,7 +69,8 @@ class Charla(
                 val oido = texto(if (listo) espera.result else espera.partialResult, if (listo) "text" else "partial")
                 if (!contienePalabra(oido, palabra)) continue
                 espera.reset()
-                frase(model, palabra)
+                frase(model, palabra, previo.toList())
+                previo.clear()
                 cola.clear()
             }
         } catch (_: InterruptedException) {
@@ -76,14 +81,14 @@ class Charla(
     }
 
     /** Escucha una frase (hasta 8 s, o hasta que se calla) con la cara de escuchar. */
-    private fun frase(model: Model, palabra: String) {
+    private fun frase(model: Model, palabra: String, previo: List<ShortArray>) {
         Log.i("Bicho", "charla: escuchando")
         voz.sonar("escuchando")
-        cola.clear()
         val r = Recognizer(model, TASA)
+        val partes = mutableListOf<String>()
+        for (t in previo) if (r.acceptWaveForm(t, t.size)) partes += texto(r.result, "text")
         var ms = 0
         var mostrado = -MOSTRAR_MS
-        var dicho = ""
         try {
             while (andando && ms < MAXIMO_MS) {
                 // La cara de escuchar se renueva mientras escucha (el comportamiento dura 2,5 s).
@@ -93,16 +98,17 @@ class Charla(
                 }
                 val tramo = cola.poll(1, TimeUnit.SECONDS) ?: break
                 ms += tramo.size * 1000 / TASA.toInt()
+                // Termina con la primera pausa después de algo más que la palabra.
                 if (r.acceptWaveForm(tramo, tramo.size)) {
-                    dicho = texto(r.result, "text")
-                    if (dicho.isNotEmpty()) break
+                    partes += texto(r.result, "text")
+                    if (sinPalabra(partes.joinToString(" "), palabra).isNotEmpty()) break
                 }
             }
-            if (dicho.isEmpty()) dicho = texto(r.finalResult, "text")
+            if (sinPalabra(partes.joinToString(" "), palabra).isEmpty()) partes += texto(r.finalResult, "text")
         } finally {
             r.close()
         }
-        val enviar = sinPalabra(dicho, palabra)
+        val enviar = sinPalabra(partes.joinToString(" "), palabra)
         if (enviar.isEmpty()) {
             Log.i("Bicho", "charla: no entendí nada")
             return
@@ -126,6 +132,7 @@ class Charla(
         const val TASA = 16000f
         const val MAXIMO_MS = 8000
         const val MOSTRAR_MS = 2000
+        const val PREVIO = 20  // tramos de 50 ms
 
         /** En minúsculas y sin tildes (Vosk escribe así; la palabra puede venir con mayúsculas). */
         fun normalizar(s: String): String =
@@ -134,10 +141,10 @@ class Charla(
         fun contienePalabra(oido: String, palabra: String) =
             palabra.isNotEmpty() && normalizar(oido).split(' ').contains(palabra)
 
-        /** La frase sin la palabra del principio, de hasta 200 bytes ("lucho qué hora es" → "qué hora es"). */
+        /** La frase desde después de la palabra, de hasta 200 bytes ("lucho qué hora es" → "qué hora es"). */
         fun sinPalabra(frase: String, palabra: String): String {
             val p = frase.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
-            val resto = if (p.isNotEmpty() && normalizar(p[0]) == palabra) p.drop(1) else p
+            val resto = p.drop(p.indexOfFirst { normalizar(it) == palabra } + 1)
             // La nube acepta hasta 200 bytes UTF-8: se corta sin partir letras.
             return String(Avisos.recortar(resto.joinToString(" "), 200), Charsets.UTF_8)
         }
