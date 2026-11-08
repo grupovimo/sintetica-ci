@@ -43,28 +43,18 @@ en `docs/motor-de-vida.md` (cómo está hecho) y
 - La web: `cd web && npm run check && npm run build`.
 - Android: `cd android && ./gradlew testDebugUnitTest`.
 
-## Memoria del proyecto (estado al 7/11/2026)
+## Memoria del proyecto (estado al 8/11/2026)
 
-Rama de trabajo: `claude/pensive-tesla-8fe2fg` (sin PR). Todo lo de abajo está
-commiteado y pusheado.
+Rama de trabajo: `claude/pensive-tesla-8fe2fg` (sin PR).
 
-- **Hecho**: M0–M6 (firmware, BLE, apps, broche, nube en Docker, web) y el
-  **motor de vida v2** (etapa 5): rostro paramétrico por SDF y bloques,
-  resortes, micro-vida, estado interno, personalidad y presets, selector por
-  utilidad, 55 comportamientos, 40 reglas, ritmo diario y sueños, memoria de la
-  relación, config v2, protocolo v1.4, simulador con panel y tiempo acelerado,
-  API (hora, memoria cada 5 min, mudanza), web (pestañas Vida, Expresiones,
-  Comportamientos; Config y Reglas v2), apps (protocolo v1.4, hora al conectar,
-  personalidad y horario).
-- **Verificado acá**: `npm test` (núcleo 85+ tests, oro, simulador 16), Go (con
-  Postgres de prueba), e2e en Docker (`TestDePuntaAPunta`,
-  `TestMemoriaYMudanza`), `web` check y build, Android unit tests, las dos
-  placas compilan (1.47B: 38 % de RAM interna; broche: 68 %).
-- **Sin verificar**: nada en placas reales (fps, batería del broche, sueño
-  profundo con despertador); iOS no se compiló nunca (no hay Xcode acá).
-- **Lo próximo posible**: probar en la placa; el diario y los editores en las
-  apps; micrófono/parlante (cubito, M7); bicho cerca por BLE; subir la nube al
-  VPS (la lista está en `docs/nube.md`, "Antes de ponerlo en el VPS").
+- **Hecho antes**: M0–M6 y el motor de vida v2 (ver `docs/motor-de-vida.md`).
+- **Etapa 6 (8/11)**:
+  - **Web**: la "consola" (`web/src/lib/consola/`, rutas `/robots`; `/bichos` redirige): Mis robots (dock con la foto real y la cara en vivo), la consola de cada robot con 10 módulos que guardan solos, el encendido (onboarding) y el Laboratorio (expresiones, comportamientos, reglas, vida, dibujos, animaciones, firmware, historial) en el mismo lenguaje. Tiempo real por SSE (`/v1/eventos`). Poco texto: ver la memoria `poco-texto`.
+  - **Núcleo**: recordatorios (se muestran a la hora; aviso 0x9E por BLE y nube), modo reloj y pomodoro, protector de pantalla, voz (solo config). Eventos 31 `recordatorio` y 32 `pomodoro`.
+  - **Nube**: bot oficial de Telegram (@sinteticalabs_bot, token en `.env`, nunca en el repo), automatizaciones (cuando X → Telegram / webhook firmado / otro robot), y un **servidor MCP con OAuth** en `/mcp` para que cada uno conecte su Claude o ChatGPT (17 herramientas; ver `docs/nube.md`).
+  - **iOS**: compila y sube a TestFlight desde `grupovimo/sintetica-ios` (`herramientas/publicar-ios.sh`); nunca en la Mac.
+- **Sin verificar**: placas reales; claude.ai/ChatGPT conectados de verdad (necesitan la nube con HTTPS público).
+- **Lo próximo posible**: caras de imagen (sprites que el motor anima), apps iOS y Android con la consola, subir la nube al VPS de Grupo Vimo.
 
 ## Trampas conocidas
 
