@@ -136,6 +136,7 @@ const instruccionesMCP = `Manejás los robots de Sintética del usuario: bichos 
 - Para inventar caras usá crear_expresion: devuelve una imagen de cómo queda; mirala y ajustá. Con solo_ver: true probás sin guardar. La guía de parámetros está en el recurso sintetica://guia/caras.
 - Si la cara no sale con parámetros (ojitos de anime, de gato, pixel art, cualquier dibujo), dibujala con dibujar_cara: cada parte en SVG; sigue viva (parpadea, mira, reacciona). Con reposo: true queda como su cara de siempre.
 - Los cambios de config (expresiones, recordatorios, personalidad, horario, modo, reflejos) se guardan y le llegan al robot apenas está conectado. Poner caras y disparar eventos necesita que esté conectado.
+- Para que el robot diga algo ya: decir (hasta 60 bytes). Para que lo haga todos los días a una hora (decir el clima, despertar, cambiar de modo): rutinas. El despertador, el clima (su ubicación) y cuánto habla solo (habla) se guardan en su config.
 - Hablale al usuario en español rioplatense.`
 
 // registroLlamada: lo que una herramienta anota mientras corre (qué bicho

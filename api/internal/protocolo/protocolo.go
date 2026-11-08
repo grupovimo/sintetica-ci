@@ -109,6 +109,7 @@ var Eventos = []string{
 	"ruido", "musica", "silencio", "notificacion", "llamada", "bateria-baja", "bateria-critica", "enchufado",
 	"desenchufado", "cargado", "sin-wifi", "cambio-de-cara", "bicho-cerca", "volvio", "hito",
 	"recordatorio", "pomodoro", // los genera el sistema (y los avisa solo: ver docs/protocolo-ble.md)
+	"despertador", // v1.6: empezó a sonar la alarma (también lo avisa solo)
 }
 
 // VariablesEstado y Rasgos: el estado interno y la personalidad, en el orden del protocolo.

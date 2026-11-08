@@ -164,7 +164,9 @@ pantalla en vivo los carga en su núcleo).
 
 Lo que hace que el bicho sirva fuera de su pantalla (`api/internal/integraciones`,
 migración `005_integraciones.sql`): el bot de Telegram, las automatizaciones
-por bicho y los recordatorios que la nube manda cuando el bicho no está.
+por bicho (y las rutinas a una hora), los recordatorios que la nube manda
+cuando el bicho no está, los cumpleaños, el clima (`api/internal/clima`) y que
+el robot diga algo o lo despierten desde afuera (protocolo v1.6).
 
 ### Telegram (@sinteticalabs_bot)
 
@@ -190,15 +192,13 @@ por bicho y los recordatorios que la nube manda cuando el bicho no está.
   `/robots` (cada uno con conectado, batería, cara y ánimo, y botones para ver
   su estado), `/estado [nombre]`, `/cara <expresión> [nombre]` (el mismo camino
   que `POST /v1/bichos/{id}/comando {expresion}`; sin expresión, un teclado
-  inline con las caras; `auto` vuelve a la automática), `/decir <texto> [nombre]`,
-  `/ayuda`. Con un solo robot el nombre no hace falta; con varios, si no se
+  inline con las caras; `auto` vuelve a la automática), `/decir <texto> [nombre]`
+  (el robot lo dice en un globo en su pantalla: el marco `0x40`, hasta 60 bytes;
+  si es más largo, el bot pide acortarlo), `/clima [nombre]` (el clima donde
+  está el robot, si tiene `ubicacion`: "En Buenos Aires: 18° y nublado (máx.
+  22°, mín. 12°)."), `/ayuda`. Con un solo robot el nombre no hace falta; con varios, si no se
   dice, aparece un teclado para elegirlo. El nombre es el apodo (o el nombre
   del bicho, o su id), sin importar mayúsculas ni tildes.
-- **Pendiente: `/decir`**. El núcleo todavía no tiene un comando para mostrar
-  un texto que llega de afuera. Por ahora le manda el evento `notificacion` (el
-  bicho reacciona) y contesta que el texto en pantalla llega con los
-  recordatorios.
-
 ### Automatizaciones
 
 "Cuando pasa X en el bicho → hacer Y". Rutas (el dueño):
@@ -224,13 +224,33 @@ por bicho y los recordatorios que la nube manda cuando el bicho no está.
 ```
 
 - `id`: 1 a 40 de `[A-Za-z0-9_-]`, sin repetir. `hacer`: de 1 a 5 acciones.
-  `valor` (opcional) solo con `"cuando": "expresion"`: cuál.
-- **Plantillas** en los textos: `{robot}` (apodo, nombre o id), `{bateria}`,
-  `{expresion}`, `{evento}`, `{texto}` (el del recordatorio), `{hora}` (HH:MM,
-  hora del bicho).
+  `valor` (opcional) solo con `"cuando": "expresion"`: cuál. `hora` (HH:MM,
+  obligatoria) y `dias` (letras `LMXJVSD` sin repetir; vacío = todos) solo con
+  `"cuando": "hora"` (ver "Rutinas").
+- **Plantillas** en los textos (`telegram` y `decir`): `{robot}` (apodo, nombre
+  o id), `{bateria}`, `{expresion}`, `{evento}`, `{texto}` (el del
+  recordatorio), `{hora}` (HH:MM, hora del bicho), `{dueno}` (`dueno.nombre`
+  de la config; vacío si no hay), `{ciudad}` (`ubicacion.ciudad`) y las del
+  clima del lugar del robot: `{clima}` ("18° y nublado"), `{temp}` ("18°"),
+  `{max}`, `{min}` (sin `ubicacion` o si Open-Meteo no contesta: "sin datos
+  del clima" y "?"). El clima solo se pide si el texto lo usa (con el caché de
+  30 min).
 - **`telegram`**: le escribe al chat vinculado del dueño (texto de 1 a 1000 bytes).
 - **`robot`**: solo a bichos de la misma cuenta (se valida al guardar y al
   correr); le pone esa expresión (el mismo comando que la web).
+- **`decir`** `{"tipo":"decir","texto":"Buen día, {dueno}: {clima}","expresion"?}`:
+  este robot lo dice en un globo (marco `0x40`). El texto es de 1 a 200 bytes
+  con plantillas; ya expandido se corta a 60 bytes sin partir una letra.
+- **`cara`** `{"tipo":"cara","expresion":"contento"}`: le pone esa cara a este
+  robot (`auto` vuelve a la automática).
+- **`modo`** `{"tipo":"modo","modo":"reloj"}` (`mascota`, `reloj`, `pomodoro`,
+  `clima`, `notificaciones`): cambia `modo` en la config por el mismo camino que
+  `PUT /v1/bichos/{id}/config` (validada por el núcleo, versión nueva con autor
+  `automatizacion`, migración `008`) y se sincroniza como siempre.
+- **`despertar`** `{"tipo":"despertar"}`: el marco `0x42` acción 3 (lo
+  despierta con un "¡Buen día!", sin alarma).
+- `decir`, `cara` y `despertar` necesitan que el robot esté conectado (si no,
+  la acción queda en el historial con `ok: false`).
 - **`webhook`**: `POST` JSON `{"evento","robot":{"id","nombre"},"datos":{…},"en":"ISO"}`
   con `X-Sintetica-Firma: sha256=<HMAC-SHA256 del cuerpo en hex>` (y
   `X-Sintetica-Evento`). El secreto es por usuario: `GET /v1/webhooks/secreto`
@@ -263,6 +283,8 @@ por bicho y los recordatorios que la nube manda cuando el bicho no está.
 | `hito` | el registro (tipo 3) |
 | `recordatorio` | el aviso que el bicho manda solo al mostrar uno (ver abajo) |
 | `pomodoro` | el aviso que el bicho manda solo al terminar un tramo del pomodoro |
+| `despertador` | el aviso que el bicho manda solo al empezar a sonar la alarma (evento `33`: `[0x9E][0x00][0x01][u32 s][0x00][0x21]`) |
+| `hora` (con `hora` y `dias`) | el reloj de la nube, cada minuto (ver "Rutinas") |
 
 Los del registro: la API le pide el registro (`0x1E`) cada 10 s **solo** a los
 bichos conectados que tienen alguna automatización activa que lo necesita, y
@@ -293,6 +315,74 @@ del estado, con el umbral de arriba).
   les manda la hora). Si la API estuvo parada, se pone al día como mucho 3
   minutos. Ojo: un bicho que nunca se conecta a la nube (un broche sin WiFi)
   cuenta como desconectado.
+
+### Rutinas (`cuando: hora`)
+
+Una automatización con `"cuando": "hora"`, `"hora": "07:30"` y `"dias": "LMXJV"`
+corre todos esos días a esa hora (la de los bichos: `nube.Zona()`,
+`America/Argentina/Buenos_Aires`). La nube las revisa cada minuto, **ande o
+no Telegram** (busca en Postgres los bichos con alguna activa:
+`lista @> '[{"cuando":"hora","activa":true}]'`) y las encola como un evento
+`hora` (`datos.hora`). Si la API estuvo parada, se pone al día como mucho 3
+minutos. El límite de disparos es el mismo de las demás.
+
+```json
+{"id":"buen-dia","activa":true,"cuando":"hora","hora":"07:30","dias":"LMXJV","hacer":[
+  {"tipo":"despertar"},
+  {"tipo":"decir","texto":"Buen día, {dueno}: {clima}"},
+  {"tipo":"modo","modo":"clima"}
+]}
+```
+
+### Cumpleaños
+
+Sin armar nada: el día de `dueno.cumple` ("MM-DD"), a la hora de
+`horario.despierta` (08:00 si no hay) en la zona de los bichos, si el dueño
+vinculó Telegram, el bot le escribe "🎂 ¡Feliz cumple, {dueno}! Te saluda
+{robot}." (sin `dueno.nombre`: "🎂 ¡Feliz cumple! Te saluda {robot}."). Igual con
+`cumple` (el del robot): "🎉 Hoy {robot} cumple años." Va **una vez por año**:
+queda en el historial como `cumple-dueno` / `cumple-robot` (evento `cumple`,
+acción `telegram`) y no se manda si ya hay uno desde el 1 de enero. El 29/2,
+en los años sin, se festeja el 28. Lo revisa el mismo trabajador de los
+recordatorios (cada minuto, solo con Telegram prendido), con el robot
+conectado o no.
+
+### Decir, despertador y clima (protocolo v1.6)
+
+Rutas (el dueño; mismas reglas de sesión y `X-Sintetica` que las demás):
+
+- `POST /v1/bichos/{id}/decir {"texto": "...", "expresion": "contento"?}` →
+  `{"ok": true}`: el marco `0x40`, el robot lo muestra en un globo (2,5 s + 60 ms
+  por byte, entre 3 y 10 s, o hasta un toque). 400 con `detalle` si el texto no
+  es de 1 a 60 bytes de UTF-8 (o la expresión no es `[a-z][a-z0-9-]`, hasta 24);
+  409 si el robot no está conectado; 30 por minuto por robot.
+- `POST /v1/bichos/{id}/alarma {"accion": "apagar"|"posponer"|"probar"|"despertar"}`
+  → `{"ok": true}`: el marco `0x42` con 0/1/2/3. 409 si no está conectado.
+- `GET /v1/clima/buscar?q=córdoba` (con sesión) →
+  `{"lugares":[{"nombre":"Córdoba","region":"Córdoba","pais":"Argentina","lat":-31.41,"lon":-64.18,"ciudad":"Córdoba, Argentina"}]}`:
+  hasta 6, del geocoding de Open-Meteo en español (`lat`/`lon` redondeados a
+  0,01; `ciudad`, lo que va en `ubicacion.ciudad`, hasta 40 bytes). `q` de 2
+  a 60 bytes (si no, 400); 502 si Open-Meteo no contesta; 30 por minuto por usuario.
+- `GET /v1/bichos/{id}/clima` → `{"ubicacion": {lat, lon, ciudad} | null,
+  "clima": {"temp": 18.4, "codigo": 3, "descripcion": "nublado", "max": 22, "min": 12, "dia": true, "en": "ISO"} | null}`
+  (`en`: cuándo se trajo; `clima` null sin ubicación o si Open-Meteo falla).
+
+**El clima** (`api/internal/clima`): Open-Meteo, sin clave.
+Pronóstico: `current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`.
+Timeout de 5 s; caché en memoria por lugar (lat/lon redondeados a 0,01) de 30
+min; si falla y hay uno de menos de 3 h, se usa ese. Las descripciones salen
+del código WMO: despejado, casi despejado, algo nublado, nublado, niebla,
+llovizna, lluvia, lluvia fuerte, chaparrones, nieve, tormenta, tormenta con
+granizo… Las URLs se pueden cambiar (`CLIMA_API_URL`, `GEOCODING_API_URL`,
+para los tests).
+
+**El trabajador del clima**: cada minuto mira los robots con dueño que están
+conectados y tienen `ubicacion` en su última config; a cada uno le manda el
+marco `0x41` (`[i16 décimas de °C][u8 WMO][i8 máx][i8 mín][u8 flags: bit 0 =
+de día][n][ciudad, hasta 24 bytes]`) si nunca se lo mandó, si pasaron 30 min,
+si se acaba de conectar (también apenas llega el evento `conectado`) o si
+cambió la ubicación (se nota en la vuelta siguiente; el MCP, al ubicar, lo
+manda ya). El robot lo da por bueno 3 h.
 
 ## MCP: que una IA maneje los robots
 
@@ -379,8 +469,13 @@ conectan desde sus servidores: necesitan **HTTPS público**; en local
 | `horario` | `despierta` / `duerme` |
 | `modo` | mascota, reloj o pomodoro (+ `pomodoro {trabajo, descanso}`) |
 | `reflejos` | Reglas `si: evento → reflejo:cara` (+ acciones extra); listar / agregar / borrar |
-| `automatizaciones` | Las de Integraciones: listar / guardar (la lista entera) / probar |
+| `automatizaciones` | Las de Integraciones: listar / guardar (la lista entera, con las acciones y los `cuando` nuevos) / probar |
 | `mandar_telegram` | Le escribe al usuario si vinculó Telegram |
+| `decir` | `{robot, texto ≤ 60 bytes, expresion?}`: lo dice en un globo (marco `0x40`) — conectado |
+| `despertador` | `ver` / `poner` (`hora`, `dias`, `texto`, `posponer`, `sonido`, `activo`; en `despertador` de la config) / `sacar`; y, conectado, `probar` / `apagar` / `posponer` (marco `0x42`) |
+| `clima` | `ver` (ubicación y clima de ahora) / `buscar` (`q`, sin robot) / `ubicar` (`lat`, `lon`, `ciudad`, o `q` y el primer lugar): guarda `ubicacion` y le manda el clima ya |
+| `rutinas` | Las automatizaciones `cuando: hora`: `listar` / `crear` (`hora`, `dias`, `hacer[]`, `id` opcional: `rutina-HHMM`) / `borrar` (`id`) |
+| `habla` | `ver` / `frecuencia` (0 a 1) / `agregar` (`situacion`, `texto` ≤ 60 bytes; hasta 12 frases propias en total) / `borrar` (`situacion` y, opcional, `texto`), en `habla` de la config |
 
 Además, el recurso **`sintetica://guia/caras`** (qué hace cada parámetro, sus
 límites, consejos y ejemplos, armado desde el schema, y la sección "Caras de
@@ -408,6 +503,7 @@ SVG) y el prompt `inventar_cara`.
 | `TELEGRAM_TOKEN` | el token del bot (de @BotFather); vacío = Telegram apagado | el de `.env` (nunca en el repo) |
 | `TELEGRAM_BOT` | el usuario del bot, sin `@` | `sinteticalabs_bot` |
 | `TELEGRAM_API_URL` | la API de Telegram (para tests) | vacío = `https://api.telegram.org` |
+| `CLIMA_API_URL`, `GEOCODING_API_URL` | Open-Meteo (pronóstico y búsqueda de lugares; para tests) | vacío = `https://api.open-meteo.com/v1/forecast` y `https://geocoding-api.open-meteo.com/v1/search` |
 
 ## Antes de ponerlo en el VPS
 

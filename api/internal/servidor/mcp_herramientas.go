@@ -143,13 +143,16 @@ func (s *Servidor) sumarHerramientas(srv *mcp.Server) {
 		 "indice":{"type":"integer","minimum":0,"maximum":23,"description":"Para borrar: la posición (la de listar)."}}}`), borra, s.hReflejos)
 
 	herramienta(s, srv, "automatizaciones", "Automatizaciones",
-		"\"Cuando pasa X en el robot → hacer Y\" (mandar un Telegram, llamar un webhook o poner una cara en otro robot propio). listar devuelve las que hay, el historial y los \"cuando\" posibles; guardar reemplaza la lista entera (hasta 20); probar corre una ya.",
+		"\"Cuando pasa X en el robot → hacer Y\" (mandar un Telegram, llamar un webhook, poner una cara en otro robot propio, o en este: decir algo, poner una cara, cambiar de modo, despertarlo). "+
+			"cuando: hora (con hora y dias) es una rutina diaria (más cómodo con la herramienta rutinas). listar devuelve las que hay, el historial y los \"cuando\" posibles; guardar reemplaza la lista entera (hasta 20); probar corre una ya.",
 		esquemaAutomatizaciones(), borra, s.hAutomatizaciones)
 
 	herramienta(s, srv, "mandar_telegram", "Mandar un Telegram",
 		"Le escribe al usuario por Telegram (si vinculó su chat con el bot de Sintética).",
 		esquemaDe(`{"type":"object","additionalProperties":false,"required":["texto"],"properties":{
 		 "texto":{"type":"string","minLength":1,"maxLength":1000}}}`), afuera, s.hTelegram)
+
+	s.sumarHerramientasHabla(srv) // mcp_habla.go
 }
 
 func jsonDe(v any) string { b, _ := json.Marshal(v); return string(b) }
@@ -1122,12 +1125,15 @@ func esquemaAutomatizaciones() *jsonschema.Schema {
 	     "activa":{"type":"boolean"},
 	     "cuando":{"type":"string","enum":` + cuandos + `},
 	     "valor":{"type":"string","description":"Solo con cuando = expresion: cuál."},
+	     "hora":{"type":"string","pattern":"^([01][0-9]|2[0-3]):[0-5][0-9]$","description":"Solo con cuando = hora: HH:MM (hora del robot, Argentina)."},
+	     "dias":{"type":"string","pattern":"^[LMXJVSD]{0,7}$","description":"Solo con cuando = hora: letras L M X J V S D (vacío = todos)."},
 	     "hacer":{"type":"array","minItems":1,"maxItems":5,"items":{"type":"object","additionalProperties":false,"required":["tipo"],"properties":{
-	       "tipo":{"enum":["telegram","webhook","robot"]},
-	       "texto":{"type":"string","maxLength":1000,"description":"telegram: el mensaje; plantillas {robot} {bateria} {expresion} {evento} {texto} {hora}."},
+	       "tipo":{"enum":` + jsonDe(integraciones.TiposDeAccion) + `},
+	       "texto":{"type":"string","maxLength":1000,"description":"telegram: el mensaje; decir: lo que dice (hasta 200; muestra 60 bytes). Plantillas {robot} {bateria} {expresion} {evento} {texto} {hora} {dueno} {ciudad} {clima} {temp} {max} {min}."},
 	       "url":{"type":"string","maxLength":500,"description":"webhook: https://… (POST firmado)."},
 	       "bicho":{"type":"string","description":"robot: el id de otro robot de la cuenta."},
-	       "expresion":{"type":"string","description":"robot: la cara que le pone."}}}}}}},
+	       "expresion":{"type":"string","description":"robot: la cara que le pone al otro; cara: la que pone este; decir: opcional."},
+	       "modo":{"enum":` + jsonDe(protocolo.Modos) + `,"description":"modo: el que pone (se guarda en la config)."}}}}}}},
 	 "n":{"type":"string","description":"Para probar: la posición (desde 0) o el id."}}}`)
 }
 

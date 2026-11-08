@@ -61,8 +61,13 @@ type Servidor struct {
 
 // Nuevo arma el servidor.
 func Nuevo(op Opciones, alm *almacen.Almacen, n *nube.Nube, i *integraciones.Integraciones, hub *eventos.Hub, c *correo.Correo, f *firma.Firmador, log *slog.Logger) *Servidor {
-	return &Servidor{op: op, alm: alm, nube: n, relevo: nube.NuevoRelevo(n), hub: hub, correo: c, firmador: f, log: log, limites: nuevoLimitador(), integ: i,
+	s := &Servidor{op: op, alm: alm, nube: n, relevo: nube.NuevoRelevo(n), hub: hub, correo: c, firmador: f, log: log, limites: nuevoLimitador(), integ: i,
 		mcp: &estadoMCP{}}
+	if i != nil {
+		// La acción "modo" de las automatizaciones guarda la config por acá.
+		i.UsarConfig(s.cambiarClaves)
+	}
+	return s
 }
 
 // Rutas es la API pública.
@@ -108,6 +113,10 @@ func (s *Servidor) Rutas() http.Handler {
 	m.HandleFunc("GET /v1/bichos/{id}/automatizaciones", s.conBicho(s.verAutomatizaciones))
 	m.HandleFunc("PUT /v1/bichos/{id}/automatizaciones", s.conBicho(s.guardarAutomatizaciones))
 	m.HandleFunc("POST /v1/bichos/{id}/automatizaciones/{n}/probar", s.conBicho(s.probarAutomatizacion))
+	m.HandleFunc("POST /v1/bichos/{id}/decir", s.conBicho(s.decir))
+	m.HandleFunc("POST /v1/bichos/{id}/alarma", s.conBicho(s.alarma))
+	m.HandleFunc("GET /v1/bichos/{id}/clima", s.conBicho(s.climaDelBicho))
+	m.HandleFunc("GET /v1/clima/buscar", s.conSesion(s.buscarLugar))
 
 	m.HandleFunc("GET /v1/telegram", s.conSesion(s.verTelegram))
 	m.HandleFunc("POST /v1/telegram/vincular", s.conSesion(s.vincularTelegram))
