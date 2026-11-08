@@ -1,0 +1,24 @@
+# Solo la landing de Sintética (sin API, MQTT ni base): la portada y las
+# páginas de las piezas en sintetica.grupovimo.com.ar. Las reservas llegan por
+# Telegram. En el VPS: /opt/sintetica/landing.compose.yml, con landing.env
+# (600) que trae TELEGRAM_TOKEN y TELEGRAM_CHAT_RESERVAS.
+#
+#   VERSION=<sha> docker compose -p sintetica-landing -f landing.compose.yml up -d
+#
+# La imagen se arma desde lo commiteado y se manda por ssh (sin registro):
+#   git archive HEAD | docker build -f web/Dockerfile -t sintetica-web:landing-<sha> -
+#   docker save sintetica-web:landing-<sha> | gzip | ssh deploy@<vps> 'gunzip | docker load'
+name: sintetica-landing
+services:
+  web:
+    image: sintetica-web:landing-${VERSION:?falta VERSION (un sha)}
+    env_file: landing.env
+    environment:
+      SOLO_LANDING: "1"
+      ORIGIN: https://sintetica.grupovimo.com.ar
+      # La IP real (para los topes de reservas): detrás de Cloudflare y Caddy.
+      ADDRESS_HEADER: CF-Connecting-IP
+    ports:
+      - "127.0.0.1:3600:3000"
+    mem_limit: 160m
+    restart: unless-stopped
