@@ -8,6 +8,7 @@
   import { usarBicho } from '$lib/bicho.svelte';
   import { escuchar } from '$lib/eventos.svelte';
   import type { Bicho } from '$lib/tipos';
+  import { cortarBytes, MAX_TEXTO } from '$lib/formato';
   import type { Modelo } from '../modelo';
 
   let { modelo: _ }: { modelo: Modelo } = $props();
@@ -16,12 +17,18 @@
   type Accion =
     | { tipo: 'telegram'; texto: string }
     | { tipo: 'webhook'; url: string }
-    | { tipo: 'robot'; bicho: string; expresion: string };
-  type Automatizacion = { id: string; activa: boolean; cuando: string; valor?: string; hacer: Accion[] };
+    | { tipo: 'robot'; bicho: string; expresion: string }
+    | { tipo: 'decir'; texto: string; expresion?: string }
+    | { tipo: 'cara'; expresion: string }
+    | { tipo: 'modo'; modo: string }
+    | { tipo: 'despertar' };
+  // cuando "hora": a esa hora (HH:MM) los días que diga (L M X J V S D; vacío = todos).
+  type Automatizacion = { id: string; activa: boolean; cuando: string; valor?: string; hora?: string; dias?: string; hacer: Accion[] };
   type Ejecucion = { automatizacion: string; evento: string; accion: string; ok: boolean; detalle?: string; en: string };
 
   // Lo que la nube detecta de verdad (la API manda la lista; estos son los nombres).
   const NOMBRES_CUANDO: Record<string, string> = {
+    hora: 'A una hora', despertador: 'Suena el despertador',
     recordatorio: 'Muestra un recordatorio', pomodoro: 'Termina una tanda de pomodoro', 'bateria-baja': 'Se queda con poca batería',
     desconectado: 'Se desconecta', conectado: 'Se conecta', despierta: 'Se despierta', duerme: 'Se va a dormir', expresion: 'Cambia de cara',
     tacto: 'Lo tocan', 'doble-toque': 'Doble toque', caricia: 'Una caricia', 'muchos-toques': 'Muchos toques', levantado: 'Lo levantan',
@@ -30,10 +37,21 @@
     cargando: 'Lo enchufan', desenchufado: 'Lo desenchufan', cargado: 'Termina de cargar', volvio: 'Volvés después de un rato', hito: 'Un hito (cumple, días juntos)',
   };
   let cuandos = $state<string[]>(['recordatorio', 'bateria-baja', 'desconectado', 'conectado', 'despierta', 'duerme', 'expresion']);
-  const CUANDO = $derived(cuandos.map((k) => [k, NOMBRES_CUANDO[k] ?? k] as [string, string]));
-  const ACCIONES: [Accion['tipo'], string][] = [['telegram', 'Mandarte un Telegram'], ['webhook', 'Llamar a una URL'], ['robot', 'Mover a otro robot']];
+  const CUANDO = $derived([...new Set(['hora', 'despertador', ...cuandos])].map((k) => [k, NOMBRES_CUANDO[k] ?? k] as [string, string]));
+  const ACCIONES: [Accion['tipo'], string][] = [
+    ['decir', 'Decir'], ['cara', 'Cara'], ['modo', 'Modo'], ['despertar', 'Despertar'], ['telegram', 'Telegram'], ['webhook', 'URL'], ['robot', 'Otro robot'],
+  ];
+  const MODOS_ACCION: [string, string][] = [['mascota', 'Compañía'], ['reloj', 'Reloj'], ['pomodoro', 'Pomodoro'], ['clima', 'Clima']];
+  const DIAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+  function dia(a: Automatizacion, l: string) {
+    const ya = a.dias || DIAS.join('');
+    const nuevo = DIAS.filter((d) => (d === l ? !ya.includes(d) : ya.includes(d))).join('');
+    if (!nuevo) return;
+    if (nuevo.length === 7) delete a.dias; else a.dias = nuevo;
+    guardar();
+  }
   const CARAS = ['contento', 'sorpresa', 'enamorado', 'guino', 'triste', 'pensando', 'dormido'];
-  const PLANTILLAS = '{robot} {bateria} {expresion} {texto} {hora}';
+  const PLANTILLAS = ['{robot}', '{dueno}', '{texto}', '{hora}', '{clima}', '{temp}', '{max}', '{min}', '{ciudad}', '{bateria}', '{expresion}'];
 
   type Telegram = { activo: boolean; bot?: string; vinculado?: boolean; nombre?: string };
   let telegram = $state<Telegram | null>(null);
@@ -149,6 +167,10 @@
   function accionNueva(tipo: Accion['tipo']): Accion {
     if (tipo === 'telegram') return { tipo, texto: '{robot}: {evento}' };
     if (tipo === 'webhook') return { tipo, url: 'https://' };
+    if (tipo === 'decir') return { tipo, texto: 'Buen día, {dueno}: {clima}' };
+    if (tipo === 'cara') return { tipo, expresion: 'contento' };
+    if (tipo === 'modo') return { tipo, modo: 'reloj' };
+    if (tipo === 'despertar') return { tipo };
     return { tipo, bicho: otros[0]?.id ?? '', expresion: 'contento' };
   }
   async function probar(i: number) {
@@ -236,14 +258,24 @@
     {#each autos as a, i (a.id)}
       <div class="auto bandeja" class:apagada={!a.activa}>
         <div class="cuando">
-          <span class="grabado">Cuando {nombreDe(b.id)}…</span>
-          <select class="sel" value={a.cuando} onchange={(e) => { a.cuando = e.currentTarget.value; if (a.cuando !== 'expresion') delete a.valor; guardar(); }}>
+          <span class="grabado">Cuando {b.bicho?.apodo || b.config.nombre || 'él'}…</span>
+          <select class="sel" value={a.cuando} onchange={(e) => {
+            a.cuando = e.currentTarget.value;
+            if (a.cuando !== 'expresion') delete a.valor;
+            if (a.cuando === 'hora') a.hora ??= '08:00'; else { delete a.hora; delete a.dias; }
+            guardar();
+          }}>
             {#each CUANDO as [k, t]}<option value={k}>{t}</option>{/each}
           </select>
           {#if a.cuando === 'expresion'}
             <select class="sel" value={a.valor ?? ''} onchange={(e) => { a.valor = e.currentTarget.value || undefined; guardar(); }}>
               <option value="">a cualquiera</option>{#each CARAS as c}<option value={c}>a {c}</option>{/each}
             </select>
+          {:else if a.cuando === 'hora'}
+            <input class="sel hora" type="time" aria-label="Hora" value={a.hora ?? '08:00'} onchange={(e) => { if (e.currentTarget.value) { a.hora = e.currentTarget.value; guardar(); } }} />
+            <div class="dias" role="group" aria-label="Días">
+              {#each DIAS as l}<button class="dia" aria-pressed={(a.dias || DIAS.join('')).includes(l)} onclick={() => dia(a, l)}>{l}</button>{/each}
+            </div>
           {/if}
         </div>
         <div class="hacer">
@@ -256,6 +288,27 @@
               {:else if h.tipo === 'webhook'}
                 <label class="visor"><span class="grabado">Llama a (POST, firmado)</span>
                   <input class="campo claro" type="url" value={h.url} placeholder="https://tu-api.com/gancho" onchange={(e) => { h.url = e.currentTarget.value.trim(); guardar(); }} /></label>
+              {:else if h.tipo === 'decir'}
+                <div class="visor"><span class="grabado">Dice</span>
+                  <div class="decir">
+                    <input class="campo claro" value={h.texto} aria-label="Qué dice" onchange={(e) => { h.texto = cortarBytes(e.currentTarget.value.trim(), MAX_TEXTO) || '¡Hola!'; e.currentTarget.value = h.texto; guardar(); }} />
+                    <select class="campo claro chico" aria-label="Con qué cara" value={h.expresion ?? ''} onchange={(e) => { h.expresion = e.currentTarget.value || undefined; guardar(); }}>
+                      <option value="">su cara</option>{#each CARAS as c}<option value={c}>{c}</option>{/each}
+                    </select>
+                  </div>
+                </div>
+              {:else if h.tipo === 'cara'}
+                <label class="visor"><span class="grabado">Pone la cara</span>
+                  <select class="campo claro" value={h.expresion} onchange={(e) => { h.expresion = e.currentTarget.value; guardar(); }}>
+                    {#each CARAS as c}<option value={c}>{c}</option>{/each}
+                  </select></label>
+              {:else if h.tipo === 'modo'}
+                <label class="visor"><span class="grabado">Pasa a</span>
+                  <select class="campo claro" value={h.modo} onchange={(e) => { h.modo = e.currentTarget.value; guardar(); }}>
+                    {#each MODOS_ACCION as [k, t]}<option value={k}>{t}</option>{/each}
+                  </select></label>
+              {:else if h.tipo === 'despertar'}
+                <div class="visor"><span class="grabado">Lo despierta</span><b class="fijo">¡Buen día!</b></div>
               {:else}
                 <div class="visor"><span class="grabado">Otro robot pone una cara</span>
                   <div class="dos">
@@ -286,7 +339,7 @@
     {:else}
       <div class="vacio bandeja"><p class="texto">Ej.: recordatorio → Telegram</p></div>
     {/each}
-    <p class="ayuda">{PLANTILLAS}</p>
+    <div class="ayuda" aria-label="Plantillas">{#each PLANTILLAS as p}<code>{p}</code>{/each}</div>
 
     <details class="bandeja webhooks">
       <summary class="grabado">Para desarrolladores: cómo verificar los webhooks</summary>
@@ -340,7 +393,14 @@
   .dos select { font-size: 16px; }
   .mas { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 28px; padding-bottom: 4px; }
   .lado { display: flex; flex-direction: column; gap: 8px; }
-  .ayuda { margin: 0; font: 700 12px/1.4 var(--marca); color: rgba(26,23,20,.7); }
+  .ayuda { display: flex; flex-wrap: wrap; gap: 6px; font: 700 12px/1.4 var(--marca); color: rgba(26,23,20,.75); }
+  .hora { width: 100%; font-variant-numeric: tabular-nums; color-scheme: dark; }
+  .dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .dia { display: grid; place-items: center; height: 32px; border-radius: 8px; cursor: pointer; background: #0e0d0b; color: #5a524a; font: 800 11px/1 var(--marca); box-shadow: inset 0 2px 4px rgba(0,0,0,.8); }
+  .dia[aria-pressed='true'] { color: #ff8a5c; text-shadow: 0 0 8px rgba(255,106,51,.6); }
+  .decir { display: flex; flex-direction: column; gap: 6px; }
+  .decir .chico { font-size: 13px; color: var(--gris-claro); }
+  .fijo { font: 900 18px/1.1 var(--marca); color: var(--c-papel); }
   .webhooks summary { cursor: pointer; }
   .webhooks[open] { display: flex; flex-direction: column; gap: 12px; }
   .secreto { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
