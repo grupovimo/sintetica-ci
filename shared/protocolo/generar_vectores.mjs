@@ -28,6 +28,8 @@ const MEMORIA_PRUEBA = {
   hitos: 0x0b, anioCumpleBicho: 2026, anioCumpleDueno: 0, deriva: { sociabilidad: 0.04, malGenio: -0.02 },
   estado: { energia: 0.6, animo: 0.7, afecto: 0.55, aburrimiento: 0.1, curiosidad: 0.5, sueno: 0.2, estres: 0 },
   epochEstado: 1793000000, ausenciaMaxima: 30, afectoHoy: 6,
+  juegosGanados: 3, juegosJugados: 7, mejorReflejo: 245, juegosHoy: 2, suenosHoy: 1, sonoConHoy: 8, animoHoy: 1,
+  esperoHoy: 20, diaContadores: 77, anioFechas: 234, fechas: 2, aguaHoy: 3,
 };
 
 const ejemplo = JSON.stringify(JSON.parse(fs.readFileSync(path.join(aqui, '../formato/config-ejemplo.json'), 'utf8')));
@@ -124,6 +126,11 @@ const vectores = {
     { nombre: 'alarma probar', hex: hex(comando.alarma('probar')) },
     { nombre: 'alarma posponer', hex: hex(comando.alarma('posponer')) },
     { nombre: 'evento despertador', hex: hex(comando.evento('despertador')) },
+    { nombre: 'jugar dado', hex: hex(comando.jugar('dado')) },
+    { nombre: 'jugar terminar', hex: hex(comando.jugar('terminar')) },
+    { nombre: 'aviso whatsapp', tipo: 'notificacion', app: 'WhatsApp', contacto: 'Mamá', hex: hex(comando.aviso({ app: 'WhatsApp', contacto: 'Mamá' })) },
+    { nombre: 'animo medio', hex: hex(comando.animo('medio')) },
+    { nombre: 'mirar derecha', x: 0.5, y: -0.2, hex: hex(comando.mirar(0.5, -0.2)) },
     { nombre: 'ota cancelar', hex: hex(ota.cancelar()) },
   ],
   ota: {

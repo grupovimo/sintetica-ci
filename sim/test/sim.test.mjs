@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { crearSimulador, memoriaVolatil } from '../web/sim.js';
 import {
   ArmadorDeConfig, Car, comando, escriturasDeConfig, escriturasDeImagen, idDeAnuncio, imagen, leerEstado, leerListaImagenes,
-  leerListaSprites, leerQr, leerRespuesta, pedirConfig, PRIMER_SPRITE,
+  leerListaSprites, leerMemoria, leerQr, leerRespuesta, pedirConfig, PRIMER_SPRITE,
 } from '../web/protocolo.js';
 import { codificarAnimacion, codificarQoi, cuadrosDe, decodificarQoi, esAnimacion } from '../web/qoi.js';
 import { decodificarGif } from '../web/gif.js';
@@ -410,4 +410,19 @@ test('v1.6: decir muestra un globo; el clima y la alarma por comando', async () 
   assert.equal(leerEstado(sim.bleLeerEstado()).expresion, 'despertador');
   sim.bleEscribir(Car.comando, comando.alarma('apagar'));
   assert.equal(leerRespuesta(notis.at(-1).b).ok, true);
+});
+
+test('v1.7: jugar al dado, un aviso del celu y la memoria con los juegos', async () => {
+  const { sim, notis, correr } = await nuevo();
+  sim.bleEscribir(Car.comando, comando.jugar('dado'));
+  assert.equal(leerRespuesta(notis.at(-1).b).ok, true);
+  correr(600);
+  assert.equal(leerEstado(sim.bleLeerEstado()).expresion, 'juego:dado');
+  sim.bleEscribir(Car.comando, comando.evento('sacudida'));
+  correr(6000);
+  sim.bleEscribir(Car.comando, comando.aviso({ app: 'WhatsApp', contacto: 'Mamá' }));
+  assert.equal(leerRespuesta(notis.at(-1).b).ok, true);
+  sim.bleEscribir(Car.comando, comando.memoria());
+  const m = leerMemoria(notis.at(-1).b.subarray(2));
+  assert.equal(m.juegosJugados, 1);
 });

@@ -13,8 +13,14 @@ func TestVectoresHabla(t *testing.T) {
 	conCara, _ := Decir("Buen día", "contento")
 	probar, _ := Alarma("probar")
 	posponer, _ := Alarma("posponer")
+	dado, _ := Jugar("dado")
+	terminar, _ := Jugar("terminar")
+	aviso, _ := Aviso("notificacion", "WhatsApp", "Mamá")
+	medio, _ := Animo(1)
 	casos := map[string][]byte{
-		"decir hola": hola, "decir con expresion": conCara,
+		"jugar dado": dado, "jugar terminar": terminar, "aviso whatsapp": aviso, "animo medio": medio,
+		"mirar derecha": Mirar(50, -20),
+		"decir hola":    hola, "decir con expresion": conCara,
 		"clima":         Clima(-2.5, 73, 1, -4, true, "Bariloche"),
 		"alarma probar": probar, "alarma posponer": posponer,
 	}

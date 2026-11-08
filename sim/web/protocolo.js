@@ -1,4 +1,4 @@
-// Protocolo de SintéticaOS v1.6 (BLE y nube), del lado de quien controla el bicho (app,
+// Protocolo de SintéticaOS v1.7 (BLE y nube), del lado de quien controla el bicho (app,
 // web, simulador). Ver docs/protocolo-ble.md. Sin dependencias: sirve en el
 // navegador y en Node.
 
@@ -19,7 +19,7 @@ export const Op = {
   cmdVincular: 0x13, cmdAutenticar: 0x14, cmdDesvincular: 0x15,
   cmdRed: 0x16, cmdNube: 0x17, cmdOlvidarRed: 0x18, cmdReproducir: 0x19,
   cmdHora: 0x1a, cmdVida: 0x1b, cmdMemoria: 0x1c, cmdRestaurar: 0x1d, cmdRegistro: 0x1e, cmdComportamiento: 0x1f,
-  cmdDecir: 0x40, cmdClima: 0x41, cmdAlarma: 0x42,
+  cmdDecir: 0x40, cmdClima: 0x41, cmdAlarma: 0x42, cmdJugar: 0x43, cmdAviso: 0x44, cmdAnimo: 0x45, cmdMirar: 0x46,
   imgInicio: 0x20, imgBloque: 0x21, imgFin: 0x22, imgBorrar: 0x23, imgListar: 0x24, imgPedir: 0x25, imgListarSprites: 0x26,
   otaInicio: 0x30, otaBloque: 0x31, otaFin: 0x32, otaDescargar: 0x33, otaProgreso: 0x34, otaCancelar: 0x35,
   respuesta: 0x80, configTrozo: 0x84, configCierre: 0x85, imgTrozo: 0xa7, imgCierre: 0xa8,
@@ -39,15 +39,20 @@ export const Eventos = [
   'caricia', 'muchos-toques', 'sacudida-suave', 'sacudida-fuerte', 'inclinado', 'caida', 'voz', 'nombre',
   'ruido', 'musica', 'silencio', 'notificacion', 'llamada', 'bateria-baja', 'bateria-critica', 'enchufado',
   'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito',
-  'recordatorio', 'pomodoro', 'despertador',
+  'recordatorio', 'pomodoro', 'despertador', 'juego', 'animo',
 ];
+// Los juegos del comando Jugar (v1.7), en orden, y los ánimos del comando Ánimo.
+export const Juegos = ['ppt', 'reflejos', 'mirada', 'dado', 'moneda'];
+export const Animos = ['bien', 'medio', 'mal'];
 // Las acciones del comando Alarma (v1.6), en orden.
 export const AccionesAlarma = ['apagar', 'posponer', 'probar', 'despertar'];
 // Las situaciones de las frases (habla.propias y vida/frases.json).
 export const Situaciones = [
   'despertar', 'buenas-noches', 'volviste', 'te-extrane', 'aburrido', 'sueno', 'bateria-baja', 'cargando',
   'caricia', 'saludo', 'hito', 'cumple-dueno', 'cumple-robot', 'recordatorio-hecho', 'despertador', 'posponer',
-  'clima-frio', 'clima-calor', 'clima-lluvia', 'clima-lindo',
+  'clima-frio', 'clima-calor', 'clima-lluvia', 'clima-lindo', 'buen-dia', 'comiste', 'a-dormir', 'tardaste',
+  'agua', 'pausa', 'como-estas', 'animo-bien', 'animo-medio', 'animo-mal', 'jugar', 'gane',
+  'perdi', 'empate', 'anio-nuevo', 'navidad', 'dia-del-amigo', 'dia-del-nino', 'aniversario',
 ];
 // El estado interno y los rasgos, en el orden del protocolo (comando Vida).
 export const VariablesEstado = ['energia', 'animo', 'afecto', 'aburrimiento', 'curiosidad', 'sueno', 'estres'];
@@ -143,6 +148,23 @@ export const comando = {
     b.set(c, 8);
     return b;
   },
+  // Un juego (v1.7): 'ppt', 'reflejos', 'mirada', 'dado', 'moneda' o 'terminar'.
+  jugar: (juego) => {
+    const i = juego === 'terminar' ? 255 : Juegos.indexOf(juego);
+    if (i < 0) throw new Error(`juego desconocido: ${juego}`);
+    return Uint8Array.from([Op.cmdJugar, i]);
+  },
+  // Una notificación o llamada del celu con su app y su contacto (v1.7).
+  aviso: ({ llamada = false, app = '', contacto = '' }) =>
+    Uint8Array.from([Op.cmdAviso, llamada ? 1 : 0, ...corto(app, 24), ...corto(contacto, 24)]),
+  // La respuesta al "¿cómo estás?" (v1.7): 'bien', 'medio' o 'mal'.
+  animo: (a) => {
+    const i = Animos.indexOf(a);
+    if (i < 0) throw new Error(`ánimo desconocido: ${a}`);
+    return Uint8Array.from([Op.cmdAnimo, i]);
+  },
+  // De dónde viene un sonido (v1.7): x e y de -1 a 1.
+  mirar: (x, y = 0) => Uint8Array.from([Op.cmdMirar, Math.round(x * 100) & 0xff, Math.round(y * 100) & 0xff]),
   // El despertador (v1.6): 'apagar', 'posponer', 'probar' o 'despertar'.
   alarma: (accion) => {
     const i = AccionesAlarma.indexOf(accion);
@@ -375,13 +397,17 @@ export function leerMemoria(m) {
     gustos: Object.fromEntries(['caricia', 'tacto', 'voz', 'musica', 'nombre', 'levantado', 'sacudida-suave', 'app-abierta'].map((g, k) => [g, i8(59 + k)])),
     hitos: u16(67), anioCumpleBicho: u16(69), anioCumpleDueno: u16(71),
     deriva, estado, epochEstado: leerU32(m, 86), ausenciaMaxima: u16(90), afectoHoy: m[92],
+    // v1.7
+    juegosGanados: u16(93), juegosJugados: u16(95), mejorReflejo: u16(97),
+    juegosHoy: m[99], suenosHoy: m[100], sonoConHoy: m[101], animoHoy: m[102], esperoHoy: m[103],
+    diaContadores: m[104], anioFechas: m[105], fechas: m[106], aguaHoy: m[107],
   };
 }
 
 // El registro: [0x9E][0][n][n × (u32 segundos, u8 tipo, u8 dato)].
 export function leerRegistro(b) {
   const n = b[2];
-  const tipos = ['evento', 'comportamiento', 'sueño', 'hito', 'recordatorio'];
+  const tipos = ['evento', 'comportamiento', 'sueño', 'hito', 'recordatorio', 'juego', 'animo'];
   return Array.from({ length: n }, (_, k) => {
     const i = 3 + k * 6;
     return { segundos: leerU32(b, i), tipo: tipos[b[i + 4]] ?? String(b[i + 4]), dato: b[i + 5] };
@@ -403,6 +429,9 @@ export function codificarMemoria(m) {
   Rasgos.forEach((r, k) => v.setInt8(73 + k, Math.round((m.deriva?.[r] ?? 0) * 100)));
   VariablesEstado.forEach((e, k) => { b[79 + k] = Math.round((m.estado?.[e] ?? 0) * 255); });
   v.setUint32(86, m.epochEstado ?? 0, true); v.setUint16(90, m.ausenciaMaxima ?? 0, true); b[92] = m.afectoHoy ?? 0;
+  v.setUint16(93, m.juegosGanados ?? 0, true); v.setUint16(95, m.juegosJugados ?? 0, true); v.setUint16(97, m.mejorReflejo ?? 0, true);
+  [m.juegosHoy, m.suenosHoy, m.sonoConHoy, m.animoHoy, m.esperoHoy, m.diaContadores, m.anioFechas, m.fechas, m.aguaHoy]
+    .forEach((x, k) => { b[99 + k] = x ?? 0; });
   v.setUint32(LARGO_MEMORIA - 4, crc32(b.subarray(0, LARGO_MEMORIA - 4)), true);
   return b;
 }
