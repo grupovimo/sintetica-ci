@@ -494,9 +494,59 @@ más de 30° → `cansado`; sol de día → `contento`. La expresión visible es
   uno de esa noche); si no, la mitad de las veces se mueve o murmura en sueños.
   La música y el silencio, nunca.
 
+## Acompañar el día (v1.7, `acompanar.cpp` y `MotorVida::rutinaConVos`)
+
+Un bicho que es parte del día y no un accesorio. Las frases son de
+`frases.json` (situaciones nuevas: `buen-dia`, `comiste`, `a-dormir`,
+`tardaste`, `agua`, `pausa`, `como-estas`, `animo-bien|medio|mal`, `jugar`,
+`gane`, `perdi`, `empate`, `anio-nuevo`, `navidad`, `dia-del-amigo`,
+`dia-del-nino`, `aniversario`) y se pueden reemplazar con `habla.propias`.
+
+- **El día con vos**: la primera interacción del día (de 2 h antes de
+  despertarse a las 14) es un "buen día" con el clima (`{clima}`: "11° y
+  despejado"); si llueve o hace frío, el consejo ("Llevá paraguas"). A la tarde
+  (13 a 15:30), "¿comiste?" (una vez). En los 45 min antes de dormir, bosteza y
+  te dice "Ya es tarde, ¿nos vamos a dormir?". Aprende a qué hora aparecés
+  (`Memoria::horas`), te espera (queda en `hoyEspero`) y, si volvés entre 1,5 y
+  6 h más tarde que lo de siempre, "¡Tardaste!".
+- **Cuidarte** (`cuidado`): agua cada `agua` horas mientras está despierto;
+  pausa activa (se estira y te lo dice) si pasan `pausa` minutos sin tocarlo en
+  el horario de `trabajo`. "¿Cómo estás?" una vez por día, cuando te vio hace
+  menos de 2 min (no en los primeros 10 min después de prenderse): toque =
+  bien, doble toque = más o menos, mantener 0,8 s = mal (o el comando `0x45`,
+  que la nube manda desde los botones de Telegram). Queda en la memoria
+  (`hoyAnimo`), en el registro (tipo 6) y avisa el evento `35 animo`; responde
+  con empatía (mal: cariñoso, con corazones, y una frase linda).
+- **Juegos** (`0x43` Jugar, la consola y `/jugar` de Telegram): piedra, papel o
+  tijera (las tres van pasando; tu toque frena tu elección y él elige al
+  azar), reflejos ("tocá en el verde": antes, perdiste; después, los ms; ganás
+  con menos de 450 ms; el récord queda en `mejorReflejo`), seguí la mirada
+  (cinco rondas: mira a un lado y tenés 2,5 s para inclinarlo hacia ahí; ganás
+  con 4), dado y moneda (sacudilo o tocalo). Los toques son del juego; si nadie
+  juega 30 s, se termina. Cada partida: `juegosJugados`, `juegosGanados`,
+  `hoyJuegos`, registro tipo 5 y evento `34 juego`, y él dice "¡Gané!",
+  "¡Ganaste!" o "¡Empate!".
+- **Fechas** (hitos, una vez por año, con festejo y frase): año nuevo (1/1),
+  Navidad (25/12), el día del amigo (20/7), el día del niño en la Argentina
+  (tercer domingo de agosto) y el aniversario (el día del primer encuentro).
+- **Te extraña**: si no lo ves en un día, se va poniendo triste (hasta la mitad
+  del ánimo de fondo a las 72 h); cuando volvés después de más de 24 h,
+  festejo grande (`reflejo:sorpresa` + `festejar` + "Te extrañé", en
+  `reglas.json`); después de 3 días, primero se ofende. La nube te manda "te
+  extraño" por Telegram (docs/nube.md).
+- **Avisos del celu** (`avisos` y `0x44`): según la app y el contacto, una
+  cara, un comportamiento, un sonido y un globo ("{contacto} te escribe").
+- **Entre robots** y **su día contado** (el resumen de la noche) los hace la
+  nube con lo que guarda la memoria (docs/nube.md).
+- **Voz** (M7): contrato en protocolo-ble.md ("Voz"); `0x46` Mirar ya lo
+  simula el núcleo.
+
+RAM: `Cuidado` 8 B, `Avisos` 769 B (8 avisos), el juego y la pregunta ~70 B.
+
 ### Sonidos (los nombres que recibe `Hal::sonido`)
 
-`despertador:1` a `despertador:5`, `ronquido`, `murmullo` (v1.6), más los de
+`despertador:1` a `despertador:5`, `ronquido`, `murmullo` (v1.6), `dado`,
+`notificacion`, `llamada` (v1.7), más los de
 siempre (`recordatorio`, `pomodoro` y los `sonido` de los pasos). Todos pasan
 por `Sistema::sonar` (`voz.volumen` 0 = silencio).
 

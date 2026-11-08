@@ -1,4 +1,4 @@
-# Protocolo de SintéticaOS (v1.6)
+# Protocolo de SintéticaOS (v1.7)
 
 Un servicio GATT propio. Todos los enteros van en little-endian. La
 implementación de referencia es `firmware/nucleo/protocolo.*` y
@@ -156,6 +156,10 @@ veces más rápido.
 | `0x40` Decir | `[n][expresión, n bytes (0 = ninguna)][texto UTF-8, 1 a 60 bytes]` | Lo muestra en un **globo** con la cara achicada arriba, con fundido; dura 2,5 s + 60 ms por byte (de 3 a 10 s) o hasta un toque. Con expresión, la pone ese rato; sin, mueve la boca (`hablando`). Si duerme, lo despierta. Si ya hay un globo, primero se va. `0x07` si la expresión no existe; `0x08` si el texto está vacío, es de más de 60 bytes o no es UTF-8 (v1.6). |
 | `0x41` Clima | `[i16 temperatura en décimas de °C][u8 código WMO][i8 máx °C][i8 mín °C][u8 flags: bit 0 es de día][n][ciudad, 0 a 24 bytes]` | El tiempo que trae la nube (Open-Meteo) para el modo clima y el despertador. Vale 3 h. `0x08` si está mal armado (v1.6). |
 | `0x42` Alarma | `[u8 acción]`: 0 apagar, 1 posponer, 2 sonar ya, 3 despertar | El despertador desde lejos. 2 lo hace sonar (para probarlo); 3 lo despierta sin alarma, con un "buen día". `0x07` si apagar o posponer y no está sonando (v1.6). |
+| `0x43` Jugar | `[u8 juego]`: 0 piedra-papel-tijera, 1 reflejos, 2 seguí la mirada, 3 dado, 4 moneda; 255 = terminar | Empieza un juego (lo despierta; ver motor-de-vida.md, "Acompañar"). Mientras se juega, la expresión visible es `juego:<ppt|reflejos|mirada|dado|moneda>` y los toques son del juego. `0x07` si no existe (v1.7). |
+| `0x44` Aviso | `[u8 0 notificación, 1 llamada][n][app][n][contacto]` (cada texto de 0 a 24 bytes) | Una notificación o llamada del celu con su app y su contacto: dispara el evento `notificacion`/`llamada` y, si coincide uno de `avisos` de la config, su cara, comportamiento, sonido y globo (v1.7). |
+| `0x45` Ánimo | `[u8 0 bien, 1 más o menos, 2 mal]` | La respuesta al "¿cómo estás?" que llegó por otro lado (Telegram): queda en la memoria y reacciona con empatía (v1.7). |
+| `0x46` Mirar | `[i8 x][i8 y]` (−100 a 100) | De dónde viene un sonido (los modelos con dos micrófonos): mira hacia ahí unos segundos (v1.7; simulado hasta que haya hardware). |
 
 Eventos (el índice del comando `0x12`; los nombres son los de las reglas):
 
@@ -169,11 +173,12 @@ Eventos (el índice del comando `0x12`; los nombres son los de las reglas):
 | `20` llamada | `21` bateria-baja | `22` bateria-critica | `23` enchufado |
 | `24` desenchufado | `25` cargado | `26` sin-wifi | `27` cambio-de-cara |
 | `28` bicho-cerca | `29` volvio | `30` hito | `31` recordatorio |
-| `32` pomodoro | `33` despertador | | |
+| `32` pomodoro | `33` despertador | `34` juego | `35` animo |
 
 Los 8 primeros son de la v1; del 8 en adelante, del motor de vida (v1.4).
 `volvio` y `hito` los genera el motor; `recordatorio`, `pomodoro` y
-`despertador` (v1.6: empezó a sonar a su hora), el sistema (mandarlos sirve
+`despertador` (v1.6: empezó a sonar a su hora), `juego` (terminó una partida)
+y `animo` (respondió el "¿cómo estás?") (v1.7), el sistema (mandarlos sirve
 para probar las reglas, pero no muestran nada). Los eventos nuevos van siempre
 al final.
 
@@ -186,6 +191,8 @@ con el mismo formato que la respuesta de Registro:
 
 - pomodoro: `[0x9E][0x00][0x01][u32 segundos][0x00 = evento][0x20]`
 - despertador: `[0x9E][0x00][0x01][u32 segundos][0x00][0x21]`
+- juego (v1.7): `[0x9E][0x00][0x02][u32 s][0x00][0x22][u32 s][0x05 = juego][u8 juego·16 + resultado]` (resultado: 0 perdió el dueño, 1 ganó, 2 empate, 3 sin resultado)
+- ánimo (v1.7): `[0x9E][0x00][0x02][u32 s][0x00][0x23][u32 s][0x06 = ánimo][u8 0 bien, 1 más o menos, 2 mal]`
 - recordatorio: `[0x9E][0x00][0x02][u32 segundos][0x00][0x1F][u32 segundos][0x04 = recordatorio][u8 índice]`
 
 El registro (`0x1E`) guarda las mismas entradas: el tipo 4 es "mostró un
@@ -216,7 +223,15 @@ tacto, voz, música, nombre, levantado, sacudida suave, app abierta), u16 hitos
 (bits: primer día, 7 días, 30 días, 100 caricias, 100 días, 1000 caricias),
 u16 año del último cumpleaños del bicho festejado, u16 ídem del dueño,
 6 × i8 deriva de los rasgos (centésimos), 7 × u8 estado, u32 epoch del estado,
-u16 ausencia máxima (horas), u8 afecto ganado hoy, ceros hasta el byte 108 y el
+u16 ausencia máxima (horas), u8 afecto ganado hoy; desde el byte 93 (v1.7, antes
+eran ceros: la versión sigue siendo 1): u16 juegos ganados (por el dueño), u16
+juegos jugados, u16 mejor reflejo (ms), u8 juegos hoy, u8 sueños hoy, u8 con qué
+soñó hoy (bits: corazón, estrella, nota, oveja, pesadilla), u8 ánimo de hoy (0
+sin respuesta, 1 bien, 2 más o menos, 3 mal), u8 a qué hora te esperó (hora + 1;
+0 = no), u8 el día de esos contadores (epoch/86400 % 251 + 1: si no es hoy,
+valen 0), u8 año de las fechas (año % 256), u8 fechas festejadas (bits: año
+nuevo, Navidad, día del amigo, día del niño, aniversario), u8 vasos de agua
+recordados hoy; ceros hasta el byte 108 y el
 CRC-32 de los primeros 108 en los últimos 4. Implementaciones:
 `codificarMemoria`/`decodificarMemoria` (C++), `leerMemoria`/`codificarMemoria`
 (JS), `protocolo.LeerMemoria` (Go).
@@ -246,6 +261,26 @@ clima, `clima`. La versión 3 no tenía la red, el firmware ni el CRC; la
 3.)
 
 Modos: `0` mascota, `1` reloj, `2` pomodoro, `3` clima, `4` notificaciones.
+
+## Voz (M7, el cubito: contrato, todavía sin hardware)
+
+Para los modelos con micrófono y parlante (dos micrófonos, un parlante):
+
+- Característica **Audio** `5157e71c-a000-4b1c-8a5e-000000000007` (write
+  without response, notify) por BLE, y tópico `bicho/{id}/audio` por la nube:
+  trozos `[u8 tipo: 0 micrófono, 1 parlante][u16 secuencia][Opus 16 kHz mono, 20 ms]`.
+- El bicho escucha su palabra (`voz.palabra`, o su nombre) en el propio chip;
+  al oírla manda el evento `15 nombre`, mira hacia donde vino (lo mismo que
+  `0x46` Mirar) y transmite el micrófono (evento `14 voz` al empezar, `18
+  silencio` después de 1 s sin voz).
+- Con `voz.conversar`, la nube hace voz → texto → IA (la cuenta del usuario)
+  → voz y devuelve el audio por Audio (tipo 1) **y** el texto con `0x40` Decir:
+  el globo se ve mientras habla, con la cara `hablando`.
+- Con parlante, el globo, los recordatorios y el despertador se **leen en voz
+  alta** (la nube manda el audio del texto; sin nube, solo el sonido).
+- Sonidos (`Hal::sonido`): `escuchando`, `pensando`, `hablando`, además de
+  `despertador:1` a `despertador:5`, `ronquido`, `murmullo`, `dado`,
+  `notificacion`, `llamada`, `recordatorio` y `pomodoro`.
 
 ## OTA (v1.3)
 
