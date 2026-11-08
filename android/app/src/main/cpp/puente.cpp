@@ -197,10 +197,8 @@ jintArray JNI(dibujarNativo)(JNIEnv* env, jobject, jbyteArray json, jstring nomb
   const char* nom = env->GetStringUTFChars(nombre, nullptr);
   std::string rgba(static_cast<size_t>(ancho) * alto * 4, '\0');
   char detalle[128] = {0};
-  // `cierre` (el parpadeo) queda para cuando el núcleo traiga sintetica_dibujar_expresion_cierre.
-  (void)cierre;
-  int r = sintetica_dibujar_expresion(n > 0 ? reinterpret_cast<const char*>(d) : nullptr, static_cast<size_t>(n), nom, ancho, alto,
-                                      redonda ? 1 : 0, t, reinterpret_cast<uint8_t*>(&rgba[0]), detalle, sizeof detalle);
+  int r = sintetica_dibujar_expresion_cierre(n > 0 ? reinterpret_cast<const char*>(d) : nullptr, static_cast<size_t>(n), nom, ancho, alto,
+                                             redonda ? 1 : 0, t, cierre, reinterpret_cast<uint8_t*>(&rgba[0]), detalle, sizeof detalle);
   env->ReleaseStringUTFChars(nombre, nom);
   if (d) env->ReleaseByteArrayElements(json, d, JNI_ABORT);
   if (r != 0) return nullptr;
@@ -212,6 +210,16 @@ jintArray JNI(dibujarNativo)(JNIEnv* env, jobject, jbyteArray json, jstring nomb
     p[i] = static_cast<jint>(0xFF000000u | (uint32_t(q[i * 4]) << 16) | (uint32_t(q[i * 4 + 1]) << 8) | q[i * 4 + 2]);
   env->ReleaseIntArrayElements(a, p, 0);
   return a;
+}
+
+// Los sprites con los que se dibujan las caras de imagen fuera de la instancia
+// (0 a 11; null o vacío lo borra). 0 si lo guardó.
+jint JNI(spriteSuelto)(JNIEnv* env, jobject, jint sprite, jbyteArray qoi) {
+  jsize n = qoi ? env->GetArrayLength(qoi) : 0;
+  jbyte* d = n > 0 ? env->GetByteArrayElements(qoi, nullptr) : nullptr;
+  int r = sintetica_sprite_suelto(sprite, reinterpret_cast<const uint8_t*>(d), static_cast<size_t>(n));
+  if (d) env->ReleaseByteArrayElements(qoi, d, JNI_ABORT);
+  return r;
 }
 
 // Lo de fábrica del motor de vida: tipo 0 = expresiones, 1 = comportamientos.

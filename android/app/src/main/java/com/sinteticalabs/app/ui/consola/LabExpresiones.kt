@@ -87,10 +87,14 @@ fun LabExpresiones(vm: RobotViewModel, modelo: Modelo) {
     var error by remember { mutableStateOf<String?>(null) }
     var aviso by remember { mutableStateOf("") }
     var guardando by remember { mutableStateOf(false) }
+    // Una cara de imagen abierta: null = el editor de perillas; "" = una nueva.
+    var imagen by remember { mutableStateOf<String?>(null) }
+    val sprites by vm.sprites.collectAsState()
+    val caraImagen = com.sinteticalabs.app.consola.CarasDeImagen.deImagen(config)
 
-    val propias = Lab.propiasParametricas(config)
+    val propias = Lab.propiasParametricas(config) - caraImagen.keys
     val base = VidaBase.nombresCaras
-    val nombres = base + propias.keys.filter { it !in base }.sorted()
+    val nombres = base + (propias.keys + caraImagen.keys).filter { it !in base }.sorted()
     val dibujar = Lab.paraDibujar(config)
     val esBase = elegida in VidaBase.expresiones
     val nombreDibujo = if (nombreValido(nombre)) nombre else "mi-cara"
@@ -105,7 +109,9 @@ fun LabExpresiones(vm: RobotViewModel, modelo: Modelo) {
     fun elegir(n: String) {
         error = null
         aviso = ""
+        imagen = if (n in caraImagen) n else null
         elegida = n
+        if (imagen != null) return
         nombre = n
         val ref = if (n in VidaBase.expresiones) Rostro.deFabrica(n, VidaBase.expresiones) else Rostro.neutral
         referencia = ref
@@ -119,6 +125,7 @@ fun LabExpresiones(vm: RobotViewModel, modelo: Modelo) {
     }
 
     fun nueva() {
+        imagen = null
         elegida = ""
         nombre = Lab.libre("mi-cara", nombres)
         referencia = Rostro.neutral
@@ -139,6 +146,16 @@ fun LabExpresiones(vm: RobotViewModel, modelo: Modelo) {
                 Grabado("Nueva", color = C.grisClaro)
             }
         }
+        item {
+            Column(Modifier.clickable { imagen = ""; elegida = "" }.padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(
+                    Modifier.width(96.dp).aspectRatio(if (modelo.redonda) 1f else 320f / 172).clip(RoundedCornerShape(9.dp))
+                        .border(2.dp, if (imagen == "") C.brasa else Color(0xFF3A3632), RoundedCornerShape(9.dp)),
+                    contentAlignment = Alignment.Center,
+                ) { Text("▣", style = T.nombre, color = C.brasa) }
+                Grabado("De imagen", color = C.grisClaro)
+            }
+        }
         items(nombres.size) { i ->
             val n = nombres[i]
             val sel = n == elegida
@@ -148,13 +165,28 @@ fun LabExpresiones(vm: RobotViewModel, modelo: Modelo) {
                     .clickable { elegir(n) }.padding(5.dp),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                MiniCara(n, dibujar, modelo.pantalla, 96.dp)
+                val ojo = caraImagen[n]?.let { com.sinteticalabs.app.consola.CarasDeImagen.sprites(it)["ojo"] }
+                if (n in caraImagen) Box(
+                    Modifier.width(96.dp).aspectRatio(if (modelo.redonda) 1f else 320f / 172).clip(RoundedCornerShape(8.dp)).background(Color.Black),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SpriteImagen(ojo?.let { sprites[it] }, Modifier.width(30.dp).aspectRatio(1f))
+                        SpriteImagen(ojo?.let { sprites[it] }, Modifier.width(30.dp).aspectRatio(1f), espejo = true)
+                    }
+                } else MiniCara(n, dibujar, modelo.pantalla, 96.dp)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(n, style = T.dato.copy(fontSize = 10.sp), color = if (sel) C.papel else C.grisClaro, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 84.dp))
-                    if (n in propias) Led(C.led, tamano = 6.dp)
+                    if (n in propias || n in caraImagen) Led(C.led, tamano = 6.dp)
                 }
             }
         }
+    }
+
+    val ini = imagen
+    if (ini != null) {
+        DeImagen(vm, modelo, ini) { n -> if (n.isNotEmpty()) { imagen = n; elegida = n } else elegir("neutral") }
+        return
     }
 
     MarcoPantalla(modelo.pantalla) { CaraViva(enVivo, nombreDibujo, modelo.pantalla, Modifier.fillMaxWidth().aspectRatio(modelo.pantalla.ancho.toFloat() / modelo.pantalla.alto)) }

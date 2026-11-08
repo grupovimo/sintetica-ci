@@ -58,8 +58,13 @@ object Miniaturas {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap?>?) = size > 160
     }
 
+    /** Cambiaron los sprites: las caras de imagen se dibujan de nuevo. */
+    fun vaciar() { cache.clear(); version++ }
+    var version = 0
+        private set
+
     fun de(config: String, nombre: String, ancho: Int, alto: Int, redonda: Boolean): ImageBitmap? {
-        val k = "${config.hashCode()}|$nombre|${ancho}x$alto|$redonda"
+        val k = "$version|${config.hashCode()}|$nombre|${ancho}x$alto|$redonda"
         if (cache.containsKey(k)) return cache[k]
         val px = Nucleo.dibujar(config, nombre, ancho, alto, redonda, 0.4f)
         val img = px?.let { Bitmap.createBitmap(it, ancho, alto, Bitmap.Config.ARGB_8888).asImageBitmap() }
@@ -76,7 +81,7 @@ private fun tamanoMini(p: Pantalla, ancho: Int): Pair<Int, Int> =
 @Composable
 fun MiniCara(nombre: String, config: String, pantalla: Pantalla, ancho: Dp, modifier: Modifier = Modifier) {
     val (w, h) = tamanoMini(pantalla, 128)
-    val img = remember(nombre, config, pantalla) { Miniaturas.de(config, nombre, w, h, pantalla.redonda) }
+    val img = remember(nombre, config, pantalla, Miniaturas.version) { Miniaturas.de(config, nombre, w, h, pantalla.redonda) }
     Box(
         modifier.width(ancho).aspectRatio(w.toFloat() / h).clip(if (pantalla.redonda) CircleShape else RoundedCornerShape(8.dp)).background(Color.Black),
         contentAlignment = Alignment.Center,

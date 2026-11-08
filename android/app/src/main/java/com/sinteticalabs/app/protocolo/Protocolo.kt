@@ -53,6 +53,7 @@ object Op {
     const val IMG_BORRAR = 0x23
     const val IMG_LISTAR = 0x24
     const val IMG_PEDIR = 0x25
+    const val IMG_LISTAR_SPRITES = 0x26  // v1.5
     const val OTA_INICIO = 0x30
     const val OTA_BLOQUE = 0x31
     const val OTA_FIN = 0x32
@@ -151,6 +152,22 @@ object Imagen {
     fun borrar(espacio: Int) = byteArrayOf(Op.IMG_BORRAR.toByte(), espacio.toByte())
     fun listar() = byteArrayOf(Op.IMG_LISTAR.toByte())
     fun pedir(espacio: Int) = byteArrayOf(Op.IMG_PEDIR.toByte(), espacio.toByte())
+    fun listarSprites() = byteArrayOf(Op.IMG_LISTAR_SPRITES.toByte())
+}
+
+/** Los sprites de las caras de imagen: del 0 al 11, en los espacios 8 a 19 (v1.5). */
+const val PRIMER_SPRITE = 8
+const val MAX_SPRITES = 12
+
+/** La respuesta a Imagen.listarSprites(): [0xA6][0][u16 máscara] + [espacio][u32 largo][u32 CRC] (el espacio ya pasado a 0-11). */
+fun leerListaSprites(b: ByteArray): List<EspacioImagen> {
+    val l = mutableListOf<EspacioImagen>()
+    var i = 4
+    while (i + 9 <= b.size) {
+        l += EspacioImagen((b[i].toInt() and 0xFF) - PRIMER_SPRITE, leerU32(b, i + 1), leerU32(b, i + 5))
+        i += 9
+    }
+    return l
 }
 
 /** Una actualización firmada: lo que manda la API (ver docs/protocolo-ble.md, "OTA"). */

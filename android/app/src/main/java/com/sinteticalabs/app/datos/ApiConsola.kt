@@ -197,3 +197,19 @@ suspend fun ApiSintetica.mudar(id: String, desde: String) { pedir("/v1/bichos/$i
 /** El secreto con el que se firman los webhooks (rotar = uno nuevo). */
 suspend fun ApiSintetica.secretoWebhooks(rotar: Boolean): String =
     pedir("/v1/webhooks/secreto", if (rotar) "POST" else "GET").texto("secreto").orEmpty()
+
+// --- Sprites de las caras de imagen (0 a 11) ---
+
+/** Los sprites del robot: número → CRC. */
+suspend fun ApiSintetica.sprites(id: String): List<EspacioImagen> = pedir("/v1/bichos/$id/sprites").lista("sprites").orEmpty().mapNotNull {
+    val o = it as? JsonObject ?: return@mapNotNull null
+    EspacioImagen(o.numero("sprite")?.toInt() ?: return@mapNotNull null, o.numero("largo")?.toLong() ?: 0, o.numero("crc")?.toLong() ?: 0)
+}
+
+/** El QOI de un sprite. */
+suspend fun ApiSintetica.sprite(id: String, n: Int): ByteArray = crudo("/v1/bichos/$id/sprites/$n")
+
+/** Sube un sprite: SVG, PNG, JPEG, GIF o QOI (la API lo recorta y lo achica a 128 × 128 con su transparencia). */
+suspend fun ApiSintetica.subirSprite(id: String, n: Int, datos: ByteArray, tipo: String) { crudo("/v1/bichos/$id/sprites/$n", "PUT", datos, tipo) }
+
+suspend fun ApiSintetica.borrarSprite(id: String, n: Int) { crudo("/v1/bichos/$id/sprites/$n", "DELETE") }

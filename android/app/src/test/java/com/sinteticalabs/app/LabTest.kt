@@ -126,4 +126,60 @@ class LabTest {
         assertEquals(listOf("siete-dias"), m.hitos)
         assertNull(Memoria.de(leerObjeto("{}")).horaPreferida)
     }
+
+    // --- Caras de imagen ---
+
+    @Test fun qoiConTransparencia() {
+        // Opaca, da lo mismo que el QOI de 3 canales salvo el byte de canales.
+        val w = 7; val h = 5
+        val rgb = ByteArray(w * h * 3) { (it * 37 % 251).toByte() }
+        val rgba = ByteArray(w * h * 4) { i -> if (i % 4 == 3) 255.toByte() else rgb[i / 4 * 3 + i % 4] }
+        val tres = com.sinteticalabs.app.protocolo.Qoi.codificar(rgb, w, h)
+        val cuatro = com.sinteticalabs.app.protocolo.Qoi.codificarRgba(rgba, w, h)
+        assertEquals(4, cuatro[12].toInt())
+        assertTrue(tres.copyOfRange(13, tres.size).contentEquals(cuatro.copyOfRange(13, cuatro.size)))
+        // Con transparencia: aparece QOI_OP_RGBA (0xFF).
+        val trans = ByteArray(4 * 4) { i -> if (i % 4 == 3) (i * 16).toByte() else 9 }
+        val q = com.sinteticalabs.app.protocolo.Qoi.codificarRgba(trans, 2, 2)
+        assertTrue(q.drop(14).any { it == 0xFF.toByte() })
+    }
+
+    @Test fun listaDeSprites() {
+        val b = byteArrayOf(0xA6.toByte(), 0, 0x05, 0, 8, 10, 0, 0, 0, 1, 2, 3, 4, 10, 20, 0, 0, 0, 0, 0, 0, 0)
+        val l = com.sinteticalabs.app.protocolo.leerListaSprites(b)
+        assertEquals(listOf(0, 2), l.map { it.espacio })
+        assertEquals(10L, l[0].largo)
+        assertEquals(0x04030201L, l[0].crc)
+    }
+
+    @Test fun carasDeImagen() {
+        val C = com.sinteticalabs.app.consola.CarasDeImagen
+        var c = leerObjeto("""{"version":2,"expresiones":{"otra":{"sprites":{"ojo":0,"boca":1}},"param":{"pulse":1}}}""")
+        assertEquals(setOf("otra"), C.deImagen(c).keys)
+        assertEquals(setOf(0, 1), C.enUso(c))
+        var d = C.nueva()
+        assertEquals(2, C.libre(c, "", d))
+        d = C.conParte(d, "ojo", 2)
+        assertEquals(3, C.libre(c, "", d))
+        d = C.conPerilla(d, C.PERILLAS[1], 0.3) // la separación de fábrica: no se escribe
+        assertNull(d["sep"])
+        d = C.conPerilla(d, C.PERILLAS[3], -0.2)
+        assertEquals("-0.2", d["boca_y"].toString())
+        // La vista previa: la cara como la de siempre.
+        assertEquals("mia", C.siempre(C.vista(c, "mia", d)))
+        assertEquals("", C.siempre(C.vista(c, "mia", C.nueva()))) // sin ojo, no
+        // Guardar de siempre, renombrar y borrar.
+        c = C.guardar(c, "", "mia", d, true)
+        assertEquals("mia", C.siempre(c))
+        assertEquals(setOf(0, 1, 2), C.enUso(c))
+        c = C.guardar(c, "mia", "mia2", d, true)
+        assertNull(c.obj("expresiones")!!["mia"])
+        assertEquals("mia2", C.siempre(c))
+        val sinSiempre = C.guardar(c, "mia2", "mia2", d, false)
+        assertEquals("", C.siempre(sinSiempre))
+        val borrada = C.borrar(c, "mia2")
+        assertEquals("", C.siempre(borrada))
+        assertEquals(setOf(2), C.sobrantes(c.obj("expresiones")!!.obj("mia2"), borrada))
+        assertNull(borrada.obj("cara")) // sin nada adentro, se saca
+    }
 }

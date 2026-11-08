@@ -155,6 +155,16 @@ class ClienteBicho(private val transporte: Transporte, alcance: CoroutineScope) 
 
     suspend fun borrarImagen(espacio: Int) { exigir(Car.IMAGEN, Imagen.borrar(espacio)) }
 
+    /** Los sprites de las caras de imagen (0 a 11); un firmware anterior a la v1.5 no tiene. */
+    suspend fun listarSprites(): List<EspacioImagen> = coroutineScope {
+        val espera = async(start = CoroutineStart.UNDISPATCHED) {
+            transporte.notificaciones.mapNotNull { (c, b) -> if (c == Car.IMAGEN && (b[0].toInt() and 0x7F) == Op.IMG_LISTAR_SPRITES) b else null }.first()
+        }
+        transporte.escribir(Car.IMAGEN, Imagen.listarSprites())
+        val b = withTimeout(5_000) { espera.await() }
+        if (b.size < 2 || b[1].toInt() != 0) emptyList() else com.sinteticalabs.app.protocolo.leerListaSprites(b)
+    }
+
     suspend fun listarImagenes(): List<EspacioImagen> = coroutineScope {
         val espera = async(start = CoroutineStart.UNDISPATCHED) {
             transporte.notificaciones.mapNotNull { (c, b) -> if (c == Car.IMAGEN && (b[0].toInt() and 0x7F) == Op.IMG_LISTAR) b else null }.first()

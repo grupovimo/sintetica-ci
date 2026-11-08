@@ -44,6 +44,10 @@ object Nucleo {
     private external fun validar(json: ByteArray): String?
     private external fun dibujarNativo(json: ByteArray?, nombre: String, ancho: Int, alto: Int, redonda: Boolean, t: Float, cierre: Float): IntArray?
     private external fun vidaBase(tipo: Int): Array<String>
+    private external fun spriteSuelto(sprite: Int, qoi: ByteArray?): Int
+
+    /** Un sprite para dibujar las caras de imagen fuera de la instancia (null lo borra). */
+    fun ponerSpriteSuelto(sprite: Int, qoi: ByteArray?): Boolean = spriteSuelto(sprite, qoi) == 0
 
     /** Valida una config con el mismo núcleo del robot: null si está bien; si no, por qué. */
     fun validarConfig(json: String): String? = validar(json.toByteArray())

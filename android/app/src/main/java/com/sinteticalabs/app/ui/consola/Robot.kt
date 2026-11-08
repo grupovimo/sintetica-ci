@@ -50,6 +50,11 @@ import com.sinteticalabs.app.datos.ponerApodo
 import com.sinteticalabs.app.datos.quitar
 import com.sinteticalabs.app.datos.robot
 import com.sinteticalabs.app.datos.subirImagen
+import com.sinteticalabs.app.datos.sprites as listaSprites
+import com.sinteticalabs.app.datos.sprite
+import com.sinteticalabs.app.datos.subirSprite as subirSpriteApi
+import com.sinteticalabs.app.datos.borrarSprite as borrarSpriteApi
+import com.sinteticalabs.app.protocolo.escriturasDeImagen
 import com.sinteticalabs.app.nucleo.AnfitrionEnMemoria
 import com.sinteticalabs.app.nucleo.Nucleo
 import com.sinteticalabs.app.protocolo.Animacion
@@ -147,6 +152,87 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
         VidaBase.cargar(app)
     }
 
+    // --- Los sprites de las caras de imagen (0 a 11) ---
+
+    data class Sprite(val qoi: ByteArray, val crc: Long)
+    val sprites = MutableStateFlow<Map<Int, Sprite>>(emptyMap())
+    /** Qué CRC de cada sprite tiene la vista previa (para no mandarlo de nuevo). */
+    private val enviados = mutableMapOf<Int, Long>()
+
+    /** Trae los sprites (la nube o, de cerca, los que este celu les mandó) y los pone en la vista previa. */
+    fun cargarSprites() = viewModelScope.launch {
+        val lista = runCatching {
+            when (via) {
+                Via.NUBE -> api!!.listaSprites(idRobot)
+                else -> cliente!!.listarSprites()
+            }
+        }.getOrNull() ?: return@launch
+        val antes = sprites.value
+        val nuevos = mutableMapOf<Int, Sprite>()
+        for (e in lista) {
+            val ya = antes[e.espacio]
+            if (ya != null && ya.crc == e.crc) { nuevos[e.espacio] = ya; continue }
+            val qoi = runCatching {
+                when (via) {
+                    Via.NUBE -> api!!.sprite(idRobot, e.espacio)
+                    else -> cache.mandada(id, com.sinteticalabs.app.protocolo.PRIMER_SPRITE + e.espacio)?.takeIf { crc32(it) == e.crc }
+                }
+            }.getOrNull() ?: continue
+            nuevos[e.espacio] = Sprite(qoi, e.crc)
+        }
+        sprites.value = nuevos
+        ponerSprites()
+    }
+
+    /** Los sprites van al núcleo de la vista previa (espacios 8 a 19, como por BLE) y a los dibujos sueltos. */
+    private fun ponerSprites() {
+        val l = sprites.value
+        for ((n, sp) in l) {
+            Nucleo.ponerSpriteSuelto(n, sp.qoi)
+            if (via == Via.DEMO || enviados[n] == sp.crc) continue
+            for (w in escriturasDeImagen(com.sinteticalabs.app.protocolo.PRIMER_SPRITE + n, sp.qoi, 512)) Nucleo.bleEscribir(Car.IMAGEN.id, w)
+            enviados[n] = sp.crc
+        }
+        for (n in enviados.keys.toList()) if (n !in l) {
+            Nucleo.bleEscribir(Car.IMAGEN.id, com.sinteticalabs.app.protocolo.Imagen.borrar(com.sinteticalabs.app.protocolo.PRIMER_SPRITE + n))
+            enviados.remove(n)
+        }
+        for (n in 0 until com.sinteticalabs.app.protocolo.MAX_SPRITES) if (n !in l) Nucleo.ponerSpriteSuelto(n, null)
+        Miniaturas.vaciar()
+    }
+
+    /**
+     * Sube un sprite. Por la nube va tal cual (la API acepta SVG, PNG, JPEG, GIF
+     * o QOI); de cerca se prepara acá (hasta 128 × 128, con transparencia).
+     */
+    suspend fun subirSprite(n: Int, datos: ByteArray, tipo: String): String? = try {
+        when (via) {
+            Via.NUBE -> api!!.subirSpriteApi(idRobot, n, datos, tipo)
+            else -> {
+                if (tipo.contains("svg")) throw IllegalStateException("El SVG necesita la nube: subí un PNG.")
+                val qoi = withContext(Dispatchers.Default) { PrepararImagen.sprite(datos) }
+                cliente!!.subirImagen(com.sinteticalabs.app.protocolo.PRIMER_SPRITE + n, qoi)
+                cache.guardar(id, com.sinteticalabs.app.protocolo.PRIMER_SPRITE + n, qoi, qoi)
+            }
+        }
+        cargarSprites().join()
+        null
+    } catch (e: ErrorApi) {
+        e.message + if (e.detalle.isNotEmpty()) ": ${e.detalle}" else ""
+    } catch (e: Exception) {
+        e.message ?: "No pude subirla."
+    }
+
+    suspend fun borrarSprite(n: Int) {
+        runCatching {
+            when (via) {
+                Via.NUBE -> api!!.borrarSpriteApi(idRobot, n)
+                else -> cliente!!.borrarImagen(com.sinteticalabs.app.protocolo.PRIMER_SPRITE + n)
+            }
+        }
+        cache.borrar(id, com.sinteticalabs.app.protocolo.PRIMER_SPRITE + n)
+    }
+
     /** El motor de vida en vivo (la respuesta al comando Vida) y cuándo llegó. */
     val vida = MutableStateFlow<com.sinteticalabs.app.consola.VidaEnVivo?>(null)
     val vidaEn = MutableStateFlow(0L)
@@ -230,6 +316,7 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
                     recargarConfig()
                     escucharNube()
                     refrescarImagenes()
+                    cargarSprites()
                 }
                 Via.DEMO -> {
                     val broche = id == ID_DEMO_BROCHE
@@ -240,6 +327,7 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
                     escucharCliente(c, if (broche) "broche" else "", virtual = true, apodo = "")
                     config.value = leerObjeto(c.pedirConfig())
                     refrescarImagenes()
+                    cargarSprites()
                 }
                 Via.CERCA -> {
                     val v = Vinculados(getApplication()).buscar(id) ?: throw IllegalStateException("No está vinculado a este celu.")
@@ -253,6 +341,7 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
                     config.value = leerObjeto(c.pedirConfig())
                     aplicarEnVistaPrevia(config.value)
                     refrescarImagenes()
+                    cargarSprites()
                 }
             }
             api = api ?: cuenta.actual().takeIf { it.activa }?.let { cuenta.api(it) }
@@ -270,6 +359,8 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
         val p = modeloDe(r?.perfil.orEmpty(), r?.virtual ?: false, r?.estado).pantalla
         Nucleo.iniciar(p.ancho, p.alto, idRobot, anfitrion, redonda = p.redonda)
         Nucleo.vistaPrevia()
+        enviados.clear()
+        ponerSprites()
         aplicarEnVistaPrevia(config.value)
         fijado = null
         espejar(r?.estado?.expresion.orEmpty())
@@ -326,6 +417,7 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
                 "sincro" -> robot.value = r.copy(sincroConfig = e.datos.texto("config") ?: r.sincroConfig)
                 "config" -> if ((e.datos.numero("version")?.toInt() ?: 0) != versionConfig.value && pendiente == null) runCatching { recargarConfig() }
                 "imagenes" -> refrescarImagenes()
+                "sprites" -> cargarSprites()
                 "ota" -> ota.value = actualizacionDeEvento(e.datos)
                 "mcp" -> avisar(textoDeMcp(e.datos), ICONO_IA)
                 "marco" -> {

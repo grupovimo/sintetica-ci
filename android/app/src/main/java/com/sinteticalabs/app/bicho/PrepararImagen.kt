@@ -86,8 +86,40 @@ object PrepararImagen {
         return sani
     }
 
+    /**
+     * Un sprite de una cara de imagen: la imagen (PNG, JPEG, GIF: el primer
+     * cuadro) sin los márgenes transparentes, achicada a 128 × 128 como mucho
+     * y con su transparencia, en un QOI de 4 canales.
+     */
+    fun sprite(bytes: ByteArray): ByteArray {
+        val fuente = android.graphics.ImageDecoder.decodeBitmap(android.graphics.ImageDecoder.createSource(java.nio.ByteBuffer.wrap(bytes))) { d, _, _ ->
+            d.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
+        }.copy(Bitmap.Config.ARGB_8888, false)
+        val w = fuente.width
+        val h = fuente.height
+        val px = IntArray(w * h)
+        fuente.getPixels(px, 0, w, 0, 0, w, h)
+        var x0 = w; var y0 = h; var x1 = -1; var y1 = -1
+        for (y in 0 until h) for (x in 0 until w) if ((px[y * w + x] ushr 24) > 8) {
+            if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y
+        }
+        val recorte = if (x1 < 0) fuente else Bitmap.createBitmap(fuente, x0, y0, x1 - x0 + 1, y1 - y0 + 1)
+        val k = minOf(1f, 128f / maxOf(recorte.width, recorte.height))
+        val chico = Bitmap.createScaledBitmap(recorte, maxOf(1, Math.round(recorte.width * k)), maxOf(1, Math.round(recorte.height * k)), true)
+        val cw = chico.width
+        val ch = chico.height
+        val q = IntArray(cw * ch)
+        chico.getPixels(q, 0, cw, 0, 0, cw, ch)
+        val rgba = ByteArray(q.size * 4)
+        for (i in q.indices) {
+            rgba[i * 4] = (q[i] shr 16).toByte(); rgba[i * 4 + 1] = (q[i] shr 8).toByte()
+            rgba[i * 4 + 2] = q[i].toByte(); rgba[i * 4 + 3] = (q[i] ushr 24).toByte()
+        }
+        return Qoi.codificarRgba(rgba, cw, ch)
+    }
+
     /** Para las miniaturas: decodifica un QOI (o el primer cuadro de una animación) a Bitmap. */
-    fun decodificar(imagen: ByteArray): Bitmap? {
+    fun decodificar(imagen: ByteArray, alfa: Boolean = false): Bitmap? {
         val q = Animacion.cuadros(imagen).first().qoi
         if (q.size < 22 || q[0] != 'q'.code.toByte()) return null
         fun be(i: Int) = ((q[i].toInt() and 255) shl 24) or ((q[i + 1].toInt() and 255) shl 16) or ((q[i + 2].toInt() and 255) shl 8) or (q[i + 3].toInt() and 255)
@@ -111,7 +143,7 @@ object PrepararImagen {
                 }
                 ind[(r * 3 + g * 5 + b * 7 + a * 11) % 64] = (a shl 24) or (r shl 16) or (g shl 8) or b
             }
-            px[i] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+            px[i] = ((if (alfa) a else 0xFF) shl 24) or (r shl 16) or (g shl 8) or b
         }
         return Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888)
     }

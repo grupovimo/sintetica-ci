@@ -151,6 +151,29 @@ fun ModCara(vm: RobotViewModel) {
                 Perilla(Editar.tamano(c), "Tamaño", { v -> vm.cambiar { Editar.ponerTamano(it, v) } }, min = 0.5, max = 1.5, paso = 0.05, tamano = 70.dp, mostrar = porcentaje)
             }
         }
+        // Su cara de siempre: la de fábrica o una de imagen, con la miniatura de su ojo.
+        val deImagen = com.sinteticalabs.app.consola.CarasDeImagen.deImagen(c)
+        val siempre = com.sinteticalabs.app.consola.CarasDeImagen.siempre(c)
+        val sprites by vm.sprites.collectAsState()
+        if (deImagen.isNotEmpty() || siempre.isNotEmpty()) Bandeja {
+            Grabado("Su cara", color = C.sobrePlaca)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OpcionCara("De fábrica", siempre.isEmpty(), { vm.cambiar { com.sinteticalabs.app.consola.CarasDeImagen.ponerSiempre(it, "") } }) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        repeat(2) { Box(Modifier.width(10.dp).height(22.dp).clip(RoundedCornerShape(5.dp)).background(Color(android.graphics.Color.parseColor(color)))) }
+                    }
+                }
+                deImagen.keys.sorted().forEach { n ->
+                    val ojo = com.sinteticalabs.app.consola.CarasDeImagen.sprites(deImagen[n])["ojo"]?.let { sprites[it] }
+                    OpcionCara(n, siempre == n, { vm.cambiar { com.sinteticalabs.app.consola.CarasDeImagen.ponerSiempre(it, n) } }) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            SpriteImagen(ojo, Modifier.size(26.dp))
+                            SpriteImagen(ojo, Modifier.size(26.dp), espejo = true)
+                        }
+                    }
+                }
+            }
+        }
         Bandeja {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Grabado("Ponele una cara", color = C.sobrePlaca)
@@ -643,5 +666,19 @@ private fun DeCerca(vm: RobotViewModel) {
             Tecla("A mi cuenta", { vm.sumarACuenta() }, Modifier.weight(1f), acabado = Acabado.NARANJA, chica = true, habilitada = !ocupado && e?.redConfigurada == true)
         }
         mensaje?.let { AvisoLinea(it) }
+    }
+}
+
+
+/** Una opción de "Su cara": una muestra en una ventanita negra y su nombre. */
+@Composable
+private fun OpcionCara(nombre: String, elegida: Boolean, alTocar: () -> Unit, muestra: @Composable () -> Unit) {
+    Column(
+        Modifier.width(92.dp).clip(RoundedCornerShape(14.dp)).background(if (elegida) C.tinta else Color(0x241A1714))
+            .clickable(role = Role.RadioButton, onClick = alTocar).padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(Modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(10.dp)).background(Color.Black), contentAlignment = Alignment.Center) { muestra() }
+        Text(nombre.uppercase(), style = T.grabado.copy(fontSize = 9.sp), color = if (elegida) C.papel else C.tinta, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
