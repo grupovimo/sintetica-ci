@@ -352,9 +352,9 @@ jbyteArray JNI(globo)(JNIEnv* env, jobject) {
   env->SetByteArrayRegion(a, 0, n, reinterpret_cast<const jbyte*>(t));
   return a;
 }
-// La charla sin IA: "código\tintención\tacción\tfrase" en UTF-8 (código 1 entendió, 0 no, < 0 error).
+// La charla sin IA: "código\tintención\tacción\tfrase\tpregunta" en UTF-8 (código 1 entendió, 0 no, < 0 error).
 jbyteArray JNI(charlar)(JNIEnv* env, jobject, jbyteArray texto) {
-  std::string r = "-9\t\t\t";
+  std::string r = "-9\t\t\t\t0";
   if (g_listo) {
     g_env = env;
     const jsize n = env->GetArrayLength(texto);
@@ -362,7 +362,8 @@ jbyteArray JNI(charlar)(JNIEnv* env, jobject, jbyteArray texto) {
     env->GetByteArrayRegion(texto, 0, n, reinterpret_cast<jbyte*>(&t[0]));
     sintetica_charla c{};
     const int codigo = sintetica_charlar(t.data(), t.size(), &c);
-    r = std::to_string(codigo) + "\t" + c.intencion + "\t" + c.accion_nombre + "\t" + c.frase;
+    r = std::to_string(codigo) + "\t" + c.intencion + "\t" + c.accion_nombre + "\t" + c.frase + "\t" +
+        ((c.confirma || c.falta) ? "1" : "0");
   }
   jbyteArray a = env->NewByteArray(static_cast<jsize>(r.size()));
   env->SetByteArrayRegion(a, 0, static_cast<jsize>(r.size()), reinterpret_cast<const jbyte*>(r.data()));

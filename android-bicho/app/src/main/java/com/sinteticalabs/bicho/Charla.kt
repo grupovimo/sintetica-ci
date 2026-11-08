@@ -34,12 +34,12 @@ class Charla(
     private val charlar: (String) -> Respuesta?,
 ) {
     /** Lo que devuelve el núcleo: 1 entendió (ya contestó), 0 no entendió, < 0 error. */
-    class Respuesta(val codigo: Int, val intencion: String, val accion: String, val frase: String) {
+    class Respuesta(val codigo: Int, val intencion: String, val accion: String, val frase: String, val pregunta: Boolean = false) {
         companion object {
             fun leer(b: ByteArray): Respuesta? {
-                val p = String(b, Charsets.UTF_8).split('\t', limit = 4)
+                val p = String(b, Charsets.UTF_8).split('\t', limit = 5)
                 if (p.size < 4) return null
-                return Respuesta(p[0].toIntOrNull() ?: return null, p[1], p[2], p[3])
+                return Respuesta(p[0].toIntOrNull() ?: return null, p[1], p[2], p[3], p.getOrNull(4) == "1")
             }
         }
     }
@@ -130,7 +130,13 @@ class Charla(
                 atento = true
                 try {
                     val resto = conversar(antes)
-                    if (resto != null) frase(model, palabra, antes + resto)
+                    // Si preguntó ("¿Te pongo una alarma a las 6?"), el "sí" entra sin repetir la palabra.
+                    var pregunto = resto != null && frase(model, palabra, antes + resto)
+                    var vueltas = 0
+                    while (pregunto && vueltas++ < 3) {
+                        esperarQueTermineDeHablar()
+                        pregunto = frase(model, palabra, emptyList(), conPalabra = false)
+                    }
                 } finally {
                     atento = false
                 }
@@ -183,7 +189,16 @@ class Charla(
     }
 
     /** Escucha una frase (hasta 8 s, o hasta que se calla) con la cara de escuchar. */
-    private fun frase(model: Model, palabra: String, previo: List<ShortArray>) {
+    /** Hasta que el bicho termina de decir la pregunta (como mucho 10 s); lo que se oyó mientras, se tira. */
+    private fun esperarQueTermineDeHablar() {
+        val hasta = System.currentTimeMillis() + 10_000
+        Thread.sleep(300)
+        while (voz.ocupada() && System.currentTimeMillis() < hasta) Thread.sleep(100)
+        cola.clear()
+    }
+
+    /** Devuelve true si el motor quedó preguntando algo (hay que seguir escuchando). */
+    private fun frase(model: Model, palabra: String, previo: List<ShortArray>, conPalabra: Boolean = true): Boolean {
         Log.i("Bicho", "charla: escuchando")
         voz.sonar("escuchando")
         val r = Recognizer(model, TASA)
@@ -210,33 +225,35 @@ class Charla(
         } finally {
             r.close()
         }
-        val enviar = sinPalabra(partes.joinToString(" "), palabra)
+        val dicho = partes.joinToString(" ")
+        val enviar = if (conPalabra) sinPalabra(dicho, palabra) else String(Avisos.recortar(dicho.trim(), 200), Charsets.UTF_8)
         if (enviar.isEmpty()) {
             Log.i("Bicho", "charla: no entendí nada")
-            return
+            return false
         }
         // Primero el motor de charla del celu: sin red y al toque.
         val local = charlar(enviar)
         if (local?.codigo == 1) {
-            Log.i("Bicho", "charla: la entendí sin IA (${local.intencion}${if (local.accion.isNotEmpty()) ", " + local.accion else ""})")
-            return
+            Log.i("Bicho", "charla: la entendí sin IA (${local.intencion}${if (local.accion.isNotEmpty()) ", " + local.accion else ""}${if (local.pregunta) ", pregunta" else ""})")
+            return local.pregunta
         }
         if (local?.codigo == 0 && !enLinea()) {
             // Sin nube no hay a quién preguntarle: el "no entendí" del motor.
             Log.i("Bicho", "charla: no la entendí y no hay nube")
             if (local.frase.isNotEmpty()) alNucleo(byteArrayOf(0x40, 0) + local.frase.toByteArray())
-            return
+            return false
         }
         Log.i("Bicho", "charla: frase de ${enviar.length} letras a la nube")
         val mandada = android.os.SystemClock.elapsedRealtime()
         alPublicar("charla", JSONObject().put("texto", enviar).toString())
         // Si nadie contesta (sin nube, sin motor ni IA), no se queda mudo: duda.
         while (android.os.SystemClock.elapsedRealtime() - mandada < SIN_RESPUESTA_MS) {
-            if (voz.ultimoGloboEn > mandada) return
+            if (voz.ultimoGloboEn > mandada) return false
             Thread.sleep(200)
         }
         Log.i("Bicho", "charla: nadie contestó")
         alNucleo(byteArrayOf(0x1F) + "dudar".toByteArray())
+        return false
     }
 
     private fun cargar(): Model? {

@@ -30,5 +30,6 @@ class CharlaTest {
         assertEquals("¡Listo! A las 7.", r.frase)
         assertEquals(0, Charla.Respuesta.leer("0\t\t\tNo te entendí.".toByteArray())!!.codigo)
         assertEquals(null, Charla.Respuesta.leer("basura".toByteArray()))
+        assertEquals(true, Charla.Respuesta.leer("1\talarma\t\t¿Te pongo una alarma a las 6?\t1".toByteArray())!!.pregunta)
     }
 }
