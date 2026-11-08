@@ -384,7 +384,7 @@
           <i class="boton b1"></i><i class="boton b2"></i><i class="boton b3"></i>
           <div class="bisel"><div class="pantalla-tel" role="img" aria-label="La app: Mis robots">
             <span class="isla"></span>
-            <img class="captura" src="/landing/app-robots.jpg" alt="" loading="lazy" />
+            <img class="captura" src="/landing/app-robots.jpg?v=2" alt="" loading="lazy" />
             <span class="reflejo"></span>
           </div></div>
         </div>
@@ -392,7 +392,7 @@
           <i class="boton b1"></i><i class="boton b2"></i><i class="boton b3"></i>
           <div class="bisel"><div class="pantalla-tel" role="img" aria-label="La app: el carácter de tu robot">
             <span class="isla"></span>
-            <img class="captura" src="/landing/app-caracter.jpg" alt="" loading="lazy" />
+            <img class="captura" src="/landing/app-caracter.jpg?v=2" alt="" loading="lazy" />
             <span class="reflejo"></span>
           </div></div>
         </div>
@@ -400,7 +400,7 @@
           <i class="boton b1"></i><i class="boton b2"></i><i class="boton b3"></i>
           <div class="bisel"><div class="pantalla-tel" role="img" aria-label="La app: tu robot, en vivo">
             <span class="isla"></span>
-            <img class="captura" src="/landing/app-consola.jpg" alt="" loading="lazy" />
+            <img class="captura" src="/landing/app-consola.jpg?v=2" alt="" loading="lazy" />
             <span class="reflejo"></span>
           </div></div>
         </div>
