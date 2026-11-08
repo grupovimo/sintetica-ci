@@ -96,7 +96,7 @@
                 onchange={(e) => { const t = cortarBytes(e.currentTarget.value.trim(), MAX_NOMBRE_HABITO); if (t) poner(i, (x) => (x.nombre = t)); else e.currentTarget.value = h.nombre; }} />
             </label>
             <div class="racha visor" aria-label="Racha: {v?.racha ?? 0} días">
-              <span class="digitos chicos">{v?.racha ?? 0}</span><span class="grabado">días</span>
+              <span class="digitos chicos">{v?.racha ?? 0}</span><span class="grabado">{(v?.racha ?? 0) === 1 ? 'día' : 'días'}</span>
             </div>
           </div>
           <button class="tecla negra cuadrada chica-c" aria-label="Quitar {h.nombre}" onclick={() => quitar(i)}>✕</button>
