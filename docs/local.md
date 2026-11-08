@@ -1,6 +1,6 @@
 # Levantar SintéticaOS en tu Mac
 
-Todo corre en Docker: la API, la web, EMQX (el broker MQTT), Postgres, Mailpit
+Todo corre en Docker: la API (con el broker MQTT adentro), la web, Postgres, Mailpit
 (los mails) y dos bichos virtuales (una 1.47B y un broche). Nada sale de tu
 máquina.
 
@@ -28,7 +28,7 @@ WebAssembly). Cuando termina:
 | Los mails (los links para entrar) | http://localhost:8025 |
 | Bicho virtual (1.47B) | http://localhost:8090 |
 | Bicho virtual (broche) | http://localhost:8091 |
-| El panel de EMQX | http://localhost:18083 (admin / la clave de `EMQX_CLAVE_PANEL`, por defecto `sintetica`) |
+| El broker MQTT | tcp://localhost:1883 (y la IP de la Mac en la red de la casa, para las placas y el celu); para mirar: `mosquitto_sub -h localhost -u api -P cambiame-api -t 'bicho/#' -v` |
 | La API | http://localhost:8080 (`/salud` dice si anda) |
 
 El servicio `claves` genera, una sola vez, el par de claves de firma de las OTA
@@ -99,7 +99,7 @@ El broche no tiene WiFi: se maneja por BLE desde la app y sus OTA van por BLE
 docker compose logs -f api            # lo que pasa (los links de los mails también salen acá)
 docker compose up -d --build api web  # después de cambiar código
 docker compose down                   # apagar (los datos quedan)
-docker compose down -v                # apagar y borrar todo (cuentas, bichos, el broker)
+docker compose down -v                # apagar y borrar todo (cuentas, bichos)
 ```
 
 Si un puerto está ocupado en la Mac, cambialo en `docker-compose.yml` (el de
@@ -109,9 +109,9 @@ mirar (`psql postgres://sintetica:sintetica@localhost:5433/sintetica`).
 ## Fuera de Docker (para desarrollar)
 
 ```sh
-docker compose up -d postgres emqx mailpit claves bicho-virtual
-# La API (EMQX la tiene que ver en api:8081: para desarrollar afuera, poné en
-# emqx/emqx.conf host.docker.internal:8081 en lugar de api:8081)
+docker compose up -d postgres mailpit claves bicho-virtual
+# La API, con el broker MQTT adentro (en :1883: pará la del compose antes,
+# docker compose stop api)
 MQTT_CLAVE=cambiame-api DATABASE_URL=postgres://sintetica:sintetica@localhost:5433/sintetica?sslmode=disable \
   CLAVE_FIRMA=claves/ota-privada.pem DESARROLLO=1 go run ./api/cmd/sintetica-api
 # La web, con recarga en vivo

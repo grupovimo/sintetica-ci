@@ -1,84 +1,51 @@
 package servidor
 
 import (
+	"context"
 	"crypto/subtle"
-	"encoding/json"
-	"net/http"
 	"strings"
 
 	"sintetica/api/internal/protocolo"
 )
 
-// EMQX pregunta acá si deja conectar a un cliente (autenticación HTTP) y si
-// puede publicar o suscribirse a un tópico (autorización HTTP). Este puerto
-// solo se ve adentro de la red de Docker.
+// El broker MQTT (embebido en la API, internal/broker) pregunta acá si deja
+// conectar a un cliente y si puede publicar o suscribirse a un tópico.
 
-type pedidoEmqx struct {
-	Usuario  string `json:"username"`
-	Clave    string `json:"password"`
-	ClientID string `json:"clientid"`
-	Topico   string `json:"topic"`
-	Accion   string `json:"action"`
-}
-
-func respuestaEmqx(w http.ResponseWriter, permitir, superusuario bool) {
-	res := "deny"
-	if permitir {
-		res = "allow"
+// AutenticarMQTT: la API misma (el superusuario, que puede todo) o un bicho
+// con su clave (usuario = su id = el client id).
+func (s *Servidor) AutenticarMQTT(ctx context.Context, usuario, clave, clientID string) bool {
+	if usuario == s.op.MQTTUsuario {
+		return s.op.MQTTClave != "" && subtle.ConstantTimeCompare([]byte(clave), []byte(s.op.MQTTClave)) == 1
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"result": res, "is_superuser": superusuario}) //nolint:errcheck
-}
-
-func (s *Servidor) emqxAutenticar(w http.ResponseWriter, r *http.Request) {
-	var p pedidoEmqx
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&p); err != nil {
-		respuestaEmqx(w, false, false)
-		return
+	if !protocolo.IDValido(usuario) || clientID != usuario || clave == "" {
+		return false
 	}
-	// La API misma.
-	if p.Usuario == s.op.MQTTUsuario {
-		ok := s.op.MQTTClave != "" && subtle.ConstantTimeCompare([]byte(p.Clave), []byte(s.op.MQTTClave)) == 1
-		respuestaEmqx(w, ok, ok)
-		return
-	}
-	// Un bicho: usuario = su id = el client id.
-	if !protocolo.IDValido(p.Usuario) || p.ClientID != p.Usuario || p.Clave == "" {
-		respuestaEmqx(w, false, false)
-		return
-	}
-	acc, err := s.alm.UsarCredencial(r.Context(), p.Usuario, hash(p.Clave))
+	acc, err := s.alm.UsarCredencial(ctx, usuario, hash(clave))
 	if err != nil || !acc.Ok {
 		if err != nil {
-			s.log.Warn("autenticación de un bicho", "bicho", p.Usuario, "error", err)
+			s.log.Warn("autenticación de un bicho", "bicho", usuario, "error", err)
 		}
-		respuestaEmqx(w, false, false)
-		return
+		return false
 	}
 	if acc.Reclamado {
-		s.log.Info("bicho sumado a una cuenta", "bicho", p.Usuario)
-		s.nube.Reclamado(p.Usuario, acc)
+		s.log.Info("bicho sumado a una cuenta", "bicho", usuario)
+		s.nube.Reclamado(usuario, acc)
 	}
-	respuestaEmqx(w, true, false)
+	return true
 }
 
-// Cada bicho solo publica en sus tópicos y solo se suscribe a sus comandos.
-func (s *Servidor) emqxAutorizar(w http.ResponseWriter, r *http.Request) {
-	var p pedidoEmqx
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&p); err != nil || !protocolo.IDValido(p.Usuario) {
-		respuestaEmqx(w, false, false)
-		return
+// AutorizarMQTT: cada bicho solo publica en sus tópicos y solo se suscribe a
+// sus comandos (lo que no está acá, no: el no_match = deny de EMQX).
+func (s *Servidor) AutorizarMQTT(usuario, topico string, publicar bool) bool {
+	if !protocolo.IDValido(usuario) {
+		return false
 	}
-	base := "bicho/" + p.Usuario + "/"
-	ok := false
-	if strings.HasPrefix(p.Topico, base) {
-		resto := strings.TrimPrefix(p.Topico, base)
-		switch p.Accion {
-		case "publish":
-			ok = resto == "state" || resto == "resp" || resto == "conexion"
-		case "subscribe":
-			ok = resto == "cmd"
-		}
+	resto, ok := strings.CutPrefix(topico, "bicho/"+usuario+"/")
+	if !ok {
+		return false
 	}
-	respuestaEmqx(w, ok, false)
+	if publicar {
+		return resto == "state" || resto == "resp" || resto == "conexion"
+	}
+	return resto == "cmd"
 }

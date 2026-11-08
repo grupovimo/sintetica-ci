@@ -1,7 +1,7 @@
 // Package servidor es la API HTTP de SintéticaOS: cuentas con link mágico,
 // bichos (config, imágenes, comandos, estado en vivo), la biblioteca de caras
 // y animaciones, los firmwares, las integraciones (Telegram, automatizaciones,
-// webhooks) y los endpoints internos que usa EMQX.
+// webhooks) y la autenticación y autorización del broker MQTT (mqtt.go).
 package servidor
 
 import (
@@ -31,11 +31,11 @@ import (
 
 // Opciones de la API (salen del entorno: ver cmd/sintetica-api).
 type Opciones struct {
-	WebURL          string // para los links mágicos
-	MQTTURLPublica  string // la que se les da a los bichos
-	MQTTURLInterna  string // la que se le da al bicho virtual (adentro de Docker)
-	MQTTUsuario     string // el de la API en el broker
-	MQTTClave       string
+	WebURL          string   // para los links mágicos
+	MQTTURLPublica  string   // la que se les da a los bichos
+	MQTTURLInterna  string   // la que se le da al bicho virtual (adentro de Docker)
+	MQTTUsuario     string   // el superusuario del broker (para mirar de afuera)
+	MQTTClave       string   // "" = nadie entra como superusuario
 	Secreto         []byte   // firma los links de descarga de las OTA
 	Admins          []string // emails que pueden subir firmwares
 	Desarrollo      bool     // habilita sumar bichos virtuales y muestra los links en el log
@@ -160,15 +160,6 @@ func (s *Servidor) Rutas() http.Handler {
 	return s.envolver(m)
 }
 
-// RutasInternas son las que llama EMQX (no se publican fuera de Docker).
-func (s *Servidor) RutasInternas() http.Handler {
-	m := http.NewServeMux()
-	m.HandleFunc("POST /emqx/autenticar", s.emqxAutenticar)
-	m.HandleFunc("POST /emqx/autorizar", s.emqxAutorizar)
-	m.HandleFunc("GET /salud", s.salud)
-	return s.envolver(m)
-}
-
 // --- Middleware y ayudas ---
 
 type escritorConEstado struct {
@@ -192,7 +183,7 @@ func (s *Servidor) envolver(h http.Handler) http.Handler {
 				s.log.Error("pánico", "error", p, "pila", string(debug.Stack()))
 				http.Error(ew, `{"error":"error interno"}`, http.StatusInternalServerError)
 			}
-			if r.URL.Path != "/salud" && !strings.HasPrefix(r.URL.Path, "/emqx/") {
+			if r.URL.Path != "/salud" {
 				s.log.Info("http", "metodo", r.Method, "ruta", r.URL.Path, "estado", ew.estado, "ms", time.Since(inicio).Milliseconds())
 			}
 		}()

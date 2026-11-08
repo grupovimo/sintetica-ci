@@ -1,1 +1,0 @@
-sintetica:clave-local-de-la-api-de-emqx

@@ -19,7 +19,7 @@ RUN useradd --system --uid 10001 --home /nonexistent sintetica
 FROM base AS api
 COPY --from=compilar /out/sintetica-api /usr/local/bin/sintetica-api
 USER sintetica
-EXPOSE 8080 8081
+EXPOSE 8080 1883 8883
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s CMD ["sintetica-api", "salud"]
 ENTRYPOINT ["sintetica-api"]
 

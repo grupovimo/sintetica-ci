@@ -1,20 +1,22 @@
-# SintéticaOS en local: la API, la web, EMQX, Postgres, Mailpit y dos bichos
-# virtuales (una 1.47B y un broche). Ver docs/local.md.
+# SintéticaOS en local: la API (con el broker MQTT adentro), la web, Postgres,
+# Mailpit y dos bichos virtuales (una 1.47B y un broche). Ver docs/local.md.
 #
 #   cp .env.example .env    (y poné tu IP en IP_LOCAL para usar placas reales)
 #   docker compose up --build
 #
-# Web: http://localhost:5173 · Mails: http://localhost:8025 · EMQX: http://localhost:18083
+# Web: http://localhost:5173 · Mails: http://localhost:8025 · MQTT: tcp://localhost:1883
 # Bichos virtuales: http://localhost:8090 y http://localhost:8091
 name: sintetica
 
 x-api-entorno: &api-entorno
   DATABASE_URL: postgres://sintetica:${POSTGRES_CLAVE:-sintetica}@postgres:5432/sintetica?sslmode=disable
-  MQTT_URL: tcp://emqx:1883
   MQTT_USUARIO: api
   MQTT_CLAVE: ${MQTT_CLAVE_API:-cambiame-api}
   MQTT_URL_PUBLICA: mqtt://${IP_LOCAL:-localhost}:1883
-  MQTT_URL_INTERNA: mqtt://emqx:1883
+  MQTT_URL_INTERNA: mqtt://api:1883
+  # El broker MQTT embebido: tcp sin TLS (en local no hay 8883).
+  MQTT_TCP: ":1883"
+  MQTT_TCP_MAX: "64"
   API_URL_PUBLICA: http://${IP_LOCAL:-localhost}:8080
   API_URL_INTERNA: http://api:8080
   WEB_URL: http://${IP_WEB:-localhost}:5173
@@ -25,8 +27,6 @@ x-api-entorno: &api-entorno
   ADMIN_EMAILS: ${ADMIN_EMAILS:-}
   DESARROLLO: "1"
   BICHOS_VIRTUALES: http://bicho-virtual:8090,http://bicho-broche:8090
-  EMQX_API_URL: http://emqx:18083
-  EMQX_API_CLAVE: sintetica:clave-local-de-la-api-de-emqx
   # El bot de Telegram (sin token, las integraciones de Telegram quedan apagadas).
   TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
   TELEGRAM_BOT: ${TELEGRAM_BOT:-sinteticalabs_bot}
@@ -47,27 +47,6 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
-    restart: unless-stopped
-
-  emqx:
-    image: emqx/emqx:5.8.6
-    # En la Mac, Erlang se queda dando vueltas aunque no haya tráfico: con medio núcleo le sobra.
-    cpus: 0.5
-    environment:
-      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_CLAVE_PANEL:-sintetica}
-    volumes:
-      - ./emqx/emqx.conf:/opt/emqx/etc/emqx.conf:ro
-      - ./emqx/api-claves.txt:/opt/emqx/etc/api-claves.txt:ro
-      - emqx:/opt/emqx/data
-    ports:
-      - "1883:1883"
-      - "8083:8083"
-      - "127.0.0.1:18083:18083"
-    healthcheck:
-      test: ["CMD", "/opt/emqx/bin/emqx", "ctl", "status"]
-      interval: 5s
-      timeout: 5s
-      retries: 30
     restart: unless-stopped
 
   mailpit:
@@ -103,6 +82,8 @@ services:
       - claves-api:/claves:ro
     ports:
       - "8080:8080"
+      # El broker MQTT (los bichos virtuales, las placas y el celu de la red de la casa).
+      - "1883:1883"
     restart: unless-stopped
 
   web:
@@ -156,6 +137,5 @@ services:
 volumes:
   claves-api:
   postgres:
-  emqx:
   bicho-virtual:
   bicho-broche:

@@ -24,7 +24,7 @@ regla de oro: caras, animaciones y reglas son **datos**, nunca código.
 | App iOS | Swift + SwiftUI + CoreBluetooth | Nativa, nada de Expo |
 | App Android | Kotlin + Jetpack Compose | Nativa |
 | Web | Svelte + TypeScript | Editor de caras y animaciones en pantalla grande |
-| Backend | API en Go + Postgres + MQTT (Mosquitto o EMQX), en el VPS de Grupo Vimo | Cuentas, configuraciones, OTA firmada |
+| Backend | API en Go (con el broker MQTT embebido, Mochi) + Postgres, en el VPS de Grupo Vimo | Cuentas, configuraciones, OTA firmada |
 | IA | Clave de API del usuario + servidor MCP | Nosotros no pagamos el uso |
 
 ## Perfiles de hardware
@@ -77,7 +77,6 @@ sintetica/
   docs/            esta especificación
   api/             la API en Go y el bicho virtual
   web/             la web (SvelteKit)
-  emqx/            el broker MQTT
   ios/, android/   las apps nativas
 ```
 
@@ -137,8 +136,9 @@ se sube nada al VPS (ver [local.md](local.md) y [nube.md](nube.md)).
 
 - **Cuentas con link mágico** por email (y un código para tipear). En local
   los mails van a Mailpit.
-- **Broker EMQX**, que autentica y autoriza contra la API: cada bicho tiene su
-  propia clave y solo ve sus tópicos.
+- **Broker MQTT**, que autentica y autoriza contra la API: cada bicho tiene su
+  propia clave y solo ve sus tópicos. (Era EMQX; desde el 8/11/2026 es Mochi
+  MQTT embebido en la API, ver `docs/nube.md`, "El broker".)
 - **El bicho pasa a la cuenta cuando se conecta con la clave que le dio la app
   por BLE** (prueba de posesión). La app también le pasa el WiFi (comandos
   `0x16` y `0x17` del protocolo v1.3).

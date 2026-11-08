@@ -12,7 +12,8 @@ Hasta ahora (hitos M0 a M6 de `docs/especificacion.md`, más el motor de vida): 
 de caras, animaciones y reglas; el núcleo del firmware con WiFi, MQTT y OTA
 firmada; un simulador que corre el mismo núcleo en el navegador; las apps
 nativas; el broche; y la nube: una API en Go con cuentas por link mágico,
-EMQX, Postgres, la web con los editores y bichos virtuales, todo en Docker.
+el broker MQTT adentro, Postgres, la web con los editores y bichos virtuales,
+todo en Docker.
 
 **Para levantarlo en tu Mac: [docs/local.md](docs/local.md)** (`docker compose up --build`).
 
@@ -27,8 +28,7 @@ EMQX, Postgres, la web con los editores y bichos virtuales, todo en Docker.
 | `firmware/api/` | El núcleo detrás de una API en C, para las apps; `cgo/`, el mismo para Go |
 | `api/` | La API en Go (cuentas, bichos, MQTT, sincronización, OTA) y el bicho virtual; ver `docs/nube.md` |
 | `web/` | La web (SvelteKit): Mis bichos y los editores de caras, animaciones y reglas |
-| `emqx/` | La config del broker MQTT |
-| `docker-compose.yml` | Todo junto en local: API, web, EMQX, Postgres, Mailpit y dos bichos virtuales |
+| `docker-compose.yml` | Todo junto en local: API (con el broker MQTT), web, Postgres, Mailpit y dos bichos virtuales |
 | `shared/protocolo/` | Vectores de prueba del protocolo BLE, compartidos por todas las implementaciones |
 | `android/` | App de Android (Kotlin + Compose + NDK) |
 | `ios/` | App de iOS (SwiftUI + CoreBluetooth); ver `ios/README.md` |

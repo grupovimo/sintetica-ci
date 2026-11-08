@@ -264,7 +264,7 @@ func (s *Servidor) reclamarVirtual(w http.ResponseWriter, r *http.Request) {
 	sumado := s.nube.EsperarReclamo(ctx, qr.ID)
 	b, err := s.alm.BichoDe(r.Context(), qr.ID, usuarioDe(r).Usuario.ID)
 	if !sumado && err != nil {
-		fallar(w, http.StatusGatewayTimeout, "el bicho virtual no se conectó a la nube: ¿está andando EMQX?")
+		fallar(w, http.StatusGatewayTimeout, "el bicho virtual no se conectó a la nube (al broker MQTT de la API)")
 		return
 	}
 	responder(w, http.StatusOK, s.vista(r.Context(), b))

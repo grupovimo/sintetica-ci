@@ -101,6 +101,24 @@ func (a *Almacen) GuardarConexion(ctx context.Context, id string, conectado bool
 	return err
 }
 
+// BichosConectados son los que figuraban conectados (al arrancar la API).
+func (a *Almacen) BichosConectados(ctx context.Context) ([]string, error) {
+	filas, err := a.db.Query(ctx, `select id from bichos where conectado`)
+	if err != nil {
+		return nil, err
+	}
+	defer filas.Close()
+	var ids []string
+	for filas.Next() {
+		var id string
+		if err := filas.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, filas.Err()
+}
+
 // --- Credenciales ---
 
 // CrearCredencialPendiente guarda el hash de una clave nueva para el bicho.

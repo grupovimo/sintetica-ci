@@ -6,17 +6,24 @@
 # Puertos (Docker se saltea UFW: todo en 127.0.0.1 salvo el 8883):
 #   3600 web  → sintetica.grupovimo.com.ar      (Caddy + Cloudflare)
 #   4400 API  → api-sintetica.grupovimo.com.ar  (Caddy + Cloudflare)
-#   8883 MQTT con TLS → mqtt-sintetica.grupovimo.com.ar (sin Cloudflare)
-#   18083 panel de EMQX y 8025 Mailpit: solo por túnel SSH
+#   8883 MQTT con TLS (el broker está adentro de la API) →
+#        mqtt-sintetica.grupovimo.com.ar (sin Cloudflare)
+#   8025 Mailpit: solo por túnel SSH
 name: sintetica
 
 x-api-entorno: &api-entorno
   DATABASE_URL: postgres://sintetica:${POSTGRES_CLAVE:?falta POSTGRES_CLAVE}@postgres:5432/sintetica?sslmode=disable
-  MQTT_URL: tcp://emqx:1883
   MQTT_USUARIO: api
   MQTT_CLAVE: ${MQTT_CLAVE_API:?falta MQTT_CLAVE_API}
   MQTT_URL_PUBLICA: mqtts://mqtt-sintetica.grupovimo.com.ar:8883
-  MQTT_URL_INTERNA: mqtt://emqx:1883
+  # El broker MQTT embebido: los bichos por TLS; el 1883 sin TLS queda solo
+  # adentro del contenedor (para mirar con docker compose exec).
+  MQTT_TLS: ":8883"
+  MQTT_TLS_MAX: "2000"
+  MQTT_TLS_CERT: /certs/mqtt.crt
+  MQTT_TLS_CLAVE: /certs/mqtt.key
+  MQTT_TCP: 127.0.0.1:1883
+  MQTT_TCP_MAX: "64"
   API_URL_PUBLICA: https://api-sintetica.grupovimo.com.ar
   API_URL_INTERNA: http://api:8080
   WEB_URL: https://sintetica.grupovimo.com.ar
@@ -28,8 +35,6 @@ x-api-entorno: &api-entorno
   ADMIN_EMAILS: ${ADMIN_EMAILS:-}
   COOKIE_SEGURA: "1"
   DESARROLLO: "0"
-  EMQX_API_URL: http://emqx:18083
-  EMQX_API_CLAVE: ${EMQX_API_CLAVE:?falta EMQX_API_CLAVE}
   # El bot de Telegram (sin token, las integraciones de Telegram quedan apagadas).
   TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
   TELEGRAM_BOT: ${TELEGRAM_BOT:-sinteticalabs_bot}
@@ -52,27 +57,6 @@ services:
     mem_limit: 256m
     restart: unless-stopped
 
-  emqx:
-    image: emqx/emqx:5.8.6
-    environment:
-      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_CLAVE_PANEL:?falta EMQX_CLAVE_PANEL}
-      EMQX_NODE__COOKIE: ${EMQX_COOKIE:?falta EMQX_COOKIE}
-    volumes:
-      - ./emqx.conf:/opt/emqx/etc/emqx.conf:ro
-      - ./secretos/emqx-api-claves.txt:/opt/emqx/etc/api-claves.txt:ro
-      - ./certs:/opt/emqx/etc/certs/sintetica:ro
-      - ./emqx-datos:/opt/emqx/data
-    ports:
-      - "8883:8883"
-      - "127.0.0.1:18083:18083"
-    healthcheck:
-      test: ["CMD", "/opt/emqx/bin/emqx", "ctl", "status"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-    mem_limit: 448m
-    restart: unless-stopped
-
   mailpit:
     image: axllent/mailpit:v1.21.8
     environment:
@@ -87,14 +71,17 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      emqx:
-        condition: service_healthy
     environment: *api-entorno
     volumes:
       - ./claves:/claves:ro
+      # El certificado de MQTT (lo renueva el timer sintetica-cert): la API lo
+      # relee sola cuando cambia, sin reiniciar.
+      - ./certs:/certs:ro
     ports:
       - "127.0.0.1:4400:8080"
-    mem_limit: 192m
+      - "8883:8883"
+    # 192m de antes + el broker (2000 bichos ≈ 20–40 MB).
+    mem_limit: 256m
     restart: unless-stopped
 
   web:

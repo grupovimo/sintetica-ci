@@ -38,8 +38,11 @@ en `docs/motor-de-vida.md` (cómo está hecho) y
   de `npm run test:nucleo` o `cmake --build build/nucleo`).
 - `node shared/protocolo/generar_vectores.mjs`: regenerar los vectores del
   protocolo después de tocar `sim/web/protocolo.js`.
-- La nube: `docker compose up --build` (ver `docs/local.md`);
-  `go test ./api/... ./firmware/api/cgo/`; `go test -tags e2e ./api/e2e/`.
+- La nube: `docker compose up --build` (ver `docs/local.md`; la web corre con
+  Vite en :5173, así que en la Mac `docker compose up -d --build --wait api
+  bicho-virtual bicho-broche`); `SINTETICA_PRUEBAS_DB=postgres://sintetica:sintetica@localhost:5433/pruebas
+  go test -p 1 ./api/... ./firmware/api/cgo/`; `go test -tags e2e -count=1 ./api/e2e/`
+  (con `ADMIN_EMAILS=@ejemplo.com` en el compose para la parte de la OTA).
 - La web: `cd web && npm run check && npm run build`.
 - Android: `cd android && ./gradlew testDebugUnitTest`.
 - iOS a TestFlight: `sh herramientas/publicar-ios.sh` (publica HEAD en `grupovimo/sintetica-ios`; compila Actions).
@@ -55,6 +58,7 @@ Rama de trabajo: `claude/pensive-tesla-8fe2fg` (sin PR).
   - **Núcleo**: recordatorios (se muestran a la hora; aviso 0x9E por BLE y nube), modo reloj y pomodoro, protector de pantalla, voz (solo config). Eventos 31 `recordatorio` y 32 `pomodoro`.
   - **Nube**: bot oficial de Telegram (@sinteticalabs_bot, token en `.env`, nunca en el repo), automatizaciones (cuando X → Telegram / webhook firmado / otro robot), y un **servidor MCP con OAuth** en `/mcp` para que cada uno conecte su Claude o ChatGPT (17 herramientas; ver `docs/nube.md`).
   - **iOS**: compila y sube a TestFlight desde `grupovimo/sintetica-ios` (`herramientas/publicar-ios.sh`); nunca en la Mac.
+  - **Broker MQTT embebido** (reemplaza a EMQX): Mochi MQTT adentro de la API (`api/internal/broker`), auth y ACL por ganchos con la lógica de `servidor/mqtt.go`, tcp :1883 (local) y TLS :8883 (producción, el certificado se relee solo). Ver `docs/nube.md`, "El broker", y en `produccion/README.md` los pasos para pasar el VPS.
 - **Sin verificar**: placas reales; claude.ai/ChatGPT conectados de verdad (necesitan la nube con HTTPS público).
 - **Lo próximo posible**: caras de imagen (sprites que el motor anima), apps iOS y Android con la consola, subir la nube al VPS de Grupo Vimo.
 
@@ -74,5 +78,8 @@ Rama de trabajo: `claude/pensive-tesla-8fe2fg` (sin PR).
   2 s: los tests que simulan días avanzan de a 10 s.
 - Los nombres del JSON son ASCII (`grunon`, `guino`, `bateria-baja`); los
   textos para el usuario, con tildes.
+- El broker vive y muere con la API: cada reinicio de la API reconecta a todos
+  los bichos (en ~5 s). Mochi tiene una carrera interna entre un retenido nuevo
+  y una suscripción con comodines (la ve `-race`): los bichos no usan comodines.
 - `.sandbox/` (excluido por `.git/info/exclude`) tiene Dockerfiles con el
   certificado del proxy de la sesión en la nube; en la Mac no hace falta.

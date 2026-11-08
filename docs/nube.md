@@ -7,18 +7,18 @@ Cómo se conectan los bichos, las apps y la web. Para levantarlo en local, ver
 ```
             BLE (cerca)                         HTTP + SSE
   App ───────────────────► Bicho          Web / App ◄──────────► API (Go) ◄──► Postgres
-   │                        │  ▲                                   │  ▲
-   │  POST /v1/bichos/      │  │ MQTT (bicho/{id}/…)               │  │ HTTP (autenticar y autorizar)
-   └──── reclamar ────► API │  └──────────────► EMQX ◄─────────────┘  │
-                            └──────────────────►  │  ─────────────────┘
+   │                        │  ▲                                ┌──────────┐
+   │  POST /v1/bichos/      │  │ MQTT (bicho/{id}/…)            │  broker  │ (Mochi, en el
+   └──── reclamar ────► API │  └──────────────────────────────► │  MQTT    │  mismo proceso)
+                            └───────────────────────────────►   └──────────┘
 ```
 
 ## Piezas
 
 | Pieza | Dónde | Qué hace |
 | --- | --- | --- |
-| API | `api/` (Go) | Cuentas, bichos, configs, imágenes, biblioteca, firmwares; habla con los bichos por MQTT y con EMQX por HTTP |
-| EMQX | `emqx/emqx.conf` | El broker. No guarda usuarios: le pregunta a la API |
+| API | `api/` (Go) | Cuentas, bichos, configs, imágenes, biblioteca, firmwares; habla con los bichos por MQTT |
+| Broker MQTT | `api/internal/broker` | Mochi MQTT embebido en la API: tcp (:1883) y TLS (:8883). No guarda usuarios: le pregunta a la API, en el mismo proceso |
 | Postgres | `api/internal/almacen/migraciones` | Todo lo que se guarda (las migraciones se aplican solas al arrancar) |
 | Web | `web/` (SvelteKit) | Mis bichos, editores de caras, animaciones y reglas; su servidor hace de proxy a la API |
 | Bicho virtual | `api/cmd/bicho-virtual` | El núcleo entero en un contenedor, con MQTT y OTA (para probar sin placa) |
@@ -45,8 +45,8 @@ Cómo se conectan los bichos, las apps y la web. Para levantarlo en local, ver
    leyó el QR y tiene su clave).
 2. `POST /v1/bichos/reclamar {id, perfil}` → la API crea una **credencial
    pendiente** (vence en 30 min) y devuelve `{url, usuario: id, clave}`.
-3. La app se la pasa al bicho por BLE (comando `0x17`). El bicho se conecta a
-   EMQX con esa clave; EMQX le pregunta a la API; la API ve que es la pendiente
+3. La app se la pasa al bicho por BLE (comando `0x17`). El bicho se conecta al
+   broker con esa clave; el broker le pregunta a la API; la API ve que es la pendiente
    y **recién ahí** el bicho pasa a la cuenta. Si era de otra cuenta, se le
    revocan las claves viejas y se borran los datos del dueño anterior: tener el
    bicho en la mano gana.
@@ -62,13 +62,56 @@ nube, revoca sus claves y lo echa del broker.
 | `bicho/{id}/cmd` | la API | `[característica][marco]`, los mismos bytes que por BLE (QoS 1) |
 | `bicho/{id}/resp` | el bicho | `[característica][respuesta]` (QoS 0) |
 | `bicho/{id}/state` | el bicho | el estado v4, retenido (QoS 1) |
-| `bicho/{id}/conexion` | el bicho | `1` al conectarse; `0` es su testamento (retenido) |
+| `bicho/{id}/conexion` | el bicho | `1` al conectarse; `0` es su testamento (retenido); el broker también publica el `0` cuando se va con DISCONNECT o lo echan |
 
 Cada bicho entra con usuario = client id = su id y su clave; solo puede
-publicar en sus tres tópicos y suscribirse a su `cmd` (ACL en
-`/emqx/autorizar`). La API entra como superusuario (`MQTT_USUARIO`/`MQTT_CLAVE`).
-Los endpoints de EMQX (`/emqx/*`) escuchan en otro puerto (8081) que no se
-publica fuera de Docker.
+publicar en sus tres tópicos y suscribirse a su `cmd`
+(`servidor.AutorizarMQTT`; lo que no está, no). La API publica y se suscribe
+en el mismo proceso; `MQTT_USUARIO`/`MQTT_CLAVE` es un superusuario para mirar
+de afuera (`mosquitto_sub -u api -P … -t 'bicho/#'`).
+
+### El broker
+
+[Mochi MQTT](https://github.com/mochi-mqtt/server) embebido en la API
+(`api/internal/broker`). Antes era EMQX aparte; se cambió porque Erlang comía
+un núcleo y medio sin tráfico en la Mac y 384–512 MB en el VPS. Lo que hacía
+EMQX y cómo se hace ahora:
+
+- **MQTT 3.1.1 y 5**, QoS 0, 1 y 2, retenidos, keepalive, sesiones limpias y
+  persistentes (las persistentes se borran a las 2 h sin volver, como el
+  `session_expiry_interval` de EMQX), paquetes de hasta **1 MB**.
+- **Autenticación y autorización**: ganchos de Mochi que llaman a
+  `servidor.AutenticarMQTT` y `servidor.AutorizarMQTT` (la misma lógica que
+  tenían `/emqx/autenticar` y `/emqx/autorizar`, sin HTTP). Autenticar tiene 5 s
+  (el `request_timeout` de EMQX). La autorización no tiene caché (la de EMQX
+  era de 1 min): es comparar textos. Publicar donde no se puede se ignora con
+  su PUBACK (el `deny_action = ignore`); suscribirse, SUBACK `0x80`. La última
+  voluntad de un bicho también se revisa (no puede ser en el tópico de otro).
+- **Puertos**: `MQTT_TCP` (sin TLS, `:1883`; en producción solo
+  `127.0.0.1` adentro del contenedor) con tope `MQTT_TCP_MAX` (64) y
+  `MQTT_TLS` (`:8883`, TLS 1.2 y 1.3) con tope `MQTT_TLS_MAX` (2000). Pasado el
+  tope, la conexión se corta en el acto; el que no manda su CONNECT en 15 s,
+  también.
+- **El certificado** (`MQTT_TLS_CERT`, `MQTT_TLS_CLAVE`) se relee solo: en
+  cada handshake se mira la fecha y el tamaño de los archivos y, si cambiaron,
+  se vuelve a cargar (si el nuevo está roto, sigue el anterior). Renovarlo no
+  necesita reiniciar nada.
+- **Echar a un bicho** (cuando sale de la cuenta) es una llamada directa al
+  broker (antes, la API REST de EMQX).
+- **El estado de conexión**: el broker publica el `0` retenido de un bicho
+  apenas se va, aunque sea con DISCONNECT (sin testamento) o echado; si el
+  bicho se reconecta antes de que se note el corte (misma client id), la
+  sesión vieja no avisa nada (su `0` llegaría después del `1` nuevo).
+- **Sin persistencia**: el broker arranca y se apaga con la API, así que los
+  bichos se reconectan solos en cada reinicio (reintentan cada 5 s) y vuelven
+  a publicar su `conexion` y su `state` retenidos; un retenido de antes del
+  reinicio estaría viejo. Las colas de QoS 1 no hacen falta: la API solo manda
+  comandos a bichos conectados. Al arrancar, la API anota quiénes figuraban
+  conectados: su vuelta en el primer minuto no dispara la automatización
+  "conectado", y los que no vuelven pasan a desconectados (lo que antes
+  hacía el `0` retenido de EMQX). Al apagarse, la API no anota desconexiones.
+- Lo que no está: el panel de EMQX (para mirar, el superusuario de arriba), el
+  cluster y el WebSocket (`:8083`, que no usaba nadie).
 
 ## Sincronización
 
@@ -487,9 +530,12 @@ SVG) y el prompt `inventar_cara`.
 | Variable | Para qué | En local |
 | --- | --- | --- |
 | `DATABASE_URL` | Postgres | el del compose |
-| `MQTT_URL`, `MQTT_USUARIO`, `MQTT_CLAVE` | la conexión de la API al broker | `tcp://emqx:1883`, `api`, `MQTT_CLAVE_API` |
+| `MQTT_USUARIO`, `MQTT_CLAVE` | el superusuario del broker (vacío = nadie) | `api`, `MQTT_CLAVE_API` |
+| `MQTT_TCP`, `MQTT_TCP_MAX` | el puerto MQTT sin TLS (`no` = apagado) y su tope de conexiones | `:1883`, `64` |
+| `MQTT_TLS`, `MQTT_TLS_MAX` | el puerto MQTT con TLS (vacío = apagado) y su tope | vacío, `2000` |
+| `MQTT_TLS_CERT`, `MQTT_TLS_CLAVE` | el certificado y la clave (PEM) del TLS; se releen solos | vacío |
 | `MQTT_URL_PUBLICA` | la que se les da a los bichos | `mqtt://IP_LOCAL:1883` |
-| `MQTT_URL_INTERNA` | la que se le da al bicho virtual | `mqtt://emqx:1883` |
+| `MQTT_URL_INTERNA` | la que se le da al bicho virtual | `mqtt://api:1883` |
 | `API_URL_PUBLICA`, `API_URL_INTERNA` | de dónde bajan las OTA (placa y virtual); la pública es también el issuer de OAuth y la base del MCP (`/mcp`) | `http://IP_LOCAL:8080`, `http://api:8080` |
 | `WEB_URL` | para los links de los mails | `http://localhost:5173` |
 | `SMTP_SERVIDOR`, `SMTP_USUARIO`, `SMTP_CLAVE`, `SMTP_DE` | el correo | Mailpit, sin usuario |
@@ -498,7 +544,6 @@ SVG) y el prompt `inventar_cara`.
 | `ADMIN_EMAILS` | quién sube firmwares | vacío |
 | `DESARROLLO` | bichos virtuales y los links en el log | `1` |
 | `BICHOS_VIRTUALES` | dónde están los virtuales | los dos del compose |
-| `EMQX_API_URL`, `EMQX_API_CLAVE` | para echar a un bicho | `http://emqx:18083`, la de `emqx/api-claves.txt` |
 | `COOKIE_SEGURA` | cookie solo por HTTPS | `0` |
 | `TELEGRAM_TOKEN` | el token del bot (de @BotFather); vacío = Telegram apagado | el de `.env` (nunca en el repo) |
 | `TELEGRAM_BOT` | el usuario del bot, sin `@` | `sinteticalabs_bot` |
@@ -511,10 +556,10 @@ Esto está pensado para correr en local. Para producción falta (y está
 anotado acá a propósito):
 
 - **TLS** en todo: la web y la API detrás de un proxy con HTTPS
-  (`COOKIE_SEGURA=1`), y MQTT por `mqtts://` (EMQX con su certificado; el
-  firmware ya acepta `mqtts://` con los certificados raíz de ESP-IDF).
-- Cambiar **todas** las claves: `MQTT_CLAVE_API`, `SECRETO`, la de Postgres,
-  el panel de EMQX y la de su API REST (`emqx/api-claves.txt`).
+  (`COOKIE_SEGURA=1`), y MQTT por `mqtts://` (el broker de la API con su
+  certificado en `MQTT_TLS_CERT`; el firmware ya acepta `mqtts://` con los
+  certificados raíz de ESP-IDF).
+- Cambiar **todas** las claves: `MQTT_CLAVE_API`, `SECRETO` y la de Postgres.
 - Un SMTP de verdad (con SPF y DKIM para el dominio).
 - Guardar `claves/ota-privada.pem` fuera del servidor de la web, con copia
   segura: perderla obliga a reflashear por USB todos los bichos.

@@ -9,12 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
-
-	mqtt "github.com/eclipse/paho.mqtt.golang"
 
 	"sintetica/api/internal/almacen"
 	"sintetica/api/internal/eventos"
@@ -24,11 +22,19 @@ import (
 // ErrDesconectado: el bicho no está conectado a la nube.
 var ErrDesconectado = errors.New("el bicho no está conectado a la nube")
 
-// Opciones de la conexión al broker.
+// Broker es el broker MQTT, embebido en la API (internal/broker): la nube
+// publica y se suscribe en el mismo proceso, sin red.
+type Broker interface {
+	Publicar(topico string, datos []byte, retener bool, qos byte) error
+	// Suscribir: f se llama en la goroutine del que publicó (no puede bloquear).
+	Suscribir(filtro string, f func(topico string, datos []byte)) error
+	// Expulsar desconecta a un cliente.
+	Expulsar(clientID string) bool
+}
+
+// Opciones de la nube.
 type Opciones struct {
-	URL, Usuario, Clave string
-	// La API REST de EMQX, para echar a un bicho cuando se le revoca la clave.
-	EmqxURL, EmqxClave string // clave = "id:secreto"
+	Broker Broker
 	// La URL de la API que ve cada bicho, para bajar las OTA.
 	URLPublica, URLInterna string
 	// Firma los links de descarga de las OTA.
@@ -37,14 +43,18 @@ type Opciones struct {
 
 // Nube es la conexión al broker y un trabajador por bicho.
 type Nube struct {
-	op     Opciones
-	alm    *almacen.Almacen
-	hub    *eventos.Hub
-	log    *slog.Logger
-	cli    mqtt.Client
-	mu     sync.Mutex
-	bichos map[string]*trabajador
-	duenos sync.Map // id → usuario ("" = sin dueño)
+	op    Opciones
+	alm   *almacen.Almacen
+	hub   *eventos.Hub
+	log   *slog.Logger
+	listo atomic.Bool // suscripta al broker
+	// Los que figuraban conectados cuando arrancó la API: el broker arranca
+	// con ella, así que se reconectan todos; esa reconexión no es "conectado".
+	arranque     time.Time
+	yaConectados sync.Map // id → true
+	mu           sync.Mutex
+	bichos       map[string]*trabajador
+	duenos       sync.Map // id → usuario ("" = sin dueño)
 
 	esperasMu sync.Mutex
 	esperas   map[string][]chan struct{}
@@ -84,68 +94,58 @@ func Nuevo(op Opciones, alm *almacen.Almacen, hub *eventos.Hub, log *slog.Logger
 	return &Nube{op: op, alm: alm, hub: hub, log: log, bichos: map[string]*trabajador{}, esperas: map[string][]chan struct{}{}, ctx: ctx, cancelar: cancelar}
 }
 
-// Conectar se conecta al broker (y se reconecta solo).
+// Conectar suscribe la nube a lo de los bichos (antes de que el broker
+// acepte clientes: así no se pierde ningún mensaje).
 func (n *Nube) Conectar() error {
-	o := mqtt.NewClientOptions().AddBroker(n.op.URL).SetClientID(fmt.Sprintf("sintetica-api-%d", time.Now().UnixNano()%100000)).
-		SetUsername(n.op.Usuario).SetPassword(n.op.Clave).SetAutoReconnect(true).SetConnectRetry(true).
-		SetConnectRetryInterval(2 * time.Second).SetMaxReconnectInterval(10 * time.Second).SetKeepAlive(30 * time.Second).
-		SetCleanSession(true).SetOrderMatters(true)
-	o.SetOnConnectHandler(func(c mqtt.Client) {
-		n.log.Info("conectado al broker", "url", n.op.URL)
-		go n.suscribir(c)
-	})
-	o.SetConnectionLostHandler(func(_ mqtt.Client, err error) { n.log.Warn("se cortó el broker", "error", err) })
-	n.cli = mqtt.NewClient(o)
-	tk := n.cli.Connect()
-	// Con ConnectRetry el token vuelve enseguida y sigue intentando atrás.
-	if tk.WaitTimeout(15*time.Second) && tk.Error() != nil {
-		return tk.Error()
+	if n.op.Broker == nil {
+		return errors.New("la nube no tiene broker")
 	}
+	ids, err := n.alm.BichosConectados(n.ctx)
+	if err != nil {
+		n.log.Warn("no sé quiénes estaban conectados", "error", err)
+	}
+	for _, id := range ids {
+		n.yaConectados.Store(id, true)
+	}
+	n.arranque = time.Now()
+	for _, t := range []string{"bicho/+/state", "bicho/+/resp", "bicho/+/conexion"} {
+		if err := n.op.Broker.Suscribir(t, n.alLlegar); err != nil {
+			return fmt.Errorf("suscribirse a %s: %w", t, err)
+		}
+	}
+	n.listo.Store(true)
 	go n.limpieza()
+	go n.olvidarAusentes()
 	return nil
 }
 
-// suscribir se suscribe a lo de los bichos. Si EMQX la rechaza (por ejemplo,
-// porque al arrancar todavía no le podía preguntar a la API si la deja),
-// reintenta: sin estas suscripciones la API no ve a ningún bicho.
-func (n *Nube) suscribir(c mqtt.Client) {
-	for {
-		rechazadas := 0
-		for _, t := range []string{"bicho/+/state", "bicho/+/resp", "bicho/+/conexion"} {
-			tk := c.Subscribe(t, 1, n.alLlegar)
-			ok := tk.WaitTimeout(10*time.Second) && tk.Error() == nil
-			if st, es := tk.(*mqtt.SubscribeToken); ok && es && st.Result()[t] == 0x80 {
-				ok = false // el SUBACK dice que no
-			}
-			if !ok {
-				rechazadas++
-				n.log.Warn("no me pude suscribir (reintento)", "topico", t, "error", tk.Error())
-			}
-		}
-		if rechazadas == 0 {
-			return
-		}
-		select {
-		case <-n.ctx.Done():
-			return
-		case <-time.After(2 * time.Second):
-		}
-		if !c.IsConnectionOpen() {
-			return // al reconectar se vuelve a llamar
-		}
+// graciaReinicio: lo que tardan en volver los bichos después de un reinicio
+// de la API (reintentan cada 5 s).
+const graciaReinicio = time.Minute
+
+// olvidarAusentes: los que estaban conectados y no volvieron, no lo están
+// (lo que antes decía el "0" retenido que guardaba EMQX).
+func (n *Nube) olvidarAusentes() {
+	select {
+	case <-n.ctx.Done():
+		return
+	case <-time.After(graciaReinicio):
 	}
+	n.yaConectados.Range(func(k, _ any) bool {
+		if _, ok := n.yaConectados.LoadAndDelete(k); ok && !n.Conectado(k.(string)) {
+			if err := n.alm.GuardarConexion(n.ctx, k.(string), false); err != nil {
+				n.log.Warn("no pude guardar la conexión", "bicho", k, "error", err)
+			}
+		}
+		return true
+	})
 }
 
-// Cerrar se desconecta.
-func (n *Nube) Cerrar() {
-	n.cancelar()
-	if n.cli != nil {
-		n.cli.Disconnect(500)
-	}
-}
+// Cerrar para a los que trabajan atrás (el broker lo cierra quien lo armó).
+func (n *Nube) Cerrar() { n.cancelar() }
 
-// BrokerConectado dice si la API está conectada al broker.
-func (n *Nube) BrokerConectado() bool { return n.cli != nil && n.cli.IsConnectionOpen() }
+// BrokerConectado dice si la nube está suscripta al broker.
+func (n *Nube) BrokerConectado() bool { return n.listo.Load() }
 
 func (n *Nube) limpieza() {
 	t := time.NewTicker(time.Hour)
@@ -162,21 +162,26 @@ func (n *Nube) limpieza() {
 	}
 }
 
-func (n *Nube) alLlegar(_ mqtt.Client, m mqtt.Message) {
-	partes := strings.Split(m.Topic(), "/")
+func (n *Nube) alLlegar(topico string, datos []byte) {
+	partes := strings.Split(topico, "/")
 	if len(partes) != 3 || partes[0] != "bicho" || !protocolo.IDValido(partes[1]) {
 		return
 	}
 	t := n.trabajador(partes[1])
-	d := append([]byte(nil), m.Payload()...)
+	d := append([]byte(nil), datos...)
 	var e entrada
 	switch partes[2] {
 	case "state":
 		e = entrada{tipo: entEstado, datos: d}
 	case "conexion":
-		// Retenido = lo que ya estaba cuando la API se suscribió (al arrancar):
-		// no es que se acabe de conectar.
-		e = entrada{tipo: entConexion, conectado: string(d) == "1", retenido: m.Retained()}
+		// El broker arranca con la API y la API se suscribe antes de que entre
+		// nadie: no hay retenidos de antes. Cuenta como retenido (no se avisa
+		// a las automatizaciones) la vuelta de uno que ya estaba conectado
+		// antes de reiniciar la API.
+		e = entrada{tipo: entConexion, conectado: string(d) == "1"}
+		if e.conectado && time.Since(n.arranque) < graciaReinicio {
+			_, e.retenido = n.yaConectados.LoadAndDelete(partes[1])
+		}
 	case "resp":
 		if len(d) < 2 {
 			return
@@ -227,14 +232,10 @@ func (n *Nube) publicar(id string, e eventos.Evento) {
 
 // enviar publica un marco al bicho (QoS 1).
 func (n *Nube) enviar(id string, car byte, marco []byte) error {
-	if n.cli == nil || !n.cli.IsConnectionOpen() {
+	if !n.listo.Load() {
 		return errors.New("la API no está conectada al broker")
 	}
-	tk := n.cli.Publish("bicho/"+id+"/cmd", 1, false, append([]byte{car}, marco...))
-	if !tk.WaitTimeout(10 * time.Second) {
-		return errors.New("el broker no confirmó")
-	}
-	return tk.Error()
+	return n.op.Broker.Publicar("bicho/"+id+"/cmd", append([]byte{car}, marco...), false, 1)
 }
 
 // --- Para el servidor HTTP ---
@@ -331,24 +332,10 @@ func (n *Nube) EsperarReclamo(ctx context.Context, id string) bool {
 	}
 }
 
-// Expulsar desconecta al bicho del broker (por la API REST de EMQX).
+// Expulsar desconecta al bicho del broker (el broker avisa su "0").
 func (n *Nube) Expulsar(id string) {
-	if n.op.EmqxURL == "" {
-		return
-	}
-	req, _ := http.NewRequestWithContext(n.ctx, http.MethodDelete, strings.TrimRight(n.op.EmqxURL, "/")+"/api/v5/clients/"+id, nil)
-	if usuario, clave, ok := strings.Cut(n.op.EmqxClave, ":"); ok {
-		req.SetBasicAuth(usuario, clave)
-	}
-	cli := &http.Client{Timeout: 5 * time.Second}
-	r, err := cli.Do(req)
-	if err != nil {
-		n.log.Warn("no pude echar al bicho del broker", "bicho", id, "error", err)
-		return
-	}
-	r.Body.Close()
-	if r.StatusCode >= 300 && r.StatusCode != http.StatusNotFound {
-		n.log.Warn("EMQX no echó al bicho", "bicho", id, "estado", r.StatusCode)
+	if n.op.Broker != nil && n.op.Broker.Expulsar(id) {
+		n.log.Info("bicho echado del broker", "bicho", id)
 	}
 }
 
