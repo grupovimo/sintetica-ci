@@ -20,6 +20,10 @@ g wifi_sleep_policy 2
 g wifi_scan_always_enabled 0
 g wifi_networks_available_notification_on 0
 
+# Sin rotación automática: la cara queda clavada en apaisado.
+y accelerometer_rotation 0
+y user_rotation 1
+
 # Sin animaciones del sistema.
 g window_animation_scale 0
 g transition_animation_scale 0

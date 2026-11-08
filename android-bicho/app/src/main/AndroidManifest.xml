@@ -24,7 +24,7 @@
         <activity
             android:name=".Bicho"
             android:exported="true"
-            android:screenOrientation="sensorLandscape"
+            android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:launchMode="singleTask"
             android:lockTaskMode="if_whitelisted">
