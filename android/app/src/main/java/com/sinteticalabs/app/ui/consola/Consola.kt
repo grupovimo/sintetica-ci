@@ -70,8 +70,9 @@ import kotlinx.coroutines.launch
 
 /** Los diez módulos del teclado (como routes/robots/[id]/+page.svelte). */
 enum class Modulo(val nombre: String, val necesita: Set<Capacidad> = emptySet()) {
-    CARACTER("Carácter"), CARA("Cara"), IMAGENES("Imágenes"), DIA("Su día"), RECORDATORIOS("Recordatorios"),
-    MODOS("Modos"), REFLEJOS("Reflejos"), INTEGRACIONES("Integraciones"), VOZ("Voz", setOf(Capacidad.MICROFONO, Capacidad.PARLANTE)), AJUSTES("Ajustes"),
+    CARACTER("Carácter"), CARA("Cara"), IMAGENES("Imágenes"), DIA("Su día"), CUIDADO("Cuidado"), RECORDATORIOS("Recordatorios"),
+    MODOS("Modos"), REFLEJOS("Reflejos"), INTEGRACIONES("Integraciones"), HABLA("Habla"), JUGAR("Jugar"),
+    VOZ("Voz", setOf(Capacidad.MICROFONO, Capacidad.PARLANTE)), AJUSTES("Ajustes"),
 }
 
 /**
@@ -180,7 +181,10 @@ private fun Consola(vm: RobotViewModel, modelo: Modelo, alVolver: () -> Unit, al
             ) {
                 Text(a.icono, style = T.aviso.copy(fontSize = T.aviso.fontSize * 1.2f))
                 Text(a.texto.uppercase(), style = T.aviso, modifier = Modifier.weight(1f), maxLines = 3, overflow = TextOverflow.Ellipsis)
-                Tecla("OK", { vm.cerrarAviso() }, acabado = Acabado.NEGRA, chica = true)
+                if (a.despertador && conectado) {
+                    Tecla("Posponer", { vm.cerrarAviso(); alcance.launch { vm.alarma("posponer") } }, chica = true)
+                    Tecla("Apagar", { vm.cerrarAviso(); alcance.launch { vm.alarma("apagar") } }, acabado = Acabado.NEGRA, chica = true)
+                } else Tecla("OK", { vm.cerrarAviso() }, acabado = Acabado.NEGRA, chica = true)
             }
         }
 
@@ -224,8 +228,10 @@ private fun Consola(vm: RobotViewModel, modelo: Modelo, alVolver: () -> Unit, al
                 Tecla("Caricia", { hacer("caricia", null, "Le gustó") }, habilitada = conectado)
                 Tecla("Llamarlo", { hacer("nombre", null, "Te escuchó") }, habilitada = conectado)
                 Tecla("Cosquillas", { hacer("muchos-toques", null, "Se rió") }, acabado = Acabado.NARANJA, habilitada = conectado)
+                Tecla("Jugar", { actual = Modulo.JUGAR }, habilitada = conectado)
                 if (sePuedeSoltar(estado)) Tecla("Soltar", { hacer(null, "", "Vuelve a ser él") }, acabado = Acabado.NEGRA, habilitada = conectado)
             }
+            DecileAlgo(vm, conectado)
             respuesta?.let { AvisoLinea(it) }
             if (!conectado) Text("Le llega cuando vuelva.", style = T.texto)
         }
@@ -243,6 +249,9 @@ private fun Consola(vm: RobotViewModel, modelo: Modelo, alVolver: () -> Unit, al
                 Modulo.MODOS -> ModModos(vm)
                 Modulo.REFLEJOS -> ModReflejos(vm, modelo)
                 Modulo.INTEGRACIONES -> ModIntegraciones(vm)
+                Modulo.CUIDADO -> ModCuidado(vm)
+                Modulo.HABLA -> ModHabla(vm)
+                Modulo.JUGAR -> ModJugar(vm)
                 Modulo.VOZ -> ModVoz(vm, modelo)
                 Modulo.AJUSTES -> ModAjustes(vm, modelo, alVolver, alLab)
             }

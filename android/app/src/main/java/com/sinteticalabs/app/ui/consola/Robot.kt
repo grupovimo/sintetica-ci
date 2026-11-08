@@ -424,7 +424,7 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
                     val car = e.datos.numero("car")?.toInt() ?: return@collect
                     val b = e.datos.texto("datos")?.let { runCatching { java.util.Base64.getDecoder().decode(it) }.getOrNull() } ?: return@collect
                     recibirMarco(car, b)
-                    avisosDeMarco(car, b).forEach { avisar(textoDeAviso(it, Recordatorios.leer(config.value), r.estado?.expresion.orEmpty())) }
+                    avisosDeMarco(car, b).forEach { avisarDelRobot(it) }
                 }
             }
         }
@@ -445,13 +445,19 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             c.marcos.collect { (car, b) ->
                 recibirMarco(car.id, b)
-                avisosDeMarco(car.id, b).forEach { avisar(textoDeAviso(it, Recordatorios.leer(config.value), robot.value?.estado?.expresion.orEmpty())) }
+                avisosDeMarco(car.id, b).forEach { avisarDelRobot(it) }
             }
         }
     }
 
-    fun avisar(texto: String, icono: String = ICONO_RECORDATORIO) {
-        val a = Aviso(texto, icono, System.currentTimeMillis())
+    private fun avisarDelRobot(a: com.sinteticalabs.app.consola.AvisoRobot) {
+        val c = config.value
+        val texto = textoDeAviso(a, Recordatorios.leer(c), robot.value?.estado?.expresion.orEmpty(), com.sinteticalabs.app.consola.Acompanar.despertador(c).texto) ?: return
+        avisar(texto, ICONO_RECORDATORIO, despertador = a == com.sinteticalabs.app.consola.AvisoRobot.Despertador)
+    }
+
+    fun avisar(texto: String, icono: String = ICONO_RECORDATORIO, despertador: Boolean = false) {
+        val a = Aviso(texto, icono, System.currentTimeMillis(), despertador)
         aviso.value = a
         viewModelScope.launch {
             delay(a.dura)
@@ -525,6 +531,43 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
         e.message
     } catch (e: Exception) {
         e.message ?: "No pude mandarlo."
+    }
+
+    // --- Lo que hace en el momento (v1.6 y v1.7): decir, la alarma, jugar y los avisos del celu ---
+
+    /** Por la nube, la ruta de la API; de cerca, el marco directo. Devuelve el error o null. */
+    private suspend fun enVivo(ruta: String, cuerpo: kotlinx.serialization.json.JsonObject, marco: () -> ByteArray): String? = try {
+        when (via) {
+            Via.NUBE -> api!!.pedir("/v1/bichos/$idRobot/$ruta", "POST", cuerpo)
+            else -> cliente!!.escribirCrudo(Car.COMANDO, marco())
+        }
+        null
+    } catch (e: ErrorApi) {
+        when (e.estado) { 409 -> "Desconectado"; 404 -> "Todavía no sabe"; else -> e.detalle.ifEmpty { e.message ?: "No pude" } }
+    } catch (e: Exception) {
+        e.message ?: "No pude"
+    }
+
+    suspend fun decir(texto: String, expresion: String? = null): String? {
+        val t = com.sinteticalabs.app.consola.cortarBytes(texto.replace(Regex("\\s+"), " ").trim(), 60)
+        if (t.isEmpty()) return "Vacío"
+        return enVivo("decir", buildJsonObject { put("texto", t); if (expresion != null) put("expresion", expresion) }) { Comando.decir(t, expresion.orEmpty()) }
+    }
+
+    /** "apagar", "posponer", "probar" o "despertar". */
+    suspend fun alarma(accion: String): String? {
+        val i = listOf("apagar", "posponer", "probar", "despertar").indexOf(accion)
+        return enVivo("alarma", buildJsonObject { put("accion", accion) }) { Comando.alarma(i) }
+    }
+
+    suspend fun jugar(juego: String): String? = enVivo("jugar", buildJsonObject { put("juego", juego) }) { Comando.jugar(juego) }
+
+    suspend fun avisoDelCelu(llamada: Boolean, app: String, contacto: String): String? {
+        val a = com.sinteticalabs.app.consola.cortarBytes(app, 24)
+        val k = com.sinteticalabs.app.consola.cortarBytes(contacto, 24)
+        return enVivo("aviso", buildJsonObject { put("tipo", if (llamada) "llamada" else "notificacion"); put("app", a); put("contacto", k) }) {
+            Comando.aviso(llamada, a, k)
+        }
     }
 
     // --- Imágenes ---

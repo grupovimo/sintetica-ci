@@ -39,6 +39,16 @@
                 <data android:scheme="sintetica" android:host="entrar" />
             </intent-filter>
         </activity>
+        <!-- Opcional: los avisos del celu al robot (solo app y contacto de las notificaciones elegidas). -->
+        <service
+            android:name=".datos.EscuchaAvisos"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
         <!-- El modelo de QR de ML Kit va dentro de la app (sin descargas de Play Services). -->
         <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode" />
     </application>

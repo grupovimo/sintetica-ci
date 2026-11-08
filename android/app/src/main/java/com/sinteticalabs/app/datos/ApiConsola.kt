@@ -213,3 +213,27 @@ suspend fun ApiSintetica.sprite(id: String, n: Int): ByteArray = crudo("/v1/bich
 suspend fun ApiSintetica.subirSprite(id: String, n: Int, datos: ByteArray, tipo: String) { crudo("/v1/bichos/$id/sprites/$n", "PUT", datos, tipo) }
 
 suspend fun ApiSintetica.borrarSprite(id: String, n: Int) { crudo("/v1/bichos/$id/sprites/$n", "DELETE") }
+
+// --- El clima (Open-Meteo, por la nube) y el resumen del día ---
+
+data class Lugar(val nombre: String, val region: String, val pais: String, val lat: Double, val lon: Double, val ciudad: String)
+data class Clima(val temp: Double, val codigo: Int, val descripcion: String, val max: Double, val min: Double, val dia: Boolean)
+
+/** Busca una ciudad (2 a 60 bytes): hasta 6 lugares. */
+suspend fun ApiSintetica.buscarCiudad(q: String): List<Lugar> =
+    pedir("/v1/clima/buscar?q=" + java.net.URLEncoder.encode(q, "UTF-8")).lista("lugares").orEmpty().mapNotNull {
+        val o = it as? JsonObject ?: return@mapNotNull null
+        Lugar(o.texto("nombre").orEmpty(), o.texto("region").orEmpty(), o.texto("pais").orEmpty(),
+            o.numero("lat") ?: return@mapNotNull null, o.numero("lon") ?: return@mapNotNull null, o.texto("ciudad").orEmpty())
+    }
+
+/** El clima de donde vive (null sin ubicación o si no se pudo traer). */
+suspend fun ApiSintetica.clima(id: String): Clima? = pedir("/v1/bichos/$id/clima").obj("clima")?.let { o ->
+    Clima(o.numero("temp") ?: 0.0, o.numero("codigo")?.toInt() ?: 0, o.texto("descripcion").orEmpty(), o.numero("max") ?: 0.0, o.numero("min") ?: 0.0, o.si("dia") ?: true)
+}
+
+/** Cómo fue su día, contado. */
+suspend fun ApiSintetica.resumen(id: String): String? = runCatching { pedir("/v1/bichos/$id/resumen").texto("texto") }.getOrNull()
+
+/** La memoria cruda (para el marcador de los juegos). */
+suspend fun ApiSintetica.memoriaCruda(id: String): JsonObject? = pedir("/v1/bichos/$id/memoria").obj("memoria")

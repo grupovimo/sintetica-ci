@@ -22,6 +22,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.float
+import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -69,6 +70,26 @@ class ProtocoloTest {
         assertEquals(s(porNombre["registro"]!!, "hex"), hex(Comando.registro()))
         assertEquals(s(porNombre["evento sacudida-fuerte"]!!, "hex"), hex(Comando.evento("sacudida-fuerte")))
         assertEquals(s(porNombre["comportamiento practicar-caras"]!!, "hex"), hex(Comando.comportamiento("practicar-caras")))
+        // v1.6 y v1.7: el paquete de vida.
+        val decir = porNombre["decir hola"]!!
+        assertEquals(s(decir, "hex"), hex(Comando.decir(s(decir, "texto"))))
+        val conCara = porNombre["decir con expresion"]!!
+        assertEquals(s(conCara, "hex"), hex(Comando.decir(s(conCara, "texto"), s(conCara, "expresion"))))
+        val clima = porNombre["clima"]!!
+        assertEquals(s(clima, "hex"), hex(Comando.clima(clima["temp"]!!.jsonPrimitive.double, clima["codigo"]!!.jsonPrimitive.int,
+            clima["max"]!!.jsonPrimitive.int, clima["min"]!!.jsonPrimitive.int, clima["dia"]!!.jsonPrimitive.boolean, s(clima, "ciudad"))))
+        assertEquals(s(porNombre["alarma probar"]!!, "hex"), hex(Comando.alarma(2)))
+        assertEquals(s(porNombre["alarma posponer"]!!, "hex"), hex(Comando.alarma(1)))
+        assertEquals(s(porNombre["jugar dado"]!!, "hex"), hex(Comando.jugar("dado")))
+        assertEquals(s(porNombre["jugar terminar"]!!, "hex"), hex(Comando.jugar("terminar")))
+        val aviso = porNombre["aviso whatsapp"]!!
+        assertEquals(s(aviso, "hex"), hex(Comando.aviso(s(aviso, "tipo") == "llamada", s(aviso, "app"), s(aviso, "contacto"))))
+        assertEquals(s(porNombre["animo medio"]!!, "hex"), hex(Comando.animo(1)))
+        val mirar = porNombre["mirar derecha"]!!
+        assertEquals(s(mirar, "hex"), hex(Comando.mirar(mirar["x"]!!.jsonPrimitive.double, mirar["y"]!!.jsonPrimitive.double)))
+        // Los eventos nuevos van al final.
+        assertEquals(33, com.sinteticalabs.app.protocolo.EVENTOS.indexOf("despertador"))
+        assertEquals(35, com.sinteticalabs.app.protocolo.EVENTOS.indexOf("animo"))
     }
 
     @Test fun ota() {

@@ -290,6 +290,7 @@ fun ModDia(vm: RobotViewModel) {
             VisorHora("Duerme", duerme, Modifier.weight(1f)) { d -> vm.cambiar { Editar.moverHora(it, "duerme", d) } }
         }
         Bandeja { Barra24(despierta, duerme) }
+        SeccionDespertador(vm)
         Visor(Modifier.fillMaxWidth()) {
             Grabado("Vos")
             CampoVisor(c.obj("dueno")?.texto("nombre").orEmpty(), { v -> vm.cambiar { Editar.ponerDueno(it, v) } }, placeholder = "Tu nombre", estilo = T.campoClaro)
@@ -426,7 +427,7 @@ fun ModModos(vm: RobotViewModel) {
     val modo = Editar.modo(c)
     val modos = listOf(
         Triple("mascota", "Compañía", true), Triple("reloj", "Reloj", true), Triple("pomodoro", "Pomodoro", true),
-        Triple("clima", "Clima", false), Triple("notificaciones", "Avisos", false),
+        Triple("clima", "Clima", true), Triple("notificaciones", "Avisos", false),
     )
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         modos.chunked(2).forEach { fila ->
@@ -447,6 +448,7 @@ fun ModModos(vm: RobotViewModel) {
             VisorMinutos("Foco", Editar.trabajo(c), Modifier.weight(1f)) { d -> vm.cambiar { Editar.moverPomodoro(it, "trabajo", d * 5) } }
             VisorMinutos("Descanso", Editar.descanso(c), Modifier.weight(1f)) { d -> vm.cambiar { Editar.moverPomodoro(it, "descanso", d) } }
         }
+        if (modo == "clima") SeccionUbicacion(vm)
         if (modo == "pomodoro") Text("Un toque arranca o pausa.", style = T.texto, color = Color(0xCC1A1714))
     }
 }
@@ -507,6 +509,7 @@ fun ModReflejos(vm: RobotViewModel, modelo: Modelo) {
             }
         }
         if (sinMovimiento) Text("No siente el movimiento.", style = T.texto, color = Color(0xCC1A1714))
+        SeccionAvisosCelu(vm)
     }
 }
 
@@ -625,6 +628,7 @@ fun ModAjustes(vm: RobotViewModel, modelo: Modelo, alSalir: () -> Unit, alLab: (
                 }
             }
         }
+        SeccionUbicacion(vm)
         Tecla("Laboratorio", alLab, Modifier.fillMaxWidth(), acabado = Acabado.NEGRA)
         if (vm.via == Via.CERCA) DeCerca(vm)
         if (vm.via != Via.DEMO) Bandeja {

@@ -30,6 +30,12 @@ fun largoBytes(t: String) = t.toByteArray(Charsets.UTF_8).size
 sealed interface AvisoRobot {
     data class Recordatorio(val indice: Int) : AvisoRobot
     data object Pomodoro : AvisoRobot
+    /** v1.6: empezó a sonar el despertador (evento 33). */
+    data object Despertador : AvisoRobot
+    /** v1.7: terminó una partida (registro tipo 5: juego·16 + resultado: 0 perdiste, 1 ganaste, 2 empate, 3 sin resultado). */
+    data class Juego(val juego: Int, val resultado: Int) : AvisoRobot
+    /** v1.7: le contestaron el "¿cómo estás?" (registro tipo 6: 0 bien, 1 más o menos, 2 mal). */
+    data class Animo(val valor: Int) : AvisoRobot
 }
 
 fun avisosDeMarco(car: Int, b: ByteArray): List<AvisoRobot> {
@@ -40,7 +46,13 @@ fun avisosDeMarco(car: Int, b: ByteArray): List<AvisoRobot> {
         if (i + 6 > b.size) break
         val tipo = b[i + 4].toInt() and 0xFF
         val dato = b[i + 5].toInt() and 0xFF
-        if (tipo == 4) l += AvisoRobot.Recordatorio(dato) else if (tipo == 0 && dato == 32) l += AvisoRobot.Pomodoro
+        when {
+            tipo == 4 -> l += AvisoRobot.Recordatorio(dato)
+            tipo == 5 -> l += AvisoRobot.Juego(dato shr 4, dato and 15)
+            tipo == 6 -> l += AvisoRobot.Animo(dato)
+            tipo == 0 && dato == 32 -> l += AvisoRobot.Pomodoro
+            tipo == 0 && dato == 33 -> l += AvisoRobot.Despertador
+        }
     }
     return l
 }
@@ -53,16 +65,19 @@ fun esRespuestaInterna(car: Int, b: ByteArray): Boolean {
 }
 
 /** Un aviso arriba de la consola: el de un recordatorio queda hasta que lo tocan (o 2 min); los demás, 5 s. */
-data class Aviso(val texto: String, val icono: String, val cuando: Long) {
+data class Aviso(val texto: String, val icono: String, val cuando: Long, val despertador: Boolean = false) {
     val dura: Long get() = if (icono == ICONO_RECORDATORIO) 120_000 else 5_000
 }
 
 const val ICONO_RECORDATORIO = "⏰"
 const val ICONO_IA = "✦"
 
-fun textoDeAviso(a: AvisoRobot, recordatorios: List<Recordatorio>, expresionActual: String): String = when (a) {
+/** El texto del aviso; null = no se muestra (el juego y el ánimo solo se cuentan). */
+fun textoDeAviso(a: AvisoRobot, recordatorios: List<Recordatorio>, expresionActual: String, textoDespertador: String? = null): String? = when (a) {
     is AvisoRobot.Recordatorio -> recordatorios.getOrNull(a.indice)?.texto ?: "Recordatorio"
     AvisoRobot.Pomodoro -> if (expresionActual == "pomodoro:trabajo") "A trabajar" else "Tanda terminada"
+    AvisoRobot.Despertador -> textoDespertador?.ifEmpty { null } ?: "Suena el despertador"
+    is AvisoRobot.Juego, is AvisoRobot.Animo -> null
 }
 
 /** Lo que hizo una IA conectada por MCP: "Claude: poner cara". */

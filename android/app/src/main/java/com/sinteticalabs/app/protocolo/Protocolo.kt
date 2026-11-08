@@ -47,6 +47,13 @@ object Op {
     const val RESTAURAR = 0x1D
     const val REGISTRO = 0x1E
     const val COMPORTAMIENTO = 0x1F
+    const val DECIR = 0x40          // v1.6
+    const val CLIMA = 0x41
+    const val ALARMA = 0x42
+    const val JUGAR = 0x43          // v1.7
+    const val AVISO = 0x44
+    const val ANIMO = 0x45
+    const val MIRAR = 0x46
     const val IMG_INICIO = 0x20
     const val IMG_BLOQUE = 0x21
     const val IMG_FIN = 0x22
@@ -73,7 +80,11 @@ val EVENTOS = listOf(
     "caricia", "muchos-toques", "sacudida-suave", "sacudida-fuerte", "inclinado", "caida", "voz", "nombre",
     "ruido", "musica", "silencio", "notificacion", "llamada", "bateria-baja", "bateria-critica", "enchufado",
     "desenchufado", "cargado", "sin-wifi", "cambio-de-cara", "bicho-cerca", "volvio", "hito",
+    "recordatorio", "pomodoro", "despertador", "juego", "animo",
 )
+
+/** Los juegos (0x43), en el orden del protocolo. */
+val JUEGOS = listOf("ppt", "reflejos", "mirada", "dado", "moneda")
 val MODOS = listOf("mascota", "reloj", "pomodoro", "clima", "notificaciones")
 
 private val MENSAJES = mapOf(
@@ -132,6 +143,40 @@ object Comando {
     fun restaurar(memoria: ByteArray) = byteArrayOf(Op.RESTAURAR.toByte()) + memoria
     fun registro() = byteArrayOf(Op.REGISTRO.toByte())
     fun comportamiento(nombre: String) = byteArrayOf(Op.COMPORTAMIENTO.toByte()) + nombre.toByteArray()
+
+    /** v1.6: lo muestra en un globo (texto de 1 a 60 bytes; con expresión, la pone ese rato). */
+    fun decir(texto: String, expresion: String = ""): ByteArray {
+        val t = texto.toByteArray()
+        require(t.isNotEmpty() && t.size <= 60) { "El texto va de 1 a 60 bytes." }
+        return byteArrayOf(Op.DECIR.toByte()) + corto(expresion, 24) + t
+    }
+
+    /** El tiempo para el modo clima: temperatura en °C (viaja en décimas), código WMO, máx, mín, si es de día y la ciudad. */
+    fun clima(temp: Double, codigo: Int, max: Int, min: Int, dia: Boolean, ciudad: String): ByteArray =
+        byteArrayOf(Op.CLIMA.toByte()) + u16(Math.round(temp * 10).toInt() and 0xFFFF) +
+            byteArrayOf(codigo.toByte(), max.toByte(), min.toByte(), (if (dia) 1 else 0).toByte()) + corto(ciudad, 24)
+
+    /** 0 apagar, 1 posponer, 2 sonar ya (probar), 3 despertar. */
+    fun alarma(accion: Int) = byteArrayOf(Op.ALARMA.toByte(), accion.toByte())
+
+    /** Un juego por nombre ("ppt", "reflejos", "mirada", "dado", "moneda") o "terminar". */
+    fun jugar(juego: String): ByteArray {
+        val i = if (juego == "terminar") 255 else JUEGOS.indexOf(juego)
+        require(i >= 0) { "juego desconocido: $juego" }
+        return byteArrayOf(Op.JUGAR.toByte(), i.toByte())
+    }
+
+    /** v1.7: una notificación (o llamada) del celu, con su app y su contacto (hasta 24 bytes cada uno). */
+    fun aviso(llamada: Boolean, app: String, contacto: String) =
+        byteArrayOf(Op.AVISO.toByte(), (if (llamada) 1 else 0).toByte()) + corto(app, 24) + corto(contacto, 24)
+
+    /** 0 bien, 1 más o menos, 2 mal. */
+    fun animo(valor: Int) = byteArrayOf(Op.ANIMO.toByte(), valor.toByte())
+
+    /** De dónde viene un sonido: x e y de −1 a 1 (viajan de −100 a 100). */
+    fun mirar(x: Double, y: Double) = byteArrayOf(
+        Op.MIRAR.toByte(), Math.round(x.coerceIn(-1.0, 1.0) * 100).toInt().toByte(), Math.round(y.coerceIn(-1.0, 1.0) * 100).toInt().toByte(),
+    )
 }
 
 /** Una imagen QOI (del tamaño de la pantalla) en las escrituras de la característica Imagen. */
