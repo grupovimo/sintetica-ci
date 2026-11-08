@@ -75,11 +75,13 @@ class Charla(
                     // Sin modelo: prueba de nuevo en un minuto.
                     if (model == null) { Thread.sleep(60_000); cola.clear(); continue }
                 }
-                val p = normalizar(Nucleo.palabra())
+                val escrita = Nucleo.palabra().trim().lowercase()
+                val p = normalizar(escrita)
                 if (p != palabra || espera == null) {
                     espera?.close()
                     palabra = p
-                    espera = Recognizer(model, TASA, JSONArray(listOf(p, "[unk]")).toString())
+                    // Las dos formas ("ramón" y "ramon"): Vosk ignora la que no está en su vocabulario.
+                    espera = Recognizer(model, TASA, JSONArray(listOf(p, escrita, "[unk]").distinct()).toString())
                     Log.i("Bicho", "charla: espera \"$p\"")
                 }
                 val listo = espera.acceptWaveForm(tramo, tramo.size)

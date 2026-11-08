@@ -63,7 +63,7 @@ Por wifi (para dejarlo en el cargador de pared): con el cable puesto,
    `curl -LO https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip && unzip vosk-model-small-es-0.42.zip`
    y `adb push vosk-model-small-es-0.42 /sdcard/Android/data/com.sinteticalabs.bicho/files/vosk-es`.
    La palabra (`voz.palabra`, o su nombre) tiene que estar en el vocabulario
-   del modelo: "ramón", "bichito" o "coco" sí; "lucho" o "bicho", no.
+   del modelo; "lucho", "ramón", "bichito" y "coco" están.
 
 Con el celu enchufado las 24 h, conviene un enchufe con horario (que cargue
 unas horas y descanse otras): sin root no se puede limitar la carga, y una
