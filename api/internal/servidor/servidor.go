@@ -41,6 +41,7 @@ type Opciones struct {
 	Desarrollo      bool     // habilita sumar bichos virtuales y muestra los links en el log
 	BichosVirtuales []string // URLs de los bichos virtuales (desarrollo)
 	CookieSegura    bool
+	URLPublica      string // la base pública de la API (API_URL_PUBLICA): el issuer y el recurso del MCP
 }
 
 // Servidor tiene todo lo que usan los handlers.
@@ -55,11 +56,13 @@ type Servidor struct {
 	log      *slog.Logger
 	limites  *limitador
 	integ    *integraciones.Integraciones
+	mcp      *estadoMCP
 }
 
 // Nuevo arma el servidor.
 func Nuevo(op Opciones, alm *almacen.Almacen, n *nube.Nube, i *integraciones.Integraciones, hub *eventos.Hub, c *correo.Correo, f *firma.Firmador, log *slog.Logger) *Servidor {
-	return &Servidor{op: op, alm: alm, nube: n, relevo: nube.NuevoRelevo(n), hub: hub, correo: c, firmador: f, log: log, limites: nuevoLimitador(), integ: i}
+	return &Servidor{op: op, alm: alm, nube: n, relevo: nube.NuevoRelevo(n), hub: hub, correo: c, firmador: f, log: log, limites: nuevoLimitador(), integ: i,
+		mcp: &estadoMCP{}}
 }
 
 // Rutas es la API pública.
@@ -121,6 +124,26 @@ func (s *Servidor) Rutas() http.Handler {
 	m.HandleFunc("DELETE /v1/firmwares/{id}", s.conSesion(s.borrarFirmware))
 	m.HandleFunc("GET /v1/firmwares/{id}/manifiesto", s.conSesion(s.manifiesto))
 	m.HandleFunc("GET /v1/firmwares/{id}/binario", s.binario) // con sesión o con el token del link
+
+	// El servidor MCP y su OAuth (ver oauth.go y mcp.go).
+	m.Handle("/mcp", s.manejadorMCP())
+	m.HandleFunc("GET /.well-known/oauth-protected-resource", cors(s.metadatosRecurso))
+	m.HandleFunc("GET /.well-known/oauth-protected-resource/mcp", cors(s.metadatosRecurso))
+	m.HandleFunc("GET /.well-known/oauth-authorization-server", cors(s.metadatosAutorizacion))
+	m.HandleFunc("OPTIONS /.well-known/", cors(func(http.ResponseWriter, *http.Request) {}))
+	m.HandleFunc("POST /oauth/registrar", cors(s.registrarCliente))
+	m.HandleFunc("OPTIONS /oauth/registrar", cors(s.registrarCliente))
+	m.HandleFunc("GET /oauth/autorizar", s.autorizar)
+	m.HandleFunc("POST /oauth/autorizar", s.consentir)
+	m.HandleFunc("POST /oauth/token", cors(s.token))
+	m.HandleFunc("OPTIONS /oauth/token", cors(s.token))
+	m.HandleFunc("POST /oauth/revocar", cors(s.revocar))
+	m.HandleFunc("OPTIONS /oauth/revocar", cors(s.revocar))
+	m.HandleFunc("POST /v1/mcp/tokens", s.conSesion(s.crearTokenPersonal))
+	m.HandleFunc("GET /v1/mcp/tokens", s.conSesion(s.listarTokensPersonales))
+	m.HandleFunc("DELETE /v1/mcp/tokens/{id}", s.conSesion(s.borrarTokenPersonal))
+	m.HandleFunc("GET /v1/mcp/clientes", s.conSesion(s.listarClientesMCP))
+	m.HandleFunc("DELETE /v1/mcp/clientes/{id}", s.conSesion(s.revocarClienteMCP))
 	return s.envolver(m)
 }
 

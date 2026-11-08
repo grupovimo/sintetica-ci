@@ -311,3 +311,64 @@ func (i *Integraciones) mandarWebhook(ctx context.Context, usuario, destino stri
 		Evento: c.evento, Robot: RobotWebhook{ID: c.bichoID, Nombre: c.robot}, Datos: datos, En: en.Format(time.RFC3339),
 	})
 }
+
+// TimeoutBajar: cuánto se espera una descarga (las imágenes del MCP).
+const TimeoutBajar = 15 * time.Second
+
+// Bajar hace un GET con las mismas protecciones que los webhooks (sin IPs
+// internas ni el propio servicio, DNS validado al conectar, sin proxies) y
+// devuelve hasta `max` bytes y el Content-Type. Solo https (http también en
+// desarrollo); sigue hasta 3 redirecciones, validando cada una.
+func (c *ClienteWebhook) Bajar(ctx context.Context, destino string, max int64) ([]byte, string, error) {
+	esquemaOk := func(u *url.URL) bool { return u.Scheme == "https" || (c.permitirInternos && u.Scheme == "http") }
+	u, err := url.Parse(destino)
+	if err != nil || !esquemaOk(u) {
+		return nil, "", errors.New("la url tiene que ser https://")
+	}
+	if err := c.ValidarURL(destino); err != nil {
+		return nil, "", err
+	}
+	cli := &http.Client{
+		Timeout:   TimeoutBajar,
+		Transport: c.cli.Transport,
+		CheckRedirect: func(r *http.Request, antes []*http.Request) error {
+			if len(antes) >= 3 {
+				return errors.New("demasiadas redirecciones")
+			}
+			if !esquemaOk(r.URL) {
+				return errors.New("redirige a algo que no es https")
+			}
+			return c.ValidarURL(r.URL.String())
+		},
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, destino, nil)
+	if err != nil {
+		return nil, "", errors.New("url inválida")
+	}
+	req.Header.Set("User-Agent", "Sintetica/1.0 (+imagenes)")
+	req.Header.Set("Accept", "image/png, image/jpeg, image/gif, image/*;q=0.8")
+	r, err := cli.Do(req)
+	if err != nil {
+		return nil, "", sinURL(err)
+	}
+	defer r.Body.Close()
+	if r.StatusCode < 200 || r.StatusCode > 299 {
+		return nil, "", fmt.Errorf("el servidor respondió %d", r.StatusCode)
+	}
+	if r.ContentLength > max {
+		return nil, "", fmt.Errorf("pesa más de %d MB", max>>20)
+	}
+	b, err := io.ReadAll(io.LimitReader(r.Body, max+1))
+	if err != nil {
+		return nil, "", sinURL(err)
+	}
+	if int64(len(b)) > max {
+		return nil, "", fmt.Errorf("pesa más de %d MB", max>>20)
+	}
+	return b, r.Header.Get("Content-Type"), nil
+}
+
+// Bajar descarga algo de afuera con las protecciones de los webhooks (ver ClienteWebhook.Bajar).
+func (i *Integraciones) Bajar(ctx context.Context, destino string, max int64) ([]byte, string, error) {
+	return i.webhook.Bajar(ctx, destino, max)
+}

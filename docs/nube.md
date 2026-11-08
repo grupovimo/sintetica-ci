@@ -99,7 +99,7 @@ núcleo), no se reintenta hasta que cambie.
 - **Eventos en vivo** (SSE): `GET /v1/eventos` (todos los bichos de la cuenta) o
   `GET /v1/bichos/{id}/eventos`: `estado` (con los bytes crudos en `crudo`),
   `conexion`, `sincro`, `config`, `imagenes`, `ota`, `marco`, `memoria`, `bicho`,
-  `automatizacion` y `telegram` (ver "Integraciones").
+  `automatizacion`, `telegram` (ver "Integraciones") y `mcp` (ver "MCP").
 
 ## El motor de vida (v1.4)
 
@@ -271,6 +271,97 @@ del estado, con el umbral de arriba).
   minutos. Ojo: un bicho que nunca se conecta a la nube (un broche sin WiFi)
   cuenta como desconectado.
 
+## MCP: que una IA maneje los robots
+
+La API es un **servidor MCP remoto**: cada usuario conecta su Claude
+(claude.ai, Claude Desktop, Claude Code) o su ChatGPT y la IA maneja sus
+robots: inventa caras (y las ve), pone imágenes, recordatorios, personalidad…
+Código: `api/internal/servidor/mcp*.go` y `oauth.go`; migración `006_mcp.sql`.
+
+- **Transporte**: MCP "Streamable HTTP" en `POST /mcp` (SDK oficial
+  `github.com/modelcontextprotocol/go-sdk` v1.8), **sin sesiones** (cada pedido
+  trae su token: sobrevive reinicios y proxies; `GET` responde 405) y con
+  respuestas JSON. Cuerpo de hasta 12 MB (una imagen en base64).
+- **Límites**: 120 llamadas a herramientas por minuto por usuario (300 pedidos
+  HTTP); 20 Telegrams por hora. Cada llamada queda en el log
+  (`msg=mcp herramienta=… usuario=… cliente=… bicho=… ok=… ms=…`).
+- **En vivo**: los cambios salen por los eventos de siempre (`config`,
+  `imagenes`, y `estado` cuando el bicho reacciona) y, por cada llamada que
+  cambia algo, un evento `mcp` `{cliente, herramienta, titulo, bicho, en}` (la
+  consola puede mostrar "Claude cambió X").
+- Todo cambio de config pasa por el mismo camino que `PUT /v1/bichos/{id}/config`:
+  la valida el núcleo (cgo) y queda como versión nueva con autor
+  `mcp:<cliente>` (por ejemplo `mcp:Claude`); un candado por bicho evita pisar
+  dos cambios simultáneos. La config conserva el orden de sus claves.
+
+### Autenticación
+
+**OAuth 2.1** (lo que usan claude.ai, Claude Desktop y ChatGPT, solos):
+
+| Ruta | Qué |
+| --- | --- |
+| `GET /.well-known/oauth-protected-resource` (y `…/mcp`) | RFC 9728: `resource` = `API_URL_PUBLICA/mcp`, `authorization_servers` = `[API_URL_PUBLICA]` |
+| `GET /.well-known/oauth-authorization-server` | RFC 8414 (issuer = `API_URL_PUBLICA`) |
+| `POST /oauth/registrar` | Registro dinámico (RFC 7591), JSON. Redirecciones: `https://…`, `http://localhost|127.0.0.1|[::1]` (cualquier puerto, RFC 8252) o un esquema propio de app (`cursor://…`); nunca `javascript:`, `data:`, etc. `token_endpoint_auth_method`: `none` (público) o `client_secret_post`/`_basic` (devuelve `client_secret`). 30 por hora por IP |
+| `GET /oauth/autorizar` | Se publica como **`WEB_URL/api/oauth/autorizar`**: pasa por el proxy de la web para que llegue la cookie de sesión. Sin sesión → `WEB_URL/entrar?volver=/api/oauth/autorizar?…`. Con sesión: la pantalla "<cliente> quiere manejar tus robots" (Permitir / Cancelar), HTML servido por la API, sin scripts, `frame-ancestors 'none'` |
+| `POST /oauth/autorizar` | El formulario: token anti-CSRF (HMAC con `SECRETO`, atado a la sesión y al pedido) y `Origin` de la web o la API. Devuelve `code` (5 min, un solo uso), `state` e `iss` |
+| `POST /oauth/token` | `authorization_code` con **PKCE S256 obligatorio**; `refresh_token` con **rotación**. Acceso: 1 h; refresco: 60 días. Reusar un código o un refresco ya canjeado revoca toda la concesión. 60 por minuto por IP |
+| `POST /oauth/revocar` | RFC 7009 (un refresco se lleva su concesión) |
+
+Los tokens son opacos (`sin_at_…`, `sin_rt_…`, `sin_pat_…`) y solo se guardan
+sus hashes. Sin token, `/mcp` responde 401 con
+`WWW-Authenticate: Bearer resource_metadata="…"`. Los tokens de sesión de la
+web y de las apps **no** sirven para el MCP, y los del MCP no sirven para el
+resto de la API.
+
+**Tokens personales** (Claude Code, pruebas), desde la web (con sesión):
+`POST /v1/mcp/tokens {nombre}` → `{token, id, nombre, creado, url}` (el token
+se ve **una sola vez**; hasta 20), `GET /v1/mcp/tokens`, `DELETE /v1/mcp/tokens/{id}`.
+**IAs conectadas**: `GET /v1/mcp/clientes` → `{clientes:[{id, clienteId, cliente, uri, alcance, creada, usada}], url}`;
+`DELETE /v1/mcp/clientes/{id}` la desconecta (todos sus tokens dejan de andar).
+
+### Cómo se conecta cada cliente
+
+La URL del servidor es **`API_URL_PUBLICA/mcp`** (en el VPS,
+`https://api-sintetica.grupovimo.com.ar/mcp`). claude.ai y ChatGPT se
+conectan desde sus servidores: necesitan **HTTPS público**; en local
+(`http://localhost:8080/mcp`) solo anda Claude Code (o Desktop con un token).
+
+- **claude.ai / Claude Desktop**: Configuración → Conectores → Agregar conector
+  personalizado → la URL. Se registra solo, abre la web para entrar y
+  permitir, y listo.
+- **ChatGPT** (modo desarrollador / conectores): Nuevo conector → la URL,
+  autenticación OAuth. Igual que Claude.
+- **Claude Code**, con un token personal:
+  `claude mcp add --transport http sintetica http://localhost:8080/mcp --header "Authorization: Bearer sin_pat_…"`
+  (o sin `--header`, con la URL https pública, y `/mcp` para hacer el OAuth).
+
+### Herramientas
+
+| Herramienta | Qué hace |
+| --- | --- |
+| `listar_robots` | Los robots: conectado, batería, cara, ánimo, pantalla |
+| `ver_robot` | Estado, capacidades y resumen de la config (personalidad, horario, expresiones y comportamientos propios, recordatorios, reflejos, imágenes, protector) |
+| `poner_cara` | Fija una expresión (o `soltar`) — robot conectado |
+| `disparar_evento` | Un evento del protocolo (caricia, sacudida, nombre…) — conectado |
+| `reproducir_comportamiento` | Empieza un comportamiento (de fábrica o propio) — conectado |
+| `listar_expresiones` | De fábrica y propias, con sus parámetros |
+| `crear_expresion` | Expresión paramétrica (ojo/izq/der y los globales del schema, con sus límites); la valida el núcleo, la guarda y devuelve un **PNG** de cómo queda (dibujado por el núcleo: `sintetica_dibujar_expresion`). `solo_ver` para iterar sin guardar; `mostrar` para ponerla ya |
+| `borrar_expresion` | Saca una propia |
+| `poner_imagen` | URL https (bajada con las protecciones anti-SSRF de los webhooks, 8 MB, 15 s, hasta 3 redirecciones validadas) o base64; PNG/JPEG/GIF → recortada llenando la pantalla, redonda en el broche, QOI de 3 canales o animación `sani` (≤ 64 cuadros); en una bahía 0–7; opcional `lista` y `protector` |
+| `borrar_imagen` | Vacía una bahía (y la saca de la lista y el protector) |
+| `recordatorios` | listar / crear / borrar (máx. 12; `{hora, dias, texto ≤ 40 bytes, expresion, sonido, activo}`) |
+| `personalidad` | Preset, rasgos y `sueno` |
+| `horario` | `despierta` / `duerme` |
+| `modo` | mascota, reloj o pomodoro (+ `pomodoro {trabajo, descanso}`) |
+| `reflejos` | Reglas `si: evento → reflejo:cara` (+ acciones extra); listar / agregar / borrar |
+| `automatizaciones` | Las de Integraciones: listar / guardar (la lista entera) / probar |
+| `mandar_telegram` | Le escribe al usuario si vinculó Telegram |
+
+Además, el recurso **`sintetica://guia/caras`** (qué hace cada parámetro, sus
+límites, consejos y ejemplos, armado desde el schema) y el prompt
+`inventar_cara`.
+
 ## Variables de la API
 
 | Variable | Para qué | En local |
@@ -279,7 +370,7 @@ del estado, con el umbral de arriba).
 | `MQTT_URL`, `MQTT_USUARIO`, `MQTT_CLAVE` | la conexión de la API al broker | `tcp://emqx:1883`, `api`, `MQTT_CLAVE_API` |
 | `MQTT_URL_PUBLICA` | la que se les da a los bichos | `mqtt://IP_LOCAL:1883` |
 | `MQTT_URL_INTERNA` | la que se le da al bicho virtual | `mqtt://emqx:1883` |
-| `API_URL_PUBLICA`, `API_URL_INTERNA` | de dónde bajan las OTA (placa y virtual) | `http://IP_LOCAL:8080`, `http://api:8080` |
+| `API_URL_PUBLICA`, `API_URL_INTERNA` | de dónde bajan las OTA (placa y virtual); la pública es también el issuer de OAuth y la base del MCP (`/mcp`) | `http://IP_LOCAL:8080`, `http://api:8080` |
 | `WEB_URL` | para los links de los mails | `http://localhost:5173` |
 | `SMTP_SERVIDOR`, `SMTP_USUARIO`, `SMTP_CLAVE`, `SMTP_DE` | el correo | Mailpit, sin usuario |
 | `CLAVE_FIRMA` | la clave privada de las OTA | `/claves/ota-privada.pem` |
@@ -309,3 +400,6 @@ anotado acá a propósito):
 - Sacar `DESARROLLO=1`, los bichos virtuales y, en las apps, el permiso de
   HTTP sin cifrar (`res/xml/red.xml` en Android, `NSAllowsLocalNetworking` en iOS).
 - El cifrado del enlace BLE y secure boot quedan para M8.
+- MCP: `API_URL_PUBLICA` con el `https://` público de la API (es el issuer y el
+  recurso) y `WEB_URL` con el de la web (la pantalla de permitir pasa por su
+  `/api`). Caddy tiene que dejar pasar `/.well-known/*`, `/oauth/*` y `/mcp`.

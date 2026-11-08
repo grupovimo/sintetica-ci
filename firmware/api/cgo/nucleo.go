@@ -370,3 +370,62 @@ func goOtaCancelar() { hal.OtaCancelar() }
 
 //export goRegistrar
 func goRegistrar(m *C.char) { hal.Registrar(C.GoString(m)) }
+
+// ErrSinExpresion: no hay una expresión paramétrica con ese nombre.
+var ErrSinExpresion = errors.New("no hay una expresión paramétrica con ese nombre")
+
+// DibujarExpresion dibuja la expresión paramétrica `nombre` de una config
+// (nil = solo las de fábrica) como la ve el editor, en el instante t
+// (segundos), y devuelve los píxeles RGBA (ancho × alto × 4). No toca el
+// bicho de este proceso. Si la config no es válida, el error es *ErrorConfig.
+func DibujarExpresion(config []byte, nombre string, ancho, alto int, redonda bool, t float32) ([]byte, error) {
+	if ancho < 16 || alto < 16 || ancho > 640 || alto > 640 {
+		return nil, errors.New("el dibujo es de 16 a 640 píxeles por lado")
+	}
+	if len(config) > MaxConfig {
+		return nil, &ErrorConfig{Codigo: 5, Detalle: "config: más de 16 KB"}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	px := make([]byte, ancho*alto*4)
+	var detalle [128]C.char
+	cnombre := C.CString(nombre)
+	defer C.free(unsafe.Pointer(cnombre))
+	var cjson unsafe.Pointer
+	if len(config) > 0 {
+		cjson = C.CBytes(config)
+		defer C.free(cjson)
+	}
+	c := C.sintetica_dibujar_expresion((*C.char)(cjson), C.size_t(len(config)), cnombre, C.int(ancho), C.int(alto), b2i(redonda),
+		C.float(t), (*C.uint8_t)(unsafe.Pointer(&px[0])), &detalle[0], C.size_t(len(detalle)))
+	switch {
+	case c == 0:
+		return px, nil
+	case c < 0:
+		return nil, ErrSinExpresion
+	}
+	return nil, &ErrorConfig{Codigo: int(c), Detalle: C.GoString(&detalle[0])}
+}
+
+// DatoBase es una expresión o un comportamiento de fábrica, con su JSON.
+type DatoBase struct {
+	Nombre string
+	JSON   string
+}
+
+func vidaBase(tipo int) []DatoBase {
+	n := int(C.sintetica_vida_base(C.int(tipo), -1, nil, nil))
+	l := make([]DatoBase, 0, n)
+	for i := 0; i < n; i++ {
+		var nombre, json *C.char
+		C.sintetica_vida_base(C.int(tipo), C.int(i), &nombre, &json)
+		l = append(l, DatoBase{C.GoString(nombre), C.GoString(json)})
+	}
+	return l
+}
+
+// ExpresionesBase son las expresiones paramétricas de fábrica (en orden).
+func ExpresionesBase() []DatoBase { return vidaBase(0) }
+
+// ComportamientosBase son los comportamientos de fábrica.
+func ComportamientosBase() []DatoBase { return vidaBase(1) }

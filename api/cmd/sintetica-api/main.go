@@ -109,6 +109,7 @@ func correr(log *slog.Logger) error {
 		Desarrollo:      desarrollo,
 		BichosVirtuales: strings.Split(strings.ReplaceAll(os.Getenv("BICHOS_VIRTUALES"), " ", ""), ","),
 		CookieSegura:    env("COOKIE_SEGURA", "0") == "1",
+		URLPublica:      env("API_URL_PUBLICA", "http://localhost:8080"),
 	}
 	if op.MQTTClave == "" {
 		return errors.New("falta MQTT_CLAVE (la clave de la API en el broker)")

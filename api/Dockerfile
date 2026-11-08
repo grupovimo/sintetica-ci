@@ -1,6 +1,6 @@
 # La API y el bicho virtual (los dos usan el núcleo de C++ por cgo).
 # Se construye desde la raíz del repo: docker build -f api/Dockerfile .
-FROM golang:1.24-bookworm AS compilar
+FROM golang:1.25-bookworm AS compilar
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

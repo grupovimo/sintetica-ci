@@ -2,6 +2,13 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
   import { api, ErrorApi } from '$lib/api';
+  import '$lib/consola/consola.css';
+  import Producto from '$lib/consola/Producto.svelte';
+  import { modeloDe } from '$lib/consola/modelo';
+
+  let { data } = $props();
+  // La foto del robot con su cara, como en la consola.
+  const modelo = modeloDe({ id: '', perfil: 'unidad', apodo: '', virtual: false, conectado: true, ultimaConexion: null, estadoEn: null, creado: '', estado: null, sincro: { config: '', imagenes: '' }, config: null });
 
   let email = $state('');
   let codigo = $state('');
@@ -40,43 +47,50 @@
   }
 </script>
 
-<svelte:head><title>Entrar · Sintética</title></svelte:head>
+<svelte:head>
+  <title>Entrar · Sintética</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap" />
+</svelte:head>
 
-<div class="contenedor entrar">
-  <div class="cara" aria-hidden="true">
-    <svg viewBox="0 0 320 172"><rect width="320" height="172" rx="14" fill="#0B0A09"/><rect x="88" y="46" width="44" height="80" rx="22" fill="#FF6A33"/><rect x="188" y="46" width="44" height="80" rx="22" fill="#FF6A33"/></svg>
-  </div>
-  <div class="tarjeta formulario">
-    <h1>Entrá a Sintética</h1>
-    {#if !enviado}
-      <p class="nota">Te mandamos un link por mail. Sin contraseñas.</p>
-      <form onsubmit={pedir} class="grilla">
-        <label><span class="etiqueta">Tu email</span>
-          <input type="email" required autocomplete="email" bind:value={email} placeholder="vos@ejemplo.com" />
-        </label>
-        <button class="primario" disabled={ocupado || !email}>{ocupado ? 'Mandando…' : 'Mandame el link'}</button>
-      </form>
-    {:else}
-      <p>Listo: si <b>{email}</b> está bien, te llegó un link. Vale 15 minutos.</p>
-      <p class="nota">En tu Mac, con Docker, los mails llegan a <a href="http://localhost:8025" target="_blank" rel="noreferrer">Mailpit (localhost:8025)</a>.</p>
-      <form onsubmit={canjear} class="grilla">
-        <label><span class="etiqueta">O escribí el código del mail</span>
-          <input required autocomplete="one-time-code" bind:value={codigo} placeholder="ABCD-EFGH" maxlength="9" style="text-transform: uppercase; letter-spacing: 0.1em" />
-        </label>
-        <div class="fila">
-          <button class="primario" disabled={ocupado || codigo.length < 8}>Entrar</button>
-          <button type="button" onclick={() => { enviado = false; codigo = ''; }}>Otro email</button>
-        </div>
-      </form>
-    {/if}
-    {#if error}<p class="aviso-caja error" role="alert">{error}</p>{/if}
-  </div>
+<div class="consola">
+  <main class="caja entrar">
+    <div class="robot"><Producto {modelo} config={{ version: 2 }} visible={enviado ? 'enamorado' : 'contento'} /></div>
+    <div class="formulario">
+      <span class="grabado" style="color: var(--brasa)">Sintética</span>
+      <h1 class="titular">{enviado ? 'Fijate tu mail.' : 'Entrá.'}</h1>
+      {#if !enviado}
+        <form onsubmit={pedir}>
+          <label class="visor"><span class="grabado">Tu email</span>
+            <!-- svelte-ignore a11y_autofocus -->
+            <input class="campo" type="email" required autocomplete="email" bind:value={email} placeholder="vos@ejemplo.com" autofocus /></label>
+          <button class="tecla naranja ancha" disabled={ocupado || !email}>{ocupado ? 'Mandando…' : 'Mandame el link'}</button>
+          <p class="texto">Sin contraseñas.</p>
+        </form>
+      {:else}
+        <form onsubmit={canjear}>
+          <p class="texto">Un link a <b>{email}</b>, o este código:</p>
+          <label class="visor"><span class="grabado">Código</span>
+            <input class="campo codigo" required autocomplete="one-time-code" bind:value={codigo} placeholder="ABCD-EFGH" maxlength="9" /></label>
+          <div class="botones">
+            <button class="tecla naranja ancha" disabled={ocupado || codigo.length < 8}>Entrar</button>
+            <button class="tecla negra" type="button" onclick={() => { enviado = false; codigo = ''; }}>Otro email</button>
+          </div>
+          {#if data.desarrollo}<p class="texto"><a href="http://localhost:8025" target="_blank" rel="noreferrer">Mailpit</a></p>{/if}
+        </form>
+      {/if}
+      {#if error}<p class="aviso error" role="alert"><span class="led"></span>{error}</p>{/if}
+    </div>
+  </main>
 </div>
 
 <style>
-  .entrar { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; min-height: 70vh; }
-  .cara svg { width: 100%; max-width: 460px; display: block; margin: 0 auto; filter: drop-shadow(0 30px 40px rgba(0,0,0,.25)); }
-  .formulario { max-width: 440px; display: grid; gap: 16px; }
-  .formulario p { margin: 0; }
-  @media (max-width: 760px) { .entrar { grid-template-columns: 1fr; gap: 24px; min-height: 0; } .cara svg { max-width: 300px; } }
+  .entrar { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 460px); gap: 64px; align-items: center; justify-content: center; padding-top: 40px; padding-bottom: 40px; }
+  .formulario { display: flex; flex-direction: column; gap: 22px; }
+  form { display: flex; flex-direction: column; gap: 16px; }
+  .ancha { width: 100%; min-height: 60px; }
+  .codigo { text-transform: uppercase; letter-spacing: .12em; }
+  .botones { display: grid; grid-template-columns: 1fr auto; gap: 12px; }
+  .texto a { color: var(--brasa); }
+  @media (max-width: 860px) { .entrar { grid-template-columns: 1fr; gap: 28px; } .robot { max-width: 260px; width: 100%; margin: 0 auto; } }
 </style>
