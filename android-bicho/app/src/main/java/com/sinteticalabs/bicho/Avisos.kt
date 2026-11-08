@@ -102,7 +102,7 @@ class Avisos : NotificationListenerService() {
         @Volatile var alAviso: ((ByteArray) -> Unit)? = null
 
         /** Los tipos de aviso 2 a 6 los entiende el núcleo desde la v1.9; antes van como notificación. */
-        const val TIPOS_V19 = false
+        const val TIPOS_V19 = true
 
         private val PAGOS = setOf("com.mercadopago.wallet", "com.uala", "ar.com.bancar.uala", "com.naranjax.app")
         private val MAILS = setOf("com.google.android.gm", "com.microsoft.office.outlook", "com.google.android.gm.lite")

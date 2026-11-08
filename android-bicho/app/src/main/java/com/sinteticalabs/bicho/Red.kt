@@ -72,6 +72,13 @@ class Red(private val raiz: File) {
         }.start()
     }
 
+    /** Un JSON a un tópico propio de la nube (bicho/{id}/{cual}: presencia, charla); si no hay conexión, se pierde. */
+    fun publicar(cual: String, json: String) {
+        val c = cliente.get() ?: return
+        if (!conectado) return
+        Thread { runCatching { c.publish("bicho/$id/$cual", json.toByteArray(), 1, false) } }.start()
+    }
+
     fun redCambio() {
         synchronized(cambio) {
             hayCambio = true

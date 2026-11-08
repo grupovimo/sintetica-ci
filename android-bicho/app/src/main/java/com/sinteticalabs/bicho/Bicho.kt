@@ -50,6 +50,7 @@ class Bicho : Activity() {
         red.prender()
         presencia = Presencia(this) { llegaste ->
             vista.queueEvent { Nucleo.nubeEscribir(2, byteArrayOf(0x49, if (llegaste) 0 else 1)) }
+            red.publicar("presencia", "{\"llegaste\":$llegaste}")
         }
         presencia.prender()
         depuracion = Depuracion(vista, presencia) { datos.alternar() }
