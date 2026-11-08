@@ -1,0 +1,61 @@
+# Compila las imágenes de la API y la web y las sube a GHCR. El VPS solo las
+# baja (produccion/README.md): nada se compila en la Mac ni en el VPS.
+name: Imágenes
+
+on:
+  push:
+    branches: [claude/pensive-tesla-8fe2fg, main]
+    paths:
+      - api/**
+      - web/**
+      - firmware/nucleo/**
+      - firmware/api/**
+      - firmware/perfiles/sim/**
+      - firmware/herramientas/fuentes/**
+      - sim/**
+      - shared/**
+      - go.mod
+      - go.sum
+      - .github/workflows/imagenes.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: imagenes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  imagen:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - nombre: sintetica-api
+            dockerfile: api/Dockerfile
+            target: api
+          - nombre: sintetica-web
+            dockerfile: web/Dockerfile
+            target: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/nawesan12/${{ matrix.nombre }}:latest
+            ghcr.io/nawesan12/${{ matrix.nombre }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.nombre }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.nombre }}

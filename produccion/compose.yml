@@ -1,0 +1,111 @@
+# SintéticaOS en el VPS de Grupo Vimo (/opt/sintetica). Ver produccion/README.md.
+#
+# Las imágenes las compila GitHub Actions (.github/workflows/imagenes.yml) y
+# acá solo se bajan: docker compose pull && docker compose up -d
+#
+# Puertos (Docker se saltea UFW: todo en 127.0.0.1 salvo el 8883):
+#   3600 web  → sintetica.grupovimo.com.ar      (Caddy + Cloudflare)
+#   4400 API  → api-sintetica.grupovimo.com.ar  (Caddy + Cloudflare)
+#   8883 MQTT con TLS → mqtt-sintetica.grupovimo.com.ar (sin Cloudflare)
+#   18083 panel de EMQX y 8025 Mailpit: solo por túnel SSH
+name: sintetica
+
+x-api-entorno: &api-entorno
+  DATABASE_URL: postgres://sintetica:${POSTGRES_CLAVE:?falta POSTGRES_CLAVE}@postgres:5432/sintetica?sslmode=disable
+  MQTT_URL: tcp://emqx:1883
+  MQTT_USUARIO: api
+  MQTT_CLAVE: ${MQTT_CLAVE_API:?falta MQTT_CLAVE_API}
+  MQTT_URL_PUBLICA: mqtts://mqtt-sintetica.grupovimo.com.ar:8883
+  MQTT_URL_INTERNA: mqtt://emqx:1883
+  API_URL_PUBLICA: https://api-sintetica.grupovimo.com.ar
+  API_URL_INTERNA: http://api:8080
+  WEB_URL: https://sintetica.grupovimo.com.ar
+  # Sin SMTP de verdad hasta tener el dominio: los mails quedan en Mailpit.
+  SMTP_SERVIDOR: mailpit:1025
+  SMTP_DE: Sintética Labs <hola@sinteticalabs.com>
+  CLAVE_FIRMA: /claves/ota-privada.pem
+  SECRETO: ${SECRETO:?falta SECRETO}
+  ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+  COOKIE_SEGURA: "1"
+  DESARROLLO: "0"
+  EMQX_API_URL: http://emqx:18083
+  EMQX_API_CLAVE: ${EMQX_API_CLAVE:?falta EMQX_API_CLAVE}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sintetica
+      POSTGRES_PASSWORD: ${POSTGRES_CLAVE}
+      POSTGRES_DB: sintetica
+    volumes:
+      - ./pg:/var/lib/postgresql/data
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=40"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "sintetica"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+    restart: unless-stopped
+
+  emqx:
+    image: emqx/emqx:5.8.6
+    environment:
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_CLAVE_PANEL:?falta EMQX_CLAVE_PANEL}
+      EMQX_NODE__COOKIE: ${EMQX_COOKIE:?falta EMQX_COOKIE}
+    volumes:
+      - ./emqx.conf:/opt/emqx/etc/emqx.conf:ro
+      - ./secretos/emqx-api-claves.txt:/opt/emqx/etc/api-claves.txt:ro
+      - ./certs:/opt/emqx/etc/certs/sintetica:ro
+      - ./emqx-datos:/opt/emqx/data
+    ports:
+      - "8883:8883"
+      - "127.0.0.1:18083:18083"
+    healthcheck:
+      test: ["CMD", "/opt/emqx/bin/emqx", "ctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    mem_limit: 448m
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    environment:
+      MP_MAX_MESSAGES: 500
+    ports:
+      - "127.0.0.1:8025:8025"
+    mem_limit: 64m
+    restart: unless-stopped
+
+  api:
+    image: ghcr.io/nawesan12/sintetica-api:${VERSION:-latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      emqx:
+        condition: service_healthy
+    environment: *api-entorno
+    volumes:
+      - ./claves:/claves:ro
+    ports:
+      - "127.0.0.1:4400:8080"
+    mem_limit: 192m
+    restart: unless-stopped
+
+  web:
+    image: ghcr.io/nawesan12/sintetica-web:${VERSION:-latest}
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      API_INTERNA: http://api:8080
+      ORIGIN: https://sintetica.grupovimo.com.ar
+      # La IP real del usuario (para los límites de la API): detrás de
+      # Cloudflare y Caddy, la del socket es siempre la del proxy.
+      ADDRESS_HEADER: CF-Connecting-IP
+    ports:
+      - "127.0.0.1:3600:3000"
+    mem_limit: 192m
+    restart: unless-stopped
