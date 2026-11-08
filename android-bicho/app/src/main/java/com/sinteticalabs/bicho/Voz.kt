@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import android.media.MediaPlayer
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Bundle
@@ -22,11 +23,19 @@ import kotlin.random.Random
  * La voz de criatura: los sonidos del núcleo (Hal::sonido) sintetizados acá,
  * sin archivos. El tono depende de voz.tipo y el volumen de voz.volumen; el
  * despertador va por el canal de alarma y sube de 1 a 5. Lo que dice el globo
- * lo lee en voz alta el TTS del celu (sin red: si no hay voz en español, calla).
+ * lo lee en voz alta el TTS del celu (sin red: si no hay voz en español, calla),
+ * salvo que la nube mande su audio (ElevenLabs, ver [VozNube]): entonces suena ese.
  */
-class Voz(contexto: Context) {
+class Voz(private val contexto: Context) {
     private val hilo = HandlerThread("voz").apply { start() }
     private val cola = Handler(hilo.looper)
+    // El globo (TTS o el mp3 de la nube) va aparte: los sonidos ocupan su hilo mientras suenan.
+    private val hiloHabla = HandlerThread("habla").apply { start() }
+    private val colaHabla = Handler(hiloHabla.looper)
+    val nube = VozNube().also { n -> n.alLlegar = { a -> colaHabla.post { audioDeLaNube(a) } } }
+
+    /** Mientras hay una conversación en tiempo real, el globo no se lee (habla el agente). */
+    @Volatile var callada = false
     private val vibrador = contexto.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator?
 
     /** {volumen, micrófono, tipo, conversa}, como lo da [Nucleo.voz]; lo actualiza el hilo de GL. */
@@ -35,6 +44,11 @@ class Voz(contexto: Context) {
     @Volatile private var habla: TextToSpeech? = null
     @Volatile private var hablaLista = false
     private var ultimoGlobo = ""
+    // Del hilo de la habla: el globo que se ve, si ya se dijo y la espera del audio de la nube.
+    private var globoCrc = -1L
+    private var globoLimpio = ""
+    private var globoDicho = true
+    private var reproductor: MediaPlayer? = null
 
     init {
         habla = TextToSpeech(contexto.applicationContext) { estado ->
@@ -59,7 +73,52 @@ class Voz(contexto: Context) {
         val texto = String(utf8, Charsets.UTF_8)
         if (texto == ultimoGlobo) return
         ultimoGlobo = texto
-        val limpio = Sintesis.paraLeer(texto)
+        colaHabla.post { globoNuevo(utf8, texto) }
+    }
+
+    private fun globoNuevo(utf8: ByteArray, texto: String) {
+        colaHabla.removeCallbacks(esperaNube)
+        globoCrc = if (texto.isEmpty()) -1L else VozNube.crc(utf8)
+        globoLimpio = Sintesis.paraLeer(texto)
+        globoDicho = texto.isEmpty() || callada
+        if (globoDicho) return
+        // El audio de la nube llega justo antes del Decir (origen 0).
+        nube.tomar(globoCrc)?.let { return reproducirMp3(it) }
+        // Los recordatorios y el despertador: la nube manda el suyo ~1 s después.
+        if (nube.leeGlobos) colaHabla.postDelayed(esperaNube, ESPERA_NUBE_MS) else decirLocal()
+    }
+
+    private val esperaNube = Runnable { decirLocal() }
+
+    private fun audioDeLaNube(a: VozNube.Audio) {
+        if (globoDicho || a.crc != globoCrc) return  // el que corresponde lo toma globoNuevo
+        colaHabla.removeCallbacks(esperaNube)
+        nube.tomar(a.crc)?.let(::reproducirMp3)
+    }
+
+    private fun reproducirMp3(a: VozNube.Audio) {
+        globoDicho = true
+        if (config[0] <= 0) return
+        habla?.stop()
+        reproductor?.release()
+        val archivo = java.io.File(contexto.cacheDir, "globo.mp3").apply { writeBytes(a.mp3) }
+        reproductor = runCatching {
+            MediaPlayer().apply {
+                setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                setDataSource(archivo.path)
+                prepare()
+                setVolume(config[0] / 100f, config[0] / 100f)
+                setOnCompletionListener { it.release(); if (reproductor === it) reproductor = null }
+                start()
+            }
+        }.onFailure { Log.w("Bicho", "voz de la nube: no sonó", it) }.getOrNull()
+    }
+
+    private fun decirLocal() {
+        if (globoDicho) return
+        globoDicho = true
+        val limpio = globoLimpio
         val h = habla ?: return
         if (limpio.isEmpty() || !hablaLista || config[0] <= 0) return
         val (tono, ritmo) = Sintesis.tonoHabla(config[2])
@@ -81,7 +140,17 @@ class Voz(contexto: Context) {
     fun apagar() {
         habla?.shutdown()
         habla = null
+        reproductor?.release()
         hilo.quitSafely()
+        hiloHabla.quitSafely()
+    }
+
+    /** Corta lo que se esté diciendo (empieza una conversación). */
+    fun cortar() = colaHabla.post {
+        habla?.stop()
+        reproductor?.release()
+        reproductor = null
+        globoDicho = true
     }
 
     private fun tocar(nombre: String, volumen: Float, tipo: Int) {
@@ -123,6 +192,7 @@ class Voz(contexto: Context) {
     }
 
     companion object {
+        const val ESPERA_NUBE_MS = 3000L
         private val ESPANOLES = listOf(Locale("es", "AR"), Locale("es", "US"), Locale("es", "MX"), Locale("es", "ES"), Locale("es"))
 
         /**

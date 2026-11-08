@@ -17,6 +17,8 @@ import java.util.concurrent.TimeUnit
  * cara de escuchar y transcribe una sola frase, que es lo único que sale del
  * celu: el texto, por la nube (bicho/{id}/charla), que contesta con un Decir
  * (globo + TTS). El audio nunca se guarda ni se manda.
+ * Si el dueño conectó ElevenLabs, después de la palabra primero pide una
+ * conversación en tiempo real ([Conversacion]); sin cuenta, como antes.
  * Solo con voz.conversar prendido. El modelo se copia una vez por adb (README).
  */
 class Charla(
@@ -24,9 +26,15 @@ class Charla(
     private val voz: Voz,
     /** Un comando al núcleo propio (por el hilo de GL). */
     private val alNucleo: (ByteArray) -> Unit,
-    /** La frase, a la nube. */
-    private val alDecir: (String) -> Unit,
+    /** Un JSON a un tópico propio de la nube (charla, conversacion). */
+    private val alPublicar: (String, String) -> Unit,
+    /** Si hay nube (para pedir la conversación). */
+    private val enLinea: () -> Boolean,
 ) {
+    private val respuestas = LinkedBlockingQueue<String>(4)
+    @Volatile private var conversacion: Conversacion? = null
+    // Sin cuenta de ElevenLabs (o sin respuesta): no se pide de nuevo por un rato.
+    private var sinConversacionHasta = 0L
     private val cola = LinkedBlockingQueue<ShortArray>(40)  // 2 s de audio, como mucho
     @Volatile private var andando = true
     private val hilo = Thread({ correr() }, "charla").apply { start() }
@@ -37,7 +45,16 @@ class Charla(
         cola.offer(tramo.copyOf(n))
     }
 
+    /** Lo que llega por bicho/{id}/conversacion/url. */
+    fun respuesta(json: String) {
+        respuestas.offer(json)
+    }
+
+    /** Corta la conversación si hay una (lo sacudieron, se fue el wifi). */
+    fun cortar(por: String) = conversacion?.terminar(por)
+
     fun apagar() {
+        cortar("se apaga el bicho")
         andando = false
         hilo.interrupt()
     }
@@ -69,8 +86,11 @@ class Charla(
                 val oido = texto(if (listo) espera.result else espera.partialResult, if (listo) "text" else "partial")
                 if (!contienePalabra(oido, palabra)) continue
                 espera.reset()
-                frase(model, palabra, previo.toList())
+                val antes = previo.toList()
                 previo.clear()
+                // Con conversación (null) ya está; si no, Vosk con lo que se oyó mientras tanto.
+                val resto = conversar(antes)
+                if (resto != null) frase(model, palabra, antes + resto)
                 cola.clear()
             }
         } catch (_: InterruptedException) {
@@ -78,6 +98,45 @@ class Charla(
             espera?.close()
             model?.close()
         }
+    }
+
+    /**
+     * Pide la conversación en tiempo real y, si la dan, la sostiene hasta que
+     * termina (null). Si no, devuelve lo que se oyó mientras esperaba, para Vosk.
+     */
+    private fun conversar(previo: List<ShortArray>): List<ShortArray>? {
+        val ahora = System.currentTimeMillis()
+        if (ahora < sinConversacionHasta || !enLinea()) return emptyList()
+        respuestas.clear()
+        alNucleo(byteArrayOf(0x10) + "escuchando".toByteArray())
+        alPublicar("conversacion", "{\"pedir\":true}")
+        val oido = ArrayList<ShortArray>()
+        var r: Conversaciones.Respuesta? = null
+        val hasta = ahora + ESPERA_URL_MS
+        while (r == null && System.currentTimeMillis() < hasta) {
+            cola.poll(50, TimeUnit.MILLISECONDS)?.let { oido += it }
+            respuestas.poll()?.let { r = runCatching { Conversaciones.leer(it) }.getOrNull() }
+        }
+        val res = r
+        if (res?.url == null) {
+            alNucleo(byteArrayOf(0x10))
+            Log.i("Bicho", "conversación: ${res?.error ?: "sin respuesta"}; sigue la charla de siempre")
+            sinConversacionHasta = ahora + if (res == null) 2 * 60_000L else 10 * 60_000L
+            return oido
+        }
+        voz.cortar()
+        voz.callada = true
+        val c = Conversacion(res.url, res.segundos, res.expresiones, { voz.config[0] / 100f }, alNucleo) {}
+        conversacion = c
+        try {
+            for (t in previo + oido) c.enviar(t)
+            while (andando && !c.termino) cola.poll(1, TimeUnit.SECONDS)?.let(c::enviar)
+        } finally {
+            c.terminar("fin")
+            conversacion = null
+            voz.callada = false
+        }
+        return null
     }
 
     /** Escucha una frase (hasta 8 s, o hasta que se calla) con la cara de escuchar. */
@@ -114,7 +173,7 @@ class Charla(
             return
         }
         Log.i("Bicho", "charla: frase de ${enviar.length} letras a la nube")
-        alDecir(enviar)
+        alPublicar("charla", JSONObject().put("texto", enviar).toString())
     }
 
     private fun cargar(): Model? {
@@ -133,6 +192,7 @@ class Charla(
         const val MAXIMO_MS = 8000
         const val MOSTRAR_MS = 2000
         const val PREVIO = 20  // tramos de 50 ms
+        const val ESPERA_URL_MS = 3000L
 
         /** En minúsculas y sin tildes (Vosk escribe así; la palabra puede venir con mayúsculas). */
         fun normalizar(s: String): String =

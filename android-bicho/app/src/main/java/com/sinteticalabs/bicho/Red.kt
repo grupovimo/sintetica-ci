@@ -72,6 +72,13 @@ class Red(private val raiz: File) {
         }.start()
     }
 
+    /** Lo que llega por bicho/{id}/audio y bicho/{id}/conversacion/url (hilo de MQTT). */
+    @Volatile var alAudio: ((ByteArray) -> Unit)? = null
+    @Volatile var alConversacion: ((String) -> Unit)? = null
+
+    /** Si está conectado a la nube. */
+    val enLinea get() = conectado && cliente.get() != null
+
     /** Un JSON a un tópico propio de la nube (bicho/{id}/{cual}: presencia, charla); si no hay conexión, se pierde. */
     fun publicar(cual: String, json: String) {
         val c = cliente.get() ?: return
@@ -249,8 +256,16 @@ class Red(private val raiz: File) {
                             val p = m.payload
                             if (p.size >= 2) vista.queueEvent { Nucleo.nubeEscribir(p[0].toInt() and 0xFF, p.copyOfRange(1, p.size)) }
                         }
+                        // La voz de la nube (ElevenLabs): los mp3 de los globos y la URL de la conversación.
                         c.publish(conexion, "1".toByteArray(), 1, true)
                         conectado = true
+                        // Una nube vieja (sin estos tópicos en la ACL) no tiene que dejarlo sin nube.
+                        runCatching {
+                            c.subscribe("bicho/$id/audio", 1) { _, m: MqttMessage -> alAudio?.invoke(m.payload) }
+                            c.subscribe("bicho/$id/conversacion/url", 1) { _, m: MqttMessage ->
+                                alConversacion?.invoke(String(m.payload, Charsets.UTF_8))
+                            }
+                        }.onFailure { Log.w("Bicho", "nube: sin la voz de la nube (${it.message}, ${(it as? org.eclipse.paho.client.mqttv3.MqttException)?.reasonCode})") }
                         val estado = enGl {
                             Nucleo.conexiones(true, true)
                             Nucleo.estado()

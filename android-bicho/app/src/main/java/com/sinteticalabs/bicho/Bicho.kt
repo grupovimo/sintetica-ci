@@ -57,9 +57,9 @@ class Bicho : Activity() {
         depuracion = Depuracion(vista, presencia) { datos.alternar() }
         registerReceiver(depuracion, IntentFilter(Depuracion.ACCION))
         sentidos = Sentidos(this, vista, lienzo)
-        charla = Charla(this, voz, { c -> vista.queueEvent { Nucleo.nubeEscribir(2, c) } }) { frase ->
-            red.publicar("charla", org.json.JSONObject().put("texto", frase).toString())
-        }
+        charla = Charla(this, voz, { c -> vista.queueEvent { Nucleo.nubeEscribir(2, c) } }, red::publicar) { red.enLinea }
+        red.alAudio = voz.nube::recibir
+        red.alConversacion = charla::respuesta
         sentidos.alOir = charla::oir
         datos = Datos(texto, lienzo, sentidos, depuracion)
         var cuadro = 0
