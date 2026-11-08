@@ -50,6 +50,8 @@ class Sentidos(
         private set
     @Volatile var nivelOido = 0f
         private set
+    /** Cada tramo del micrófono, antes de borrarlo (la charla). */
+    @Volatile var alOir: ((ShortArray, Int) -> Unit)? = null
     @Volatile var lux = -1f
         private set
     /** Dónde está la cara que ve (de -1 a 1), o null. */
@@ -181,6 +183,7 @@ class Sentidos(
                 val n = mic.read(tramo, 0, tramo.size)
                 if (n <= 0) continue
                 val oyo = oido.tramo(tramo, n)
+                alOir?.invoke(tramo, n)
                 tramo.fill(0)
                 nivelOido = oido.nivel
                 if (oyo != null) {

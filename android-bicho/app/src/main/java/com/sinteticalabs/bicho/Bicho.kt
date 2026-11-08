@@ -25,6 +25,7 @@ class Bicho : Activity() {
     private lateinit var raiz: FrameLayout
     private lateinit var voz: Voz
     private lateinit var presencia: Presencia
+    private lateinit var charla: Charla
     private var menu: View? = null
     private val secreto by lazy { Secreto(resources.displayMetrics.density * 80) { abrirMenu() } }
 
@@ -56,6 +57,10 @@ class Bicho : Activity() {
         depuracion = Depuracion(vista, presencia) { datos.alternar() }
         registerReceiver(depuracion, IntentFilter(Depuracion.ACCION))
         sentidos = Sentidos(this, vista, lienzo)
+        charla = Charla(this, voz, { c -> vista.queueEvent { Nucleo.nubeEscribir(2, c) } }) { frase ->
+            red.publicar("charla", org.json.JSONObject().put("texto", frase).toString())
+        }
+        sentidos.alOir = charla::oir
         datos = Datos(texto, lienzo, sentidos, depuracion)
         var cuadro = 0
         lienzo.alDibujar = {
@@ -70,6 +75,7 @@ class Bicho : Activity() {
     override fun onDestroy() {
         Avisos.alAviso = null
         presencia.apagar()
+        charla.apagar()
         voz.apagar()
         unregisterReceiver(depuracion)
         super.onDestroy()
