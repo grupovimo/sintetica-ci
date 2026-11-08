@@ -118,6 +118,9 @@ enum class Evento : uint8_t {
   Despertador,   // empezó a sonar el despertador (lo genera el sistema; v1.6)
   Juego,         // terminó una partida de un juego (v1.7)
   Animo,         // respondió el "¿cómo estás?" (v1.7)
+  CaraDetectada,  // la cámara ve una cara después de un rato sin ver ninguna (v1.8)
+  Oscuridad,      // se apagó la luz del cuarto (v1.8)
+  ManoCerca,      // una mano cerca de la pantalla, sin tocarla (v1.8)
   Cantidad
 };
 // El evento "padre" (sacudida-fuerte → sacudida, caricia → tacto): si no hay

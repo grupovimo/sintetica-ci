@@ -148,7 +148,7 @@
         "properties": {
           "si": {
             "type": "string",
-            "description": "Un evento (tacto, toque, doble-toque, levantado, sacudida, boca-abajo, vinculado, app-abierta, despertado, caricia, muchos-toques, sacudida-suave, sacudida-fuerte, inclinado, caida, voz, nombre, ruido, musica, silencio, notificacion, llamada, bateria-baja, bateria-critica, enchufado, desenchufado, cargado, sin-wifi, cambio-de-cara, bicho-cerca, volvio, hito, recordatorio, pomodoro; también con _ o . en vez de -, como \"sacudida.fuerte\") o una condición de estado (bateria<15, humor>0.5).",
+            "description": "Un evento (tacto, toque, doble-toque, levantado, sacudida, boca-abajo, vinculado, app-abierta, despertado, caricia, muchos-toques, sacudida-suave, sacudida-fuerte, inclinado, caida, voz, nombre, ruido, musica, silencio, notificacion, llamada, bateria-baja, bateria-critica, enchufado, desenchufado, cargado, sin-wifi, cambio-de-cara, bicho-cerca, volvio, hito, recordatorio, pomodoro, despertador, juego, animo, cara-detectada, oscuridad, mano-cerca; también con _ o . en vez de -, como \"sacudida.fuerte\") o una condición de estado (bateria<15, humor>0.5).",
             "pattern": "^([a-z][a-z._-]*|(bateria|humor)[<>]-?[0-9]+(\\.[0-9]+)?)$"
           },
           "entonces": {

@@ -39,7 +39,7 @@ export const Eventos = [
   'caricia', 'muchos-toques', 'sacudida-suave', 'sacudida-fuerte', 'inclinado', 'caida', 'voz', 'nombre',
   'ruido', 'musica', 'silencio', 'notificacion', 'llamada', 'bateria-baja', 'bateria-critica', 'enchufado',
   'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito',
-  'recordatorio', 'pomodoro', 'despertador', 'juego', 'animo',
+  'recordatorio', 'pomodoro', 'despertador', 'juego', 'animo', 'cara-detectada', 'oscuridad', 'mano-cerca',
 ];
 // Los juegos del comando Jugar (v1.7), en orden, y los ánimos del comando Ánimo.
 export const Juegos = ['ppt', 'reflejos', 'mirada', 'dado', 'moneda'];

@@ -11,7 +11,7 @@ export const EVENTOS = [
   'caricia', 'muchos-toques', 'sacudida-suave', 'sacudida-fuerte', 'inclinado', 'caida', 'voz', 'nombre',
   'ruido', 'musica', 'silencio', 'notificacion', 'llamada', 'bateria-baja', 'bateria-critica', 'enchufado',
   'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito', 'recordatorio', 'pomodoro', 'despertador',
-  'juego', 'animo',
+  'juego', 'animo', 'cara-detectada', 'oscuridad', 'mano-cerca',
 ] as const;
 export const NOMBRES_EVENTO: Record<string, string> = {
   tacto: 'Lo tocan', 'doble-toque': 'Doble toque', levantado: 'Lo levantan', sacudida: 'Lo sacuden (cualquiera)',
@@ -23,7 +23,8 @@ export const NOMBRES_EVENTO: Record<string, string> = {
   enchufado: 'Lo enchufan', desenchufado: 'Lo desenchufan', cargado: 'Carga completa', 'sin-wifi': 'Se queda sin WiFi',
   'cambio-de-cara': 'Le cambian la cara', 'bicho-cerca': 'Otro robot cerca', volvio: 'Volvés después de un rato',
   hito: 'Un hito (días juntos, caricias, cumpleaños)', recordatorio: 'Muestra un recordatorio', pomodoro: 'Termina una tanda', despertador: 'Suena el despertador',
-  juego: 'Termina un juego', animo: 'Le contás cómo estás',
+  juego: 'Termina un juego', animo: 'Le contás cómo estás', 'cara-detectada': 'Te ve', oscuridad: 'Se apaga la luz',
+  'mano-cerca': 'Una mano cerca',
 };
 
 // El robot cuenta los textos en bytes UTF-8 (una tilde ocupa 2): se corta sin partir una letra.

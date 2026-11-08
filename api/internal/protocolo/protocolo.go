@@ -112,6 +112,7 @@ var Eventos = []string{
 	"despertador", // v1.6: empezó a sonar la alarma (también lo avisa solo)
 	"juego",       // v1.7: terminó una partida (lo avisa solo, con una entrada de tipo 5)
 	"animo",       // v1.7: respondió el "¿Cómo estás?" (lo avisa solo, con una entrada de tipo 6)
+	"cara-detectada", "oscuridad", "mano-cerca", // v1.8: los sentidos del bicho-celu (cámara, luz, proximidad)
 }
 
 // VariablesEstado y Rasgos: el estado interno y la personalidad, en el orden del protocolo.

@@ -174,13 +174,16 @@ Eventos (el índice del comando `0x12`; los nombres son los de las reglas):
 | `24` desenchufado | `25` cargado | `26` sin-wifi | `27` cambio-de-cara |
 | `28` bicho-cerca | `29` volvio | `30` hito | `31` recordatorio |
 | `32` pomodoro | `33` despertador | `34` juego | `35` animo |
+| `36` cara-detectada | `37` oscuridad | `38` mano-cerca | |
 
 Los 8 primeros son de la v1; del 8 en adelante, del motor de vida (v1.4).
 `volvio` y `hito` los genera el motor; `recordatorio`, `pomodoro` y
 `despertador` (v1.6: empezó a sonar a su hora), `juego` (terminó una partida)
 y `animo` (respondió el "¿cómo estás?") (v1.7), el sistema (mandarlos sirve
-para probar las reglas, pero no muestran nada). Los eventos nuevos van siempre
-al final.
+para probar las reglas, pero no muestran nada). `cara-detectada` (la cámara
+ve una cara después de un rato sin ver ninguna), `oscuridad` (se apagó la luz)
+y `mano-cerca` (el sensor de proximidad) son de los sentidos del bicho-celu
+(v1.8). Los eventos nuevos van siempre al final.
 
 ### Eventos que avisa el bicho solo
 
