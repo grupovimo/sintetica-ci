@@ -1,4 +1,4 @@
-# Protocolo de SintéticaOS (v1.9)
+# Protocolo de SintéticaOS (v1.10)
 
 Un servicio GATT propio. Todos los enteros van en little-endian. La
 implementación de referencia es `firmware/nucleo/protocolo.*` y
@@ -165,6 +165,8 @@ veces más rápido.
 | `0x49` Presencia | `[u8 0 llegaste, 1 te fuiste]` | Del celu (por cercanía de Bluetooth) o de la nube (v1.9). Llegaste: evento `42 llegaste` y el "¡volviste!" con el ánimo de cuánto tardaste. Te fuiste: evento `43 te-fuiste`, el globo de `presencia.texto` (o de `te-vas`) si `presencia.preguntar`, y un rato después se aburre y le da sueño. |
 | `0x4A` Hábito | `[u8 índice 0-3][u8 0 hecho, 1 deshacer][u8 racha en días]` | Marca un hábito de `habitos` (v1.9). Hecho: comportamiento `orgulloso`, evento `44 habito` (registro tipo 8) y el globo de `habito-hecho` o, con racha de 3 o más, `habito-racha` (`{racha}`). Deshacer: nada visible. Por este comando no avisa (ya lo sabe quien lo mandó). `0x07` si ese hábito no existe. |
 | `0x4B` Música | `[u8 bpm (0 = no se sabe)][u8 flags: bit 0 está sonando][n][título, 0 a 40 bytes][n][artista, 0 a 24 bytes]` | Lo que suena (v1.9). Sonando: mueve la cabeza al ritmo (el bpm, o 100), con notas; al cambiar de tema, `bailar-ritmo` y quizás un globo de `musica` (`{titulo}`, `{artista}`). Sin el bit (o sin otro marco en 20 min): deja de bailar, de a poco. |
+
+| `0x4C` Charlar | `[n][texto UTF-8, 1 a 200 bytes]` | Lo charla él, sin IA (v1.10; ver motor-de-vida.md, "Charla sin IA"): entiende lo que dijiste, hace la acción (alarma, recordatorio, hábito, juego, modo, gusto...), contesta con su globo, su expresión y su voz propia, y responde `[0xCC][0x00][flags: bit 0 no entendió, bit 1 preguntó lo que faltaba, bit 2 hizo una acción][confianza 0-100][n][intención][u8 acción][i8 dato][i16 minuto][i16 en minutos][i8 día][u8 días][n][texto][n][frase]`. Acciones: 0 ninguna, 1 alarma, 2 cancelar-alarma, 3 posponer, 4 apagar-alarma, 5 recordatorio, 6 hábito, 7 jugar, 8 modo, 9 gusto, 10 olvidar-gusto, 11 toque, 12 música, 13 dormir, 14 despertar, 15 dueño, 16 volumen, 17 callar, 18 ánimo. Con el bit 0, quien lo mandó puede probar la IA y mandar su respuesta con `0x40`. Cuando charla desde adentro (el micrófono del robot-celu) y hace una acción, manda el mismo `0xCC` solo, por BLE y por la nube, para que se guarde (el despertador de todos los días, un recordatorio, un gusto, un toque para un amigo). `0x08` si está mal armado. |
 
 Los textos de la v1.9 se cortan por bytes UTF-8 sin partir letras (los
 armadores de Go y JS ya los cortan); el robot responde `0x08` si un largo no
@@ -353,6 +355,9 @@ Para los modelos con micrófono y parlante (dos micrófonos, un parlante):
   pasa por este tópico. El robot-celu pide la URL por
   `bicho/{id}/conversacion` y habla directo con ElevenLabs (ver
   `docs/nube.md`).
+- **Voz propia** (v1.10): con parlante (`Hal::audio`, PCM 16 kHz mono), el
+  robot lee el globo con su propio balbuceo, sin nube ni costo. La API C la
+  apaga con `sintetica_voz_propia(0)` cuando llega audio de la nube.
 - Sonidos (`Hal::sonido`): `escuchando`, `pensando`, `hablando`, además de
   `despertador:1` a `despertador:5`, `ronquido`, `murmullo`, `dado`,
   `notificacion`, `llamada`, `recordatorio` y `pomodoro`; desde la v1.9,

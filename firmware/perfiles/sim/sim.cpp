@@ -23,6 +23,7 @@ IMPORTAR(js_notificar) void js_notificar(int caracteristica, const uint8_t* dato
 IMPORTAR(js_sonido) void js_sonido(const char* nombre);
 IMPORTAR(js_led) void js_led(uint32_t rgb);
 IMPORTAR(js_registrar) void js_registrar(const char* mensaje);
+IMPORTAR(js_audio) void js_audio(const int16_t* muestras, size_t n);
 
 // Lo que el compilador puede pedir aunque no haya libc.
 void* memcpy(void* d, const void* s, size_t n) {
@@ -86,6 +87,7 @@ __attribute__((export_name("sim_iniciar"))) void sim_iniciar(int perfil) {
   h.sonido = js_sonido;
   h.led = js_led;
   h.registrar = js_registrar;
+  h.audio = js_audio;  // la voz propia: el navegador la toca con WebAudio
   Perfil p;
   if (perfil == 1) {
     p.ancho = 240, p.alto = 240, p.filasFranja = 40, p.redonda = true, p.boton = Perfil::Boton::Broche;
@@ -94,6 +96,13 @@ __attribute__((export_name("sim_iniciar"))) void sim_iniciar(int perfil) {
 }
 
 __attribute__((export_name("sim_tick"))) void sim_tick() { g_sistema.tick(); }
+// La charla sin IA (v1.10): el texto (n bytes) en el intercambio. 1 entendió, 0 no.
+__attribute__((export_name("sim_charlar"))) int sim_charlar(int n) {
+  if (n <= 0 || n > MAX_ENTRADA_CHARLA) return -1;
+  RespuestaCharla r;
+  return g_sistema.charlar(reinterpret_cast<const char*>(g_intercambio), static_cast<size_t>(n), &r) ? 1 : 0;
+}
+__attribute__((export_name("sim_voz_propia"))) void sim_voz_propia(int si) { g_sistema.vozPropia(si != 0); }
 __attribute__((export_name("sim_tacto"))) void sim_tacto(int apretado) { g_sistema.tacto(apretado != 0); }
 __attribute__((export_name("sim_imu"))) void sim_imu(float ax, float ay, float az) { g_sistema.imu(ax, ay, az); }
 __attribute__((export_name("sim_evento"))) void sim_evento(int e) {

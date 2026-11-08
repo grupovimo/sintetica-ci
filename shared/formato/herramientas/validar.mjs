@@ -112,4 +112,11 @@ for (const c of JSON.parse(fs.readFileSync(path.join(paridad, 'paridad.json'), '
     console.log(`MAL  paridad/${c.archivo}: el schema ${dice ? 'la acepta' : 'la rechaza'}`);
   }
 }
+
+// La charla sin IA (shared/formato/charla): las intenciones contra su schema
+// (los largos en bytes, las expresiones y los comportamientos los revisa embeber_caras.py).
+const charla = path.join(formato, 'charla');
+const validarCharla = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true })
+  .compile(JSON.parse(fs.readFileSync(path.join(charla, 'intenciones.schema.json'), 'utf8')));
+revisar('charla/intenciones.json', validarCharla, JSON.parse(fs.readFileSync(path.join(charla, 'intenciones.json'), 'utf8')));
 process.exit(errores ? 1 : 0);

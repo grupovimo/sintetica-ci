@@ -3,7 +3,7 @@
 import { almacenLocal, crearSimulador } from './sim.js';
 import {
   ArmadorDeConfig, Car, comando, escriturasDeConfig, escriturasDeImagen, Eventos, imagen, leerEstado,
-  leerListaImagenes, leerQr, leerRespuesta, pedirConfig,
+  leerCharla, leerListaImagenes, leerQr, leerRespuesta, pedirConfig,
 } from './protocolo.js';
 import { codificarQoi } from './qoi.js';
 
@@ -66,8 +66,31 @@ function escribir(car, bytes, comentario = '') {
   sim.bleEscribir(car, bytes);
 }
 
+// La voz propia: el núcleo manda PCM de 16 kHz y acá se encola en WebAudio.
+let audio = null, audioHasta = 0, conVoz = true;
+function tocarVoz(m) {
+  if (!conVoz || typeof AudioContext === 'undefined') return;
+  if (!audio) audio = new AudioContext();
+  const buf = audio.createBuffer(1, m.length, 16000);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < m.length; i++) d[i] = m[i] / 32768;
+  const src = audio.createBufferSource();
+  src.buffer = buf;
+  src.connect(audio.destination);
+  const t = Math.max(audio.currentTime + 0.02, audioHasta);
+  src.start(t);
+  audioHasta = t + m.length / 16000;
+}
+
 function alNotificar(car, b) {
   if (car === Car.estado) { mostrarEstado(leerEstado(b)); return; }
+  const c = car === Car.comando ? leerCharla(b) : null;
+  if (c) {
+    const que = c.noEntendi ? 'no entendió' : `${c.intencion}${c.accion !== 'ninguna' ? ` → ${c.accion}` : ''}${c.falta ? ' (falta)' : ''}`;
+    $('v-charla').textContent = `${que} · ${c.confianza} %`;
+    anotar(`← charla  ${que}  «${c.frase}»${c.texto ? `  [${c.texto}]` : ''}${c.minuto >= 0 ? `  ${Math.floor(c.minuto / 60)}:${String(c.minuto % 60).padStart(2, '0')}` : ''}`);
+    return;
+  }
   if (car === Car.imagen && b[0] === 0xa4 && b[1] === 0) {
     const l = leerListaImagenes(b);
     ocupados = l.mascara;
@@ -233,6 +256,7 @@ async function arrancar() {
     alRegistrar: (m) => anotar(`· ${m}`),
     alSonido: (s) => anotar(`♪ sonido: ${s}`),
     alLed: (rgb) => { $('led').style.background = `#${rgb.toString(16).padStart(6, '0')}`; },
+    alAudio: tocarVoz,
   });
   armarCaras();
   armarAnimaciones();
@@ -438,3 +462,18 @@ function enlazar() {
     anotar(`No pude arrancar el simulador: ${e.message}`, 'mal');
   }
 })();
+
+// La charla sin IA: se manda como lo mandaría la app (0x4C Charlar) y él
+// contesta con su globo, su voz y lo que hizo (0xCC).
+$('f-charla').addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const t = $('i-charla').value.trim();
+  if (!t || !sim) return;
+  if (!audio && typeof AudioContext !== 'undefined') audio = new AudioContext();  // el navegador pide un gesto
+  escribir(Car.comando, comando.charlar(t), `«${t}»`);
+  $('i-charla').select();
+});
+$('b-voz').addEventListener('click', () => {
+  conVoz = !conVoz;
+  $('b-voz').setAttribute('aria-pressed', String(conVoz));
+});

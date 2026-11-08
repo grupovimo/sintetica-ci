@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sinteticalabs.com/schema/charla/intenciones/v1.json",
+  "title": "Las intenciones de la charla sin IA",
+  "description": "Lo que entiende el robot sin IA (firmware/nucleo/charla.cpp). Un patrón son palabras separadas por espacios, ya normalizadas (minúsculas, sin tildes); cada palabra puede tener alternativas con | , una raíz con * al final y ser opcional con ? al final. Las respuestas son de 1 a 60 bytes UTF-8 (el globo) y usan las plantillas {dueno} {robot} {hora} {fecha} {dia} {clima} {cuando} {cuando_dia} {a_las} {minutos} {texto} {quien} {toque} {juego} {habito} {habitos} {gustos} {agenda} {musica} {dias} {resultado}.",
+  "type": "object",
+  "required": ["version", "umbral", "contexto", "abreviaturas", "relleno", "juegos", "modos", "toques", "no_entendi", "intenciones"],
+  "additionalProperties": false,
+  "$defs": {
+    "patron": {"type": "string", "pattern": "^[a-záéíóúüñ0-9|*?]+( [a-záéíóúüñ0-9|*?]+)*$"},
+    "frase": {"type": "string", "minLength": 1, "maxLength": 60},
+    "respuestas": {
+      "type": "object",
+      "propertyNames": {"enum": ["todos", "timido", "picaro", "dormilon", "carinoso", "curioso", "grunon", "electrico"]},
+      "additionalProperties": {"type": "array", "items": {"$ref": "#/$defs/frase"}, "minItems": 1}
+    },
+    "falta": {
+      "type": "object",
+      "propertyNames": {"enum": ["todos", "timido", "picaro", "dormilon", "carinoso", "curioso", "grunon", "electrico", "hora", "texto", "juego", "habito", "quien"]},
+      "additionalProperties": {"type": "array", "items": {"$ref": "#/$defs/frase"}, "minItems": 1}
+    },
+    "grupo": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["nombre", "patrones"],
+        "additionalProperties": false,
+        "properties": {
+          "nombre": {"type": "string", "pattern": "^[a-z-]+$"},
+          "decir": {"type": "string"},
+          "patrones": {"type": "array", "items": {"$ref": "#/$defs/patron"}, "minItems": 1}
+        }
+      }
+    }
+  },
+  "properties": {
+    "version": {"const": 1},
+    "umbral": {"type": "number", "minimum": 0, "maximum": 1, "description": "Desde qué puntaje entiende (0-1)."},
+    "contexto": {"type": "integer", "minimum": 0, "description": "Segundos que recuerda la última intención."},
+    "abreviaturas": {"type": "object", "additionalProperties": {"type": "string"}},
+    "relleno": {"type": "array", "items": {"type": "string"}, "description": "Palabras que no cuentan para ver cuánto entendió."},
+    "juegos": {"type": "array", "$ref": "#/$defs/grupo", "minItems": 5, "maxItems": 5},
+    "modos": {"type": "array", "$ref": "#/$defs/grupo", "minItems": 4, "maxItems": 4},
+    "toques": {"type": "array", "$ref": "#/$defs/grupo", "minItems": 4, "maxItems": 4},
+    "no_entendi": {"$ref": "#/$defs/respuestas"},
+    "intenciones": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[a-z0-9-]+$"},
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["patrones", "respuestas"],
+        "additionalProperties": false,
+        "properties": {
+          "patrones": {"type": "array", "items": {"$ref": "#/$defs/patron"}, "minItems": 1},
+          "accion": {"enum": ["ninguna", "alarma", "cancelar-alarma", "posponer", "apagar-alarma", "recordatorio", "habito", "jugar", "modo", "gusto", "olvidar-gusto", "toque", "musica", "dormir", "despertar", "dueno", "volumen", "callar", "animo"]},
+          "dato": {"type": ["string", "integer"], "description": "El juego, el modo, el toque o el ánimo (por nombre), o ±1 para el volumen."},
+          "necesita": {"type": "array", "items": {"enum": ["hora", "texto", "juego", "habito", "quien"]}},
+          "requiere": {"enum": ["alarma", "habitos"]},
+          "expresion": {"type": "string"},
+          "comportamiento": {"type": "string"},
+          "texto": {"type": "string", "maxLength": 40, "description": "El texto por defecto (el del temporizador)."},
+          "sigue": {"type": "boolean", "description": "Se puede seguir con «¿y mañana?», «otro», «mejor a las 8»."},
+          "ia": {"type": "boolean", "description": "Si hay IA, que conteste ella (no_entendi)."},
+          "manana": {"type": "boolean", "description": "Una hora sin «de la tarde» es de la mañana (despertarse)."},
+          "mayuscula": {"type": "boolean"},
+          "respuestas": {"$ref": "#/$defs/respuestas"},
+          "falta": {"$ref": "#/$defs/falta"},
+          "sin": {"$ref": "#/$defs/respuestas"}
+        }
+      }
+    }
+  }
+}

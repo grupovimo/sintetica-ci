@@ -13,6 +13,7 @@ export async function crearSimulador(opciones) {
     alRegistrar = () => {},
     alSonido = () => {},
     alLed = () => {},
+    alAudio = () => {},        // (muestras: Int16Array) la voz propia, PCM 16 kHz mono
     bateria = () => -1,
     // La hora local. Si se pasa minutoDelDia (los tests), el día es uno fijo y
     // la hora arranca en ese minuto; si no, la del reloj de la compu.
@@ -83,6 +84,7 @@ export async function crearSimulador(opciones) {
     js_sonido: (p) => alSonido(cadena(p)),
     js_led: (rgb) => alLed(rgb >>> 0),
     js_registrar: (p) => alRegistrar(cadena(p)),
+    js_audio: (p, n) => alAudio(new Int16Array(memoria.buffer, p, n).slice()),
   };
 
   const fuente = wasm instanceof Response ? await wasm.arrayBuffer() : wasm;
@@ -133,6 +135,14 @@ export async function crearSimulador(opciones) {
       nombre: cadena(x.sim_parametro_nombre(i)), min: x.sim_parametro_min(i), max: x.sim_parametro_max(i), defecto: x.sim_parametro_defecto(i),
     })),
     tacto: (apretado) => x.sim_tacto(apretado ? 1 : 0),
+    // La charla sin IA: lo charla él (globo, acción y voz). true si entendió.
+    charlar: (t) => {
+      const b = new TextEncoder().encode(t);
+      if (b.length < 1 || b.length > 200) return false;
+      bytes(x.sim_intercambio(), b.length).set(b);
+      return x.sim_charlar(b.length) === 1;
+    },
+    vozPropia: (si) => x.sim_voz_propia(si ? 1 : 0),
     imu: (ax, ay, az) => x.sim_imu(ax, ay, az),
     evento: (i) => x.sim_evento(i),
     // Una escritura BLE, con los mismos bytes que mandaría la app.

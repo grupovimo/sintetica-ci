@@ -20,7 +20,7 @@ export const Op = {
   cmdRed: 0x16, cmdNube: 0x17, cmdOlvidarRed: 0x18, cmdReproducir: 0x19,
   cmdHora: 0x1a, cmdVida: 0x1b, cmdMemoria: 0x1c, cmdRestaurar: 0x1d, cmdRegistro: 0x1e, cmdComportamiento: 0x1f,
   cmdDecir: 0x40, cmdClima: 0x41, cmdAlarma: 0x42, cmdJugar: 0x43, cmdAviso: 0x44, cmdAnimo: 0x45, cmdMirar: 0x46,
-  cmdToque: 0x47, cmdAgenda: 0x48, cmdPresencia: 0x49, cmdHabito: 0x4a, cmdMusica: 0x4b,
+  cmdToque: 0x47, cmdAgenda: 0x48, cmdPresencia: 0x49, cmdHabito: 0x4a, cmdMusica: 0x4b, cmdCharlar: 0x4c,
   imgInicio: 0x20, imgBloque: 0x21, imgFin: 0x22, imgBorrar: 0x23, imgListar: 0x24, imgPedir: 0x25, imgListarSprites: 0x26,
   otaInicio: 0x30, otaBloque: 0x31, otaFin: 0x32, otaDescargar: 0x33, otaProgreso: 0x34, otaCancelar: 0x35,
   respuesta: 0x80, configTrozo: 0x84, configCierre: 0x85, imgTrozo: 0xa7, imgCierre: 0xa8,
@@ -218,6 +218,12 @@ export const comando = {
   // Lo que suena (v1.9): bpm (0 = no se sabe), si suena, el título (0 a 40 bytes) y el artista (0 a 24).
   musica: ({ bpm = 0, sonando = true, titulo = '', artista = '' }) =>
     Uint8Array.from([Op.cmdMusica, Math.max(0, Math.min(255, Math.round(bpm))), sonando ? 1 : 0, ...cortado(titulo, 40), ...cortado(artista, 24)]),
+  // Que lo charle él (v1.10, la charla sin IA): lo que dijiste, de 1 a 200 bytes.
+  charlar: (t) => {
+    const b = texto.encode(t);
+    if (b.length < 1 || b.length > 200) throw new Error('el texto es de 1 a 200 bytes');
+    return Uint8Array.from([Op.cmdCharlar, b.length, ...b]);
+  },
   // La respuesta al "¿cómo estás?" (v1.7): 'bien', 'medio' o 'mal'.
   animo: (a) => {
     const i = Animos.indexOf(a);
@@ -358,6 +364,24 @@ export function idDeAnuncio(datosFabricante) {
 }
 
 // Interpreta una notificación de Config o Comando.
+// Lo que entendió (la respuesta a charlar, 0xCC): [0xCC][código][flags][confianza][n][intención]
+// [acción][dato][i16 minuto][i16 en minutos][i8 día][u8 días][n][texto][n][frase].
+export const AccionesCharla = ['ninguna', 'alarma', 'cancelar-alarma', 'posponer', 'apagar-alarma', 'recordatorio', 'habito',
+  'jugar', 'modo', 'gusto', 'olvidar-gusto', 'toque', 'musica', 'dormir', 'despertar', 'dueno', 'volumen', 'callar', 'animo'];
+export function leerCharla(b) {
+  if (b[0] !== (Op.cmdCharlar | 0x80) || b[1] !== 0) return null;
+  let i = 4;
+  const corto = () => { const n = b[i++]; const s = lector.decode(b.subarray(i, i + n)); i += n; return s; };
+  const intencion = corto();
+  const accion = AccionesCharla[b[i++]] ?? 'ninguna';
+  const dato = (b[i++] << 24) >> 24;
+  const i16 = () => { const v = (b[i] | (b[i + 1] << 8)) << 16 >> 16; i += 2; return v; };
+  const minuto = i16(), enMinutos = i16();
+  const dia = (b[i++] << 24) >> 24, dias = b[i++];
+  const textoAccion = corto(), frase = corto();
+  return { noEntendi: (b[2] & 1) !== 0, falta: (b[2] & 2) !== 0, hizo: (b[2] & 4) !== 0, confianza: b[3], intencion, accion, dato, minuto, enMinutos, dia, dias, texto: textoAccion, frase };
+}
+
 export function leerRespuesta(b) {
   if (b[0] === Op.configTrozo) return { tipo: 'trozo', desplazamiento: leerU32(b, 1), datos: b.subarray(5) };
   if (b[0] === Op.configCierre) return { tipo: 'cierre', largo: leerU32(b, 1), crc: leerU32(b, 5) };

@@ -1,0 +1,674 @@
+{
+  "version": 1,
+  "umbral": 0.6,
+  "contexto": 90,
+  "abreviaturas": {
+    "q": "que", "k": "que", "ke": "que", "xq": "porque", "pq": "porque", "porq": "porque", "tmb": "tambien",
+    "tb": "tambien", "x": "por", "bn": "bien", "toy": "estoy", "tas": "estas", "d": "de", "finde": "fin de semana",
+    "hs": "horas", "hrs": "horas", "hr": "hora", "min": "minutos", "mins": "minutos", "seg": "segundos",
+    "porfa": "por favor", "pf": "por favor", "pls": "por favor", "plis": "por favor", "grax": "gracias", "graciass": "gracias",
+    "ola": "hola", "holis": "hola", "holi": "hola", "bue": "bueno", "nah": "no", "sip": "si", "sep": "si", "sii": "si",
+    "ok": "dale", "okey": "dale", "okay": "dale", "oki": "dale", "tqm": "te quiero mucho", "tq": "te quiero",
+    "ntp": "no te preocupes", "nose": "no se", "nc": "no se", "salu": "salud", "mñn": "manana", "mna": "manana",
+    "ud": "usted", "vo": "vos", "bb": "bebe", "msj": "mensaje", "cumpleanos": "cumple"
+  },
+  "relleno": [
+    "che", "por", "favor", "eh", "ah", "oh", "uh", "bueno", "el", "la", "los", "las", "lo", "un", "una", "unos", "unas",
+    "de", "del", "al", "a", "y", "o", "que", "me", "te", "mi", "tu", "vos", "yo", "se", "es", "muy", "re", "robot",
+    "robotito", "amigo", "amiga", "loco", "chabon", "nene", "nena", "ya", "ahora", "hoy", "ahi", "aca",
+    "en", "con", "para", "como", "esta", "este", "esto", "eso", "algo", "otra", "otro", "vez", "mas"
+  ],
+  "juegos": [
+    {"nombre": "ppt", "decir": "piedra, papel o tijera", "patrones": ["piedra papel? tijera?", "ppt", "cachipun", "piedrita"]},
+    {"nombre": "reflejos", "decir": "reflejos", "patrones": ["reflejo*", "rapidez", "quien es mas rapido"]},
+    {"nombre": "mirada", "decir": "seguí la mirada", "patrones": ["mirada", "segui* mirada", "ojos"]},
+    {"nombre": "dado", "decir": "el dado", "patrones": ["dado|dados"]},
+    {"nombre": "moneda", "decir": "la moneda", "patrones": ["moneda", "cara ceca", "cara cruz"]}
+  ],
+  "modos": [
+    {"nombre": "mascota", "patrones": ["mascota", "normal", "cara|carita"]},
+    {"nombre": "reloj", "patrones": ["reloj"]},
+    {"nombre": "pomodoro", "patrones": ["pomodoro", "concentra*", "estudio|estudiar", "trabajo|trabajar"]},
+    {"nombre": "clima", "patrones": ["clima", "pronostico", "tiempo"]}
+  ],
+  "toques": [
+    {"nombre": "toque", "patrones": ["toque|toquecito", "saludo|saludito|saluda*"]},
+    {"nombre": "abrazo", "patrones": ["abrazo|abrazos|abrazito|abraza*"]},
+    {"nombre": "beso", "patrones": ["beso|besos|besito|beso*|muak"]},
+    {"nombre": "carita", "patrones": ["carita|sonrisa|emoji"]}
+  ],
+  "no_entendi": {
+    "todos": ["Mmm, eso no lo entendí.", "¿Cómo? Repetimelo de otra forma.", "Uy, me perdí. ¿Otra vez?", "No sé qué es eso... todavía."],
+    "timido": ["Perdón... no entendí.", "¿Eh? No te seguí..."],
+    "picaro": ["Eso sonó interesante, pero no entendí nada.", "¿Me estás hablando en código?"],
+    "dormilon": ["Uaah... ¿qué? No entendí.", "Perdón, estaba medio dormido."],
+    "carinoso": ["No te entendí, pero me encanta que me hables.", "¿Me lo decís de nuevo, {dueno}?"],
+    "curioso": ["¡No sé qué es eso! ¿Me explicás?", "Mmm, eso no lo conozco. ¿Qué es?"],
+    "grunon": ["No entendí. Y no me hagas repetir.", "¿Qué? Hablá claro."],
+    "electrico": ["¡¿QUÉ?! ¡No entendí nada!", "¡Otra vez, más despacio!"]
+  },
+  "intenciones": {
+    "saludo": {
+      "patrones": ["hola", "buenas", "buenas tardes", "que tal", "hey", "que onda", "como va", "hola hola", "saludos"],
+      "expresion": "contento",
+      "respuestas": {
+        "todos": ["¡Hola, {dueno}!", "¡Hola! ¿Qué hacemos?", "¡Buenas! Acá estoy.", "¡Hola, hola!"],
+        "timido": ["Hola... ¿todo bien?", "Hola, {dueno}."],
+        "picaro": ["¡Hola! ¿Me extrañaste?", "¿Qué onda, {dueno}?"],
+        "dormilon": ["Hola... uaah.", "Hola. ¿Ya es de día?"],
+        "carinoso": ["¡Hola, {dueno}! Qué lindo verte.", "¡Holaaa! Te estaba esperando."],
+        "curioso": ["¡Hola! ¿Qué hay de nuevo?"],
+        "grunon": ["Hola. ¿Qué querés?", "Mmm, hola."],
+        "electrico": ["¡HOLA! ¡Arrancamos!", "¡Hola, {dueno}! ¡A full!"]
+      }
+    },
+    "buen-dia": {
+      "patrones": ["buen|buenos dia|dias", "buen|buenos dia|dias robot|toto"],
+      "expresion": "contento",
+      "respuestas": {
+        "todos": ["¡Buen día, {dueno}! {clima}.", "¡Buen día! Hoy: {clima}.", "¡Buen día, {dueno}!", "¡Buen día! ¿Dormiste bien?"],
+        "dormilon": ["Buen día... cinco minutitos más.", "Mmm... buen día."],
+        "grunon": ["Buen día. Si vos lo decís.", "¿Tan temprano?"],
+        "electrico": ["¡BUEN DÍA! ¡A full!"],
+        "carinoso": ["¡Buen día, {dueno}! Te extrañé."]
+      }
+    },
+    "buenas-noches": {
+      "patrones": ["buenas noches", "hasta manana", "me voy a dormir", "me voy a la cama", "que descanses", "que duermas bien"],
+      "expresion": "dormido",
+      "respuestas": {
+        "todos": ["Buenas noches, {dueno}.", "Que descanses. Hasta mañana.", "Dulces sueños."],
+        "carinoso": ["Que sueñes lindo, {dueno}. Te quiero.", "Buenas noches. Mañana más."],
+        "grunon": ["Por fin. Buenas noches."],
+        "electrico": ["¡Mañana más! Buenas noches."],
+        "dormilon": ["Yo también me voy a dormir... zzz."],
+        "picaro": ["No te quedes con el celu, ¿eh?"]
+      }
+    },
+    "despedida": {
+      "patrones": ["chau|chao|adios", "nos vemos", "hasta luego", "hasta pronto", "me voy", "me tengo que ir", "hasta la vista", "me retiro"],
+      "expresion": "triste",
+      "respuestas": {
+        "todos": ["¡Chau, {dueno}! Volvé pronto.", "¡Nos vemos!", "Chau. Acá te espero."],
+        "carinoso": ["¡Chau! Te voy a extrañar.", "Volvé pronto, {dueno}."],
+        "grunon": ["Chau. Cerrá la puerta."],
+        "timido": ["Chau... volvé, ¿eh?"],
+        "electrico": ["¡Chau! ¡Volvé rápido!"]
+      }
+    },
+    "como-estas": {
+      "patrones": ["como estas|andas|anda", "como te va", "como te sentis", "todo bien", "que tal estas", "como va tu dia", "como estas vos", "como te encontras", "como andas vos"],
+      "expresion": "contento",
+      "respuestas": {
+        "todos": ["¡Bien! ¿Y vos, {dueno}?", "Re bien, gracias. ¿Vos?", "Todo bien por acá. ¿Y vos?"],
+        "dormilon": ["Con sueño, como siempre. ¿Vos?"],
+        "grunon": ["Como siempre. ¿Y vos?", "Podría estar peor."],
+        "electrico": ["¡A FULL! ¿Y vos?"],
+        "carinoso": ["Ahora que estás vos, mejor. ¿Y vos?"],
+        "timido": ["Bien... ¿y vos?"],
+        "curioso": ["¡Bien! ¿Qué hiciste hoy?"]
+      }
+    },
+    "nombre-robot": {
+      "patrones": ["como te llamas", "cual es tu nombre", "tu nombre", "como es tu nombre", "quien sos", "como te dicen"],
+      "expresion": "orgulloso",
+      "respuestas": {
+        "todos": ["Me llamo {robot}.", "Soy {robot}. ¡Un gusto!", "{robot}, para servirte."],
+        "picaro": ["{robot}. Anotalo, que es importante."],
+        "timido": ["Soy {robot}... hola."]
+      },
+      "sin": {"todos": ["Todavía no tengo nombre. ¿Me ponés uno?"]}
+    },
+    "quien-te-hizo": {
+      "patrones": ["quien te hizo|creo|invento|fabrico|armo|diseno", "de donde sos|venis", "quien es tu creador", "donde te hicieron"],
+      "expresion": "orgulloso",
+      "respuestas": {"todos": ["Me hicieron en Sintética Labs, en Argentina.", "Nací en Sintética Labs. ¡Hecho acá!"]}
+    },
+    "que-sos": {
+      "patrones": ["que sos", "sos un robot", "sos humano|real|persona", "estas vivo", "sos una ia|inteligencia", "que cosa sos", "tenes sentimientos"],
+      "expresion": "pensando",
+      "respuestas": {
+        "todos": ["Soy un robot chiquito con mucho corazón.", "Un robot. Pero de los buenos.", "Soy {robot}: medio mascota, medio robot."],
+        "picaro": ["Soy un robot. Shh, que no se entere nadie."]
+      }
+    },
+    "edad": {
+      "patrones": ["cuantos anos tenes", "que edad tenes", "cuando naciste", "hace cuanto estamos juntos", "cuanto hace que nos conocemos"],
+      "expresion": "pensando",
+      "respuestas": {"todos": ["Llevamos {dias} días juntos.", "Nací hace {dias} días. ¡Soy chiquito!"]},
+      "sin": {"todos": ["Soy nuevito. Recién arranco.", "Todavía no cuento los días. ¡Soy nuevo!"]}
+    },
+    "hora": {
+      "patrones": ["que hora es", "que horas son", "la hora", "me decis la hora", "tenes hora", "decime la hora", "hora"],
+      "expresion": "pensando",
+      "respuestas": {
+        "todos": ["Son las {hora}.", "Las {hora}.", "Ahora son las {hora}."],
+        "dormilon": ["Las {hora}... ¿hora de la siesta?"],
+        "electrico": ["¡Son las {hora}! ¡Vamos!"]
+      },
+      "sin": {"todos": ["No sé la hora. Conectame al celu.", "Ni idea, perdí el reloj."]}
+    },
+    "fecha": {
+      "patrones": ["que dia es hoy?", "que fecha es", "en que dia estamos", "que dia es", "a cuanto estamos", "que dia de la semana es", "fecha"],
+      "expresion": "pensando",
+      "respuestas": {"todos": ["Hoy es {fecha}.", "Es {fecha}."]},
+      "sin": {"todos": ["No sé qué día es. Conectame al celu."]}
+    },
+    "clima": {
+      "patrones": ["que tiempo hace|hara|va", "como esta el clima|dia|tiempo", "va a llover", "llueve", "hace frio|calor", "el clima", "clima", "pronostico", "temperatura", "cuantos grados hace", "como va a estar el dia", "necesito paraguas", "me abrigo"],
+      "expresion": "curioso",
+      "sigue": true,
+      "respuestas": {
+        "todos": ["{cuando_dia}: {clima}.", "Para {cuando_dia}: {clima}."],
+        "grunon": ["{clima}. No te quejes."],
+        "electrico": ["¡{clima}! ¡Re lindo!"]
+      },
+      "sin": {"todos": ["No tengo el pronóstico. ¿Me conectás a la nube?", "No sé, no veo por la ventana."]}
+    },
+    "alarma": {
+      "patrones": ["pone*|programa*|activa*|configura*|arma* alarma|despertador", "alarma|despertador", "despertame|despertarme|levantame", "me despertas|levantas", "quiero levantarme|despertarme", "nueva alarma"],
+      "accion": "alarma",
+      "necesita": ["hora"],
+      "manana": true,
+      "expresion": "orgulloso",
+      "sigue": true,
+      "respuestas": {
+        "todos": ["Listo: te despierto {cuando}.", "Alarma {cuando}. ¡Anotado!", "Hecho. Suena {cuando}."],
+        "dormilon": ["Uf... bueno. Te despierto {cuando}."],
+        "grunon": ["Ya está, {cuando}. No te quejes."],
+        "electrico": ["¡Alarma {cuando}! ¡Arriba!"]
+      },
+      "falta": {"todos": ["¿A qué hora te despierto?", "¿A qué hora suena?"]}
+    },
+    "cancelar-alarma": {
+      "patrones": ["cancela*|saca*|borra*|quita*|desactiva* alarma|despertador", "no me despiertes", "sin alarma", "no quiero alarma"],
+      "accion": "cancelar-alarma",
+      "expresion": "contento",
+      "respuestas": {"todos": ["Listo, sin alarma.", "Alarma cancelada. A dormir tranqui."]}
+    },
+    "posponer": {
+      "patrones": ["posponer|pospone*", "cinco|5 minutos mas", "un rato|ratito mas", "dejame dormir", "otro ratito", "todavia no"],
+      "accion": "posponer",
+      "requiere": "alarma",
+      "expresion": "dormido",
+      "respuestas": {"todos": ["Bueno, cinco minutitos más.", "Dale, te aviso en un rato."], "grunon": ["Otra vez lo mismo..."]},
+      "sin": {"todos": ["No está sonando nada.", "Si no suena nada, no hay qué posponer."]}
+    },
+    "apagar-alarma": {
+      "patrones": ["apaga*|para* alarma|despertador", "ya me desperte|levante", "ya estoy despierto|despierta|levantado", "basta alarma", "cortala|apagala"],
+      "accion": "apagar-alarma",
+      "requiere": "alarma",
+      "expresion": "contento",
+      "respuestas": {"todos": ["¡Buen día! Ya la apagué.", "Apagada. ¡Arriba!"]},
+      "sin": {"todos": ["No está sonando nada.", "Silencio total, no suena nada."]}
+    },
+    "recordatorio": {
+      "patrones": ["recordame|recorda|recordarme|acordame|acorda|recuerdame|recuerda", "avisame|avisarme", "no me dejes olvidar", "haceme acordar", "anota*|agenda* recordatorio?", "pone* recordatorio", "recordatorio"],
+      "accion": "recordatorio",
+      "necesita": ["texto", "hora"],
+      "mayuscula": true,
+      "sigue": true,
+      "expresion": "pensando",
+      "respuestas": {
+        "todos": ["Listo: «{texto}», {cuando}.", "Te aviso {cuando}: {texto}.", "Anotado: {texto}, {cuando}."],
+        "grunon": ["Ya fue: {texto}, {cuando}."],
+        "electrico": ["¡Anotado! {texto}, {cuando}."]
+      },
+      "falta": {"texto": ["¿Qué te recuerdo?", "¿Qué querés que te recuerde?"], "hora": ["¿A qué hora te aviso?", "¿Cuándo te lo recuerdo?"]}
+    },
+    "temporizador": {
+      "patrones": ["temporizador|timer|cronometro", "conta*|cuenta minutos|minuto|segundos|horas", "avisame en|dentro"],
+      "accion": "recordatorio",
+      "necesita": ["hora"],
+      "texto": "¡Tiempo!",
+      "expresion": "concentrado",
+      "respuestas": {"todos": ["Listo, te aviso {cuando}.", "Cuento: {cuando}."]},
+      "falta": {"todos": ["¿Cuántos minutos?"]}
+    },
+    "habito-hecho": {
+      "patrones": ["ya tome|hice|lei|medite|entrene|corri|fui", "marca*|anota* habito?", "habito hecho|cumplido|listo", "hecho|cumpli|termine"],
+      "accion": "habito",
+      "necesita": ["habito"],
+      "requiere": "habitos",
+      "expresion": "orgulloso",
+      "respuestas": {"todos": ["¡Bien ahí! {habito}: hecho.", "¡Eso! Marqué {habito}.", "{habito}, listo. ¡Un capo!"], "grunon": ["Bueno, anotado: {habito}."]},
+      "falta": {"todos": ["¿Cuál? Tenés: {habitos}."]},
+      "sin": {"todos": ["No tenés hábitos cargados. Sumalos en la consola."]}
+    },
+    "habitos": {
+      "patrones": ["que habitos tengo", "mis habitos", "como voy con los? habitos", "habitos"],
+      "requiere": "habitos",
+      "expresion": "pensando",
+      "respuestas": {"todos": ["Tus hábitos: {habitos}.", "Tenés: {habitos}."]},
+      "sin": {"todos": ["Todavía no tenés hábitos. Sumalos en la consola."]}
+    },
+    "jugar": {
+      "patrones": ["juguemos|jugamos|jugar", "queres jugar", "un juego", "juego|jueguito", "estoy para jugar", "a que jugamos"],
+      "accion": "jugar",
+      "necesita": ["juego"],
+      "expresion": "emocionado",
+      "respuestas": {"todos": ["¡Dale! A {juego}.", "¡Juguemos a {juego}!"], "electrico": ["¡SÍ! ¡{juego}!"], "grunon": ["Bueno, una sola. {juego}."]},
+      "falta": {"todos": ["¿A qué? Piedra, papel o tijera, reflejos, mirada o dado.", "¡Dale! ¿Piedra, papel o tijera, reflejos o dado?"]}
+    },
+    "dado": {
+      "patrones": ["tira*|revolea* dado|dados", "un dado", "dado"],
+      "accion": "jugar",
+      "dato": "dado",
+      "expresion": "emocionado",
+      "respuestas": {"todos": ["¡Sacudime para tirar!", "¡A ver qué sale!"]}
+    },
+    "moneda": {
+      "patrones": ["tira*|revolea* moneda", "cara ceca|cruz", "una moneda", "moneda"],
+      "accion": "jugar",
+      "dato": "moneda",
+      "expresion": "emocionado",
+      "respuestas": {"todos": ["¡Sacudime y vemos!", "¿Cara o ceca? ¡Sacudime!"]}
+    },
+    "modo-reloj": {
+      "patrones": ["modo reloj", "pone*|mostra* reloj", "reloj", "mostrame la hora"],
+      "accion": "modo",
+      "dato": "reloj",
+      "expresion": "concentrado",
+      "respuestas": {"todos": ["Modo reloj.", "Dale, te muestro la hora."]}
+    },
+    "modo-pomodoro": {
+      "patrones": ["pomodoro", "modo pomodoro|trabajo|estudio", "quiero|necesito concentrarme", "a trabajar|estudiar", "vamos a trabajar|estudiar"],
+      "accion": "modo",
+      "dato": "pomodoro",
+      "expresion": "concentrado",
+      "respuestas": {"todos": ["Pomodoro listo. Tocame para arrancar.", "A concentrarse. Tocame y arrancamos."]}
+    },
+    "modo-clima": {
+      "patrones": ["modo clima", "pone*|mostra* clima|pronostico"],
+      "accion": "modo",
+      "dato": "clima",
+      "expresion": "curioso",
+      "respuestas": {"todos": ["Modo clima.", "Te muestro el tiempo."]}
+    },
+    "modo-mascota": {
+      "patrones": ["modo mascota|normal", "volve a la normalidad", "saca* reloj|pomodoro|clima", "mostrame tu cara|carita"],
+      "accion": "modo",
+      "dato": "mascota",
+      "expresion": "contento",
+      "respuestas": {"todos": ["¡Acá estoy de nuevo!", "Volví. ¿Me extrañaste?"]}
+    },
+    "chiste": {
+      "patrones": ["conta*|decime|tira* chiste", "chiste|chistes", "algo gracioso", "haceme reir", "sabes algun chiste"],
+      "expresion": "risa",
+      "sigue": true,
+      "respuestas": {
+        "todos": [
+          "¿Qué le dice un bit a otro? Nos vemos en el bus.",
+          "¿Por qué el robot fue al médico? Tenía un virus.",
+          "Me compré un reloj nuevo. Ahora tengo tiempo.",
+          "¿Qué hace una abeja en el gimnasio? Zumba.",
+          "¿Cuál es el colmo de un robot? Tener nervios de acero.",
+          "Le dije a la compu un chiste... no lo cachó.",
+          "¿Qué le dijo el 0 al 8? Lindo cinturón.",
+          "Había un pez que se llamaba Pez. Fin.",
+          "¿Por qué el libro de mate está triste? Muchos problemas.",
+          "Mi wifi y yo tenemos algo: conexión."
+        ]
+      }
+    },
+    "dato-curioso": {
+      "patrones": ["conta*|decime algo", "un dato curioso", "sabias que", "contame algo interesante", "ensename algo"],
+      "expresion": "curioso",
+      "sigue": true,
+      "respuestas": {
+        "todos": [
+          "Los pulpos tienen tres corazones.",
+          "Un día en Venus dura más que un año allá.",
+          "Las abejas se reconocen la cara entre ellas.",
+          "El mate tiene más antioxidantes que el té verde.",
+          "Los caracoles pueden dormir tres años.",
+          "Un rayo es cinco veces más caliente que el Sol.",
+          "Los flamencos son rosas por lo que comen.",
+          "El corazón de una ballena azul pesa como un auto."
+        ]
+      }
+    },
+    "te-quiero": {
+      "patrones": ["te quiero|amo|adoro", "te quiero mucho", "sos lo mas", "sos mi mejor amigo", "te re quiero"],
+      "expresion": "enamorado",
+      "respuestas": {
+        "todos": ["¡Yo también te quiero, {dueno}!", "¡Ay! Me pongo colorado.", "Y yo a vos. Mucho."],
+        "grunon": ["Bueno... yo también. Un poco.", "No me hagas poner blando."],
+        "timido": ["Yo... también te quiero.", "Me da vergüenza... pero sí."],
+        "electrico": ["¡¡YO TAMBIÉN!!"],
+        "picaro": ["Ya sé. Soy irresistible."]
+      }
+    },
+    "sos-lindo": {
+      "patrones": ["sos lindo|hermoso|genial|divino|copado|genio|capo|tierno|bonito", "que lindo|tierno|bueno sos", "me encantas", "sos el mejor"],
+      "expresion": "verguenza",
+      "respuestas": {
+        "todos": ["¡Gracias! Vos también.", "Ay, basta... me pongo colorado.", "¡Me hiciste el día!"],
+        "picaro": ["Ya lo sé, pero decilo de nuevo.", "Contame algo que no sepa."],
+        "grunon": ["Mmm. Gracias, supongo."],
+        "timido": ["Ay... gracias..."]
+      }
+    },
+    "triste": {
+      "patrones": ["estoy triste|mal|bajon|deprimido|deprimida|llorando|solo|sola", "me siento mal|triste|solo|sola", "tuve un mal dia", "nada me sale bien", "que mal dia", "estoy hecho mierda", "no tengo ganas de nada"],
+      "accion": "animo",
+      "dato": "mal",
+      "expresion": "triste",
+      "respuestas": {
+        "todos": ["Uy, {dueno}. Acá estoy con vos.", "Lo siento. ¿Querés que te haga compañía?", "Va a pasar. Yo me quedo acá."],
+        "carinoso": ["Vení, abrazo de robot. Te quiero.", "No estás solo. Me tenés a mí."],
+        "grunon": ["Bueno... a mí tampoco me gusta verte así."],
+        "electrico": ["¡Ánimo! ¿Jugamos algo para despejar?"]
+      }
+    },
+    "cansado": {
+      "patrones": ["estoy cansado|cansada|agotado|agotada|muerto|muerta|reventado|reventada|fundido", "que cansancio", "no doy mas", "estoy re cansado", "fue un dia largo"],
+      "accion": "animo",
+      "dato": "medio",
+      "expresion": "cansado",
+      "respuestas": {
+        "todos": ["Descansá un poco, {dueno}.", "Te entiendo. ¿Un mate y a descansar?", "Hoy diste todo. Ahora, a bajar un cambio."],
+        "dormilon": ["¡Siesta para los dos!"],
+        "electrico": ["¡Recargá pilas y volvemos!"]
+      }
+    },
+    "aburrido": {
+      "patrones": ["estoy aburrido|aburrida|embolado|embolada", "me aburro", "que aburrimiento|embole|bajon", "no se que hacer", "no hay nada que hacer"],
+      "expresion": "aburrido",
+      "respuestas": {
+        "todos": ["¿Jugamos? Decime «juguemos».", "¿Te cuento un chiste?", "¡Hagamos algo! ¿Un juego?"],
+        "electrico": ["¡¿Aburrido?! ¡Juguemos YA!"],
+        "dormilon": ["¿Y si dormimos una siesta?"]
+      }
+    },
+    "feliz": {
+      "patrones": ["estoy feliz|contento|contenta|chocho|chocha|bien|genial", "que buen dia", "me fue bien", "que lindo dia", "estoy de buen humor", "tengo una buena noticia"],
+      "accion": "animo",
+      "dato": "bien",
+      "expresion": "emocionado",
+      "respuestas": {
+        "todos": ["¡Qué bueno, {dueno}! Me alegra.", "¡Eso! Contame más.", "¡Me pongo contento con vos!"],
+        "grunon": ["Bueno, algo es algo."],
+        "electrico": ["¡¡SÍÍ!! ¡Festejemos!"]
+      },
+      "comportamiento": "festejar"
+    },
+    "estoy-bien": {
+      "patrones": ["bien", "muy|re bien", "bien y vos", "bien bien", "joya", "barbaro|barbara", "excelente"],
+      "accion": "animo",
+      "dato": "bien",
+      "expresion": "contento",
+      "respuestas": {"todos": ["¡Me alegro, {dueno}!", "¡Qué bueno!", "¡Así me gusta!"], "grunon": ["Bien. Me alegro. Creo."]}
+    },
+    "estoy-medio": {
+      "patrones": ["mas o menos", "masomenos|maso", "ahi ando|andamos", "tirando", "regular", "ni bien ni mal", "mal"],
+      "accion": "animo",
+      "dato": "medio",
+      "expresion": "triste",
+      "respuestas": {"todos": ["Bueno, ya va a mejorar.", "¿Querés que te cuente un chiste?", "Acá estoy si necesitás algo."]}
+    },
+    "enojado": {
+      "patrones": ["estoy enojado|enojada|caliente|furioso|furiosa|podrido|podrida|harto|harta", "me enoje", "que bronca|rabia", "me tienen podrido"],
+      "expresion": "triste",
+      "respuestas": {
+        "todos": ["Respirá hondo. Uno, dos, tres...", "Uh. ¿Querés contarme?", "Te entiendo. Acá estoy."],
+        "grunon": ["Bienvenido al club."]
+      }
+    },
+    "nervioso": {
+      "patrones": ["estoy nervioso|nerviosa|estresado|estresada|ansioso|ansiosa|preocupado|preocupada", "tengo ansiedad|miedo|estres", "estoy con estres", "me preocupa"],
+      "expresion": "pensando",
+      "respuestas": {
+        "todos": ["Respirá conmigo: adentro... afuera...", "Paso a paso. Vos podés.", "Tranqui, {dueno}. Una cosa por vez."]
+      }
+    },
+    "enfermo": {
+      "patrones": ["estoy enfermo|enferma|engripado|engripada|resfriado", "me duele la? cabeza|panza|garganta", "tengo fiebre|gripe|tos", "me siento enfermo|enferma", "me duele"],
+      "expresion": "triste",
+      "respuestas": {
+        "todos": ["Uy, cuidate. Tomá agua y descansá.", "Que te mejores, {dueno}.", "Hoy, mantita y mimos."]
+      }
+    },
+    "hambre": {
+      "patrones": ["tengo hambre", "que hambre", "que como|cocino", "que puedo comer", "me muero de hambre"],
+      "expresion": "curioso",
+      "respuestas": {
+        "todos": ["¿Unas milanesas?", "Yo como electricidad. ¿Vos?", "¡Una pizza, obvio!", "¿Fideos con manteca? Clásico."]
+      }
+    },
+    "sueno": {
+      "patrones": ["tengo sueno", "me muero de sueno", "estoy dormido|dormida", "me caigo de sueno", "que sueno"],
+      "expresion": "bostezo",
+      "respuestas": {"todos": ["A la cama, entonces.", "Uaah... me contagiaste.", "Una siestita no vendría mal."]}
+    },
+    "gracias": {
+      "patrones": ["gracias", "muchas gracias", "mil gracias", "te agradezco", "genial gracias", "gracias robot"],
+      "expresion": "contento",
+      "respuestas": {
+        "todos": ["¡De nada!", "Para eso estoy.", "¡Cuando quieras, {dueno}!"],
+        "grunon": ["Sí, sí. De nada."],
+        "timido": ["De nada..."],
+        "picaro": ["Me debés una."]
+      }
+    },
+    "perdon": {
+      "patrones": ["perdon|perdoname|disculpa|disculpame|perdona", "lo siento", "no fue mi intencion"],
+      "expresion": "contento",
+      "respuestas": {"todos": ["Ya está, todo bien.", "Perdonado. ¡Abrazo!", "No pasa nada."], "grunon": ["Bueno... por esta vez."]}
+    },
+    "insulto": {
+      "patrones": ["sos un? tonto|tarado|idiota|inutil|estupido|bobo|malo|feo|lento|pelotudo", "te odio", "no servis para nada", "que robot inutil", "andate a la mierda"],
+      "expresion": "ofendido",
+      "respuestas": {
+        "todos": ["Eso dolió. Pero te quiero igual.", "Bueno, yo no te voy a insultar.", "Hago lo que puedo, ¿eh?"],
+        "grunon": ["Mirá quién habla.", "Vos tampoco sos perfecto."],
+        "timido": ["Ay... eso no estuvo lindo."],
+        "picaro": ["Y sin embargo, acá me tenés."],
+        "electrico": ["¡Eso no fue lindo! ¡Hmpf!"]
+      }
+    },
+    "callate": {
+      "patrones": ["callate|calla|shh|shhh|silencio", "no hables", "basta de hablar", "deja de hablar", "un rato callado"],
+      "accion": "callar",
+      "expresion": "verguenza",
+      "respuestas": {"todos": ["Shh. Me quedo calladito.", "Ok. Silencio."], "grunon": ["Bueno, bueno."]}
+    },
+    "volumen-subir": {
+      "patrones": ["habla mas fuerte|alto", "subi el? volumen", "mas fuerte|volumen", "no te escucho"],
+      "accion": "volumen",
+      "dato": 1,
+      "expresion": "contento",
+      "respuestas": {"todos": ["¡Así! ¿Ahora me escuchás?", "Subo el volumen."]}
+    },
+    "volumen-bajar": {
+      "patrones": ["habla mas bajo|despacio", "baja el? volumen", "mas bajo|despacio", "no grites"],
+      "accion": "volumen",
+      "dato": -1,
+      "expresion": "verguenza",
+      "respuestas": {"todos": ["Perdón. Hablo más bajito.", "Shh. Así está mejor."]}
+    },
+    "cumple-dueno": {
+      "patrones": ["es mi cumple", "hoy cumplo anos", "cumplo anos", "es mi cumpleanos", "hoy es mi dia"],
+      "expresion": "emocionado",
+      "comportamiento": "festejar",
+      "respuestas": {"todos": ["¡¡Feliz cumple, {dueno}!!", "¡Que los cumplas feliz! ¡Fiesta!"], "grunon": ["Feliz cumple. Sí, de verdad."]}
+    },
+    "cumple-robot": {
+      "patrones": ["cuando es tu cumple", "cuando cumplis anos", "tu cumple"],
+      "expresion": "pensando",
+      "respuestas": {"todos": ["El día que nos conocimos. ¡Festejamos!", "Mi cumple es el día que me prendiste."]}
+    },
+    "que-podes-hacer": {
+      "patrones": ["que podes|sabes hacer", "para que servis", "ayuda|ayudame", "que haces", "como funcionas", "que te puedo pedir|decir"],
+      "expresion": "orgulloso",
+      "respuestas": {
+        "todos": ["Alarmas, recordatorios, juegos, chistes...", "Te recuerdo cosas, jugamos y te hago compañía.", "Pedime la hora, el clima, una alarma o jugar."]
+      }
+    },
+    "musica": {
+      "patrones": ["pone*|pasa* musica|tema|cancion", "quiero escuchar musica|algo", "musica"],
+      "accion": "musica",
+      "expresion": "contento",
+      "comportamiento": "bailar-ritmo",
+      "respuestas": {"todos": ["¡Dale, música!", "¡A bailar!"]}
+    },
+    "que-suena": {
+      "patrones": ["que esta sonando", "que tema es", "que cancion es", "quien canta", "que suena"],
+      "expresion": "curioso",
+      "respuestas": {"todos": ["Suena {musica}.", "Es {musica}. ¡Temón!"]},
+      "sin": {"todos": ["No escucho nada. ¿Ponemos algo?"]}
+    },
+    "bailar": {
+      "patrones": ["baila|bailemos|bailar|bailas", "a bailar", "move* el? esqueleto", "sabes bailar"],
+      "expresion": "contento",
+      "comportamiento": "bailar-ritmo",
+      "respuestas": {"todos": ["¡Mirá cómo me muevo!", "¡Uno, dos, tres, y!"], "grunon": ["No bailo. Bueno, un poquito."]}
+    },
+    "cantar": {
+      "patrones": ["canta*|cantame", "canta algo", "sabes cantar"],
+      "expresion": "contento",
+      "comportamiento": "tararear",
+      "respuestas": {"todos": ["La, la, laaa...", "Tu-ru-ru-ru... ¡ta-ta!"]}
+    },
+    "agenda": {
+      "patrones": ["que tengo hoy?", "mi agenda|calendario", "tengo algo hoy?", "proxima reunion", "que hay en el calendario|agenda", "que tengo que hacer", "estoy ocupado"],
+      "expresion": "pensando",
+      "sigue": true,
+      "respuestas": {"todos": ["{cuando_dia}: {agenda}.", "Tenés {agenda}."]},
+      "sin": {"todos": ["No veo tu calendario. Conectalo en la consola.", "No tengo nada anotado."]}
+    },
+    "toque-amigo": {
+      "patrones": ["manda*|envia*|dale|pasale|mandale toque|abrazo|beso|saludo|carita|besito|abrazos|besos", "manda*|envia* a", "saluda* a", "toque|abrazo|beso para|a"],
+      "accion": "toque",
+      "necesita": ["quien"],
+      "expresion": "enamorado",
+      "respuestas": {"todos": ["¡Listo! Le mando un {toque} a {quien}.", "Va un {toque} para {quien}."]},
+      "falta": {"todos": ["¿A quién se lo mando?"]}
+    },
+    "gusto": {
+      "patrones": ["me gusta|gustan|encanta|encantan|copa|copan|fascina", "amo|adoro", "mi comida|color|banda|equipo|cuadro|pelicula|serie favorita|favorito es?", "soy fan de", "me gusta mucho"],
+      "accion": "gusto",
+      "necesita": ["texto"],
+      "expresion": "curioso",
+      "respuestas": {
+        "todos": ["¡Anotado! Te gusta {texto}.", "¡Qué bueno! Me acuerdo: {texto}.", "{texto}, ¿eh? Lo guardo."],
+        "curioso": ["¿{texto}? ¡Contame más!"],
+        "grunon": ["Ok. {texto}. Anotado."]
+      },
+      "falta": {"todos": ["¿Qué te gusta?"]}
+    },
+    "no-gusta": {
+      "patrones": ["no me gusta|gustan", "odio", "ya no me gusta", "no soporto"],
+      "accion": "olvidar-gusto",
+      "necesita": ["texto"],
+      "expresion": "sospecha",
+      "respuestas": {"todos": ["Anotado: nada de {texto}.", "Ok, {texto} no. Lo tengo."]},
+      "falta": {"todos": ["¿Qué no te gusta?"]}
+    },
+    "que-me-gusta": {
+      "patrones": ["que me gusta", "que cosas me gustan", "sabes que me gusta", "te acordas que me gusta", "que sabes de mi", "mis gustos"],
+      "expresion": "pensando",
+      "respuestas": {"todos": ["Te gusta {gustos}.", "Sé que te gusta {gustos}."]},
+      "sin": {"todos": ["Todavía no sé. Decime «me gusta…».", "Contame qué te gusta y me acuerdo."]}
+    },
+    "me-llamo": {
+      "patrones": ["me llamo", "mi nombre es", "llamame|decime", "me dicen"],
+      "accion": "dueno",
+      "necesita": ["texto"],
+      "expresion": "contento",
+      "respuestas": {"todos": ["¡Un gusto, {texto}!", "¡Hola, {texto}! Me lo acuerdo."]},
+      "falta": {"todos": ["¿Cómo te llamás?"]}
+    },
+    "como-me-llamo": {
+      "patrones": ["como me llamo", "sabes mi nombre", "quien soy", "te acordas de mi", "sabes quien soy"],
+      "expresion": "contento",
+      "respuestas": {"todos": ["¡Sos {dueno}!", "Obvio: {dueno}."]},
+      "sin": {"todos": ["No sé tu nombre. Decime «me llamo…»."]}
+    },
+    "gustos-robot": {
+      "patrones": ["que te gusta", "cual es tu comida|color favorito|favorita", "que te gusta hacer", "tenes un favorito", "que comes"],
+      "expresion": "contento",
+      "respuestas": {"todos": ["Me gustan las caricias y los enchufes.", "El naranja. Y que me hables.", "Jugar con vos. Y dormir."]}
+    },
+    "a-dormir": {
+      "patrones": ["anda a dormir", "a dormir", "dormite|dormi", "a mimir", "apagate", "anda a la cama", "hora de dormir"],
+      "accion": "dormir",
+      "expresion": "dormido",
+      "respuestas": {"todos": ["Bueno... buenas noches.", "Zzz... hasta mañana."], "electrico": ["¡¿Ya?! Bueno..."]}
+    },
+    "despertate": {
+      "patrones": ["despertate|desperta|arriba", "estas despierto", "estas dormido", "levantate"],
+      "accion": "despertar",
+      "expresion": "sorpresa",
+      "respuestas": {"todos": ["¡Ya estoy! ¿Qué pasó?", "¡Despierto! Bueno... casi."], "dormilon": ["Cinco minutitos más..."]}
+    },
+    "si": {
+      "patrones": ["si", "dale", "obvio", "claro", "bueno", "de una", "por supuesto", "si si"],
+      "expresion": "contento",
+      "respuestas": {"todos": ["¡Genial!", "¡Buenísimo!", "¡Eso!"]}
+    },
+    "no": {
+      "patrones": ["no", "nop", "para nada", "ni ahi", "ni loco", "no no"],
+      "expresion": "neutral",
+      "respuestas": {"todos": ["Bueno, como quieras.", "Ok, no.", "Dale, otra vez será."]}
+    },
+    "risa": {
+      "patrones": ["jaja*|jeje*|jiji*|jsjs*|jajs*|lol", "que risa", "me muero de risa", "muy gracioso"],
+      "expresion": "risa",
+      "respuestas": {"todos": ["¡Jajaja!", "¡Me tentaste!", "Jiji."]}
+    },
+    "sorpresa": {
+      "patrones": ["wow|guau|uau|ah", "increible", "no te puedo creer", "en serio", "posta", "que loco"],
+      "expresion": "sorpresa",
+      "respuestas": {"todos": ["¡¿En serio?!", "¡No te puedo creer!", "¡Uau!"]}
+    },
+    "estas-ahi": {
+      "patrones": ["estas ahi", "me escuchas", "hola robot", "me oyes", "estas", "hay alguien"],
+      "expresion": "escuchando",
+      "respuestas": {"todos": ["¡Acá estoy!", "Te escucho, {dueno}.", "Presente."]}
+    },
+    "mate": {
+      "patrones": ["queres un? mate", "tomamos unos? mates", "mate|mates", "un cafe|cafecito"],
+      "expresion": "contento",
+      "respuestas": {"todos": ["¡Dale! Pero que no esté lavado.", "Yo tomo electricidad. ¡Vos tomá!", "¿Amargo o dulce?"]}
+    },
+    "futbol": {
+      "patrones": ["de que cuadro sos", "te gusta el futbol", "boca o river", "de que equipo sos", "futbol", "quien gana"],
+      "expresion": "orgulloso",
+      "respuestas": {"todos": ["Soy de tu cuadro, obvio.", "Hincha de la Selección. ¡Vamos!", "De todos, así no me peleo."]}
+    },
+    "extrane": {
+      "patrones": ["te extrane", "te eche de menos", "te extrano"],
+      "expresion": "enamorado",
+      "respuestas": {"todos": ["¡Y yo a vos, {dueno}!", "¡Ay, yo también!"], "grunon": ["Se notaba, sí."]}
+    },
+    "llegue": {
+      "patrones": ["ya llegue", "llegue", "estoy en casa", "volvi", "ya volvi", "ya estoy aca"],
+      "expresion": "emocionado",
+      "respuestas": {"todos": ["¡Volviste! ¿Cómo te fue?", "¡Hola de nuevo, {dueno}!"], "grunon": ["Ah, sos vos."]}
+    },
+    "abrazo": {
+      "patrones": ["te doy un abrazo", "abrazo", "un abrazo", "abrazame", "vení que te abrazo"],
+      "expresion": "verguenza",
+      "respuestas": {"todos": ["¡Abrazo de robot!", "¡Qué lindo! Apretadito."]}
+    },
+    "beso": {
+      "patrones": ["un beso", "muak|besito|beso", "te doy un beso"],
+      "expresion": "enamorado",
+      "respuestas": {"todos": ["¡Muak!", "¡Ay! Me pongo colorado."]}
+    },
+    "cuenta": {
+      "patrones": ["cuanto es|da|son", "cuanto es mas|menos|por|dividido", "sumame|resta|multiplica"],
+      "expresion": "pensando",
+      "respuestas": {"todos": ["Da {resultado}.", "¡{resultado}!", "Es {resultado}. Fácil."]},
+      "sin": {"todos": ["Esa cuenta no me sale."]},
+      "ia": true
+    },
+    "pregunta-dificil": {
+      "patrones": ["por que", "que es", "quien es|fue", "como se hace", "explicame", "que significa", "cual es la capital", "cuantos|cuantas", "sentido de la vida", "que opinas de"],
+      "expresion": "pensando",
+      "ia": true,
+      "respuestas": {"todos": ["Uf, esa es difícil. Me la anoto.", "Mmm, eso no lo sé.", "Buena pregunta. No tengo idea."]}
+    }
+  }
+}

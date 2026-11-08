@@ -143,6 +143,8 @@ const vectores = {
     { nombre: 'musica parar', bpm: 0, sonando: false, titulo: '', artista: '', hex: hex(comando.musica({ sonando: false })) },
     { nombre: 'aviso pago', tipo: 'pago', app: '$12.000', contacto: 'Ana', hex: hex(comando.aviso({ tipo: 'pago', app: '$12.000', contacto: 'Ana' })) },
     { nombre: 'aviso github', tipo: 'github', app: 'PR #12', contacto: 'octocat', hex: hex(comando.aviso({ tipo: 'github', app: 'PR #12', contacto: 'octocat' })) },
+    // v1.10: la charla sin IA.
+    { nombre: 'charlar hola', texto: '¡Hola, Toto!', hex: hex(comando.charlar('¡Hola, Toto!')) },
     { nombre: 'ota cancelar', hex: hex(ota.cancelar()) },
   ],
   ota: {

@@ -610,6 +610,75 @@ por `Sistema::sonar` (`voz.volumen` 0 = silencio).
 texto del despertador, `DatosClima` (40 B) y el `Hablador`: unos 2,3 KB en
 total. El broche quedó en 74 % de RAM (con las caras de imagen).
 
+## Charla sin IA (v1.10, `charla.cpp`, `conversar.cpp`, `voz_propia.cpp`)
+
+El robot conversa sin IA y sin costo, igual en todas las placas: entra lo que
+dijiste (ya en texto: el micrófono del robot-celu con Vosk, el teclado de la
+app, Telegram) y sale una frase, una expresión y, si corresponde, una acción.
+La IA (si el dueño la conectó) es el último recurso: solo cuando el motor dice
+`no_entendi`.
+
+- **Los datos**: `shared/formato/charla/intenciones.json` (con su schema): 78
+  intenciones del día a día (saludo, buen día, cómo estás, cómo te llamás,
+  quién te hizo, la hora, la fecha, el clima, alarmas, posponer, apagar,
+  recordatorios, temporizador, hábitos, juegos, dado, moneda, modos, chistes,
+  datos curiosos, te quiero, triste, cansado, aburrido, feliz, enojado,
+  nervioso, enfermo, hambre, gracias, perdón, insultos con dignidad, callate,
+  volumen, cumpleaños, qué podés hacer, música, bailar, cantar, agenda, toques
+  a amigos, gustos, me llamo, dormir, despertar, sí, no, risa, mate, fútbol,
+  cuentas y preguntas difíciles), cada una con patrones, respuestas por preset
+  (como `frases.json`), lo que **necesita** (la hora, un texto, el juego, el
+  hábito, a quién), lo que **falta** (lo que pregunta si no lo dijo) y lo que
+  dice **sin** el dato. `npm run caras` las pasa a tablas en `charla_base.h`
+  (flash, sin parsear: ~38 KB de flash, 0 de RAM) y valida largos (60 bytes),
+  plantillas, expresiones y comportamientos.
+- **Entender**: normaliza (minúsculas, sin tildes ni signos, "holaaa" →
+  "hola", abreviaturas: "q", "xq", "tqm", "finde"); un patrón son palabras en
+  orden, con alternativas (`pone*|programa*`), raíces (`*`) y opcionales
+  (`?`); tolera un error de tipeo (dos en las palabras largas; la primera letra
+  tiene que estar) y puntúa por la calidad y por cuánto de la frase explica (sin
+  el relleno: "che", "el", "que", el nombre del robot). Umbral 0,6.
+- **Entidades**: horas ("a las 7", "7 y media", "8 menos cuarto", "6:45", "a la
+  una", "al mediodía", "de la tarde", "a la noche", "en 10 minutos", "en media
+  hora", "en un rato"), días ("hoy", "mañana", "pasado mañana", "el sábado",
+  "todos los días", "de lunes a viernes", "los fines de semana"), números (con
+  letras también), el juego, el modo, el toque, el hábito (contra los nombres
+  de la config, con raíces: "ya tomé agua" → "Tomar agua") y el texto libre
+  (el recordatorio, el gusto, el nombre, a quién: con sus tildes y mayúsculas
+  originales). Una hora sin "de la tarde" es la próxima que viene (de 1 a 6, de
+  tarde), salvo para despertarse; si ya pasó, es mañana.
+- **Contexto** (`EstadoCharla`, ~70 B, 90 s): completa lo que preguntó
+  ("poneme una alarma" → "¿A qué hora?" → "a las 9"), sigue ("¿qué tiempo
+  hace?" → "¿y mañana?"; "contame un chiste" → "otro"; "mejor a las 10") y no
+  repite la última respuesta.
+- **Acciones en el robot** (`Sistema::charlar`): alarma (una vez: un timer;
+  con días: el despertador de la config en la RAM), cancelar, posponer,
+  apagar, recordatorio (una vez: un timer que a su hora suena `recordatorio`
+  y lo dice en el globo; con días: se suma a `recordatorios`), hábito
+  (`marcarHabito`), jugar, modo, gustos (hasta 4, en la flash: `"gustos"`,
+  aparte de la memoria de 112 bytes, que no tiene lugar), el nombre del dueño,
+  el volumen, callarse (una hora sin frases espontáneas), dormir (siesta de
+  20 min de día) y el ánimo (como la respuesta al "¿cómo estás?"). Toques y
+  música los hace la nube. Todo lo que cambia la config queda en la RAM: el
+  aviso `0xCC` le dice a la nube o a la app qué guardar.
+- **La voz propia** (`VozPropia`): un balbuceo de robot (como el
+  "animalese") que sigue el globo letra por letra: cada vocal es una sílaba
+  con dos formantes (resonadores enteros en Q14, tablas por vocal), las
+  consonantes son ruido, chasquidos o un zumbido nasal. El tono es el de
+  `voz.tipo` (grave 120 Hz, media 185, aguda 280, robot: onda cuadrada) y
+  sube y baja según la letra, el ánimo, la energía y la personalidad (pícaro:
+  más melodía; tímido: más bajito; con energía: más rápido); las preguntas
+  suben al final. PCM 16 kHz mono por `Hal::audio`, de a bloques en el tick con
+  150 ms de adelanto; sin parlante no hace nada. Determinista; sin float por
+  muestra.
+- **Dónde corre**: el robot (comando `0x4C`, o `sintetica_charlar` en la API
+  C del robot-celu), la nube (`nucleo.Charlar` en Go por cgo: la misma
+  función, pura, en paralelo) y el simulador (panel "Charla", con la voz por
+  WebAudio).
+
+RAM: `EstadoCharla` 72 B, `VozPropia` ~56 B, el recordatorio de una vez 41 B y
+unos timers en `Sistema`; en la pila, ~1,5 KB mientras charla.
+
 ## Protocolo v1.4
 
 Ver [protocolo-ble.md](protocolo-ble.md): eventos nuevos (índices 8 a 30) y los

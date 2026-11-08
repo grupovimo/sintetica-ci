@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { crearSimulador, memoriaVolatil } from '../web/sim.js';
 import {
   ArmadorDeConfig, Car, comando, escriturasDeConfig, escriturasDeImagen, idDeAnuncio, imagen, leerEstado, leerListaImagenes,
-  leerListaSprites, leerMemoria, leerQr, leerRespuesta, pedirConfig, PRIMER_SPRITE,
+  leerCharla, leerListaSprites, leerMemoria, leerQr, leerRespuesta, pedirConfig, PRIMER_SPRITE,
 } from '../web/protocolo.js';
 import { codificarAnimacion, codificarQoi, cuadrosDe, decodificarQoi, esAnimacion } from '../web/qoi.js';
 import { decodificarGif } from '../web/gif.js';
@@ -22,10 +22,11 @@ let claveCelu = null;
 async function nuevo(almacen = memoriaVolatil(), { vincular = true, perfil = 'mascota' } = {}) {
   const reloj = { t: 0 };
   const notis = [];
+  const audio = [];
   let cuadros = 0;
   const sim = await crearSimulador({
     wasm, almacen, perfil, ahora: () => reloj.t, semilla: () => 1234, minutoDelDia: () => 12 * 60,
-    alNotificar: (c, b) => notis.push({ c, b }), alPresentar: () => cuadros++,
+    alNotificar: (c, b) => notis.push({ c, b }), alPresentar: () => cuadros++, alAudio: (m) => audio.push(m),
   });
   const correr = (ms) => { for (let i = 0; i < ms; i += 20) { reloj.t += 20; sim.tick(); } };
   sim.bleConexion(true);
@@ -39,7 +40,7 @@ async function nuevo(almacen = memoriaVolatil(), { vincular = true, perfil = 'ma
     }
     notis.length = 0;
   }
-  return { sim, reloj, notis, correr, cuadros: () => cuadros, almacen };
+  return { sim, reloj, notis, correr, cuadros: () => cuadros, almacen, audio };
 }
 
 test('arranca con las 16 caras y en neutral', async () => {
@@ -425,4 +426,26 @@ test('v1.7: jugar al dado, un aviso del celu y la memoria con los juegos', async
   sim.bleEscribir(Car.comando, comando.memoria());
   const m = leerMemoria(notis.at(-1).b.subarray(2));
   assert.equal(m.juegosJugados, 1);
+});
+
+test('v1.10: charla sin IA (0x4C): entiende, hace la acción, contesta con su globo y su voz', async () => {
+  const { sim, notis, correr, audio } = await nuevo();
+  sim.bleEscribir(Car.comando, comando.charlar('poneme una alarma en 5 minutos'));
+  const c = leerCharla(notis.filter((n) => n.c === Car.comando).at(-1).b);
+  assert.equal(c.intencion, 'alarma');
+  assert.equal(c.accion, 'alarma');
+  assert.equal(c.enMinutos, 5);
+  assert.equal(c.noEntendi, false);
+  correr(600);
+  assert.equal(sim.expresionVisible(), 'globo');
+  correr(4000);
+  const muestras = audio.reduce((s, m) => s + m.length, 0);
+  assert.ok(muestras > 8000, `la voz: ${muestras} muestras`);
+  assert.ok(audio.every((m) => m.every((x) => Math.abs(x) <= 30000)));
+  // Lo que no entiende: lo dice, con el flag para que pruebe la IA.
+  sim.bleEscribir(Car.comando, comando.charlar('asdf qwerty zxcv'));
+  assert.equal(leerCharla(notis.filter((n) => n.c === Car.comando).at(-1).b).noEntendi, true);
+  // Directo (lo que usa el robot-celu): true si entendió.
+  assert.equal(sim.charlar('contame un chiste'), true);
+  assert.equal(sim.charlar('asdf qwerty zxcv'), false);
 });

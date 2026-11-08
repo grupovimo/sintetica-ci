@@ -189,6 +189,20 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--linea);
     </div>
 
     <div class="panel">
+      <section aria-labelledby="t-charla">
+        <h2 id="t-charla">Charla</h2>
+        <form class="dos" id="f-charla">
+          <label for="i-charla"><span class="etiqueta">Decile algo</span>
+            <input type="text" id="i-charla" maxlength="200" value="¿qué hora es?" autocomplete="off">
+          </label>
+          <button id="b-charla" class="primario">Decir</button>
+        </form>
+        <div class="fila">
+          <button id="b-voz" aria-pressed="true">Voz</button>
+          <span class="etiqueta" id="v-charla">—</span>
+        </div>
+      </section>
+
       <section aria-labelledby="t-vida">
         <div class="fila">
           <h2 id="t-vida">Motor de vida</h2>
