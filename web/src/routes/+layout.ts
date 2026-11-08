@@ -20,7 +20,7 @@ export async function load({ fetch, url }) {
     /* la API no responde: se ve en cada página */
   }
   // Públicas: la landing y entrar.
-  const publica = url.pathname === '/' || url.pathname.startsWith('/entrar');
+  const publica = url.pathname === '/' || url.pathname.startsWith('/piezas') || url.pathname.startsWith('/entrar');
   if (!usuario && !publica) {
     redirect(307, `/entrar?volver=${encodeURIComponent(url.pathname + url.search)}`);
   }

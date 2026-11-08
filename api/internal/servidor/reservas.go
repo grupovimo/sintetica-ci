@@ -11,9 +11,9 @@ import (
 	"sintetica/api/internal/almacen"
 )
 
-// Las piezas y los colores de carcasa de la landing.
+// Las piezas (web/src/lib/landing/piezas.ts) y los colores de carcasa.
 var (
-	piezas         = map[string]bool{"unidad": true, "broche": true}
+	piezas         = map[string]bool{"unidad": true, "broche": true, "hebilla": true, "colgante": true, "translucido": true, "alfiler": true, "hebilla-pelo": true}
 	coloresCarcasa = map[string]bool{"naranja": true, "negro": true, "blanco": true}
 )
 
@@ -44,7 +44,7 @@ func (s *Servidor) reservar(w http.ResponseWriter, r *http.Request) {
 		fallar(w, http.StatusBadRequest, "dejanos un email o un WhatsApp para escribirte")
 		return
 	case !piezas[res.Pieza]:
-		fallar(w, http.StatusBadRequest, "la pieza es unidad o broche")
+		fallar(w, http.StatusBadRequest, "esa pieza no existe")
 		return
 	case !coloresCarcasa[res.Color]:
 		fallar(w, http.StatusBadRequest, "el color es naranja, negro o blanco")

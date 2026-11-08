@@ -6,8 +6,12 @@
   import Lenis from 'lenis';
   import { api, ErrorApi } from '$lib/api';
   import Pantalla from '$lib/componentes/Pantalla.svelte';
+  import Cabecera from '$lib/landing/Cabecera.svelte';
   import Foto from '$lib/landing/Foto.svelte';
+  import Pie from '$lib/landing/Pie.svelte';
+  import '$lib/landing/marca.css';
   import { fotos } from '$lib/landing/caras';
+  import { JOYAS, pieza as datosPieza } from '$lib/landing/piezas';
 
   let { data } = $props();
 
@@ -32,11 +36,20 @@
   ] as const;
 
   let personalidad = $state('picaro');
+  // La vitrina: qué pieza se ve, según cuánto se scrolleó la sección.
+  let vitrina: HTMLElement;
+  let activa = $state(0);
+  function irAJoya(i: number) {
+    const r = vitrina.getBoundingClientRect();
+    const y = scrollY + r.top + ((i + 0.5) / JOYAS.length) * (r.height - innerHeight);
+    if (lenis) lenis.scrollTo(y, { duration: 1 });
+    else scrollTo({ top: y });
+  }
   const configVivo = $derived({ version: 2, personalidad: { preset: personalidad } });
   let caras = $state<{ nombre: string; url: string }[]>([]);
 
   // La reserva
-  let pieza = $state<'unidad' | 'broche'>('unidad');
+  let pieza = $state('unidad');
   let color = $state('naranja');
   let nombre = $state('');
   let contacto = $state('');
@@ -59,7 +72,7 @@
     }
   }
 
-  function elegirPieza(p: 'unidad' | 'broche') {
+  function elegirPieza(p: string) {
     pieza = p;
   }
 
@@ -71,12 +84,20 @@
   let observador: IntersectionObserver | null = null;
 
   onMount(() => {
+    // Desde la página de una pieza: la reserva ya la trae elegida.
+    const pedida = new URLSearchParams(location.search).get('pieza');
+    if (pedida && datosPieza(pedida)) pieza = pedida;
     fotos(['contento', 'enamorado', 'mareado', 'sospecha'])
       .then((f) => (caras = f))
       .catch(() => {});
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
       raiz.classList.add('quieto');
-      return;
+      const alScroll = () => {
+        const r = vitrina.getBoundingClientRect();
+        activa = Math.floor(Math.min(Math.max(-r.top / (r.height - innerHeight), 0), 0.9999) * JOYAS.length);
+      };
+      addEventListener('scroll', alScroll, { passive: true });
+      return () => removeEventListener('scroll', alScroll);
     }
     lenis = new Lenis({ lerp: 0.09, smoothWheel: true });
     raiz.querySelectorAll<HTMLAnchorElement>('a[href^="#"]').forEach((a) =>
@@ -90,6 +111,12 @@
     const moviles = [...raiz.querySelectorAll<HTMLElement>('[data-parallax]')];
     const vuelta = (t: number) => {
       lenis?.raf(t);
+      if (vitrina) {
+        const r = vitrina.getBoundingClientRect();
+        const p = Math.min(Math.max(-r.top / (r.height - innerHeight), 0), 0.9999);
+        const k = Math.floor(p * JOYAS.length);
+        if (k !== activa) activa = k;
+      }
       const mitad = innerHeight / 2;
       for (const el of moviles) {
         const r = el.getBoundingClientRect();
@@ -128,18 +155,7 @@
   <!-- 1 · Portada -->
   <section class="portada">
     <div class="puntos" data-parallax="0.08" aria-hidden="true"></div>
-    <header class="contenedor nav">
-      <a class="marca" href="#inicio" aria-label="Sintética, inicio">
-        <svg width="40" height="24" viewBox="0 0 40 26" aria-hidden="true"><rect x="4" y="3" width="11" height="20" rx="5.5" fill="currentColor" /><path d="M25 8 L36 3 V18 A5.5 5.5 0 0 1 25 18 Z" fill="currentColor" /></svg>
-        <span>SINTÉTICA</span>
-      </a>
-      <nav aria-label="Secciones">
-        <a class="ficha" href="#piezas">Unidades</a>
-        <a class="ficha" href="#app">App</a>
-        <a class="ficha" href={data.usuario ? '/bichos' : '/entrar'}>{data.usuario ? 'Mis robots' : 'Entrar'}</a>
-      </nav>
-      <a class="inflado" href="#reservar">Reservar</a>
-    </header>
+    <Cabecera usuario={data.usuario} />
 
     <div id="inicio" class="contenedor inicio">
       <h1 class="t-display aparece">Tu propio<br /><span class="cromo">robot.</span></h1>
@@ -189,41 +205,57 @@
       <article class="pieza aparece">
         <Foto alt="la Unidad en el escritorio" clara />
         <div class="pie-pieza">
-          <div><h3 class="t-h3">Unidad</h3><span class="detalle">Robot de escritorio · [PRECIO]</span></div>
+          <div><h3 class="t-h3"><a href="/piezas/unidad">Unidad</a></h3><span class="detalle">Robot de escritorio · [PRECIO]</span></div>
           <a class="inflado" href="#reservar" onclick={() => elegirPieza('unidad')}>Reservar</a>
         </div>
       </article>
       <article class="pieza aparece" style:transition-delay="80ms">
         <Foto src="/landing/hebilla.jpg" alt="El Broche como hebilla naranja de cinturón, con una carita guiñando en la pantalla" />
         <div class="pie-pieza">
-          <div><h3 class="t-h3">Broche</h3><span class="detalle">Joyería electrónica · [PRECIO]</span></div>
+          <div><h3 class="t-h3"><a href="/piezas/broche">Broche</a></h3><span class="detalle">Joyería electrónica · [PRECIO]</span></div>
           <a class="inflado" href="#reservar" onclick={() => elegirPieza('broche')}>Reservar</a>
         </div>
       </article>
     </div>
   </section>
 
-  <!-- 3b · Joyería electrónica -->
-  <section id="joyeria" class="crema seccion">
-    <div class="contenedor angosto app">
-      <div class="pila-40">
-        <div class="pila">
+  <!-- 3b · Joyería electrónica: la vitrina. Mientras se scrollea, queda fija y
+       las piezas pasan de a una bajo un foco. -->
+  <section id="joyeria" class="vitrina" style:--n={JOYAS.length} bind:this={vitrina}>
+    <div class="escenario-v">
+      <div class="foco" aria-hidden="true"></div>
+      <div class="contenedor angosto v-grilla">
+        <div class="v-izq">
           <span class="ficha arriba-sola">Joyería electrónica</span>
-          <h2 class="t-h2 aparece">Llevalo<br />puesto.</h2>
+          <h2 class="t-h2">Llevalo<br />puesto.</h2>
+          <ol class="indice">
+            {#each JOYAS as j, i}
+              <li>
+                <button type="button" class={i === activa ? 'inflado naranja chico' : 'inflado blanco chico'} aria-pressed={i === activa} onclick={() => irAJoya(i)}>
+                  <span class="num">{String(i + 1).padStart(2, '0')}</span>{j.nombre}
+                </button>
+              </li>
+            {/each}
+          </ol>
         </div>
-        <div class="fila chica">
-          {#each ['Hebilla', 'Colgante', 'Alfiler', 'Hebilla de pelo', 'Broche'] as tipo}<span class="ficha">{tipo}</span>{/each}
+        <div class="v-centro" aria-live="polite">
+          {#each JOYAS as j, i}
+            <figure class="v-pieza" class:activa={i === activa} class:antes={i < activa} aria-hidden={i !== activa}>
+              <span class="v-nombre" aria-hidden="true">{j.nombre}</span>
+              <img src={j.foto} alt={j.queMuestra} loading={i < 2 ? 'eager' : 'lazy'} decoding="async" />
+            </figure>
+          {/each}
         </div>
-        <div class="fila"><a class="inflado" href="#reservar" onclick={() => elegirPieza('broche')}>Reservar un Broche</a></div>
+        <div class="v-der">
+          <span class="v-numero">#{String(activa + 1).padStart(3, '0')}</span>
+          <p class="t-lead">{JOYAS[activa].frase}</p>
+          <div class="fila">
+            <a class="inflado" href="/piezas/{JOYAS[activa].clave}">Ver pieza</a>
+            <a class="inflado contorno-claro" href="#reservar" onclick={() => elegirPieza(JOYAS[activa].clave)}>Reservar</a>
+          </div>
+        </div>
       </div>
-      <div class="collage">
-        <div class="aparece" data-parallax="0.04" style="transform: translateY(var(--py, 0px))">
-          <Foto src="/landing/coleccion.jpg" alt="La colección: hebilla de cinturón, colgante, broche translúcido, alfiler y hebilla de pelo, cada uno con una carita luminosa y su número" radio="32px" />
-        </div>
-        <div class="aparece baja" data-parallax="-0.04" style="transform: translateY(var(--py, 0px))">
-          <Foto src="/landing/hebilla.jpg" alt="El Broche como hebilla de cinturón, puesto" radio="32px" />
-        </div>
-      </div>
+      <div class="progreso" aria-hidden="true"><span style:width={`${((activa + 1) / JOYAS.length) * 100}%`}></span></div>
     </div>
   </section>
 
@@ -359,7 +391,7 @@
       {#if reservado}
         <div class="formulario listo">
           <p class="t-lead">¡Listo, {nombre.split(' ')[0]}!</p>
-          <p class="detalle-claro">Te escribimos a <b>{contacto}</b> para coordinar tu {pieza === 'broche' ? 'Broche' : 'Unidad'}.</p>
+          <p class="detalle-claro">Te escribimos a <b>{contacto}</b> para coordinar tu {datosPieza(pieza)?.nombre ?? 'pieza'}.</p>
         </div>
       {:else}
         <form class="formulario banda" onsubmit={reservar}>
@@ -370,6 +402,9 @@
             <div class="selector">
               <button type="button" class={pieza === 'unidad' ? 'inflado blanco mini' : 'inflado plano mini'} aria-pressed={pieza === 'unidad'} onclick={() => (pieza = 'unidad')}>Unidad</button>
               <button type="button" class={pieza === 'broche' ? 'inflado blanco mini' : 'inflado plano mini'} aria-pressed={pieza === 'broche'} onclick={() => (pieza = 'broche')}>Broche</button>
+              {#if pieza !== 'unidad' && pieza !== 'broche'}
+                <button type="button" class="inflado blanco mini" aria-pressed="true">{datosPieza(pieza)?.nombre}</button>
+              {/if}
               <span class="relleno"></span>
               {#each COLORES as [clave, etiqueta, fondo]}
                 <button type="button" class="muestra" style:background={fondo} aria-label={etiqueta} aria-pressed={color === clave} onclick={() => (color = clave)}></button>
@@ -384,88 +419,52 @@
     </div>
   </section>
 
-  <footer class="pie">
-    <div class="contenedor angosto entre">
-      <span>SINTÉTICA LABS · MAR DEL PLATA</span>
-      <a href="https://instagram.com/sintetica.labs" target="_blank" rel="noopener">@sintetica.labs</a>
-    </div>
-  </footer>
+  <Pie />
 </div>
 
 <style>
-  .landing { position: relative; overflow-x: clip; background: #ff5a1f; color: #111; font-family: 'Archivo', system-ui, sans-serif; -webkit-font-smoothing: antialiased; color-scheme: light; }
-  .landing :global(*) { box-sizing: border-box; }
-  .landing a { text-decoration: none; }
-  .landing a:not(.inflado):not(.tienda) { color: inherit; }
-  .landing :global(:focus-visible) { outline: 3px solid #fff; outline-offset: 3px; }
 
-  /* Textura: grano que se mueve y la trama de puntos. */
-  .grano { position: fixed; inset: -50%; z-index: 60; pointer-events: none; opacity: 0.07; mix-blend-mode: multiply; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); animation: grano 1s steps(5) infinite; }
-  @keyframes grano { 0% { transform: translate(0, 0); } 25% { transform: translate(-2%, 3%); } 50% { transform: translate(3%, -2%); } 75% { transform: translate(-3%, -3%); } 100% { transform: translate(0, 0); } }
-  .puntos { position: absolute; inset: -80px 0; pointer-events: none; opacity: 0.5; background-image: radial-gradient(rgba(0, 0, 0, 0.16) 1.2px, transparent 1.6px); background-size: 8px 8px; transform: translateY(var(--py, 0)); }
 
-  /* Escala tipográfica (200 / 128 / 64 / 36) y grilla de 8 px. */
-  .t-display { margin: 0; font: 900 clamp(72px, 11.7vw, 168px) / 0.9 'Archivo', sans-serif; font-stretch: 125%; letter-spacing: -0.05em; text-transform: uppercase; }
-  .t-h2 { margin: 0; font: 900 clamp(56px, 8.9vw, 128px) / 0.92 'Archivo', sans-serif; font-stretch: 125%; letter-spacing: -0.05em; text-transform: uppercase; }
-  .t-h3 { margin: 0; font: 900 clamp(40px, 4.4vw, 64px) / 0.9 'Archivo', sans-serif; font-stretch: 125%; letter-spacing: -0.04em; text-transform: uppercase; }
-  .t-h4 { margin: 0; font: 900 clamp(28px, 2.5vw, 36px) / 0.95 'Archivo', sans-serif; font-stretch: 120%; letter-spacing: -0.03em; text-transform: uppercase; }
-  .t-lead { margin: 0; font: 800 clamp(28px, 3vw, 44px) / 1.02 'Archivo', sans-serif; font-stretch: 110%; letter-spacing: -0.03em; }
-  .naranja { color: #ff5a1f; }
-  .cromo { background: linear-gradient(100deg, #fff 0%, #c8f1ff 22%, #ffd1f4 44%, #fff6c2 62%, #fff 80%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 4px 0 #111); animation: cromo 6s ease-in-out infinite alternate; }
-  @keyframes cromo { to { background-position: 100% 0; } }
 
-  .contenedor { position: relative; z-index: 1; max-width: 1312px; margin: 0 auto; padding: 0 40px; }
-  .contenedor.angosto { max-width: 1312px; }
-  .seccion { position: relative; padding: 128px 0; }
-  .seccion.sin-arriba { padding-top: 0; }
-  .hueso { background: #efece6; }
-  .crema { background: #f6f3ee; }
-  .arriba-sola { align-self: flex-start; }
-  .collage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-  .collage .baja { margin-top: 64px; }
-  .collage :global(.foto) { box-shadow: 0 32px 48px -32px rgba(0, 0, 0, 0.45); }
-  .negra { background: #111; color: #fff; }
-  .pila { display: flex; flex-direction: column; gap: 24px; }
-  .pila-32 { display: flex; flex-direction: column; gap: 32px; }
-  .pila-48 { display: flex; flex-direction: column; gap: 48px; }
-  .pila-64 { display: flex; flex-direction: column; gap: 64px; }
-  .fila { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
-  .fila.chica { gap: 8px; }
-  .col { display: flex; flex-direction: column; gap: 6px; }
-  .entre { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
-  .grilla-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap: 24px; }
-  .grilla-2.centrado { align-items: center; gap: 48px; }
-  .grilla-3 { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 24px; }
+  .t-h3 a:hover { text-decoration: underline; text-decoration-thickness: 4px; }
 
-  /* Botones inflados y fichas */
-  .inflado { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; padding: 0 32px; border-radius: 999px; border: 0; font: 800 16px/1 'Archivo', sans-serif; font-stretch: 112%; text-transform: uppercase; letter-spacing: 0.02em; cursor: pointer; color: #fff; background: radial-gradient(130% 150% at 30% 0%, #4a4a4a 0%, #161616 45%, #000 100%); box-shadow: inset 0 2px 1px rgba(255, 255, 255, 0.35), inset 0 -10px 16px rgba(0, 0, 0, 0.6), 0 16px 24px -12px rgba(0, 0, 0, 0.6), 0 3px 0 #000; transition: transform 0.25s cubic-bezier(0.3, 1.7, 0.45, 1); }
-  .inflado:hover { transform: translateY(-2px) scale(1.03); }
-  .inflado:active { transform: translateY(2px) scale(0.97); }
-  .inflado:disabled { opacity: 0.6; cursor: progress; }
-  .inflado.blanco { color: #111; background: radial-gradient(130% 150% at 30% 0%, #fff 0%, #f1efea 45%, #c9c5bd 100%); box-shadow: inset 0 2px 1px #fff, inset 0 -10px 16px rgba(0, 0, 0, 0.18), 0 16px 24px -12px rgba(0, 0, 0, 0.45), 0 3px 0 rgba(0, 0, 0, 0.3); }
-  .inflado.naranja { color: #111; background: radial-gradient(130% 150% at 30% 0%, #ffb08a 0%, #ff5a1f 45%, #c2410c 100%); box-shadow: inset 0 2px 1px rgba(255, 255, 255, 0.6), inset 0 -10px 16px rgba(110, 30, 0, 0.45), 0 16px 24px -12px rgba(194, 65, 12, 0.7), 0 3px 0 rgba(0, 0, 0, 0.3); }
-  .inflado.contorno { box-shadow: inset 0 2px 1px rgba(255, 255, 255, 0.25), 0 0 0 2px #3a3a3a; }
-  .inflado.chico { min-height: 48px; padding: 0 24px; font-size: 14px; }
-  .ficha { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 18px; border-radius: 999px; font: 700 15px/1 'Archivo', sans-serif; font-stretch: 110%; color: #111; background: radial-gradient(130% 150% at 30% 0%, #fff 0%, #f4f2ee 60%, #dcd8d0 100%); box-shadow: inset 0 2px 1px #fff, inset 0 -6px 10px rgba(0, 0, 0, 0.12), 0 8px 16px -10px rgba(0, 0, 0, 0.5); }
-  a.ficha:hover { transform: translateY(-1px); }
 
-  /* Apariciones al scrollear */
-  .aparece { opacity: 0; translate: 0 32px; transition: opacity 0.7s ease, translate 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
-  .aparece:global(.visto) { opacity: 1; translate: 0 0; }
-  .landing:global(.quieto) .aparece { opacity: 1; translate: none; transition: none; }
 
   /* 1 · Portada */
   .portada { position: relative; overflow: hidden; }
-  .nav { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding-top: 24px; padding-bottom: 24px; }
-  .marca { display: flex; align-items: center; gap: 8px; font: 900 22px/1 'Archivo', sans-serif; font-stretch: 125%; letter-spacing: -0.02em; }
-  .nav .ficha, .nav .inflado { min-height: 48px; padding: 0 24px; font-size: 15px; }
-  .nav nav { flex: 1; display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
   .inicio { display: flex; flex-direction: column; gap: 32px; padding-top: 32px; padding-bottom: 128px; }
   .dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 24px; align-items: stretch; }
   /* La foto y la tarjeta miden lo mismo: la foto llena el alto de la fila. */
   .foto-hero { display: flex; min-height: 400px; }
   .foto-hero :global(.foto) { flex: 1; }
   .tarjeta-negra { display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: 40px; border-radius: 40px; background: #111; color: #fff; box-shadow: 0 32px 48px -32px rgba(0, 0, 0, 0.7); }
+
+
+  /* La vitrina: el escenario tiene el mismo crema que el fondo de las fotos;
+     con "darken" el fondo de la foto desaparece y queda la pieza. */
+  .vitrina { position: relative; height: calc(var(--n) * 80vh + 100vh); background: #f3eeea; }
+  .escenario-v { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; display: flex; align-items: center; background: radial-gradient(70% 70% at 50% 55%, #f3eeea 55%, #e4ddd6 100%); }
+  .foco { position: absolute; left: 50%; top: 52%; width: min(70vw, 900px); aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; background: radial-gradient(closest-side, rgba(255, 106, 51, 0.16), rgba(255, 106, 51, 0)); pointer-events: none; }
+  .v-grilla { width: 100%; display: grid; grid-template-columns: minmax(240px, 1fr) minmax(0, 1.4fr) minmax(220px, 0.9fr); gap: 32px; align-items: center; }
+  .v-izq, .v-der { display: flex; flex-direction: column; gap: 24px; position: relative; z-index: 2; }
+  .vitrina .t-h2 { font-size: clamp(48px, 5.6vw, 80px); }
+  .indice { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+  .indice .inflado { gap: 12px; }
+  .num { opacity: 0.55; font-variant-numeric: tabular-nums; }
+  .v-centro { position: relative; height: min(72vh, 680px); }
+  /* El fundido va en la tarjeta (no en la foto): la opacidad y la escala la
+     aíslan, y la foto sola no tendría contra qué mezclarse. */
+  .vitrina .v-grilla { z-index: auto; }
+  .v-pieza { mix-blend-mode: darken; position: absolute; inset: 0; margin: 0; display: grid; place-items: center; opacity: 0; scale: 0.86; translate: 0 40px; transition: opacity 0.6s ease, scale 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), translate 0.8s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .v-pieza.antes { translate: 0 -40px; }
+  .v-pieza.activa { opacity: 1; scale: 1; translate: 0 0; }
+  .v-pieza img { position: relative; height: 100%; width: auto; max-width: 100%; object-fit: contain; -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent 100%); mask-image: radial-gradient(closest-side, #000 72%, transparent 100%); animation: flotar 6s ease-in-out infinite; }
+  @keyframes flotar { 50% { transform: translateY(-14px) rotate(-1deg); } }
+  .v-nombre { position: absolute; left: 50%; top: 50%; translate: -50% -50%; white-space: nowrap; font: 900 clamp(80px, 13vw, 220px) / 1 'Archivo', sans-serif; font-stretch: 125%; letter-spacing: -0.05em; text-transform: uppercase; color: transparent; -webkit-text-stroke: 2px rgba(255, 90, 31, 0.35); pointer-events: none; }
+  .v-numero { font: 900 clamp(56px, 6vw, 96px) / 1 'Archivo', sans-serif; font-stretch: 125%; letter-spacing: -0.04em; color: #ff5a1f; }
+  .inflado.contorno-claro { color: #111; background: transparent; box-shadow: 0 0 0 2px #111; }
+  .progreso { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(0, 0, 0, 0.08); }
+  .progreso span { display: block; height: 100%; background: #ff5a1f; transition: width 0.5s ease; }
 
   /* 2 y 3 */
   .paso { display: flex; flex-direction: column; gap: 24px; padding: 32px; border-radius: 40px; background: #fff; box-shadow: inset 0 -10px 16px rgba(0, 0, 0, 0.06), 0 24px 40px -28px rgba(0, 0, 0, 0.5); }
@@ -489,7 +488,6 @@
 
   /* 6 · La app */
   .app { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap: 64px; align-items: center; }
-  .pila-40 { display: flex; flex-direction: column; gap: 40px; }
   /* En media columna el título va un escalón más chico: si no, no entra. */
   .app .t-h2, .personalidad .t-h2 { font-size: clamp(48px, 5.6vw, 80px); }
   .funciones { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
@@ -559,28 +557,23 @@
   .formulario input { min-height: 56px; padding: 0 24px; border-radius: 999px; border: 0; background: #262626; color: #fff; font: 600 18px 'Archivo', sans-serif; }
   .formulario fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
   .selector { display: flex; gap: 8px; align-items: center; min-height: 56px; padding: 4px 12px 4px 4px; border-radius: 999px; background: #262626; }
-  .inflado.mini { min-height: 48px; padding: 0 18px; font-size: 13px; }
-  .inflado.plano { background: none; box-shadow: none; }
   .muestra { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 0; cursor: pointer; box-shadow: 0 0 0 1px #555; }
   .muestra[aria-pressed='true'] { box-shadow: 0 0 0 2px #262626, 0 0 0 4px #fff; }
   .enviar { width: 100%; font-size: 17px; }
   .error { grid-column: 1 / -1; margin: 0; color: #ffb4a1; font-weight: 700; }
   .detalle-claro { margin: 0; color: #c4c4c4; font-size: 18px; line-height: 1.4; }
   .trampa { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  .pie { background: #111; color: #a3a3a3; padding: 32px 0; font: 700 15px 'Archivo', sans-serif; }
-  .pie a { color: #e5e5e5; }
 
   @media (max-width: 720px) {
-    .contenedor { padding: 0 16px; }
-    .seccion { padding: 96px 0; }
     .tarjeta-negra, .paso, .formulario { padding: 24px; }
     .formulario.banda { grid-template-columns: 1fr; }
-    .nav nav .ficha:not(:last-child) { display: none; }
     .escenario { height: 600px; }
+    .v-grilla { grid-template-columns: 1fr; gap: 16px; }
+    .v-izq .t-h2, .indice { display: none; }
+    .v-centro { height: 44vh; }
     .telefono.izq, .telefono.der { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .grano, .cromo { animation: none; }
-    .inflado { transition: none; }
+    .v-pieza img { animation: none; }
   }
 </style>

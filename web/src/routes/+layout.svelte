@@ -13,7 +13,7 @@
   ];
   const activa = (ruta: string) => page.url.pathname.startsWith(ruta);
   // La landing (/) tiene su propia barra y su propio diseño.
-  const landing = $derived(page.url.pathname === '/');
+  const landing = $derived(page.url.pathname === '/' || page.url.pathname.startsWith('/piezas'));
 
   async function salir() {
     await api('/v1/sesion', { metodo: 'DELETE' }).catch(() => {});
