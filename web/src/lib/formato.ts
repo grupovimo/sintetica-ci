@@ -20,7 +20,7 @@ export const NOMBRES_EVENTO: Record<string, string> = {
   ruido: 'Un ruido fuerte', musica: 'Música', silencio: 'Silencio largo', notificacion: 'Una notificación',
   llamada: 'Una llamada', 'bateria-baja': 'Batería baja (20 %)', 'bateria-critica': 'Batería crítica (5 %)',
   enchufado: 'Lo enchufan', desenchufado: 'Lo desenchufan', cargado: 'Carga completa', 'sin-wifi': 'Se queda sin WiFi',
-  'cambio-de-cara': 'Le cambian la cara', 'bicho-cerca': 'Otro bicho cerca', volvio: 'Volvés después de un rato',
+  'cambio-de-cara': 'Le cambian la cara', 'bicho-cerca': 'Otro robot cerca', volvio: 'Volvés después de un rato',
   hito: 'Un hito (días juntos, caricias, cumpleaños)', recordatorio: 'Muestra un recordatorio', pomodoro: 'Termina una tanda',
 };
 
@@ -163,7 +163,7 @@ export const TIPOS_FORMA: { tipo: Forma['forma']; nombre: string; nueva: () => F
 
 export const nombreValido = (n: string) => /^[a-z][a-z0-9-]{0,23}$/.test(n);
 
-// Una config "vacía" pero completa: lo que muestran los editores si el bicho no tiene nada.
+// Una config "vacía" pero completa: lo que muestran los editores si el robot no tiene nada.
 export function configBase(): Config {
   return { version: 2 };
 }

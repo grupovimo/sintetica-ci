@@ -47,7 +47,7 @@
     guardando = false;
     if (e) errorEditor = e;
     else {
-      aviso = `"${editando.nombre}" está en el bicho.`;
+      aviso = `"${editando.nombre}" está en el robot.`;
       editando = null;
     }
   }
@@ -75,7 +75,7 @@
   async function traer(p: Pieza) {
     const c = clonar(foto(b.config)) as Config;
     c.expresiones = { ...c.expresiones, [p.nombre]: p.documento };
-    aviso = (await b.guardar(c)) ?? `"${p.nombre}" está en el bicho.`;
+    aviso = (await b.guardar(c)) ?? `"${p.nombre}" está en el robot.`;
   }
 </script>
 
@@ -86,16 +86,15 @@
       <div class="fila">
         <button onclick={() => (editando = null)}>Cancelar</button>
         <button onclick={guardarEnBiblioteca} disabled={!!errorEditor || !nombreValido(editando.nombre)}>A mi biblioteca</button>
-        <button class="primario" onclick={guardarEnBicho} disabled={guardando || !!errorEditor || !nombreValido(editando.nombre)}>{guardando ? 'Guardando…' : 'Guardar en el bicho'}</button>
+        <button class="primario" onclick={guardarEnBicho} disabled={guardando || !!errorEditor || !nombreValido(editando.nombre)}>{guardando ? 'Guardando…' : 'Guardar'}</button>
       </div>
     </div>
-    {#if BASE.includes(editando.nombre)}<p class="nota">Es una cara del manual: al guardarla, el bicho usa tu versión en lugar de la original (y la podés volver atrás).</p>{/if}
     <EditorCara bind:expresion={editando.expresion} bind:nombre={editando.nombre} nombreFijo={!editando.nueva} contexto={{ version: 1, cara: b.config.cara }} bind:error={errorEditor} />
   </div>
 {:else}
   <div class="grilla">
     <div class="fila" style="justify-content: space-between">
-      <p class="nota" style="margin: 0">Las 16 del manual y las propias. Tocá una para editarla.</p>
+      <span class="etiqueta">Dibujos</span>
       <button class="primario" onclick={() => nueva()} disabled={Object.keys(propias).length >= 24}>Cara nueva</button>
     </div>
     {#if aviso}<p class="aviso-caja ok">{aviso}</p>{/if}
@@ -125,7 +124,7 @@
             <Miniatura expresion={p.documento} contexto={{ version: 1, cara: b.config.cara }} ancho={200} />
             <div class="fila" style="justify-content: space-between">
               <span class="mono">{p.nombre}</span>
-              <span class="fila"><button class="chico" onclick={() => nueva(p.documento)}>Copiar</button><button class="chico" onclick={() => traer(p)}>Al bicho</button></span>
+              <span class="fila"><button class="chico" onclick={() => nueva(p.documento)}>Copiar</button><button class="chico" onclick={() => traer(p)}>Al robot</button></span>
             </div>
           </div>
         {/each}

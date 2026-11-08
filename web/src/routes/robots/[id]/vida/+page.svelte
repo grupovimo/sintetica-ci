@@ -4,7 +4,7 @@
   import { onMount } from 'svelte';
   import { api, ErrorApi } from '$lib/api';
   import { usarBicho } from '$lib/bicho.svelte';
-  import { ESTADO, EVENTOS, NOMBRES_ESTADO, NOMBRES_EVENTO, NOMBRES_RASGO, RASGOS } from '$lib/formato';
+  import { ESTADO, NOMBRES_ESTADO, NOMBRES_EVENTO, NOMBRES_RASGO, RASGOS } from '$lib/formato';
   import type { Bicho } from '$lib/tipos';
 
   const b = usarBicho();
@@ -49,10 +49,6 @@
     return () => { clearInterval(reloj); clearInterval(relojMemoria); };
   });
 
-  async function evento(n: string) {
-    error = (await b.comando({ evento: n })) ?? '';
-  }
-
   async function cambiarSuperposicion() {
     superposicion = !superposicion;
     error = (await b.pedirVida(superposicion)) ?? '';
@@ -80,109 +76,105 @@
   const vieja = $derived(b.vidaEn > 0 && Date.now() - b.vidaEn > 8000);
 </script>
 
-<div class="dos">
-  <div class="grilla">
-    <section class="tarjeta grilla" aria-live="polite">
-      <div class="fila">
-        <h2 style="margin-right: auto">Ahora</h2>
-        <button class="chico" aria-pressed={superposicion} onclick={cambiarSuperposicion} disabled={!b.bicho?.conectado}>
-          Superposición en la pantalla
-        </button>
-      </div>
-      {#if !b.bicho?.conectado}
-        <p class="nota">El bicho no está conectado: el estado en vivo aparece cuando vuelva.</p>
-      {:else if !b.vida}
-        <p class="nota">Preguntándole…</p>
-      {:else}
-        <p>
-          <b>{b.vida.dormido ? (b.vida.sonando ? 'Soñando' : 'Durmiendo') : b.vida.comportamiento || 'Nada en especial'}</b>
-          <span class="nota">· se ve <span class="mono">{b.vida.visible}</span>{b.vida.fps ? ` · ${b.vida.fps} fps` : ''}{vieja ? ' · (hace un rato)' : ''}</span>
-        </p>
-        <div class="barras">
-          {#each ESTADO as v}
-            <div class="barra"><span>{NOMBRES_ESTADO[v]}</span><i><b style="width: {Math.round((b.vida.estado[v] ?? 0) * 100)}%" class:estres={v === 'estres'}></b></i><span class="mono">{(b.vida.estado[v] ?? 0).toFixed(2)}</span></div>
-          {/each}
-        </div>
-        {#if b.vida.candidatos.length}
-          <p class="nota">Lo último que pensó hacer: {b.vida.candidatos.map((c) => `${c.nombre} (${c.puntaje.toFixed(2)})`).join(', ')}</p>
-        {/if}
-      {/if}
-    </section>
-
-    <section class="tarjeta grilla">
-      <h2>Probar</h2>
-      <p class="nota">Le manda el evento como si pasara de verdad (las reglas deciden qué hace).</p>
-      <div class="eventos">
-        {#each EVENTOS.filter((e) => e !== 'volvio' && e !== 'hito') as e}
-          <button class="chico" onclick={() => evento(e)} disabled={!b.bicho?.conectado} title={e}>{NOMBRES_EVENTO[e] ?? e}</button>
+<div class="vida">
+  <section class="ahora chapa" aria-live="polite">
+    <div class="cabeza">
+      <span class="grabado"><span class="led" class:verde={!!b.vida && !vieja}></span>Ahora</span>
+      <button class="llave" aria-pressed={superposicion} onclick={cambiarSuperposicion} disabled={!b.bicho?.conectado} title="Ver los datos en su pantalla"><span class="led"></span>En su pantalla</button>
+    </div>
+    {#if !b.bicho?.conectado}
+      <b class="haciendo apagado">Desconectado</b>
+    {:else if !b.vida}
+      <b class="haciendo apagado">Escuchando…</b>
+    {:else}
+      <b class="haciendo">{b.vida.dormido ? (b.vida.sonando ? 'Soñando' : 'Durmiendo') : (b.vida.comportamiento || 'Tranqui').replaceAll('-', ' ')}</b>
+      <div class="vumetros">
+        {#each ESTADO as v}
+          {@const x = b.vida.estado[v] ?? 0}
+          <div class="vu" title="{NOMBRES_ESTADO[v]} {Math.round(x * 100)}">
+            <div class="columna">{#each Array.from({ length: 12 }, (_, k) => 11 - k) as k}<i class:on={x * 12 > k} class:alto={k >= 9} class:estres={v === 'estres'}></i>{/each}</div>
+            <span class="grabado">{NOMBRES_ESTADO[v]}</span>
+          </div>
         {/each}
       </div>
-    </section>
-  </div>
+    {/if}
+  </section>
 
-  <div class="grilla">
-    <section class="tarjeta grilla">
-      <h2>Diario</h2>
-      {#if !memoria}
-        <p class="nota">Todavía no me mandó su memoria (la pido cada 5 minutos mientras está conectado).</p>
-      {:else}
-        <dl class="datos">
-          <div><dt class="etiqueta">Días juntos</dt><dd>{memoria.dias}</dd></div>
-          <div><dt class="etiqueta">Racha</dt><dd>{memoria.racha} {memoria.racha === 1 ? 'día' : 'días'} (récord {memoria.rachaMax})</dd></div>
-          <div><dt class="etiqueta">Caricias</dt><dd>{memoria.caricias}</dd></div>
-          <div><dt class="etiqueta">Toques</dt><dd>{memoria.toques}</dd></div>
-          <div><dt class="etiqueta">Desde</dt><dd>{fecha(memoria.nacimiento)}</dd></div>
-          <div><dt class="etiqueta">Afecto</dt><dd>{(memoria.estado.afecto ?? 0).toFixed(2)}</dd></div>
-        </dl>
-        {#if memoria.hitos.length}
-          <p>Hitos: {memoria.hitos.map((h) => HITOS[h] ?? h).join(' · ')}</p>
-        {/if}
-        {#if horaPreferida !== null && horaPreferida >= 0}
-          <p>Te espera a eso de las <b>{horaPreferida}:00</b> (a esa hora mira más al frente).</p>
-        {/if}
-        <div class="horas" aria-label="A qué hora aparecés">
-          {#each memoria.horas as v, h}
-            <i title="{h}:00 · {v}" style="height: {Math.min(100, v * 8)}%"></i>
-          {/each}
-        </div>
-        {#if gustos.length}<p>Le gusta: {gustos.map(([g]) => NOMBRES_EVENTO[g] ?? g).join(', ')}.</p>{/if}
-        {#if memoria.ausenciaMaxima}<p class="nota">Lo más que estuvo sin verte: {memoria.ausenciaMaxima} h.</p>{/if}
-        {#if Object.values(memoria.deriva).some((x) => x !== 0)}
-          <p class="nota">Cómo lo cambió el trato:
-            {RASGOS.filter((r) => memoria!.deriva[r]).map((r) => `${NOMBRES_RASGO[r][0]} ${memoria!.deriva[r] > 0 ? '+' : ''}${Math.round(memoria!.deriva[r] * 100)} %`).join(', ')}</p>
-        {/if}
-        <p class="nota">Actualizado {actualizada ? new Date(actualizada).toLocaleString('es-AR') : '—'}</p>
-      {/if}
-    </section>
-
-    <section class="tarjeta grilla">
-      <h2>Mudanza</h2>
-      <p class="nota">Si cambiaste de placa, el bicho "se muda": su memoria y su config pasan a esta.</p>
-      {#if mudanzaPendiente}<p class="aviso-caja">Hay una mudanza en camino: se completa cuando se conecte.</p>{/if}
-      <div class="fila">
-        <select bind:value={desde} style="flex: 1">
-          <option value="">Elegí el bicho viejo…</option>
-          {#each otros as o}<option value={o.id}>{o.apodo || o.estado?.nombre || o.id} · {o.id}</option>{/each}
-        </select>
-        <button onclick={mudar} disabled={!desde}>Mudar</button>
+  <section class="placa-naranja diario">
+    <span class="grabado">Diario</span>
+    {#if !memoria}
+      <p class="texto">Todavía sin recuerdos.</p>
+    {:else}
+      <div class="contadores">
+        {#each [['Días juntos', memoria.dias], ['Racha', memoria.racha], ['Caricias', memoria.caricias], ['Toques', memoria.toques]] as [t, n]}
+          <div class="visor"><span class="grabado">{t}</span><span class="digitos">{n}</span></div>
+        {/each}
       </div>
-      {#if aviso}<p class="aviso-caja ok">{aviso}</p>{/if}
-      {#if error}<p class="aviso-caja error" role="alert">{error}</p>{/if}
-    </section>
-  </div>
+      {#if memoria.hitos.length}
+        <div class="hitos">{#each memoria.hitos as h}<span class="medalla">★ {HITOS[h] ?? h}</span>{/each}</div>
+      {/if}
+      <div class="bandeja horas-caja">
+        <span class="grabado">Cuándo aparecés{horaPreferida !== null && horaPreferida >= 0 ? ` · te espera a las ${horaPreferida}:00` : ''}</span>
+        <div class="horas" aria-label="A qué hora aparecés">
+          {#each memoria.horas as v, h}<i class:pico={h === horaPreferida} title="{h}:00" style="height: {Math.max(4, Math.min(100, v * 8))}%"></i>{/each}
+        </div>
+        <div class="ejes">{#each [0, 6, 12, 18, 24] as h}<span>{h}</span>{/each}</div>
+      </div>
+      {#if gustos.length}
+        <div class="fila-chips"><span class="grabado">Le gusta</span>{#each gustos as [g]}<span class="gusto">♥ {NOMBRES_EVENTO[g] ?? g}</span>{/each}</div>
+      {/if}
+      {#if RASGOS.some((r) => memoria!.deriva[r])}
+        <div class="fila-chips"><span class="grabado">Lo cambiaste</span>
+          {#each RASGOS.filter((r) => memoria!.deriva[r]) as r}<span class="gusto">{memoria.deriva[r] > 0 ? '▲' : '▼'} {NOMBRES_RASGO[r][0]}</span>{/each}
+        </div>
+      {/if}
+    {/if}
+  </section>
+
+  <section class="mudanza chapa">
+    <span class="grabado">Mudanza{mudanzaPendiente ? ' · en camino' : ''}</span>
+    <div class="fila">
+      <select class="sel" bind:value={desde} aria-label="Robot viejo">
+        <option value="">Traer la memoria de…</option>
+        {#each otros as o}<option value={o.id}>{o.apodo || o.estado?.nombre || o.id}</option>{/each}
+      </select>
+      <button class="tecla naranja chica" onclick={mudar} disabled={!desde}>Mudar</button>
+    </div>
+    {#if aviso}<p class="aviso"><span class="led verde"></span>{aviso}</p>{/if}
+    {#if error}<p class="aviso error" role="alert"><span class="led"></span>{error}</p>{/if}
+  </section>
 </div>
 
 <style>
-  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-  @media (max-width: 900px) { .dos { grid-template-columns: 1fr; } }
-  .barras { display: grid; gap: 6px; }
-  .barra { display: grid; grid-template-columns: 8em 1fr 3em; gap: 8px; align-items: center; font-size: 13px; }
-  .barra i { display: block; height: 8px; border-radius: 4px; background: var(--linea, #2c2925); overflow: hidden; }
-  .barra i b { display: block; height: 100%; background: #ff6a33; transition: width 0.6s; }
-  .barra i b.estres { background: #ff3820; }
-  .eventos { display: flex; flex-wrap: wrap; gap: 6px; }
-  .datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; }
-  .datos dd { margin: 0; font-size: 18px; }
-  .horas { display: grid; grid-template-columns: repeat(24, 1fr); align-items: end; gap: 2px; height: 48px; }
-  .horas i { display: block; background: #ff6a33; min-height: 2px; border-radius: 2px; }
+  .vida { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  .ahora { display: flex; flex-direction: column; gap: 18px; padding: 22px; }
+  .cabeza { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .cabeza .grabado { display: inline-flex; align-items: center; gap: 8px; }
+  .haciendo { font: 900 clamp(30px, 4vw, 46px)/.95 var(--marca); font-stretch: 120%; letter-spacing: -.03em; text-transform: uppercase; color: var(--brasa); }
+  .haciendo.apagado { color: #5a524a; }
+  .vumetros { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; padding: 16px 12px 12px; border-radius: 18px; background: var(--hundido);
+    box-shadow: inset 0 3px 10px rgba(0,0,0,.8); }
+  .vu { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
+  .columna { display: flex; flex-direction: column; gap: 3px; width: 100%; max-width: 26px; }
+  .columna i { height: 9px; border-radius: 2px; background: #2a2622; transition: background .3s, box-shadow .3s; }
+  .columna i.on { background: var(--led); box-shadow: 0 0 6px var(--led); }
+  .columna i.on.alto { background: #ffb347; box-shadow: 0 0 6px #ffb347; }
+  .columna i.on.estres { background: #ff3b3b; box-shadow: 0 0 6px #ff3b3b; }
+  .vu .grabado { font-size: 8.5px; letter-spacing: .06em; text-align: center; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .diario { grid-row: span 2; display: flex; flex-direction: column; gap: 16px; }
+  .contadores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .contadores .digitos { font-size: 40px; }
+  .hitos, .fila-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .medalla, .gusto { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 10px; background: #1a1714; color: var(--c-papel);
+    font: 800 12px/1 var(--marca); }
+  .medalla { color: #ffb347; }
+  .horas-caja { display: flex; flex-direction: column; gap: 10px; }
+  .horas { display: grid; grid-template-columns: repeat(24, 1fr); align-items: end; gap: 3px; height: 80px; }
+  .horas i { display: block; border-radius: 3px 3px 1px 1px; background: rgba(26,23,20,.55); }
+  .horas i.pico { background: #1a1714; box-shadow: 0 -3px 0 #fff inset; }
+  .ejes { display: flex; justify-content: space-between; font: 800 11px/1 var(--marca); color: rgba(26,23,20,.66); }
+  .mudanza { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; }
+  .fila { display: flex; gap: 10px; }
+  .sel { flex: 1; min-width: 0; height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--hundido); color: var(--c-papel); font: 700 14px/1 var(--marca); }
+  @media (max-width: 1000px) { .vida { grid-template-columns: 1fr; } .diario { grid-row: auto; } }
 </style>

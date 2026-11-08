@@ -26,7 +26,7 @@
   }
 
   async function quitar() {
-    if (!confirm('¿Sacar este bicho de tu cuenta? Se olvida del WiFi y de la nube; para volver a sumarlo hace falta la app, cerca.')) return;
+    if (!confirm('¿Sacar este robot de tu cuenta? Se olvida del WiFi y de la nube; para volver a sumarlo hace falta la app, cerca.')) return;
     quitando = true;
     try {
       await api(`/v1/bichos/${b.id}`, { metodo: 'DELETE' });
@@ -48,7 +48,7 @@
       <h2>Ahora</h2>
       <button class="chico" aria-pressed={!fija} disabled={!conectado} onclick={() => mandar({ expresion: '' })}>Automático</button>
     </div>
-    {#if !conectado}<p class="aviso-caja">El bicho no está conectado: los comandos sueltos necesitan que esté en línea. Los cambios de config le llegan cuando vuelva.</p>{/if}
+    {#if !conectado}<p class="aviso-caja">El robot no está conectado: los comandos sueltos necesitan que esté en línea. Los cambios de config le llegan cuando vuelva.</p>{/if}
     <p class="etiqueta">Dejar una cara fija</p>
     <div class="botones">
       {#each b.nombresCaras as n}
@@ -82,7 +82,7 @@
         <button style="align-self: end">Guardar</button>
       </form>
       <form class="fila" onsubmit={(e) => { e.preventDefault(); mandar({ nombre: nombreNuevo }); nombreNuevo = ''; }}>
-        <label style="flex: 1"><span class="etiqueta">Nombre del bicho (comando, hasta que cambie la config)</span><input bind:value={nombreNuevo} maxlength="24" /></label>
+        <label style="flex: 1"><span class="etiqueta">Nombre del robot (comando, hasta que cambie la config)</span><input bind:value={nombreNuevo} maxlength="24" /></label>
         <button style="align-self: end" disabled={!conectado || !nombreNuevo}>Cambiar</button>
       </form>
       <p class="nota">Para que quede siempre, cambialo en <a href="/robots/{b.id}/config">Config</a>.</p>

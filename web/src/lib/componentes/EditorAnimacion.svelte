@@ -170,7 +170,7 @@
       {/each}
       <p class="nota">Arrastrá los rombos para moverlos en el tiempo. En pausa, arrastrá la forma en la pantalla: con una clave elegida movés la clave; si no, la forma.</p>
     </div>
-    {#if error}<p class="aviso-caja error" role="alert">El bicho no la aceptaría: {error}</p>{/if}
+    {#if error}<p class="aviso-caja error" role="alert">El robot no la aceptaría: {error}</p>{/if}
   </div>
 
   <div class="panel grilla">

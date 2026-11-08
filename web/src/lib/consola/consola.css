@@ -24,16 +24,16 @@
 }
 .consola *, .consola *::before, .consola *::after { box-sizing: border-box; }
 .consola a { color: inherit; }
-:where(.consola) :is(h1, h2, h3):where(:not(.monitor *)) { font-family: var(--marca); margin: 0; }
+:where(.consola) :is(h1, h2, h3):where(:not(.monitor *, .viejo *)) { font-family: var(--marca); margin: 0; }
 .consola :focus-visible { outline: 3px solid var(--brasa); outline-offset: 3px; }
 
 /* Lo de la web de siempre (botones píldora, letra monoespaciada) no entra acá:
    cada pieza de la consola trae su estilo. */
-:where(.consola) button:where(:not(.monitor *)) { font: inherit; letter-spacing: normal; text-transform: none; border-radius: 0; padding: 0; border: 0; background: none;
+:where(.consola) button:where(:not(.monitor *, .viejo *)) { font: inherit; letter-spacing: normal; text-transform: none; border-radius: 0; padding: 0; border: 0; background: none;
   color: inherit; display: revert; gap: 0; align-items: normal; justify-content: normal; text-align: inherit; white-space: normal; transition: none; }
-:where(.consola) button:where(:not(.monitor *)):hover { border-color: transparent; }
-:where(.consola) button:where(:not(.monitor *))[aria-pressed='true'] { box-shadow: none; }
-:where(.consola) label:where(:not(.monitor *)) { display: revert; }
+:where(.consola) button:where(:not(.monitor *, .viejo *)):hover { border-color: transparent; }
+:where(.consola) button:where(:not(.monitor *, .viejo *))[aria-pressed='true'] { box-shadow: none; }
+:where(.consola) label:where(:not(.monitor *, .viejo *)) { display: revert; }
 
 .consola .caja { max-width: 1280px; margin: 0 auto; padding: 0 40px; }
 @media (max-width: 700px) { .consola .caja { padding: 0 16px; } }
@@ -116,3 +116,13 @@
 @media (prefers-reduced-motion: reduce) {
   .consola *, .consola *::before, .consola *::after { transition: none !important; animation: none !important; }
 }
+
+/* Las herramientas de antes (editores con lienzo, compartidos con las
+   bibliotecas): sus variables pasan a la paleta y la letra de la consola. */
+.consola .viejo {
+  --papel: #16140f; --papel-2: #211e1a; --tarjeta: #211e1a; --tinta: #f3eee8; --tinta-suave: #b9b1a6; --tinta-tenue: #8f877c;
+  --linea: #2c2925; --naranja: #ff6a33; --naranja-tinta: #ff8a5c; --pantalla: #050505;
+  --serif: 'Archivo', system-ui, sans-serif; --mono: 'Archivo', system-ui, sans-serif;
+  color: var(--tinta); font: 600 16px/1.45 var(--marca); color-scheme: dark;
+}
+.consola .viejo .nota { max-width: 40ch; }

@@ -1,6 +1,6 @@
 <script lang="ts">
-  // La pantalla de un bicho, viva: el mismo núcleo del firmware, con su config.
-  // Si se pasa `visible`, muestra eso (así copia lo que se ve en el bicho real).
+  // La pantalla de un robot, viva: el mismo núcleo del firmware, con su config.
+  // Si se pasa `visible`, muestra eso (así copia lo que se ve en el robot real).
   import { onDestroy, onMount } from 'svelte';
   import { fijar, pintar, vistaPrevia, type VistaPrevia } from '$lib/nucleo';
 
@@ -9,7 +9,7 @@
     visible = '',
     redonda = false,
     ancho = 320,
-    etiqueta = 'Pantalla del bicho',
+    etiqueta = 'Pantalla del robot',
     desnuda = false,
     alError = (_: string | null) => {},
   }: {

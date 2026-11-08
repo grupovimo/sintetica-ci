@@ -52,7 +52,7 @@
   }
 
   async function borrar(p: Pieza) {
-    if (!confirm(`¿Borrar "${p.nombre}" de tu biblioteca? Los bichos que ya la tienen la conservan.`)) return;
+    if (!confirm(`¿Borrar "${p.nombre}" de tu biblioteca? Los robots que ya la tienen la conservan.`)) return;
     await api(`/v1/biblioteca/${p.id}`, { metodo: 'DELETE' });
     await cargar();
   }
@@ -106,7 +106,7 @@
             </button>
             <div class="fila" style="justify-content: space-between">
               <span class="mono">{p.nombre}</span>
-              <span class="fila">{#if bichos.length}<button class="chico" onclick={() => mandar(p)}>Al bicho</button>{/if}<button class="chico peligro" onclick={() => borrar(p)}>Borrar</button></span>
+              <span class="fila">{#if bichos.length}<button class="chico" onclick={() => mandar(p)}>Al robot</button>{/if}<button class="chico peligro" onclick={() => borrar(p)}>Borrar</button></span>
             </div>
           </div>
         {/each}

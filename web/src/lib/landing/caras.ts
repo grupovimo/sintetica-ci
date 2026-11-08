@@ -1,5 +1,5 @@
 // Las fotos de las caras para la tira de la landing, sacadas del núcleo de
-// verdad: un bicho con el reloj en nuestras manos que pasa por cada expresión y
+// verdad: un robot con el reloj en nuestras manos que pasa por cada expresión y
 // se queda quieto hasta que los resortes se asientan.
 import { crearSimulador } from '$compartido/sim.js';
 import { Car, comando } from '$compartido/protocolo.js';

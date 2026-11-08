@@ -31,8 +31,11 @@
     { ruta: '/historial', nombre: 'Historial', icono: 'M12 7v5l3 2 M3 12a9 9 0 1 0 3-6.7L3 8 M3 3v5h5' },
   ];
   // Las herramientas ya rehechas en el lenguaje de la consola (las demás, en el monitor de siempre).
-  const NUEVAS = ['/expresiones', '/comportamientos', '/reglas'];
+  const NUEVAS = ['/expresiones', '/comportamientos', '/reglas', '/vida', '/actualizar', '/historial'];
   const nueva = $derived(NUEVAS.some((r) => page.url.pathname === base + r));
+  // Los editores con lienzo (compartidos con las bibliotecas): en la mesa, con la paleta de la consola.
+  const VIEJAS = ['/caras', '/animaciones'];
+  const vieja = $derived(VIEJAS.some((r) => page.url.pathname === base + r));
   const nombre = $derived(b.bicho?.apodo || b.bicho?.estado?.nombre || b.config.nombre || 'Tu robot');
   const modelo = $derived(b.bicho ? modeloDe(b.bicho) : null);
 </script>
@@ -60,7 +63,7 @@
         {/each}
       </nav>
     </aside>
-    <section class={nueva ? 'mesa' : 'monitor'}>
+    <section class={nueva ? 'mesa' : vieja ? 'mesa viejo' : 'monitor'}>
       {#if b.error}<p class="aviso-caja error">{b.error}</p>
       {:else if b.bicho}{@render children()}
       {:else}<p class="etiqueta">Cargando…</p>{/if}

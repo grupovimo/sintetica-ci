@@ -107,7 +107,7 @@
       </div>
     </div>
     {#if redonda}<p class="nota">En el broche los ojos se ven 1,5× y los indicadores, más cerca del centro. Para mover formas, volvé a la pantalla rectangular.</p>{/if}
-    {#if error}<p class="aviso-caja error" role="alert">El bicho no la aceptaría: {error}</p>{/if}
+    {#if error}<p class="aviso-caja error" role="alert">El robot no la aceptaría: {error}</p>{/if}
   </div>
 
   <div class="panel grilla">

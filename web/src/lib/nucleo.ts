@@ -1,4 +1,4 @@
-// El núcleo de SintéticaOS en WebAssembly: el mismo C++ que corre en el bicho.
+// El núcleo de SintéticaOS en WebAssembly: el mismo C++ que corre en el robot.
 // Las vistas previas y los editores dibujan con él, así se ve igual.
 import { crearSimulador } from '$compartido/sim.js';
 import { Car, escriturasDeConfig, comando } from '$compartido/protocolo.js';
@@ -20,7 +20,7 @@ export type VistaPrevia = Simulador & {
   aplicar: (config: unknown) => string | null;
 };
 
-// Un bicho entero en vista previa: vive (parpadea, mira), con la config que
+// Un robot entero en vista previa: vive (parpadea, mira), con la config que
 // se le pase. `alCuadro` recibe cada cuadro.
 export async function vistaPrevia(op: {
   redonda?: boolean;

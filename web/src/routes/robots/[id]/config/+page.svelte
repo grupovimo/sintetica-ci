@@ -15,7 +15,7 @@
   let json = $state('');
   let errorJson = $state('');
 
-  // Si llega una versión nueva (de otro celu, o del bicho) y no hay cambios sin guardar, se toma.
+  // Si llega una versión nueva (de otro celu, o del robot) y no hay cambios sin guardar, se toma.
   $effect(() => {
     if (b.versionConfig !== version && !sucio) {
       c = clonar($state.snapshot(b.config)) as Config;
@@ -70,7 +70,7 @@
     if (e) error = e;
     else {
       version = b.versionConfig;
-      ok = b.bicho?.conectado ? 'Guardada: ya se la estoy mandando al bicho.' : 'Guardada: le llega cuando se conecte.';
+      ok = b.bicho?.conectado ? 'Guardada: ya se la estoy mandando al robot.' : 'Guardada: le llega cuando se conecte.';
     }
   }
 
@@ -101,7 +101,7 @@
     <section class="tarjeta grilla">
       <h2>General</h2>
       <div class="campos">
-        <label><span class="etiqueta">Nombre</span><input maxlength="24" bind:value={c.nombre} placeholder="bicho" /></label>
+        <label><span class="etiqueta">Nombre</span><input maxlength="24" bind:value={c.nombre} placeholder="Lucho" /></label>
         <label><span class="etiqueta">Modo</span>
           <select bind:value={c.modo}>{#each MODOS as m}<option value={m}>{m}</option>{/each}</select>
         </label>
@@ -152,7 +152,7 @@
           oninput={(e) => (c.dueno = { ...c.dueno, nombre: e.currentTarget.value || undefined })} /></label>
         <label><span class="etiqueta">Tu cumpleaños (MM-DD)</span><input maxlength="5" pattern="[0-1][0-9]-[0-3][0-9]" value={c.dueno?.cumple ?? ''} placeholder="03-14"
           oninput={(e) => (c.dueno = { ...c.dueno, cumple: e.currentTarget.value || undefined })} /></label>
-        <label><span class="etiqueta">El cumpleaños del bicho (MM-DD)</span><input maxlength="5" value={c.cumple ?? ''} placeholder="11-07"
+        <label><span class="etiqueta">El cumpleaños del robot (MM-DD)</span><input maxlength="5" value={c.cumple ?? ''} placeholder="11-07"
           oninput={(e) => (c.cumple = e.currentTarget.value || undefined)} /></label>
         <label><span class="etiqueta">Brillo máximo · {Math.round((c.limites_marca?.brillo_max ?? 1) * 100)} %</span>
           <input type="range" min="0.2" max="1" step="0.05" value={c.limites_marca?.brillo_max ?? 1}
@@ -197,7 +197,7 @@
       </div>
       {#if error}<p class="aviso-caja error" role="alert">{error}</p>{/if}
       {#if ok && !sucio}<p class="aviso-caja ok">{ok}</p>{/if}
-      <p class="nota">v{b.versionConfig}{b.autorConfig ? ` · la última la hizo ${b.autorConfig === 'bicho' ? 'el bicho (cambió cerca, por BLE)' : b.autorConfig}` : ''}</p>
+      <p class="nota">v{b.versionConfig}{b.autorConfig ? ` · la última la hizo ${b.autorConfig === 'bicho' ? 'el robot' : b.autorConfig}` : ''}</p>
     </div>
   </aside>
 </div>
@@ -206,7 +206,7 @@
   <div class="fondo" role="presentation" onclick={(e) => e.target === e.currentTarget && (avanzado = false)}>
     <div class="tarjeta dialogo grilla" role="dialog" aria-modal="true" aria-label="Editar el JSON">
       <h2>La config en JSON</h2>
-      <p class="nota">Es el documento de <code>shared/formato/config.schema.json</code>. Se valida con el mismo núcleo del bicho.</p>
+      <p class="nota">Es el documento de <code>shared/formato/config.schema.json</code>. Se valida con el mismo núcleo del robot.</p>
       <textarea bind:value={json} spellcheck="false" rows="22"></textarea>
       {#if errorJson}<p class="aviso-caja error">{errorJson}</p>{/if}
       <div class="fila" style="justify-content: flex-end"><button onclick={() => (avanzado = false)}>Cancelar</button><button class="primario" onclick={aplicarJson}>Usar este</button></div>

@@ -46,7 +46,7 @@
     const e = await b.guardar(c);
     guardando = false;
     if (e) errorEditor = e;
-    else { aviso = `"${editando.nombre}" está en el bicho. Ponela en la lista o en una regla, o reproducila desde Resumen.`; editando = null; }
+    else { aviso = `"${editando.nombre}" guardada`; editando = null; }
   }
   async function guardarEnBiblioteca() {
     if (!editando) return;
@@ -65,7 +65,7 @@
     aviso = (await b.guardar(c)) ?? `"${n}" se borró.`;
   }
   async function reproducir(n: string) {
-    aviso = (await b.comando({ reproducir: n })) ?? `Reproduciendo "${n}" en el bicho.`;
+    aviso = (await b.comando({ reproducir: n })) ?? `▶ ${n}`;
   }
 </script>
 
@@ -76,7 +76,7 @@
       <div class="fila">
         <button onclick={() => (editando = null)}>Cancelar</button>
         <button onclick={guardarEnBiblioteca} disabled={!!errorEditor || !nombreValido(editando.nombre)}>A mi biblioteca</button>
-        <button class="primario" onclick={guardarEnBicho} disabled={guardando || !!errorEditor || !nombreValido(editando.nombre)}>{guardando ? 'Guardando…' : 'Guardar en el bicho'}</button>
+        <button class="primario" onclick={guardarEnBicho} disabled={guardando || !!errorEditor || !nombreValido(editando.nombre)}>{guardando ? 'Guardando…' : 'Guardar'}</button>
       </div>
     </div>
     <EditorAnimacion bind:animacion={editando.animacion} bind:nombre={editando.nombre} nombreFijo={!editando.nueva} {contexto} caras={b.nombresCaras} bind:error={errorEditor} />
@@ -84,7 +84,7 @@
 {:else}
   <div class="grilla">
     <div class="fila" style="justify-content: space-between">
-      <p class="nota" style="margin: 0">Formas que se mueven, escalan, giran y cambian de color en el tiempo. Hasta 6 por bicho.</p>
+      <span class="etiqueta">Animaciones · hasta 6</span>
       <button class="primario" onclick={() => nueva()} disabled={Object.keys(propias).length >= 6}>Animación nueva</button>
     </div>
     {#if aviso}<p class="aviso-caja ok">{aviso}</p>{/if}
@@ -101,7 +101,7 @@
         {/each}
       </div>
     {:else}
-      <p class="nota">Este bicho todavía no tiene animaciones.</p>
+      <p class="nota">Sin animaciones.</p>
     {/if}
     <h3>Para empezar</h3>
     <div class="lista">

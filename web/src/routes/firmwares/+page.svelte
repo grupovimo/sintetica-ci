@@ -54,7 +54,7 @@
   {:else}
     <form class="tarjeta grilla" onsubmit={subir}>
       <h2>Subir una versión</h2>
-      <p class="nota">El <code>firmware.bin</code> de PlatformIO (<code>firmware/.pio/build/&lt;perfil&gt;/firmware.bin</code>), compilado con <code>-DSINTETICA_VERSION</code> igual a la versión de acá. La API lo firma con su clave; el bicho solo instala lo firmado.</p>
+      <p class="nota">El <code>firmware.bin</code> de PlatformIO (<code>firmware/.pio/build/&lt;perfil&gt;/firmware.bin</code>), compilado con <code>-DSINTETICA_VERSION</code> igual a la versión de acá. La API lo firma con su clave; el robot solo instala lo firmado.</p>
       <div class="campos">
         <label><span class="etiqueta">Perfil</span>
           <select bind:value={perfil}>

@@ -1,4 +1,4 @@
-// El bicho abierto en la web: su estado en vivo y su config. Lo comparten las
+// El robot abierto en la web: su estado en vivo y su config. Lo comparten las
 // pestañas de /robots/[id] por contexto.
 import { getContext, setContext } from 'svelte';
 import { api, ErrorApi } from './api';
@@ -32,7 +32,7 @@ export class BichoAbierto {
       await this.cargarConfig();
       this.error = '';
     } catch (e) {
-      this.error = e instanceof ErrorApi ? e.message : 'No pude cargar el bicho.';
+      this.error = e instanceof ErrorApi ? e.message : 'No pude cargar el robot.';
     }
   }
 
@@ -73,7 +73,7 @@ export class BichoAbierto {
           if (e.datos.car === 2 && b.length >= 2) {
             const ok = b[1] === 0;
             const detalle = b.length > 2 ? new TextDecoder().decode(b.subarray(2)) : '';
-            this.respuestas = [{ texto: ok ? 'el bicho dijo que sí' : `el bicho dijo que no${detalle ? ': ' + detalle : ''}`, ok, cuando: Date.now() }, ...this.respuestas].slice(0, 5);
+            this.respuestas = [{ texto: ok ? 'el robot dijo que sí' : `el robot dijo que no${detalle ? ': ' + detalle : ''}`, ok, cuando: Date.now() }, ...this.respuestas].slice(0, 5);
           }
           break;
         }
@@ -89,7 +89,7 @@ export class BichoAbierto {
 
   cerrar() { this.dejar?.(); }
 
-  // Valida con el núcleo (el mismo del bicho) y guarda. Devuelve el error o null.
+  // Valida con el núcleo (el mismo del robot) y guarda. Devuelve el error o null.
   async guardar(nueva: Config): Promise<string | null> {
     const n = await nucleoEditor();
     const v = n.validar(nueva);
