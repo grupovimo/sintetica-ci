@@ -9,7 +9,7 @@
 # pantalla de inicio (ver README).
 set -u
 PAQUETES=(
-  # Google: apps y servicios (ML Kit va con el modelo adentro, sin Play Services)
+  # Google: apps y servicios (ML Kit va con el modelo adentro, sin Play Services; el TTS de Google queda: lee el globo)
   com.android.chrome com.android.vending com.google.android.gms com.google.android.gsf
   com.google.android.gsf.login com.google.android.googlequicksearchbox com.google.android.youtube
   com.google.android.music com.google.android.videos com.google.android.apps.photos
@@ -19,7 +19,7 @@ PAQUETES=(
   com.google.android.apps.cloudprint com.google.android.apps.wallpaper com.google.android.feedback
   com.google.android.backuptransport com.google.android.configupdater com.google.android.partnersetup
   com.google.android.syncadapters.contacts com.google.android.onetimeinitializer
-  com.google.android.marvin.talkback com.google.android.tts com.google.android.printservice.recommendation
+  com.google.android.marvin.talkback com.google.android.printservice.recommendation
   com.google.android.setupwizard com.google.android.ims
   # Android: apps de celular que el bicho no usa
   com.android.dialer com.android.contacts com.android.calllogbackup com.android.mms.service

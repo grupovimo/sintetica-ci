@@ -32,17 +32,26 @@ class Voz(contexto: Context) {
     /** {volumen, micrófono, tipo, conversa}, como lo da [Nucleo.voz]; lo actualiza el hilo de GL. */
     @Volatile var config = intArrayOf(70, 60, 1, 0)
 
-    private var habla: TextToSpeech? = null
+    @Volatile private var habla: TextToSpeech? = null
     @Volatile private var hablaLista = false
     private var ultimoGlobo = ""
 
     init {
         habla = TextToSpeech(contexto.applicationContext) { estado ->
-            val h = habla ?: return@TextToSpeech
-            val r = if (estado == TextToSpeech.SUCCESS) h.setLanguage(Locale("es", "AR")) else TextToSpeech.ERROR
-            hablaLista = r >= TextToSpeech.LANG_AVAILABLE
-            Log.i("Bicho", "habla: ${if (hablaLista) "lista" else "sin voz en español ($r)"}")
+            // Puede llegar antes de que `habla` quede asignado: se mira en el hilo de la voz.
+            cola.post { alIniciar(estado) }
         }
+    }
+
+    private fun alIniciar(estado: Int) {
+        val h = habla ?: return
+        if (estado != TextToSpeech.SUCCESS) return Log.w("Bicho", "habla: el TTS no arrancó ($estado)").let { }
+        // El primer español que tenga instalado.
+        val idioma = ESPANOLES.firstOrNull { h.isLanguageAvailable(it) >= TextToSpeech.LANG_AVAILABLE }
+        hablaLista = idioma != null && h.setLanguage(idioma) >= TextToSpeech.LANG_AVAILABLE
+        Log.i("Bicho", "habla: ${if (hablaLista) "lista ($idioma)" else "sin voz en español"}; voces: ${
+            runCatching { h.voices?.map { it.locale }?.distinct()?.joinToString() }.getOrNull()
+        }")
     }
 
     /** Lo llama el hilo de GL con el texto del globo: lo lee cuando aparece uno nuevo. */
@@ -114,6 +123,8 @@ class Voz(contexto: Context) {
     }
 
     companion object {
+        private val ESPANOLES = listOf(Locale("es", "AR"), Locale("es", "US"), Locale("es", "MX"), Locale("es", "ES"), Locale("es"))
+
         /**
          * Los canales que usa el bicho, al máximo (el volumen lo pone él), salvo
          * que lo hayan silenciado por adb (el despertador suena igual).
