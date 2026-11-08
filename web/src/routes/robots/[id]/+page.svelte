@@ -82,6 +82,9 @@
   <main class="caja"><p class="aviso error"><span class="led"></span>{b.error}</p></main>
 {:else if b.bicho && modelo}
   <main class="caja">
+    {#if b.aviso}
+      <div class="aviso-robot" role="status"><span class="campana" aria-hidden="true">⏰</span><b>{b.aviso.texto}</b><button class="tecla negra chica" onclick={() => (b.aviso = null)}>OK</button></div>
+    {/if}
     <section class="heroe">
       <div class="foto">
         <Producto {modelo} config={b.config} visible={b.bicho.estado?.expresion ?? ''} apagado={!conectado}
@@ -131,6 +134,11 @@
 
 <style>
   main { display: flex; flex-direction: column; gap: 40px; padding-top: 4px; padding-bottom: 64px; }
+  .aviso-robot { display: flex; align-items: center; gap: 14px; padding: 14px 16px 14px 20px; border-radius: 18px; color: #1a1714;
+    background: linear-gradient(180deg, #ff8a5c, #f2541a); box-shadow: 0 6px 0 #9a3209, 0 20px 30px -16px rgba(0,0,0,.8); animation: entra .4s cubic-bezier(.3,1.5,.5,1); }
+  .aviso-robot b { flex: 1; font: 900 22px/1.1 var(--marca); font-stretch: 112%; text-transform: uppercase; }
+  .campana { font-size: 24px; }
+  @keyframes entra { from { transform: translateY(-12px) scale(.96); opacity: 0; } }
   .guardado { display: inline-flex; align-items: center; gap: 8px; font: 800 11px/1 var(--marca); letter-spacing: .12em; text-transform: uppercase; color: var(--gris); }
   .guardado.error { color: #ff7a7a; }
   .heroe { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 48px; align-items: center; }

@@ -16,6 +16,7 @@ declare module '$compartido/protocolo.js' {
   export function crc32(b: Uint8Array): number;
   export const VariablesEstado: string[];
   export const Rasgos: string[];
+  export function leerRegistro(b: Uint8Array): { segundos: number; tipo: string; dato: number }[];
   export function leerVida(b: Uint8Array): {
     estado: Record<string, number>; rasgos: Record<string, number>; dormido: boolean; sonando: boolean; superposicion: boolean;
     comportamiento: string; visible: string; candidatos: { nombre: string; puntaje: number }[]; fps: number;

@@ -4,6 +4,7 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
   import { api } from '$lib/api';
+  import { conexionEnVivo } from '$lib/eventos.svelte';
 
   let { izquierda, medio }: { izquierda?: Snippet; medio?: Snippet } = $props();
   let abierto = $state(false);
@@ -30,7 +31,7 @@
     {#if usuario}
       <div class="cuenta">
         <button class="tecla negra chica" aria-expanded={abierto} onclick={() => (abierto = !abierto)}>
-          <span class="led verde"></span><span class="nombre">{usuario.nombre || usuario.email.split('@')[0]}</span>
+          <span class="led" class:verde={conexionEnVivo.conectado} title={conexionEnVivo.conectado ? 'En vivo' : 'Reconectando…'}></span><span class="nombre">{usuario.nombre || usuario.email.split('@')[0]}</span>
         </button>
         {#if abierto}
           <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->

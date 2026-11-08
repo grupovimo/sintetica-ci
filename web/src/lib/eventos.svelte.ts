@@ -1,4 +1,5 @@
-// Los eventos en vivo de la API (SSE): estado, conexión, sincronización, OTA.
+// Los eventos en vivo de la API (SSE): estado, conexión, sincronización, OTA,
+// automatizaciones y Telegram.
 // Se reconecta solo.
 import type { Evento } from './tipos';
 
@@ -8,7 +9,7 @@ const oyentes = new Set<Oyente>();
 let fuente: EventSource | null = null;
 export const conexionEnVivo = $state({ conectado: false });
 
-const TIPOS = ['estado', 'conexion', 'sincro', 'config', 'imagenes', 'ota', 'marco', 'bicho'];
+const TIPOS = ['estado', 'conexion', 'sincro', 'config', 'imagenes', 'ota', 'marco', 'bicho', 'automatizacion', 'telegram'];
 
 function abrir() {
   if (fuente || typeof EventSource === 'undefined') return;

@@ -25,6 +25,18 @@
   let cuadro = 0;
   const pantalla = $derived(b.bicho ? pantallaDe(b.bicho) : { ancho: 320, alto: 172, redonda: false });
   const sucio = $derived(JSON.stringify(reglas) !== JSON.stringify(b.config.reglas ?? []));
+  // Cuando llega (o cambia) la config y no hay cambios sin guardar, se toman sus reglas.
+  let version = -1;
+  let tomadas = '[]';
+  $effect(() => {
+    if (b.versionConfig === version) return;
+    const sinCambios = JSON.stringify($state.snapshot(reglas)) === tomadas;
+    version = b.versionConfig;
+    if (!sinCambios) return;
+    reglas = clonar($state.snapshot(b.config.reglas ?? [])) as Regla[];
+    tomadas = JSON.stringify(reglas);
+    aplicar();
+  });
   const comportamientos = $derived([...new Set([...Object.keys(COMPORTAMIENTOS_BASE), ...Object.keys(b.config.comportamientos ?? {})])]);
 
   // Los eventos, agrupados, con su ícono.
@@ -116,7 +128,7 @@
     const e = await b.guardar(borrador());
     guardando = false;
     if (e) error = e;
-    else { aviso = 'Guardado'; setTimeout(() => (aviso = ''), 2500); }
+    else { tomadas = JSON.stringify($state.snapshot(reglas)); aviso = 'Guardado'; setTimeout(() => (aviso = ''), 2500); }
   }
 </script>
 

@@ -5,7 +5,7 @@ import { api, ErrorApi } from './api';
 import { escuchar } from './eventos.svelte';
 import type { Bicho, Actualizacion } from './tipos';
 import { EXPRESIONES_BASE, type Config } from './formato';
-import { Car, comando, leerVida } from '$compartido/protocolo.js';
+import { Car, comando, leerRegistro, leerVida } from '$compartido/protocolo.js';
 import { nucleoEditor } from './nucleo';
 import { foto } from './foto.svelte';
 
@@ -20,6 +20,8 @@ export class BichoAbierto {
   // El motor de vida en vivo (respuesta al comando Vida, que se pide desde la pestaña Vida).
   vida = $state<ReturnType<typeof leerVida> | null>(null);
   vidaEn = $state(0);
+  // Lo que el robot acaba de avisar solo (un recordatorio, el fin de un pomodoro), para mostrarlo al toque.
+  aviso = $state<{ texto: string; cuando: number } | null>(null);
   private dejar: (() => void) | null = null;
 
   constructor(public id: string) {}
@@ -56,6 +58,15 @@ export class BichoAbierto {
             try { this.vida = leerVida(b); this.vidaEn = Date.now(); } catch { /* una respuesta rara */ }
             break;
           }
+          // El robot avisa solo con un registro cortito: un recordatorio o el fin de un pomodoro.
+          if (e.datos.car === 2 && b[0] === 0x9e && b[1] === 0 && b[2] <= 2) {
+            try {
+              for (const x of leerRegistro(b)) {
+                if (x.tipo === 'recordatorio') this.avisar(this.config.recordatorios?.[x.dato]?.texto ?? 'Recordatorio');
+                else if (x.tipo === 'evento' && x.dato === 32) this.avisar(this.bicho?.estado?.expresion === 'pomodoro:trabajo' ? 'A trabajar' : 'Tanda terminada');
+              }
+            } catch { /* un registro raro */ }
+          }
           // Las respuestas de Memoria y Registro no son para mostrar.
           if (e.datos.car === 2 && (b[0] === 0x9c || b[0] === 0x9e || b[0] === 0x9a)) break;
           if (e.datos.car === 2 && b.length >= 2) {
@@ -67,6 +78,12 @@ export class BichoAbierto {
         }
       }
     });
+  }
+
+  private avisar(texto: string) {
+    const cuando = Date.now();
+    this.aviso = { texto, cuando };
+    setTimeout(() => { if (this.aviso?.cuando === cuando) this.aviso = null; }, 15000);
   }
 
   cerrar() { this.dejar?.(); }
