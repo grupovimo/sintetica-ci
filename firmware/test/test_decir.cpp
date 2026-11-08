@@ -1,6 +1,7 @@
 // Escribir (comando Decir y el globo), hablar solo, el cumple, el despertador
 // y el modo clima, con el sistema entero y un HAL falso.
 #include <algorithm>
+#include <cstdlib>
 #include <map>
 #include <string>
 #include <vector>
@@ -55,6 +56,7 @@ Hal halFalso() {
   };
   h.notificar = [](uint8_t c, const uint8_t* d, size_t n) { g_notis.push_back({c, std::vector<uint8_t>(d, d + n)}); };
   h.sonido = [](const char* s) { g_sonidos.push_back(s); };
+  h.registrar = [](const char* m) { if (std::getenv("DEPURAR")) std::printf("    [%s]\n", m); };
   h.epoch = [] { return g_epoch ? g_epoch + (g_ahora - 1000) / 1000 : 0u; };
   h.minutoDelDia = [] {
     if (!g_epoch) return -1;
@@ -236,7 +238,7 @@ PRUEBA("decir: habla solo con las reglas (caricia, volviste) y sin ser pesado") 
   VERIFICAR(dijoPropia);
   VERIFICAR(globos >= 1 && globos <= 4);
   // Frecuencia 0: callado.
-  arrancar("{\"version\":2,\"habla\":{\"frecuencia\":0}}", LUNES_0729 + 3 * 3600);
+  arrancar("{\"version\":2,\"habla\":{\"frecuencia\":0},\"cuidado\":{\"animo\":false}}", LUNES_0729 + 3 * 3600);
   correr(1000);
   int callado = 0;
   for (int i = 0; i < 30; i++) {
@@ -438,4 +440,195 @@ PRUEBA("dormido: de noche la voz y el ruido casi no lo despiertan; su nombre sí
   g_s.evento(Evento::Nombre);
   correr(500);
   VERIFICAR(!g_s.motor().dormido());
+}
+
+// ---------------------------------------------------------------- acompañar (v1.7)
+
+namespace {
+bool avisoCon(Evento e, uint8_t tipo, int dato = -1) {
+  for (auto& x : g_notis) {
+    const auto& b = x.second;
+    if (x.first == CarComando && b.size() == 15 && b[0] == (CmdRegistro | Respuesta) && b[2] == 2 && b[8] == static_cast<uint8_t>(e) &&
+        b[13] == tipo && (dato < 0 || b[14] == dato))
+      return true;
+  }
+  return false;
+}
+bool globoDice(const std::string& parte, int ms = 3000) {
+  for (int i = 0; i < ms / 50; i++) {
+    correr(50, 50);
+    if (g_s.panel() == Sistema::Panel::Globo && std::string(g_s.textoGlobo()).find(parte) != std::string::npos) return true;
+  }
+  return false;
+}
+}  // namespace
+
+PRUEBA("acompañar: cuidado y avisos en la config") {
+  VERIFICAR(cargar("{\"version\":2,\"cuidado\":{\"agua\":2,\"pausa\":90,\"trabajo\":{\"desde\":\"10:00\",\"hasta\":\"19:00\",\"dias\":\"LMXJ\"},"
+                   "\"animo\":false,\"extranar\":true,\"extranarDias\":3,\"resumen\":true},"
+                   "\"avisos\":[{\"tipo\":\"notificacion\",\"app\":\"WhatsApp\",\"contacto\":\"Mamá\",\"expresion\":\"enamorado\","
+                   "\"decir\":\"{contacto} te escribe\"},{\"tipo\":\"llamada\",\"comportamiento\":\"llamada\",\"sonido\":false}]}")
+               .ok());
+  VERIFICAR(g_cfg.cuidado.agua == 2 && g_cfg.cuidado.pausa == 90 && g_cfg.cuidado.desde == 600 && g_cfg.cuidado.dias == 0x0F);
+  VERIFICAR(!g_cfg.cuidado.animo && g_cfg.avisos.n == 2 && g_cfg.avisos.lista[1].llamada && !g_cfg.avisos.lista[1].sonido);
+  VERIFICAR(buscarAviso(g_cfg.avisos, false, "whatsapp", "MAMÁ") == 0);
+  VERIFICAR(buscarAviso(g_cfg.avisos, false, "telegram", "Mamá") == -1);
+  VERIFICAR(buscarAviso(g_cfg.avisos, true, "", "") == 1);
+  VERIFICAR(rechaza("{\"version\":2,\"cuidado\":{\"agua\":9}}", "agua"));
+  VERIFICAR(rechaza("{\"version\":2,\"cuidado\":{\"pausa\":10}}", "pausa"));
+  VERIFICAR(rechaza("{\"version\":2,\"avisos\":[{\"tipo\":\"sms\"}]}", "tipo"));
+  VERIFICAR(rechaza("{\"version\":2,\"avisos\":[{\"tipo\":\"llamada\",\"expresion\":\"nada\"}]}", "expresion"));
+  std::printf("    RAM: Cuidado %zu B, Avisos %zu B\n", sizeof(Cuidado), sizeof(Avisos));
+  VERIFICAR(sizeof(Avisos) <= 800);
+}
+
+PRUEBA("acompañar: el primer encuentro del día es un buen día con el clima") {
+  arrancar("{\"version\":2,\"dueno\":{\"nombre\":\"Nahuel\"},\"cuidado\":{\"animo\":false}}", LUNES_0729 + 3600);
+  correr(500);
+  const uint8_t m[] = {CmdClima, 0xB8, 0x00, 0, 22, 12, 1, 0};  // 18,4° despejado
+  escribir(std::vector<uint8_t>(m, m + sizeof m));
+  g_s.evento(Evento::Tacto);
+  const bool dijo = globoDice("18° y despejado");
+  if (!dijo) std::printf("    globo: %s (panel %d)\n", g_s.textoGlobo(), static_cast<int>(g_s.panel()));
+  VERIFICAR(dijo);
+}
+
+PRUEBA("acompañar: ¿cómo estás? se responde tocándolo (toque, doble, mantener) y queda en la memoria") {
+  for (int r = 0; r < 3; r++) {
+    arrancar("{\"version\":2,\"habla\":{\"frecuencia\":0}}", LUNES_0729 + 3 * 3600);
+    correr(10 * 60000 + 500, 100);  // recién prendido no pregunta
+    g_s.evento(Evento::Tacto);
+    for (int i = 0; i < 100 && !g_s.preguntandoAnimo(); i++) correr(50, 50);
+    VERIFICAR(g_s.preguntandoAnimo());
+    correr(600);
+    if (r == 0) tocar();
+    else if (r == 1) tocar(), tocar();
+    else tocar(1000);
+    correr(600);
+    VERIFICAR(!g_s.preguntandoAnimo());
+    VERIFICAR(g_s.motor().memoria().hoyAnimo == r + 1);
+    VERIFICAR(avisoCon(Evento::Animo, 6, r));
+  }
+  // Por comando (lo que llega de Telegram).
+  arrancar("{\"version\":2}", LUNES_0729 + 3 * 3600);
+  escribir({CmdAnimo, 2});
+  VERIFICAR(ultimaRespuesta(CmdAnimo) == Ok && g_s.motor().memoria().hoyAnimo == 3);
+}
+
+PRUEBA("acompañar: el agua y la pausa activa") {
+  arrancar("{\"version\":2,\"cuidado\":{\"agua\":1,\"pausa\":30,\"animo\":false},\"habla\":{\"frecuencia\":0}}", LUNES_0729 + 3 * 3600);
+  correr(500);
+  bool agua = false, pausa = false;
+  for (int i = 0; i < 3700 && !(agua && pausa); i++) {
+    correr(1000, 250);
+    const std::string t = g_s.panel() == Sistema::Panel::Globo ? g_s.textoGlobo() : "";
+    agua = agua || t.find("agua") != std::string::npos;
+    pausa = pausa || t.find("ausa") != std::string::npos || t.find("ovete") != std::string::npos || t.find("evantate") != std::string::npos;
+  }
+  VERIFICAR(agua && pausa);
+  VERIFICAR(g_s.motor().memoria().hoyAgua >= 1);
+}
+
+PRUEBA("acompañar: juegos (dado, moneda, piedra-papel-tijera, reflejos, seguí la mirada) y su puntaje") {
+  arrancar("{\"version\":2,\"cuidado\":{\"animo\":false}}", LUNES_0729 + 3 * 3600);
+  correr(500);
+  // Dado: sacudirlo tira.
+  escribir({CmdJugar, 3});
+  VERIFICAR(ultimaRespuesta(CmdJugar) == Ok);
+  correr(600);
+  VERIFICAR(g_s.panel() == Sistema::Panel::Juego && expresionDelEstado() == "juego:dado");
+  g_s.evento(Evento::Sacudida);
+  correr(1500);
+  const std::string dado = g_s.textoJuego();
+  VERIFICAR(dado.size() == 1 && dado[0] >= '1' && dado[0] <= '6');
+  correr(4000);
+  VERIFICAR(g_s.juego() == Sistema::Juego::Ninguno);
+  // Moneda: un toque también.
+  escribir({CmdJugar, 4});
+  correr(300);
+  tocar();
+  correr(1500);
+  VERIFICAR(std::string(g_s.textoJuego()) == "Cara" || std::string(g_s.textoJuego()) == "Ceca");
+  correr(4000);
+  // Piedra, papel o tijera: tocás para frenar.
+  escribir({CmdJugar, 0});
+  correr(1000);
+  tocar();
+  VERIFICAR(std::string(g_s.textoJuego()).find(" vs ") != std::string::npos);
+  correr(4000);
+  VERIFICAR(avisoCon(Evento::Juego, 5));
+  // Reflejos: tocar antes del verde pierde; en el verde, mide.
+  escribir({CmdJugar, 1});
+  correr(300);
+  tocar();
+  VERIFICAR(std::string(g_s.textoJuego()).find("pido") != std::string::npos);
+  correr(4000);
+  escribir({CmdJugar, 1});
+  for (int i = 0; i < 300 && std::string(g_s.textoJuego()) != "\xC2\xA1Ya!"; i++) correr(20);
+  correr(200);
+  tocar();
+  VERIFICAR(std::string(g_s.textoJuego()).find(" ms") != std::string::npos);
+  const uint16_t reflejo = g_s.motor().memoria().mejorReflejo;
+  VERIFICAR(reflejo >= 150 && reflejo <= 400);
+  correr(4000);
+  // Seguí la mirada: inclinándolo hacia donde mira.
+  escribir({CmdJugar, 2});
+  for (int r = 0; r < 5; r++) {
+    for (int i = 0; i < 200 && std::string(g_s.textoJuego()).find("Para") == std::string::npos; i++) correr(20);
+    const bool alla = std::string(g_s.textoJuego()).find("all") != std::string::npos;
+    for (int i = 0; i < 30; i++) {
+      g_s.imu(alla ? -0.6f : 0.6f, 0, 0.8f);
+      correr(20);
+    }
+    g_s.imu(0, 0, 1);
+    correr(1400);
+  }
+  correr(4500);
+  const Memoria& m = g_s.motor().memoria();
+  std::printf("    jugados %u, ganados %u, hoy %u, mejor reflejo %u ms\n", m.juegosJugados, m.juegosGanados, m.hoyJuegos, m.mejorReflejo);
+  VERIFICAR(m.juegosJugados >= 6 && m.hoyJuegos >= 6);
+  VERIFICAR(m.juegosGanados >= 2);  // el reflejo y la mirada
+  escribir({CmdJugar, 9});
+  VERIFICAR(ultimaRespuesta(CmdJugar) == NoExiste);
+}
+
+PRUEBA("acompañar: un aviso del celu según la app y el contacto") {
+  arrancar("{\"version\":2,\"cuidado\":{\"animo\":false},\"avisos\":[{\"tipo\":\"notificacion\",\"app\":\"whatsapp\",\"contacto\":\"Mamá\","
+           "\"expresion\":\"enamorado\",\"decir\":\"{contacto} te escribe\"}]}",
+           LUNES_0729 + 3 * 3600);
+  correr(500);
+  std::vector<uint8_t> m = {CmdAviso, 0, 8};
+  for (char c : std::string("WhatsApp")) m.push_back(static_cast<uint8_t>(c));
+  const std::string mama = "Mamá";
+  m.push_back(static_cast<uint8_t>(mama.size()));
+  for (char c : mama) m.push_back(static_cast<uint8_t>(c));
+  escribir(m);
+  VERIFICAR(ultimaRespuesta(CmdAviso) == Ok);
+  VERIFICAR(globoDice("Mamá te escribe"));
+  VERIFICAR(std::string(g_s.motor().nombreVisible()) == "enamorado");
+  VERIFICAR(cuantos("notificacion") >= 1);
+  escribir({CmdMirar, 100, 0});
+  VERIFICAR(ultimaRespuesta(CmdMirar) == Ok);
+}
+
+PRUEBA("acompañar: las fechas (Navidad) se festejan una vez por año; te extraña si no lo ves") {
+  // 25/12/2026, 10:00.
+  arrancar("{\"version\":2,\"dueno\":{\"nombre\":\"Nahuel\"},\"cuidado\":{\"animo\":false}}", 1798192800u);
+  correr(1000);
+  g_s.evento(Evento::Tacto);
+  bool navidad = false;
+  for (int i = 0; i < 300 && !navidad; i++) {
+    correr(100);
+    navidad = g_s.panel() == Sistema::Panel::Globo && std::string(g_s.textoGlobo()).find("Navidad") != std::string::npos;
+  }
+  VERIFICAR(navidad);
+  VERIFICAR(g_s.motor().memoria().fechas & 2);
+  // Dos días sin verlo: triste.
+  arrancar("{\"version\":2,\"cuidado\":{\"animo\":false}}", LUNES_0729 + 3 * 3600);
+  correr(1000);
+  float triste = 0;
+  for (int i = 0; i < 48 * 6; i++) correr(600000, 10000);
+  triste = g_s.motor().variable(VarVida::Ignorado);
+  std::printf("    48 h sin verlo: ignorado %.0f min, se ve %s\n", triste, g_s.motor().nombreVisible());
+  VERIFICAR(triste > 47 * 60);
 }

@@ -101,6 +101,10 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
   alarmaDia_ = 0;
   clima_ = DatosClima();
   proximaCaraClima_ = 0;
+  proximaAgua_ = 0;
+  pausaDicha_ = preguntando_ = pregApretado_ = tragarPregunta_ = false;
+  animoDia_ = 0;
+  juego_ = Juego::Ninguno;
 
   canal_ = Canal::Ble;
   wifi_ = nube_ = false;
@@ -281,6 +285,12 @@ void Sistema::evento(Evento e) {
   actividad();  // cualquier evento saca el protector de pantalla
   // Levantarlo apaga el despertador.
   if (alarma_ && (e == Evento::Levantado || e == Evento::SacudidaFuerte)) apagarAlarma();
+  // Sacudirlo tira el dado o la moneda.
+  if ((juego_ == Juego::Dado || juego_ == Juego::Moneda) && juegoFase_ == 0 &&
+      (e == Evento::Sacudida || e == Evento::SacudidaSuave || e == Evento::SacudidaFuerte || e == Evento::Levantado)) {
+    juegoFase_ = 1;
+    juegoDesde_ = juegoProximo_ = juegoAccion_ = hal_.ahoraMs();
+  }
   motor_.evento(e, hal_.ahoraMs());
 }
 
@@ -789,6 +799,25 @@ void Sistema::tacto(bool apretado) {
     if (!apretado) tragarAlarma_ = false;
     return;
   }
+  // Jugando, los toques son del juego.
+  if (juego_ != Juego::Ninguno) {
+    tactoJuego(apretado, ahora);
+    return;
+  }
+  // Esperando el "¿cómo estás?": toque = bien, doble = más o menos, mantener = mal.
+  if (preguntando_) {
+    if (apretado) {
+      pregApretado_ = true;
+      pregToque_ = ahora;
+      pregToques_++;
+    } else if (pregApretado_) {
+      pregApretado_ = false;
+      if (ahora - pregToque_ >= 800) responderAnimo(2);  // mantener: mal
+      else if (pregToques_ >= 2) responderAnimo(1);
+      else pregToque_ = ahora;  // espera el segundo toque (Sistema::cuidar)
+    }
+    return;
+  }
   // Un toque cierra el recordatorio, y ese toque no hace nada más.
   if (apretado && recVisible_ >= 0) {
     cerrarRecordatorio();
@@ -939,6 +968,13 @@ void Sistema::tick() {
   revisarRecordatorios(ahora);
   revisarDespertador(ahora);
   avanzarAlarma(ahora);
+  cuidar(ahora);
+  avanzarJuego(ahora);
+  // Mantenerlo apretado mientras pregunta "¿cómo estás?" ya es "mal".
+  if (preguntando_ && pregApretado_ && ahora - pregToque_ >= 800) {
+    pregApretado_ = false;
+    responderAnimo(2);
+  }
   avanzarPomodoro(ahora, dtCuadro);
   motor_.tick(ahora, contexto());
   avanzarSprites(dtCuadro);
@@ -1092,8 +1128,9 @@ void Sistema::sonar(const char* nombre) {
 
 // Un evento que genera el sistema (recordatorio, pomodoro): además del
 // registro, se avisa ya, como una respuesta de Registro, por BLE y por la
-// nube: [evento] o, un recordatorio, [evento 31][tipo 4 con su índice].
-void Sistema::notificarEvento(Evento e, int recordatorio) {
+// nube: [evento] o, con un tipo (un recordatorio, un juego, el ánimo),
+// [evento][tipo con su dato].
+void Sistema::notificarEvento(Evento e, int tipo, uint8_t dato) {
   using namespace protocolo;
   EntradaRegistro r[1];
   const uint32_t seg = motor_.registro(r, 1) == 1 ? r[0].segundos : 0;
@@ -1101,15 +1138,15 @@ void Sistema::notificarEvento(Evento e, int recordatorio) {
   size_t n = 3;
   b[0] = static_cast<uint8_t>(CmdRegistro | Respuesta);
   b[1] = Ok;
-  b[2] = recordatorio >= 0 ? 2 : 1;
+  b[2] = tipo >= 0 ? 2 : 1;
   escribir32(b + n, seg);
   b[n + 4] = 0;
   b[n + 5] = static_cast<uint8_t>(e);
   n += 6;
-  if (recordatorio >= 0) {
+  if (tipo >= 0) {
     escribir32(b + n, seg);
-    b[n + 4] = 4;
-    b[n + 5] = static_cast<uint8_t>(recordatorio);
+    b[n + 4] = static_cast<uint8_t>(tipo);
+    b[n + 5] = dato;
     n += 6;
   }
   if (hal_.notificar) hal_.notificar(CarComando, b, n);
@@ -1176,11 +1213,18 @@ void Sistema::hablar(Situacion s) {
   if (apagado_ || emparejando_) return;
   const bool siempre = situacionSiempre(s);
   // Las espontáneas no esperan: si ya está mostrando algo, no dice nada.
-  if (!siempre && (globo_ || hayPendiente_ || recVisible_ >= 0 || alarma_)) return;
+  if (!siempre && (globo_ || hayPendiente_ || recVisible_ >= 0 || alarma_ || juego_ != Juego::Ninguno)) return;
+  // El buen día con el tiempo: si llueve o hace frío, mejor el consejo.
+  char c[40] = {};
+  if (climaVigente()) {
+    textoClima(clima_, c, sizeof c);
+    const Situacion sc = situacionClima(clima_);
+    if (s == Situacion::BuenDia && (sc == Situacion::ClimaLluvia || sc == Situacion::ClimaFrio)) s = sc;
+  }
   const uint32_t e = epoch();
   if (!hablador_.quiere(s, hal_.ahoraMs() / 1000u, e ? e / 86400u : 0, config_.habla.frecuencia, azar_)) return;
   char t[LARGO_FRASE];
-  if (!elegirFrase(config_.habla, s, presetCercano(motor_.rasgos()), config_.vida.dueno, nombre(), azar_, t, sizeof t))
+  if (!elegirFrase(config_.habla, s, presetCercano(motor_.rasgos()), config_.vida.dueno, nombre(), azar_, t, sizeof t, c))
     return;
   decir(t);
 }
@@ -1337,7 +1381,7 @@ void Sistema::mostrarRecordatorio(int i, uint32_t ahora) {
   if (r.sonido) sonar("recordatorio");
   evento(Evento::Recordatorio);
   motor_.anotarRegistro(4, static_cast<uint8_t>(i));
-  notificarEvento(Evento::Recordatorio, i);
+  notificarEvento(Evento::Recordatorio, 4, static_cast<uint8_t>(i));
   log("recordatorio");
 }
 
@@ -1395,6 +1439,7 @@ void Sistema::avanzarPanel(uint32_t ahora, uint32_t dt) {
   Panel deseado = Panel::Ninguno;
   if (recVisible_ >= 0) deseado = Panel::Recordatorio;
   else if (alarma_) deseado = Panel::Despertador;
+  else if (juego_ != Juego::Ninguno) deseado = Panel::Juego;
   else if (globo_) deseado = Panel::Globo;
   else if (config_.modo == Modo::Reloj && !caraPorToque) deseado = Panel::Reloj;
   else if (config_.modo == Modo::Pomodoro) deseado = Panel::Pomodoro;
@@ -1553,6 +1598,8 @@ void Sistema::dibujarPanel() {
     }
   } else if (panel_ == Panel::Clima) {
     dibujarClima(cx, W, H, f);
+  } else if (panel_ == Panel::Juego) {
+    dibujarJuego(cx, W, H, f);
   }
   lienzo_.opacidad(1);
 }
@@ -1603,6 +1650,7 @@ size_t Sistema::estadoBle(uint8_t* salida, size_t cap) const {
   // "pomodoro:trabajo", "pomodoro:descanso" o "pomodoro:pausa".
   if (recVisible_ >= 0) p.expresion = recNombre_;
   else if (alarma_) p.expresion = "despertador";
+  else if (juego_ != Juego::Ninguno) p.expresion = visibleJuego_;
   else if (globo_) p.expresion = "globo";
   else if (config_.modo == Modo::Clima && panel_ == Panel::Clima) p.expresion = "clima";
   else if (config_.modo == Modo::Pomodoro) p.expresion = nombrePomodoro();
@@ -2089,6 +2137,7 @@ void Sistema::procesar(uint8_t car, const uint8_t* d, size_t n) {
         recPendientes_ = 0;
         recMinuto_ = -1;
         alarmaMinuto_ = -1;
+        proximaAgua_ = 0;
         if (config_.modo != modoAntes || config_.pomodoro.trabajo != tramosAntes.trabajo ||
             config_.pomodoro.descanso != tramosAntes.descanso)
           reiniciarPomodoro();
@@ -2235,6 +2284,60 @@ void Sistema::procesar(uint8_t car, const uint8_t* d, size_t n) {
             hablar(Situacion::Despertar);
             break;
         }
+        return responder(car, op, Ok);
+      }
+      case CmdJugar: {
+        if (n != 2 || (d[1] > 4 && d[1] != 255)) return responder(car, op, n != 2 ? Malformado : NoExiste);
+        jugar(static_cast<Juego>(d[1]));
+        if (d[1] != 255) {
+          const size_t k = copiarTexto(visibleJuego_, sizeof visibleJuego_, "juego:");
+          copiarTexto(visibleJuego_ + k, sizeof visibleJuego_ - k, nombreJuego(d[1]));
+        }
+        return responder(car, op, Ok);
+      }
+      case CmdAviso: {
+        // [tipo][n][app][n][contacto]
+        char app[LARGO_APP] = {}, contacto[LARGO_APP] = {};
+        size_t i = 2;
+        if (n < 2 || d[1] > 1) return responder(car, op, Malformado, "[u8 tipo][n][app][n][contacto]");
+        if (i < n) {
+          const size_t k = leerTextoCorto(d + i, n - i, app, sizeof app);
+          if (!k) return responder(car, op, Malformado, "app de hasta 24 bytes");
+          i += k;
+        }
+        if (i < n) {
+          const size_t k = leerTextoCorto(d + i, n - i, contacto, sizeof contacto);
+          if (!k) return responder(car, op, Malformado, "contacto de hasta 24 bytes");
+          i += k;
+        }
+        const bool llamada = d[1] == 1;
+        evento(llamada ? Evento::Llamada : Evento::Notificacion);
+        const int a = buscarAviso(config_.avisos, llamada, app, contacto);
+        if (a >= 0) {
+          const Aviso& x = config_.avisos.lista[a];
+          Config::Cara c;
+          c.vida = x.caraVida, c.dibujo = x.caraDibujo;
+          if (x.comportamiento >= 0) motor_.comportamiento(x.comportamiento, ahora);
+          if (c.existe()) motor_.reaccionar(c, ahora, 4000);
+          if (x.sonido) sonar(llamada ? "llamada" : "notificacion");
+          if (x.decir[0]) {
+            char t[LARGO_FRASE];
+            completarFrase(x.decir, config_.vida.dueno, nombre(), t, sizeof t, nullptr, app, contacto);
+            decir(t, c);
+          }
+        }
+        return responder(car, op, Ok);
+      }
+      case CmdAnimo: {
+        if (n != 2 || d[1] > 2) return responder(car, op, Malformado, "0 bien, 1 más o menos, 2 mal");
+        responderAnimo(d[1]);
+        return responder(car, op, Ok);
+      }
+      case CmdMirar: {
+        if (n != 3) return responder(car, op, Malformado, "[i8 x][i8 y]");
+        const float x = limitar(static_cast<int8_t>(d[1]) / 100.0f, -1, 1), y = limitar(static_cast<int8_t>(d[2]) / 100.0f, -1, 1);
+        motor_.estimulo(x, y);
+        motor_.seguir(x, y, ahora);
         return responder(car, op, Ok);
       }
       case CmdReproducir: {

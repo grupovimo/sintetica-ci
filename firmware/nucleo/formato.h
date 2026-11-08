@@ -116,6 +116,8 @@ enum class Evento : uint8_t {
   Recordatorio,  // se disparó un recordatorio (lo genera el sistema)
   Pomodoro,      // terminó un tramo del pomodoro (lo genera el sistema)
   Despertador,   // empezó a sonar el despertador (lo genera el sistema; v1.6)
+  Juego,         // terminó una partida de un juego (v1.7)
+  Animo,         // respondió el "¿cómo estás?" (v1.7)
   Cantidad
 };
 // El evento "padre" (sacudida-fuerte → sacudida, caricia → tacto): si no hay
@@ -269,6 +271,8 @@ struct Config {
   Protector protector;
   Habla habla;
   Despertador despertador;
+  Cuidado cuidado;
+  Avisos avisos;
 
   int indiceExpresion(const char* nombre) const;
   int indiceAnimacion(const char* nombre) const;

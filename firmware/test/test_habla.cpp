@@ -109,7 +109,7 @@ PRUEBA("habla: el hablador no es pesado (enfriamiento, separaci√≥n y tope por d√
   for (uint32_t s = 0; s < 86400; s += 30)
     for (int k = 0; k < N_SITUACIONES; k++) {
       const Situacion si = static_cast<Situacion>(k);
-      if (si == Situacion::CumpleDueno || si == Situacion::CumpleRobot || si == Situacion::Despertador || si == Situacion::Posponer) continue;
+      if (situacionSiempre(si)) continue;
       total += g.quiere(si, s, 1, 50, a);
     }
   VERIFICAR(total <= FRASES_POR_DIA);

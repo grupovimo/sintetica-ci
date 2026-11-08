@@ -104,6 +104,10 @@ size_t codificarMemoria(const Memoria& m, uint8_t* s, size_t cap) {
   u32(m.epochEstado);
   u16(m.ausenciaMaxima);
   s[i++] = m.afectoHoy;
+  // v1.7 (byte 93 en adelante; antes eran ceros).
+  u16(m.juegosGanados), u16(m.juegosJugados), u16(m.mejorReflejo);
+  s[i++] = m.hoyJuegos, s[i++] = m.hoySuenos, s[i++] = m.hoySonoCon, s[i++] = m.hoyAnimo, s[i++] = m.hoyEspero;
+  s[i++] = m.hoyDia, s[i++] = m.anioFechas, s[i++] = m.fechas, s[i++] = m.hoyAgua;
   // CRC al final.
   protocolo::escribir32(s + LARGO_MEMORIA - 4, protocolo::crc32(s, LARGO_MEMORIA - 4));
   return LARGO_MEMORIA;
@@ -135,6 +139,9 @@ bool decodificarMemoria(const uint8_t* s, size_t n, Memoria* salida) {
   m.epochEstado = u32();
   m.ausenciaMaxima = u16();
   m.afectoHoy = s[i++];
+  m.juegosGanados = u16(), m.juegosJugados = u16(), m.mejorReflejo = u16();
+  m.hoyJuegos = s[i++], m.hoySuenos = s[i++], m.hoySonoCon = s[i++], m.hoyAnimo = s[i++], m.hoyEspero = s[i++];
+  m.hoyDia = s[i++], m.anioFechas = s[i++], m.fechas = s[i++], m.hoyAgua = s[i++];
   for (int8_t& d : m.deriva) d = static_cast<int8_t>(limitar(d, -10, 10));
   *salida = m;
   return true;
@@ -148,6 +155,9 @@ void MotorVida::iniciar(const Config* config, uint32_t semilla, uint32_t ahora) 
   azar_.sembrar(semilla_);
   for (int i = 0; i < N_ANIMO; i++) g_idxAnimo[i] = config->vida.indiceCara(NOMBRES_ANIMO[i]);
   ahora_ = inicio_ = ultimoTick_ = ahora;
+  mem_ = Memoria();  // la que estaba guardada la pone el sistema (restaurarMemoria)
+  primeroDelDia_ = hitoPendiente_ = false;
+  hitoSituacion_ = -1;
   acumulado_ = 0;
   t_ = 0;
   pasos_ = 0;
@@ -1012,6 +1022,8 @@ void MotorVida::lento(float dt) {
   w[AMiedo] = limitar((estado_[6] - 0.7f) * 2 * (0.5f + p.timidez), 0, 0.5f);
   w[ACurioso] = limitar((estado_[4] - 0.7f), 0, 0.3f);
   w[AOfendido] = t < ofendidoHasta_ ? 0.7f : 0;
+  // Te extraña: si no lo ves en un día o dos, se pone triste (hasta la mitad).
+  if (modo_ == Modo::Despierto) w[ATriste] += limitar((variable(VarVida::Ignorado) / 60.0f - 24) / 48, 0, 0.5f);
   float suma = 0;
   for (float x : w) suma += x;
   const float k = suma > 1 ? 1 / suma : 1;
@@ -1034,6 +1046,7 @@ void MotorVida::lento(float dt) {
     if (mejor >= 0) {
       const int d = minutosHasta(mejor * 60, ctx_.minutoDelDia);
       esperandoDueno_ = (d < 30 || d > 1410) && t - ultimaInteraccion_ > 1800;
+      if (esperandoDueno_) anotarHoy(Hoy::Espero, static_cast<uint8_t>(mejor));
     }
   }
 
@@ -1093,7 +1106,9 @@ void MotorVida::ritmo() {
   // Sueños: cada 20 a 40 min, una fase de unos 30 s.
   if (t >= proximoSueno_ && actual_ == -1) {
     proximoSueno_ = t + entre(azar_, 600, 1500);
-    const int s = config_->vida.indiceComportamiento(estado_[6] > 0.5f || azar_.real() < 0.2f ? "pesadilla" : "sonar");
+    const bool pesadilla = estado_[6] > 0.5f || azar_.real() < 0.2f;
+    const int s = config_->vida.indiceComportamiento(pesadilla ? "pesadilla" : "sonar");
+    anotarHoy(Hoy::Sueno, pesadilla ? 16 : 0);
     if (s >= 0) comportamiento(s, ahora_);
   }
 }
@@ -1330,7 +1345,9 @@ void MotorVida::empezarPaso(int i, bool primera) {
   if (p.dentro >= 0 && p.particula == static_cast<int8_t>(TipoParticula::Burbuja)) {
     // Lo que sueña, adentro de la burbuja que acaba de salir.
     static const TipoParticula SUENOS[] = {TipoParticula::Corazon, TipoParticula::Estrella, TipoParticula::Nota, TipoParticula::Oveja};
-    const TipoParticula que = p.dentro == DENTRO_SUENO ? SUENOS[azar_.entre(0, 3)] : static_cast<TipoParticula>(p.dentro);
+    const uint32_t cual = azar_.entre(0, 3);
+    const TipoParticula que = p.dentro == DENTRO_SUENO ? SUENOS[cual] : static_cast<TipoParticula>(p.dentro);
+    if (p.dentro == DENTRO_SUENO) anotarHoy(Hoy::SonoCon, static_cast<uint8_t>(1u << cual));
     const Particula* b = nullptr;
     for (const Particula& q : cuadro_.particulas)
       if (q.viva && q.tipo == TipoParticula::Burbuja && q.edad == 0) b = &q;
@@ -1546,6 +1563,9 @@ void MotorVida::evento(Evento e, uint32_t ahora) {
     estado_[3] *= 0.2f;
     estado_[0] = maxf(0, estado_[0] - 0.005f);
     memoriaInteraccion(e);
+    // Lo que se dice con vos según el momento del día (antes que las reglas:
+    // el globo es de quien lo pide primero).
+    rutinaConVos(hayVolvio_);
   }
   if (e == Evento::SacudidaFuerte || e == Evento::Caida) {
     if (ctx_.epoch) mem_.rencorHasta = ctx_.epoch + 86400;
@@ -1648,6 +1668,7 @@ void MotorVida::memoriaInteraccion(Evento e) {
     const uint32_t dia = ctx_.epoch / 86400;
     if (!mem_.nacimiento) mem_.nacimiento = ctx_.epoch;
     if (dia != mem_.ultimoDia) {
+      primeroDelDia_ = true;
       mem_.racha = (mem_.ultimoDia && dia == mem_.ultimoDia + 1) ? mem_.racha + 1 : 1;
       mem_.rachaMax = maxi(mem_.rachaMax, mem_.racha);
       mem_.dias++;
@@ -1665,6 +1686,80 @@ void MotorVida::memoriaInteraccion(Evento e) {
   if (e == Evento::Caricia && azar_.real() < 0.05f) {
     mem_.deriva[1] = static_cast<int8_t>(mini(10, mem_.deriva[1] + 1));
     mem_.deriva[5] = static_cast<int8_t>(maxi(-10, mem_.deriva[5] - 1));
+  }
+}
+
+// ---------------------------------------------------------------- el día con vos (v1.7)
+
+void MotorVida::anotarHoy(Hoy que, uint8_t dato) {
+  const uint8_t hoy = ctx_.epoch ? static_cast<uint8_t>((ctx_.epoch / 86400u) % 251u + 1u) : 0;
+  if (hoy && hoy != mem_.hoyDia) {
+    mem_.hoyDia = hoy;
+    mem_.hoyJuegos = mem_.hoySuenos = mem_.hoySonoCon = mem_.hoyAnimo = mem_.hoyEspero = mem_.hoyAgua = 0;
+  }
+  auto mas = [](uint8_t& x) { if (x < 255) x++; };
+  switch (que) {
+    case Hoy::Juego:
+      mas(mem_.hoyJuegos);
+      if (mem_.juegosJugados < 65535) mem_.juegosJugados++;
+      break;
+    case Hoy::JuegoGanado:
+      if (mem_.juegosGanados < 65535) mem_.juegosGanados++;
+      break;
+    case Hoy::Sueno:
+      mas(mem_.hoySuenos);
+      mem_.hoySonoCon |= dato;
+      break;
+    case Hoy::SonoCon: mem_.hoySonoCon |= dato; break;
+    case Hoy::Animo: mem_.hoyAnimo = dato; break;
+    case Hoy::Espero:
+      if (!mem_.hoyEspero) mem_.hoyEspero = static_cast<uint8_t>(dato + 1);
+      break;
+    case Hoy::Agua: mas(mem_.hoyAgua); break;
+  }
+}
+
+void MotorVida::anotarReflejo(uint16_t ms) {
+  if (ms && (!mem_.mejorReflejo || ms < mem_.mejorReflejo)) mem_.mejorReflejo = ms;
+}
+
+// Lo que te dice según el momento: el "buen día" del primer encuentro (con el
+// clima, si hay), "¿comiste?" a la tarde, "¡tardaste!" si llegás mucho más
+// tarde que lo de siempre y, antes de su hora de dormir, bosteza y te invita a
+// dormir. Las frases son datos (frases.json); el Hablador decide si las dice.
+void MotorVida::rutinaConVos(bool volvio) {
+  const bool primero = primeroDelDia_;
+  primeroDelDia_ = false;
+  if (modo_ != Modo::Despierto) return;
+  const int m = ctx_.minutoDelDia;
+  if (primero) {
+    // El buen día, de la mañana hasta las 14 (de noche, no).
+    if (m < 0 || (minutosHasta(config_->vida.despierta, m) < 6 * 60 + 60 && m < 14 * 60) ||
+        minutosHasta(m, config_->vida.despierta) <= 120) {
+      decir(Situacion::BuenDia);
+      return;
+    }
+  }
+  if (volvio && m >= 0) {
+    // ¿A qué hora suele aparecer? Si llegó entre 1,5 y 6 h más tarde, lo dice.
+    int mejor = -1;
+    for (int h = 0; h < 24; h++)
+      if (mem_.horas[h] >= 3 && (mejor < 0 || mem_.horas[h] > mem_.horas[mejor])) mejor = h;
+    const int tarde = mejor >= 0 ? minutosHasta(mejor * 60, m) : -1;
+    if (tarde >= 90 && tarde <= 360) {
+      decir(Situacion::Tardaste);
+      return;
+    }
+  }
+  if (m < 0) return;
+  if (m >= 13 * 60 && m <= 15 * 60 + 30) decir(Situacion::Comiste);
+  const int falta = minutosHasta(m, config_->vida.duerme);
+  const uint32_t dia = ctx_.epoch / 86400u + 1u;
+  if (falta > 0 && falta <= 45 && aDormirDia_ != dia) {
+    aDormirDia_ = dia;
+    const int b = config_->vida.indiceComportamiento("bostezar");
+    if (b >= 0) comportamiento(b, ahora_);
+    decir(Situacion::ADormir);
   }
 }
 
@@ -1695,6 +1790,33 @@ void MotorVida::revisarHitos() {
       mem_.anioCumpleBicho = static_cast<uint16_t>(anio), nuevos++;
       hitoSituacion_ = static_cast<int8_t>(Situacion::CumpleRobot);
     }
+    // Las fechas (una vez por año): año nuevo, Navidad, el día del amigo, el
+    // del niño (en la Argentina, el tercer domingo de agosto) y el aniversario
+    // (el día que se conocieron).
+    if (mem_.anioFechas != static_cast<uint8_t>(anio)) mem_.anioFechas = static_cast<uint8_t>(anio), mem_.fechas = 0;
+    const int semana = static_cast<int>((ctx_.epoch / 86400 + 3) % 7);  // 0 = lunes
+    int aniversario = -1;
+    if (mem_.nacimiento && ctx_.epoch / 86400 > mem_.nacimiento / 86400 + 300) {
+      const int32_t zn = static_cast<int32_t>(mem_.nacimiento / 86400) + 719468;
+      const int32_t en = zn / 146097, dn = zn - en * 146097;
+      const int32_t yn = (dn - dn / 1460 + dn / 36524 - dn / 146096) / 365;
+      const int32_t dy = dn - (365 * yn + yn / 4 - yn / 100);
+      const int32_t mpn = (5 * dy + 2) / 153;
+      aniversario = (mpn < 10 ? mpn + 3 : mpn - 9) * 100 + (dy - (153 * mpn + 2) / 5 + 1);
+    }
+    const struct {
+      bool es;
+      Situacion s;
+    } fechas[] = {{hoy == 101, Situacion::AnioNuevo},
+                  {hoy == 1225, Situacion::Navidad},
+                  {hoy == 720, Situacion::DiaDelAmigo},
+                  {mes == 8 && semana == 6 && dia >= 15 && dia <= 21, Situacion::DiaDelNino},
+                  {hoy == aniversario, Situacion::Aniversario}};
+    for (int f = 0; f < 5; f++)
+      if (fechas[f].es && !(mem_.fechas & (1u << f))) {
+        mem_.fechas = static_cast<uint8_t>(mem_.fechas | (1u << f)), nuevos++;
+        hitoSituacion_ = static_cast<int8_t>(fechas[f].s);
+      }
     if (config_->vida.cumpleDueno == hoy && mem_.anioCumpleDueno != anio) {
       mem_.anioCumpleDueno = static_cast<uint16_t>(anio), nuevos++;
       hitoSituacion_ = static_cast<int8_t>(Situacion::CumpleDueno);  // el del dueño gana

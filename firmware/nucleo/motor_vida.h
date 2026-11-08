@@ -62,7 +62,17 @@ struct Memoria {
   uint32_t epochEstado = 0;
   uint16_t ausenciaMaxima = 0;      // horas
   uint8_t afectoHoy = 0;            // cuánto afecto ganó hoy (tope diario)
+  // v1.7 (en los bytes que eran ceros): juegos, el día de hoy y las fechas.
+  uint16_t juegosGanados = 0, juegosJugados = 0, mejorReflejo = 0;  // ms (0 = nunca)
+  uint8_t hoyJuegos = 0, hoySuenos = 0, hoySonoCon = 0;  // bits: corazón, estrella, nota, oveja, pesadilla
+  uint8_t hoyAnimo = 0;             // 0 sin respuesta, 1 bien, 2 más o menos, 3 mal
+  uint8_t hoyEspero = 0;            // a qué hora te esperó (hora + 1; 0 = no)
+  uint8_t hoyDia = 0;               // el día de los contadores de hoy (epoch/86400 % 251 + 1)
+  uint8_t anioFechas = 0, fechas = 0;  // año % 256 y bits: año nuevo, navidad, amigo, niño, aniversario
+  uint8_t hoyAgua = 0;              // vasos de agua recordados hoy
 };
+// Qué cuenta el día (MotorVida::anotarHoy).
+enum class Hoy : uint8_t { Juego, JuegoGanado, Sueno, SonoCon, Animo, Espero, Agua };
 constexpr size_t LARGO_MEMORIA = 112;
 size_t codificarMemoria(const Memoria& m, uint8_t* salida, size_t cap);
 bool decodificarMemoria(const uint8_t* d, size_t n, Memoria* m);
@@ -148,8 +158,13 @@ class MotorVida {
   // Los tres mejores del último sorteo del selector (nombre, puntaje).
   int candidatos(const char** nombres, float* puntajes, int max) const;
   int registro(EntradaRegistro* salida, int max) const;
-  // Anota algo que pasó fuera del motor (el sistema: 4 = recordatorio, con su índice).
+  // Anota algo que pasó fuera del motor (el sistema: 4 = recordatorio, con su
+  // índice; 5 = juego; 6 = ánimo).
   void anotarRegistro(uint8_t tipo, uint8_t dato) { anotar(tipo, dato); }
+  // Los contadores del día en la memoria (se vuelven a cero cada día).
+  void anotarHoy(Hoy que, uint8_t dato = 0);
+  // Un juego: cuánto tardó en tocar (reflejos), para el récord.
+  void anotarReflejo(uint16_t ms);
   // El broche: de noche, después de dormirse, puede apagar la pantalla hasta
   // la mañana. segundosHastaDespertar: -1 si no se sabe la hora.
   bool quiereSuenoProfundo() const;
@@ -190,6 +205,7 @@ class MotorVida {
   void empujar(int var, float delta);
   void soltar(TipoParticula t, int cuantas = 1);
   void ritmo();
+  void rutinaConVos(bool volvio);
   void vidaDormido();
   void revolverseEnSuenos(bool murmurar);
   void decir(Situacion s) {
@@ -291,6 +307,8 @@ class MotorVida {
   int caraEstado_ = -1;
   float guardadoEn_ = 0;
   bool hayVolvio_ = false;
+  bool primeroDelDia_ = false;   // la primera interacción del día (el "buen día")
+  uint32_t aDormirDia_ = 0;      // el día en que ya le dijo "¿nos vamos a dormir?"
   bool hitoPendiente_ = false;
   int8_t hitoSituacion_ = -1;    // qué se dice al festejar el hito (el cumple gana)
   // La batería baja va como una capa del ánimo (no gana sobre todo).

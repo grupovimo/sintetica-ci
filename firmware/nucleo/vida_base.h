@@ -110,7 +110,7 @@ inline const DatoVidaBase COMPORTAMIENTOS_BASE[CANTIDAD_COMPORTAMIENTOS_BASE] = 
     {"volver-ofendido", R"json({"tipo":"reaccion","pasos":[{"cara":"ofendido","mirada":"reojo","dura":3},{"cara":"ofendido","dura":2,"decir":"te-extrane"},{"cara":"contento","peso":0.6,"dura":1.5}]})json"},
 };
 
-inline const char* const REGLAS_VIDA_BASE = R"json([{"si":"despertado","y":"afecto>0.7","entonces":["reflejo:sorpresa","comportamiento:despertar-con-amor"]},{"si":"despertado","entonces":["reflejo:sorpresa","comportamiento:despertar-forzado","estado.animo-0.05"]},{"si":"tacto","y":"rasgo.timidez>0.65","entonces":["comportamiento:toque-timido","estado.animo+0.02"]},{"si":"tacto","entonces":["comportamiento:toque","estado.animo+0.03"]},{"si":"caricia","y":"estres>0.5,rasgo.malGenio>0.5","entonces":["comportamiento:caricia-calma","estado.estres-0.2","estado.animo+0.05"]},{"si":"caricia","y":"afecto>0.6","entonces":["comportamiento:caricia-amor","estado.animo+0.08","estado.estres-0.15"]},{"si":"caricia","entonces":["comportamiento:caricia","estado.animo+0.08","estado.estres-0.15"]},{"si":"doble-toque","entonces":["expresion:sospecha","estado.curiosidad+0.1"]},{"si":"muchos-toques","y":"rasgo.malGenio>0.5","entonces":["comportamiento:molesto","estado.estres+0.15"]},{"si":"muchos-toques","entonces":["comportamiento:cosquillas","estado.animo+0.05","estado.estres+0.05"]},{"si":"sacudida-suave","entonces":["comportamiento:bamboleo","estado.animo+0.03","estado.energia+0.03"]},{"si":"sacudida-fuerte","y":"rasgo.timidez>0.6","entonces":["reflejo:miedo","comportamiento:miedo-sacudida","estado.estres+0.5","estado.animo-0.12"]},{"si":"sacudida-fuerte","entonces":["reflejo:mareado","comportamiento:mareo","estado.estres+0.4","estado.animo-0.1"]},{"si":"sacudida","entonces":["comportamiento:mareo","estado.estres+0.3"]},{"si":"boca-abajo","entonces":["reflejo:miedo","comportamiento:boca-abajo","estado.estres+0.3"]},{"si":"caida","entonces":["reflejo:sorpresa","comportamiento:ko","estado.estres+0.6"]},{"si":"levantado","y":"rencor","entonces":["comportamiento:dudar","estado.curiosidad+0.15"]},{"si":"levantado","entonces":["comportamiento:curiosear","estado.curiosidad+0.2"]},{"si":"voz","entonces":["comportamiento:escuchar","estado.animo+0.03","estado.curiosidad+0.1"]},{"si":"nombre","entonces":["comportamiento:saludar","estado.animo+0.2"]},{"si":"ruido","y":"rasgo.timidez>0.6","entonces":["reflejo:miedo","comportamiento:susto","estado.estres+0.35"]},{"si":"ruido","entonces":["reflejo:sorpresa","estado.estres+0.2","estado.curiosidad+0.1"]},{"si":"musica","entonces":["comportamiento:bailar","estado.animo+0.08"]},{"si":"silencio","entonces":["estado.aburrimiento+0.1"]},{"si":"notificacion","entonces":["comportamiento:notificacion","estado.curiosidad+0.1"]},{"si":"llamada","entonces":["comportamiento:llamada"]},{"si":"bateria-baja","entonces":["comportamiento:cansancio","estado.energia-0.2","estado.animo-0.05"]},{"si":"bateria-critica","entonces":["comportamiento:apagarse","estado.energia-0.3"]},{"si":"enchufado","entonces":["comportamiento:alivio","estado.estres-0.1","estado.animo+0.05"]},{"si":"cargado","entonces":["comportamiento:carga-completa","estado.animo+0.05"]},{"si":"sin-wifi","entonces":["comportamiento:buscar-red"]},{"si":"app-abierta","entonces":["comportamiento:saludar-app","estado.animo+0.05"]},{"si":"vinculado","entonces":["expresion:guino","estado.animo+0.1"]},{"si":"cambio-de-cara","entonces":["comportamiento:espejo","estado.curiosidad+0.1"]},{"si":"bicho-cerca","entonces":["comportamiento:otro-bicho","estado.curiosidad+0.2","estado.animo+0.05"]},{"si":"volvio","y":"ausencia>72","entonces":["comportamiento:volver-ofendido"]},{"si":"volvio","y":"afecto>0.6","entonces":["comportamiento:saludar-con-amor","estado.animo+0.15"]},{"si":"volvio","entonces":["comportamiento:saludar-al-volver","estado.animo+0.1"]},{"si":"hito","entonces":["comportamiento:festejar","estado.animo+0.2"]},{"si":"bateria<15","entonces":["expresion:bateria-baja"]}])json";
+inline const char* const REGLAS_VIDA_BASE = R"json([{"si":"despertado","y":"afecto>0.7","entonces":["reflejo:sorpresa","comportamiento:despertar-con-amor"]},{"si":"despertado","entonces":["reflejo:sorpresa","comportamiento:despertar-forzado","estado.animo-0.05"]},{"si":"tacto","y":"rasgo.timidez>0.65","entonces":["comportamiento:toque-timido","estado.animo+0.02"]},{"si":"tacto","entonces":["comportamiento:toque","estado.animo+0.03"]},{"si":"caricia","y":"estres>0.5,rasgo.malGenio>0.5","entonces":["comportamiento:caricia-calma","estado.estres-0.2","estado.animo+0.05"]},{"si":"caricia","y":"afecto>0.6","entonces":["comportamiento:caricia-amor","estado.animo+0.08","estado.estres-0.15"]},{"si":"caricia","entonces":["comportamiento:caricia","estado.animo+0.08","estado.estres-0.15"]},{"si":"doble-toque","entonces":["expresion:sospecha","estado.curiosidad+0.1"]},{"si":"muchos-toques","y":"rasgo.malGenio>0.5","entonces":["comportamiento:molesto","estado.estres+0.15"]},{"si":"muchos-toques","entonces":["comportamiento:cosquillas","estado.animo+0.05","estado.estres+0.05"]},{"si":"sacudida-suave","entonces":["comportamiento:bamboleo","estado.animo+0.03","estado.energia+0.03"]},{"si":"sacudida-fuerte","y":"rasgo.timidez>0.6","entonces":["reflejo:miedo","comportamiento:miedo-sacudida","estado.estres+0.5","estado.animo-0.12"]},{"si":"sacudida-fuerte","entonces":["reflejo:mareado","comportamiento:mareo","estado.estres+0.4","estado.animo-0.1"]},{"si":"sacudida","entonces":["comportamiento:mareo","estado.estres+0.3"]},{"si":"boca-abajo","entonces":["reflejo:miedo","comportamiento:boca-abajo","estado.estres+0.3"]},{"si":"caida","entonces":["reflejo:sorpresa","comportamiento:ko","estado.estres+0.6"]},{"si":"levantado","y":"rencor","entonces":["comportamiento:dudar","estado.curiosidad+0.15"]},{"si":"levantado","entonces":["comportamiento:curiosear","estado.curiosidad+0.2"]},{"si":"voz","entonces":["comportamiento:escuchar","estado.animo+0.03","estado.curiosidad+0.1"]},{"si":"nombre","entonces":["comportamiento:saludar","estado.animo+0.2"]},{"si":"ruido","y":"rasgo.timidez>0.6","entonces":["reflejo:miedo","comportamiento:susto","estado.estres+0.35"]},{"si":"ruido","entonces":["reflejo:sorpresa","estado.estres+0.2","estado.curiosidad+0.1"]},{"si":"musica","entonces":["comportamiento:bailar","estado.animo+0.08"]},{"si":"silencio","entonces":["estado.aburrimiento+0.1"]},{"si":"notificacion","entonces":["comportamiento:notificacion","estado.curiosidad+0.1"]},{"si":"llamada","entonces":["comportamiento:llamada"]},{"si":"bateria-baja","entonces":["comportamiento:cansancio","estado.energia-0.2","estado.animo-0.05"]},{"si":"bateria-critica","entonces":["comportamiento:apagarse","estado.energia-0.3"]},{"si":"enchufado","entonces":["comportamiento:alivio","estado.estres-0.1","estado.animo+0.05"]},{"si":"cargado","entonces":["comportamiento:carga-completa","estado.animo+0.05"]},{"si":"sin-wifi","entonces":["comportamiento:buscar-red"]},{"si":"app-abierta","entonces":["comportamiento:saludar-app","estado.animo+0.05"]},{"si":"vinculado","entonces":["expresion:guino","estado.animo+0.1"]},{"si":"cambio-de-cara","entonces":["comportamiento:espejo","estado.curiosidad+0.1"]},{"si":"bicho-cerca","entonces":["comportamiento:otro-bicho","estado.curiosidad+0.2","estado.animo+0.05"]},{"si":"volvio","y":"ausencia>72","entonces":["comportamiento:volver-ofendido"]},{"si":"volvio","y":"ausencia>24","entonces":["reflejo:sorpresa","comportamiento:festejar","decir:te-extrane","estado.animo+0.25","estado.afecto+0.05"]},{"si":"volvio","y":"afecto>0.6","entonces":["comportamiento:saludar-con-amor","estado.animo+0.15"]},{"si":"volvio","entonces":["comportamiento:saludar-al-volver","estado.animo+0.1"]},{"si":"hito","entonces":["comportamiento:festejar","estado.animo+0.2"]},{"si":"bateria<15","entonces":["expresion:bateria-baja"]}])json";
 
 inline const char* const PERSONALIDADES_BASE = R"json({"equilibrado":{"energia":0.5,"sociabilidad":0.5,"picardia":0.45,"timidez":0.3,"curiosidad":0.55,"malGenio":0.25},"timido":{"energia":0.4,"sociabilidad":0.35,"picardia":0.2,"timidez":0.9,"curiosidad":0.5,"malGenio":0.15},"picaro":{"energia":0.65,"sociabilidad":0.6,"picardia":0.95,"timidez":0.15,"curiosidad":0.6,"malGenio":0.3},"dormilon":{"energia":0.15,"sociabilidad":0.45,"picardia":0.3,"timidez":0.35,"curiosidad":0.3,"malGenio":0.3},"carinoso":{"energia":0.5,"sociabilidad":0.95,"picardia":0.4,"timidez":0.3,"curiosidad":0.45,"malGenio":0.05},"curioso":{"energia":0.65,"sociabilidad":0.5,"picardia":0.45,"timidez":0.2,"curiosidad":0.95,"malGenio":0.2},"grunon":{"energia":0.45,"sociabilidad":0.25,"picardia":0.3,"timidez":0.2,"curiosidad":0.35,"malGenio":0.9},"electrico":{"energia":0.95,"sociabilidad":0.7,"picardia":0.65,"timidez":0.1,"curiosidad":0.75,"malGenio":0.35}})json";
 
@@ -130,7 +130,7 @@ struct FraseBase {
 constexpr int FRASES_POR_DIA = 10;
 constexpr int FRASES_SEPARACION_S = 900;
 
-constexpr int CANTIDAD_SITUACIONES_BASE = 20;
+constexpr int CANTIDAD_SITUACIONES_BASE = 39;
 inline const SituacionBase SITUACIONES_BASE[CANTIDAD_SITUACIONES_BASE] = {
     {"despertar", 80, 14400, false, 0, 19},
     {"buenas-noches", 70, 36000, false, 19, 9},
@@ -152,9 +152,28 @@ inline const SituacionBase SITUACIONES_BASE[CANTIDAD_SITUACIONES_BASE] = {
     {"clima-calor", 60, 21600, false, 112, 3},
     {"clima-lluvia", 60, 21600, false, 115, 3},
     {"clima-lindo", 40, 21600, false, 118, 3},
+    {"buen-dia", 100, 57600, false, 121, 6},
+    {"comiste", 80, 72000, false, 127, 5},
+    {"a-dormir", 90, 72000, false, 132, 4},
+    {"tardaste", 90, 72000, false, 136, 4},
+    {"agua", 100, 1800, true, 140, 4},
+    {"pausa", 100, 1800, true, 144, 3},
+    {"como-estas", 100, 3600, true, 147, 3},
+    {"animo-bien", 100, 0, true, 150, 3},
+    {"animo-medio", 100, 0, true, 153, 2},
+    {"animo-mal", 100, 0, true, 155, 3},
+    {"jugar", 100, 0, true, 158, 2},
+    {"gane", 100, 0, true, 160, 4},
+    {"perdi", 100, 0, true, 164, 3},
+    {"empate", 100, 0, true, 167, 2},
+    {"anio-nuevo", 100, 3600, true, 169, 2},
+    {"navidad", 100, 3600, true, 171, 1},
+    {"dia-del-amigo", 100, 3600, true, 172, 2},
+    {"dia-del-nino", 100, 3600, true, 174, 1},
+    {"aniversario", 100, 3600, true, 175, 2},
 };
 
-constexpr int CANTIDAD_FRASES_BASE = 121;
+constexpr int CANTIDAD_FRASES_BASE = 177;
 inline const FraseBase FRASES_BASE[CANTIDAD_FRASES_BASE] = {
     {"", "¡Buen día, {dueno}!"},
     {"", "¡Arriba! Hoy va a estar bueno."},
@@ -277,6 +296,62 @@ inline const FraseBase FRASES_BASE[CANTIDAD_FRASES_BASE] = {
     {"", "¡Qué lindo día!"},
     {"", "Hay sol. ¡Salí un rato!"},
     {"electrico", "¡Día espectacular!"},
+    {"", "¡Buen día, {dueno}! {clima}"},
+    {"", "¡Hola, {dueno}! {clima}"},
+    {"", "¡Buen día! {clima}"},
+    {"grunon", "Buen día. {clima}"},
+    {"electrico", "¡BUEN DÍA, {dueno}! {clima}"},
+    {"carinoso", "¡Buen día, {dueno}! Te extrañé. {clima}"},
+    {"", "¿Comiste, {dueno}?"},
+    {"", "¿Ya almorzaste?"},
+    {"", "No te olvides de comer."},
+    {"grunon", "¿Comiste o qué?"},
+    {"carinoso", "¿Comiste algo rico?"},
+    {"", "Ya es tarde, ¿nos vamos a dormir?"},
+    {"", "Uaah... ¿vamos a dormir?"},
+    {"dormilon", "¿A la cama ya? Dale."},
+    {"electrico", "¿Dormir? Bueno... un poco."},
+    {"", "¡Tardaste! Te estaba esperando."},
+    {"", "¿Dónde estabas? ¡Tardaste!"},
+    {"grunon", "Tarde. Como siempre."},
+    {"carinoso", "¡Por fin! Te esperé un montón."},
+    {"", "¿Tomaste agua?"},
+    {"", "Un vasito de agua, {dueno}."},
+    {"", "Hora de tomar agua."},
+    {"grunon", "Tomá agua. Ya."},
+    {"", "¡Pausa activa! Estirá un poco."},
+    {"", "Levantate un ratito, dale."},
+    {"", "Mucho rato quieto. ¡A moverse!"},
+    {"", "¿Cómo estás hoy?"},
+    {"", "¿Cómo andás, {dueno}?"},
+    {"carinoso", "¿Cómo estás, {dueno}? Contame."},
+    {"", "¡Qué bueno! Me alegra."},
+    {"", "¡Bien ahí!"},
+    {"electrico", "¡VAMOS!"},
+    {"", "Bueno, ya va a mejorar."},
+    {"", "Acá estoy si me necesitás."},
+    {"", "Uh... vení, te doy un abrazo."},
+    {"", "Acá estoy, {dueno}. Te quiero."},
+    {"", "Va a pasar. Estoy con vos."},
+    {"", "¡A jugar!"},
+    {"", "¡Dale, juguemos!"},
+    {"", "¡Gané!"},
+    {"", "¡Te gané, {dueno}!"},
+    {"grunon", "Obvio que gané."},
+    {"timido", "Gané... perdón."},
+    {"", "¡Ganaste!"},
+    {"", "Me ganaste. ¿Otra?"},
+    {"grunon", "Hiciste trampa."},
+    {"", "¡Empate!"},
+    {"", "Empatamos. ¿Otra?"},
+    {"", "¡Feliz año nuevo, {dueno}!"},
+    {"electrico", "¡FELIZ AÑO NUEVO!"},
+    {"", "¡Feliz Navidad, {dueno}!"},
+    {"", "¡Feliz día del amigo, {dueno}!"},
+    {"", "¡Sos mi mejor amigo!"},
+    {"", "¡Feliz día del niño! ¿Jugamos?"},
+    {"", "¡Hoy hace un año que estamos juntos!"},
+    {"", "¡Feliz aniversario, {dueno}!"},
 };
 
 }  // namespace sintetica

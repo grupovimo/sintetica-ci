@@ -398,7 +398,7 @@ PRUEBA("recordatorios: el broche se despierta del sueño profundo para el próxi
 // ---------------------------------------------------------------- modos
 
 PRUEBA("modo reloj: la hora grande con la cara chiquita; --:-- sin hora; un toque muestra la cara") {
-  arrancar("{\"version\":2,\"modo\":\"reloj\"}");
+  arrancar("{\"version\":2,\"modo\":\"reloj\",\"habla\":{\"frecuencia\":0},\"cuidado\":{\"animo\":false}}");
   correr(1000);
   VERIFICAR(g_s.panel() == Sistema::Panel::Reloj && g_s.fasePanel() >= 0.999f);
   const int sinHora = clarosEntre(85, 150);
