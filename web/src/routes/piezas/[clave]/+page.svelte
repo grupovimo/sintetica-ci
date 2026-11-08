@@ -24,7 +24,7 @@
   <div class="grano" aria-hidden="true"></div>
   <section class="cabeza">
     <div class="puntos" aria-hidden="true"></div>
-    <Cabecera usuario={data.usuario} base="/" />
+    <Cabecera usuario={data.usuario} base="/" soloLanding={data.soloLanding} />
     {#if p}
       <div class="contenedor detalle">
         <div class="foto-grande">

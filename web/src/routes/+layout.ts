@@ -9,12 +9,14 @@ export const trailingSlash = 'never';
 export async function load({ fetch, url }) {
   let usuario: Usuario | null = null;
   let desarrollo = false;
+  let soloLanding = false;
   try {
     const r = await fetch('/api/v1/sesion');
     if (r.ok) {
       const d = await r.json();
-      usuario = d.usuario;
-      desarrollo = d.desarrollo;
+      usuario = d.usuario ?? null;
+      desarrollo = !!d.desarrollo;
+      soloLanding = !!d.soloLanding;
     }
   } catch {
     /* la API no responde: se ve en cada página */
@@ -24,5 +26,5 @@ export async function load({ fetch, url }) {
   if (!usuario && !publica) {
     redirect(307, `/entrar?volver=${encodeURIComponent(url.pathname + url.search)}`);
   }
-  return { usuario, desarrollo };
+  return { usuario, desarrollo, soloLanding };
 }

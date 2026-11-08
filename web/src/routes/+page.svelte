@@ -163,7 +163,7 @@
   <!-- 1 · Portada -->
   <section class="portada">
     <div class="puntos" data-parallax="0.08" aria-hidden="true"></div>
-    <Cabecera usuario={data.usuario} />
+    <Cabecera usuario={data.usuario} soloLanding={data.soloLanding} />
 
     <div id="inicio" class="contenedor inicio">
       <h1 class="t-display aparece">Tu propio<br /><span class="cromo">robot.</span></h1>

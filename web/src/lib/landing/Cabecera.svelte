@@ -1,7 +1,7 @@
 <script lang="ts">
   // La barra de arriba de la landing y de las páginas de las piezas. En otra
   // página, los links llevan a las secciones de la landing.
-  let { usuario = null, base = '' }: { usuario?: unknown; base?: string } = $props();
+  let { usuario = null, base = '', soloLanding = false }: { usuario?: unknown; base?: string; soloLanding?: boolean } = $props();
 </script>
 
 <header class="contenedor nav">
@@ -12,7 +12,7 @@
   <nav aria-label="Secciones">
     <a class="ficha" href="{base}#piezas">Unidades</a>
     <a class="ficha" href="{base}#app">App</a>
-    <a class="ficha" href={usuario ? '/robots' : '/entrar'}>{usuario ? 'Mis robots' : 'Entrar'}</a>
+    {#if !soloLanding}<a class="ficha" href={usuario ? '/robots' : '/entrar'}>{usuario ? 'Mis robots' : 'Entrar'}</a>{/if}
   </nav>
   <a class="inflado" href="{base}#reservar">Reservar</a>
 </header>
