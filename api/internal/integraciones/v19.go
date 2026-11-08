@@ -35,6 +35,12 @@ type OpcionesV19 struct {
 	// ElevenLabsURL: vacía, la de siempre (los tests ponen un servidor falso).
 	// La clave de ElevenLabs es de cada usuario (voz.go).
 	ElevenLabsURL string
+	// La voz gratis (Edge TTS, edge.go): EdgeApagado la apaga en todo el
+	// servidor (EDGE_TTS=0); EdgeTope, caracteres por usuario por día
+	// (EDGE_TTS_TOPE, por defecto 3000). Las URLs, para los tests.
+	EdgeApagado           bool
+	EdgeTope              int
+	EdgeURL, EdgeVocesURL string
 }
 
 type estadoV19 struct {

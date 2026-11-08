@@ -17,6 +17,65 @@ func (s *Servidor) rutasVoz(m *http.ServeMux) {
 	m.HandleFunc("DELETE /v1/voz/elevenlabs", s.conSesion(s.borrarVoz))
 	m.HandleFunc("POST /v1/voz/elevenlabs/probar", s.conSesion(s.probarVoz))
 	m.HandleFunc("GET /v1/bichos/{id}/conversacion", s.conBicho(s.pedirConversacion))
+	m.HandleFunc("GET /v1/voz/edge", s.conSesion(s.verEdge))
+	m.HandleFunc("PUT /v1/voz/edge", s.conSesion(s.guardarEdge))
+	m.HandleFunc("POST /v1/voz/edge/probar", s.conSesion(s.probarEdge))
+}
+
+// GET /v1/voz/edge → {disponible, prendida, voz, voces: [{id, nombre, idioma,
+// genero}], usados_hoy, tope}: la voz gratis.
+func (s *Servidor) verEdge(w http.ResponseWriter, r *http.Request) {
+	e, err := s.integ.EstadoEdge(r.Context(), usuarioDe(r).Usuario.ID, true)
+	if err != nil {
+		s.interno(w, err)
+		return
+	}
+	responder(w, http.StatusOK, e)
+}
+
+// PUT /v1/voz/edge {prendida?, voz?}.
+func (s *Servidor) guardarEdge(w http.ResponseWriter, r *http.Request) {
+	var p integraciones.CambiosEdge
+	if !leerJSON(w, r, 1024, &p) {
+		return
+	}
+	u := usuarioDe(r).Usuario.ID
+	if !s.limites.permitir("voz:"+u, 30, time.Hour) {
+		fallar(w, http.StatusTooManyRequests, "cambiaste mucho la voz: esperá un poco")
+		return
+	}
+	if !s.integ.EdgeActivo() {
+		fallar(w, http.StatusServiceUnavailable, integraciones.ErrEdgeApagado.Error())
+		return
+	}
+	if err := s.integ.CambiarEdge(r.Context(), u, p); err != nil {
+		s.fallarVoz(w, err)
+		return
+	}
+	s.verEdge(w, r)
+}
+
+// POST /v1/voz/edge/probar {texto?} → audio/mpeg.
+func (s *Servidor) probarEdge(w http.ResponseWriter, r *http.Request) {
+	var p struct {
+		Texto string `json:"texto"`
+	}
+	if r.ContentLength != 0 && !leerJSON(w, r, 4096, &p) {
+		return
+	}
+	u := usuarioDe(r).Usuario.ID
+	if !s.limites.permitir("voz-probar:"+u, 10, time.Minute) {
+		fallar(w, http.StatusTooManyRequests, "probaste muchas veces: esperá un poco")
+		return
+	}
+	audio, err := s.integ.ProbarEdge(r.Context(), u, p.Texto)
+	if err != nil {
+		s.fallarVoz(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "audio/mpeg")
+	w.WriteHeader(http.StatusOK)
+	w.Write(audio) //nolint:errcheck
 }
 
 // fallarVoz: el error de ElevenLabs con su código.
@@ -28,7 +87,9 @@ func (s *Servidor) fallarVoz(w http.ResponseWriter, err error) {
 		fallar(w, http.StatusBadRequest, integraciones.MensajeVoz(err))
 	case errors.Is(err, integraciones.ErrSinElevenLabs):
 		fallar(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, integraciones.ErrTopeCaracteres), errors.Is(err, integraciones.ErrTopeMinutos):
+	case errors.Is(err, integraciones.ErrEdgeApagado):
+		fallar(w, http.StatusServiceUnavailable, err.Error())
+	case errors.Is(err, integraciones.ErrTopeCaracteres), errors.Is(err, integraciones.ErrTopeMinutos), errors.Is(err, integraciones.ErrTopeEdge):
 		fallar(w, http.StatusTooManyRequests, err.Error())
 	default:
 		s.log.Info("elevenlabs", "error", err)

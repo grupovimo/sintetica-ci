@@ -4,7 +4,7 @@ package integraciones
 // cifrada en la base y solo sale de la nube en el encabezado xi-api-key
 // hacia api.elevenlabs.io. Acá está el cliente HTTP y la cuenta (conectar,
 // voces, topes); lo de leer en voz alta en voz.go y la conversación en
-// tiempo real en conversacion.go. Ver docs/nube.md, "Voz con ElevenLabs".
+// tiempo real en conversacion.go. Ver docs/nube.md, "Voz".
 
 import (
 	"bytes"

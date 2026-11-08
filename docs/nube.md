@@ -738,15 +738,15 @@ el tope de 60 por día por usuario es el mismo. Sin ninguno, `GET /v1/charla` �
   cuandos (no le reenvía el `0x49`: ya se lo dijo a su núcleo).
 - SSE `charla` (`{texto, expresion, de, enviado}`).
 
-### Voz con ElevenLabs (cada usuario con su cuenta)
+### Voz: ElevenLabs (cada usuario con su cuenta) y la voz gratis (Edge)
 
 Código: `api/internal/integraciones/elevenlabs.go` (el cliente y la cuenta),
 `voz.go` (leer en voz alta) y `conversacion.go` (en tiempo real); las rutas en
 `servidor/voz.go`, el MCP en `servidor/mcp_voz.go`; migración
 `013_elevenlabs.sql`. **No hay clave del servidor**: cada usuario pega la suya
 (elevenlabs.io → API Keys, con permisos de Voces, Texto a voz y Agentes) y la
-factura le llega a él. Sin clave, todo sigue igual: el robot-celu usa su voz
-local y los demás no hablan. Todo verificado en elevenlabs.io/docs.
+factura le llega a él. Sin clave, lee la voz gratis (Edge TTS, abajo) y, si
+esa falla, el robot usa su voz propia. Lo de ElevenLabs, verificado en elevenlabs.io/docs.
 
 - **La clave** va **cifrada** en `elevenlabs_cuentas` (`api/internal/cifra`,
   como Spotify, con su derivación `elevenlabs`; si `SECRETO` cambia, hay que
@@ -774,26 +774,59 @@ local y los demás no hablan. Todo verificado en elevenlabs.io/docs.
   conectado, la voz y lo usado hoy; `probar`: el robot lo dice con su voz).
   Nunca ve ni cambia la clave.
 
-**Leer en voz alta.** Con la cuenta conectada y `leer` prendido, en los robots
-con parlante (hoy el perfil `celu`, `integraciones.PerfilesConParlante`):
+**La voz gratis: Edge TTS** (`api/internal/edgetts`, migración
+`014_voz_edge.sql`). Las voces neuronales de Microsoft Edge ("leer en voz
+alta"), sin clave: la que usa por defecto xiaozhi-esp32-server. **No es un
+servicio oficial**: Microsoft lo puede cambiar o cortar cuando quiera. Por eso
+está aislado en su paquete (un websocket a
+`speech.platform.bing.com/…/readaloud/edge/v1` con un SSML de ida y el mp3 de
+vuelta), en Go puro, con el protocolo del paquete abierto
+[edge-tts](https://github.com/rany2/edge-tts) (`constants.py`, `drm.py` y
+`communicate.py`), y si falla el robot usa su voz propia **en silencio**, con un
+log `voz: Edge TTS no leyó` y nada más.
+
+- Prendida por defecto para todos, con `es-AR-ElenaNeural`. `GET /v1/voz/edge`
+  → `{"disponible", "prendida", "voz", "voces": [{id, nombre, idioma, genero}]`
+  (las `es-*`; la lista se lee cada 6 h y, si falla, quedan las dos de
+  Argentina)`, "usados_hoy", "tope"}`. `PUT /v1/voz/edge {"prendida"?, "voz"?}`
+  (una `es-*` de la lista; 400 si no). `POST /v1/voz/edge/probar {"texto"?}` →
+  `audio/mpeg` (502 si el servicio no contesta).
+- `EDGE_TTS=0` la apaga en todo el servidor (`GET` → `{"disponible": false}`).
+  Tope de **3000 caracteres por usuario por día** (`EDGE_TTS_TOPE`;
+  `voz_edge_uso`) y **4 a la vez** en todo el servidor, para no abusar.
+- Formato `audio-24khz-48kbitrate-mono-mp3` (6 KB por segundo): también mp3,
+  el mismo formato 1 del paquete de audio, así el robot reproduce uno solo.
+- **Si Microsoft lo cambia** (el síntoma: `voz: Edge TTS no leyó` con un 403 o
+  "se cortó" en el log): mirá los últimos cambios de `constants.py` y `drm.py`
+  en edge-tts. Lo que suele cambiar es la versión de Chromium
+  (`edgetts.VersionChromium`) y el token `Sec-MS-GEC` (`edgetts/gec.go`, hoy
+  la v2, de octubre de 2026). Con un 403 se corrige solo la hora con el `Date`
+  de ellos y reintenta una vez. Para probar contra el de verdad, a mano:
+  `EDGE_TTS_REAL=1 go test -run TestReal ./api/internal/edgetts/`.
+
+**Leer en voz alta.** En los robots con parlante (hoy el perfil `celu`,
+`integraciones.PerfilesConParlante`), la voz, en orden: **1)** ElevenLabs, si el
+dueño conectó su cuenta y dejó prendido `leer` (si falla o se llenó su tope,
+sigue con la 2); **2)** Edge TTS, si está prendida (por defecto sí); **3)** nada:
+el robot usa su voz propia (el robot-celu, su TTS local).
 
 - Todo 0x40 Decir que la nube le manda (charla, `POST decir`, automatizaciones
   `decir`, Telegram, MCP `decir` y `voz`) pasa por `nube.Enviar`, que se lo
   da a `integraciones.TomarDecir`: una cola por robot (en orden, hasta 8) pide
-  el audio (`POST /v1/text-to-speech/{voz}?output_format=mp3_22050_32`, modelo
-  **`eleven_flash_v2_5`**: ~100 ms y multilingüe, el que sirve en el texto a
-  voz común —`eleven_v4_turbo` va solo por su websocket de diálogo— y la mitad
-  de precio por carácter), lo publica en `bicho/{id}/audio` y **enseguida**
-  manda el 0x40: llegan juntos. Si ElevenLabs falla o tarda más de 8 s, el
-  0x40 sale solo.
+  el audio (ElevenLabs: `POST /v1/text-to-speech/{voz}?output_format=mp3_22050_32`,
+  modelo **`eleven_flash_v2_5`**: ~100 ms y multilingüe, el que sirve en el
+  texto a voz común —`eleven_v4_turbo` va solo por su websocket de diálogo— y
+  la mitad de precio por carácter), lo publica en `bicho/{id}/audio` y
+  **enseguida** manda el 0x40: llegan juntos. Si ninguna voz contesta en 8 s,
+  el 0x40 sale solo.
 - Los globos que el robot muestra solo y la nube conoce: el **recordatorio**
   (evento `recordatorio`: el texto de `recordatorios[i]`) y el
   **despertador** (`despertador.texto`, también cuando lo despierta la nube),
   con `{dueno}` y `{robot}` reemplazados; cada uno, una vez (no se repite en 3
   minutos). Las frases propias (`habla`) no: el estado solo dice `globo`, sin
   el texto.
-- El formato: mp3 mono de 22,05 kHz a 32 kbps (4 KB por segundo: un globo de
-  10 s son unos 40 KB, un solo paquete) en el paquete **tipo 2** de
+- El formato: mp3 mono (ElevenLabs a 22,05 kHz y 32 kbps, Edge a 24 kHz y 48
+  kbps: un globo de 10 s son de 40 a 60 KB, un solo paquete) en el paquete **tipo 2** de
   `docs/protocolo-ble.md`, "Voz". Al conectarse (y cuando cambia la cuenta),
   el robot recibe el **tipo 3** (si la nube lee sus globos): así el
   robot-celu espera el audio de sus recordatorios en vez de usar su voz local.

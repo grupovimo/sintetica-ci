@@ -188,6 +188,8 @@ func correr(log *slog.Logger) error {
 			SpotifyID: os.Getenv("SPOTIFY_CLIENT_ID"), SpotifySecreto: os.Getenv("SPOTIFY_CLIENT_SECRET"),
 			AnthropicClave: os.Getenv("ANTHROPIC_API_KEY"), AnthropicModelo: os.Getenv("CHARLA_MODELO"),
 			CharlaURL: os.Getenv("CHARLA_URL"), CharlaClave: os.Getenv("CHARLA_CLAVE"),
+			// La voz gratis (Edge TTS): prendida salvo EDGE_TTS=0.
+			EdgeApagado: env("EDGE_TTS", "1") == "0", EdgeTope: numero(log, "EDGE_TTS_TOPE", integraciones.TopeEdgePorDefecto),
 		},
 	}, alm, n, hub, log)
 	n.Escuchar(integ)

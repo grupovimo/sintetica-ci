@@ -45,6 +45,8 @@ x-api-entorno: &api-entorno
   CHARLA_URL: ${CHARLA_URL:-}
   CHARLA_CLAVE: ${CHARLA_CLAVE:-}
   CHARLA_MODELO: ${CHARLA_MODELO:-}
+  EDGE_TTS: ${EDGE_TTS:-1}
+  EDGE_TTS_TOPE: ${EDGE_TTS_TOPE:-3000}
 
 services:
   postgres:

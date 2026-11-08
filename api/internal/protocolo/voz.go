@@ -22,7 +22,7 @@ const (
 
 // Formatos de AudioEntero.
 const (
-	FormatoMP3 = 1 // mp3 mono de 22,05 kHz y 32 kbps (mp3_22050_32 de ElevenLabs)
+	FormatoMP3 = 1 // mp3 mono: 22,05 kHz y 32 kbps (ElevenLabs) o 24 kHz y 48 kbps (Edge)
 )
 
 // Orígenes de AudioEntero: a qué globo acompaña.

@@ -7,7 +7,7 @@ package integraciones
 // en 15 minutos y el cliente (la web con el SDK de JS, el robot-celu) habla
 // directo con ElevenLabs: la clave nunca sale de la nube. Las client tools
 // (poner_expresion y mirar) las ejecuta el cliente contra su robot. Tope:
-// minutos por día que elige el usuario. Ver docs/nube.md, "Voz con ElevenLabs".
+// minutos por día que elige el usuario. Ver docs/nube.md, "Voz".
 
 import (
 	"context"
@@ -383,7 +383,7 @@ func (i *Integraciones) ConversacionMQTT(bicho string, datos []byte) {
 
 // MensajeVoz: el error para mostrar (sin detalles internos).
 func MensajeVoz(err error) string {
-	for _, e := range []error{ErrSinElevenLabs, ErrClaveElevenLabs, ErrPermisoEleven, ErrVozElevenLabs, ErrTopeCaracteres, ErrTopeMinutos, ErrElevenLabsCaido} {
+	for _, e := range []error{ErrSinElevenLabs, ErrClaveElevenLabs, ErrPermisoEleven, ErrVozElevenLabs, ErrTopeCaracteres, ErrTopeMinutos, ErrElevenLabsCaido, ErrTopeEdge, ErrEdgeCaido, ErrEdgeApagado} {
 		if errors.Is(err, e) {
 			return e.Error()
 		}

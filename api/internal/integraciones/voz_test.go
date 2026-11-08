@@ -3,17 +3,22 @@ package integraciones
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
+
+	"sintetica/api/internal/edgetts"
 	"sintetica/api/internal/eventos"
 	"sintetica/api/internal/protocolo"
 )
@@ -150,6 +155,42 @@ func (r *robotsConParlante) lista() []string {
 	return append([]string(nil), r.publicados...)
 }
 
+// edgeFalso: el servicio de Edge (como en edgetts/edgetts_test.go): devuelve
+// "ID3edge:<voz>".
+func edgeFalso(t *testing.T, falla *atomic.Bool) *httptest.Server {
+	up := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+	vozDe := regexp.MustCompile(`voice name='([^']+)'`)
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/voces" {
+			io.WriteString(w, `[{"ShortName":"es-AR-ElenaNeural","FriendlyName":"Microsoft Elena Online (Natural) - Spanish (Argentina)","Locale":"es-AR","Gender":"Female"},
+				{"ShortName":"es-AR-TomasNeural","FriendlyName":"Microsoft Tomas Online (Natural) - Spanish (Argentina)","Locale":"es-AR","Gender":"Male"},
+				{"ShortName":"en-US-EmmaMultilingualNeural","FriendlyName":"Microsoft Emma","Locale":"en-US","Gender":"Female"}]`) //nolint:errcheck
+			return
+		}
+		if falla.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		ws, err := up.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer ws.Close()
+		ws.ReadMessage() //nolint:errcheck
+		_, p, _ := ws.ReadMessage()
+		v := vozDe.FindStringSubmatch(string(p))
+		if v == nil {
+			return
+		}
+		cab := "X-RequestId:x\r\nContent-Type:audio/mpeg\r\nPath:audio\r\n"
+		m := append(binary.BigEndian.AppendUint16(nil, uint16(len(cab))), cab...)
+		ws.WriteMessage(websocket.BinaryMessage, append(m, "ID3edge:"+v[1]...))                    //nolint:errcheck
+		ws.WriteMessage(websocket.TextMessage, []byte("X-RequestId:x\r\nPath:turn.end\r\n\r\n{}")) //nolint:errcheck
+	}))
+	t.Cleanup(s.Close)
+	return s
+}
+
 func esperar(t *testing.T, que string, f func() bool) {
 	t.Helper()
 	for k := 0; k < 300; k++ {
@@ -170,15 +211,51 @@ func TestVozElevenLabs(t *testing.T) {
 	_, otro := usuarioConBicho(t, a)
 	rs := &robotsConParlante{robotsFalsos: robotsFalsos{duenos: map[string]string{id: u.ID, otro: "x"},
 		estados: map[string]protocolo.Estado{id: {Perfil: "celu", Nombre: "Pipo"}, otro: {Perfil: "dev-147b"}}}}
-	i := Nuevo(Opciones{V19: OpcionesV19{Secreto: []byte("secreto de prueba 1234"), ElevenLabsURL: el.URL}}, a, rs, eventos.Nuevo(), sinLog)
+	var edgeFalla atomic.Bool
+	ed := edgeFalso(t, &edgeFalla)
+	i := Nuevo(Opciones{V19: OpcionesV19{Secreto: []byte("secreto de prueba 1234"), ElevenLabsURL: el.URL,
+		EdgeURL: "ws" + strings.TrimPrefix(ed.URL, "http") + "/edge/v1", EdgeVocesURL: ed.URL + "/voces"}}, a, rs, eventos.Nuevo(), sinLog)
 	fijo := time.Date(2026, 11, 8, 15, 0, 0, 0, time.UTC)
 	i.v19.ahora = func() time.Time { return fijo }
 
-	// Sin cuenta: no se queda con nada.
+	// Sin ElevenLabs: la voz gratis (Edge), con la de Argentina.
 	m, _ := protocolo.Decir("Hola Ana", "")
-	if i.TomarDecir(id, m, func() error { return nil }) {
-		t.Fatal("sin ElevenLabs no lee")
+	if !i.TomarDecir(id, m, func() error { rs.anotar("cmd"); return nil }) {
+		t.Fatal("sin ElevenLabs lee con Edge")
 	}
+	esperar(t, "el globo con Edge", func() bool { l := rs.lista(); return len(l) == 2 && l[1] == "cmd" })
+	if tr, _ := protocolo.LeerTrozoAudio([]byte(strings.TrimPrefix(rs.lista()[0], "audio "))); string(tr.Datos) != "ID3edge:es-AR-ElenaNeural" {
+		t.Fatalf("edge: %q", tr.Datos)
+	}
+	// Si Edge falla, el globo sale igual, sin audio (el robot usa su voz).
+	edgeFalla.Store(true)
+	i.TomarDecir(id, m, func() error { rs.anotar("cmd"); return nil })
+	esperar(t, "el globo sin Edge", func() bool { return len(rs.lista()) == 3 })
+	if rs.lista()[2] != "cmd" {
+		t.Fatalf("con Edge caído: %q", rs.lista())
+	}
+	edgeFalla.Store(false)
+	// Otra voz es-*, sí; una que no está o que no es es-*, no.
+	if g, _ := i.EstadoEdge(ctx, u.ID, true); g["prendida"] != true || g["voz"] != "es-AR-ElenaNeural" || len(g["voces"].([]edgetts.Voz)) != 2 ||
+		g["usados_hoy"] != 16 || g["tope"] != TopeEdgePorDefecto {
+		t.Fatalf("estado edge: %v", g)
+	}
+	for _, v := range []string{"en-US-EmmaMultilingualNeural", "es-AR-PepeNeural", "x'><y"} {
+		var cv ErrCambioVoz
+		if err := i.CambiarEdge(ctx, u.ID, CambiosEdge{Voz: &v}); !errors.As(err, &cv) {
+			t.Errorf("voz edge %q: %v", v, err)
+		}
+	}
+	tomas := "es-AR-TomasNeural"
+	if err := i.CambiarEdge(ctx, u.ID, CambiosEdge{Voz: &tomas}); err != nil {
+		t.Fatal(err)
+	}
+	if mp3, err := i.ProbarEdge(ctx, u.ID, ""); err != nil || string(mp3) != "ID3edge:es-AR-TomasNeural" {
+		t.Fatalf("probar edge: %q %v", mp3, err)
+	}
+	rs.pmu.Lock()
+	rs.publicados = nil
+	rs.pmu.Unlock()
 	if e, _ := i.EstadoVoz(ctx, u.ID, true); e["conectado"] != false || e["tope"] != TopeCaracteresPorDefecto {
 		t.Fatalf("estado sin cuenta: %v", e)
 	}
@@ -233,15 +310,16 @@ func TestVozElevenLabs(t *testing.T) {
 	if i.TomarDecir(otro, m, func() error { return nil }) {
 		t.Fatal("sin parlante no lee")
 	}
-	// Con el tope del día lleno, el globo sale igual, sin audio.
+	// Con el tope de ElevenLabs lleno, lee la voz gratis.
 	diez := 10
 	if err := i.ConectarVoz(ctx, u.ID, CambiosVoz{Tope: &diez}); err != nil {
 		t.Fatal(err)
 	}
 	antes := len(rs.lista())
 	i.TomarDecir(id, m, func() error { rs.anotar("cmd"); return nil })
-	esperar(t, "el globo sin audio", func() bool { return len(rs.lista()) == antes+1 })
-	if rs.lista()[antes] != "cmd" {
+	esperar(t, "el globo con Edge", func() bool { return len(rs.lista()) == antes+2 })
+	if tr, _ := protocolo.LeerTrozoAudio([]byte(strings.TrimPrefix(rs.lista()[antes], "audio "))); string(tr.Datos) != "ID3edge:es-AR-TomasNeural" ||
+		rs.lista()[antes+1] != "cmd" {
 		t.Fatalf("con el tope lleno: %q", rs.lista()[antes:])
 	}
 	cinco := 5000
@@ -267,13 +345,19 @@ func TestVozElevenLabs(t *testing.T) {
 		t.Fatal("el recordatorio se repitió")
 	}
 
-	// Apagada la llave, no lee; el aviso se lo dice al robot.
+	// Apagadas las dos, no lee; el aviso se lo dice al robot.
 	no := false
 	if err := i.ConectarVoz(ctx, u.ID, CambiosVoz{Leer: &no}); err != nil {
 		t.Fatal(err)
 	}
+	if !i.TomarDecir(id, m, func() error { return nil }) {
+		t.Fatal("sin leer de ElevenLabs, lee Edge")
+	}
+	if err := i.CambiarEdge(ctx, u.ID, CambiosEdge{Prendida: &no}); err != nil {
+		t.Fatal(err)
+	}
 	if i.TomarDecir(id, m, func() error { return nil }) {
-		t.Fatal("con leer apagado no lee")
+		t.Fatal("con las dos apagadas no lee")
 	}
 	esperar(t, "el aviso de voz", rs.avisoApagado)
 

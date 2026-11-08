@@ -6,6 +6,7 @@ require (
 	github.com/anthropics/anthropic-sdk-go v1.84.0
 	github.com/eclipse/paho.mqtt.golang v1.5.0
 	github.com/google/jsonschema-go v0.4.3
+	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/mochi-mqtt/server/v2 v2.7.9
 	github.com/modelcontextprotocol/go-sdk v1.8.0
@@ -19,7 +20,6 @@ require (
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/invopop/jsonschema v0.14.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

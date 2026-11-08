@@ -61,7 +61,18 @@ func TestVozHTTP(t *testing.T) {
 	hub := eventos.Nuevo()
 	n := nube.Nuevo(nube.Opciones{}, alm, hub, log)
 	t.Cleanup(n.Cerrar)
-	i := integraciones.Nuevo(integraciones.Opciones{V19: integraciones.OpcionesV19{Secreto: []byte("secreto de prueba 1234"), ElevenLabsURL: el.URL}}, alm, n, hub, log)
+	// La voz gratis: solo la lista de voces (los robots no están conectados).
+	edge := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/voces" {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		io.WriteString(w, `[{"ShortName":"es-AR-ElenaNeural","FriendlyName":"Microsoft Elena Online (Natural) - Spanish (Argentina)","Locale":"es-AR","Gender":"Female"},
+			{"ShortName":"es-MX-DaliaNeural","FriendlyName":"Microsoft Dalia Online (Natural) - Spanish (Mexico)","Locale":"es-MX","Gender":"Female"}]`) //nolint:errcheck
+	}))
+	defer edge.Close()
+	i := integraciones.Nuevo(integraciones.Opciones{V19: integraciones.OpcionesV19{Secreto: []byte("secreto de prueba 1234"), ElevenLabsURL: el.URL,
+		EdgeURL: "ws" + strings.TrimPrefix(edge.URL, "http") + "/edge/v1", EdgeVocesURL: edge.URL + "/voces"}}, alm, n, hub, log)
 	n.UsarVoz(i)
 	s := Nuevo(Opciones{WebURL: webPrueba, URLPublica: apiPrueba, Secreto: []byte("secreto de prueba 1234")}, alm, n, i, hub, nil, nil, log)
 	h := s.Rutas()
@@ -129,6 +140,23 @@ func TestVozHTTP(t *testing.T) {
 	}
 	if cod, _ := pedir(t, h, token, "GET", "/v1/bichos/"+bichos[0]+"/conversacion", ""); cod != http.StatusNotFound {
 		t.Fatalf("conversación sin cuenta: %d", cod)
+	}
+	// La voz gratis: prendida por defecto con una de Argentina; otra es-*, sí.
+	if cod, v := pedir(t, h, token, "GET", "/v1/voz/edge", ""); cod != 200 || v["disponible"] != true || v["prendida"] != true ||
+		v["voz"] != "es-AR-ElenaNeural" || len(v["voces"].([]any)) != 2 {
+		t.Fatalf("GET edge: %d %v", cod, v)
+	}
+	if cod, v := pedir(t, h, token, "PUT", "/v1/voz/edge", `{"voz":"es-MX-DaliaNeural","prendida":false}`); cod != 200 || v["prendida"] != false || v["voz"] != "es-MX-DaliaNeural" {
+		t.Fatalf("PUT edge: %d %v", cod, v)
+	}
+	for _, c := range []string{`{"voz":"en-US-EmmaMultilingualNeural"}`, `{"voz":"es-AR-NoexisteNeural"}`, `{"otra":1}`} {
+		if cod, _ := pedir(t, h, token, "PUT", "/v1/voz/edge", c); cod != http.StatusBadRequest {
+			t.Errorf("PUT edge %s: %d", c, cod)
+		}
+	}
+	// Si el servicio no contesta, 502 (y nada más se rompe).
+	if cod, _ := pedir(t, h, token, "POST", "/v1/voz/edge/probar", ""); cod != http.StatusBadGateway {
+		t.Fatalf("probar edge caído: %d", cod)
 	}
 	if cod, _ := pedir(t, h, "", "GET", "/v1/voz/elevenlabs", ""); cod != http.StatusUnauthorized {
 		t.Fatalf("sin sesión: %d", cod)
