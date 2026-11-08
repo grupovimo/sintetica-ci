@@ -480,11 +480,13 @@ private val ALTO_JACK = Modifier.height(1.dp)
  */
 @Composable
 fun EscucharCelu(vm: RobotViewModel) {
-    if (vm.via != Via.NUBE) return
+    if (vm.via == Via.DEMO) return
+    // Por la nube, el id del robot; de cerca, "cerca:<id>" (va directo por BLE mientras está conectado).
+    val clave = if (vm.via == Via.NUBE) vm.idRobot else com.sinteticalabs.app.datos.AvisosCelu.claveCerca(vm.idRobot)
     val contexto = androidx.compose.ui.platform.LocalContext.current
     val c by vm.config.collectAsState()
     val avisos = Acompanar.avisos(c)
-    var prendido by remember { mutableStateOf(com.sinteticalabs.app.datos.AvisosCelu.prendido(contexto, vm.idRobot)) }
+    var prendido by remember { mutableStateOf(com.sinteticalabs.app.datos.AvisosCelu.prendido(contexto, clave)) }
     var permiso by remember { mutableStateOf(com.sinteticalabs.app.datos.AvisosCelu.permiso(contexto)) }
     var explicando by remember { mutableStateOf(false) }
     // Al volver de los ajustes del sistema, se mira de nuevo.
@@ -494,13 +496,13 @@ fun EscucharCelu(vm: RobotViewModel) {
         dueno.lifecycle.addObserver(o)
         onDispose { dueno.lifecycle.removeObserver(o) }
     }
-    LaunchedEffect(avisos) { com.sinteticalabs.app.datos.AvisosCelu.actualizar(contexto, vm.idRobot, avisos) }
+    LaunchedEffect(avisos) { com.sinteticalabs.app.datos.AvisosCelu.actualizar(contexto, clave, avisos) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Llave("Este celu avisa", prendido && permiso, {
             if (!permiso) explicando = true
             else {
                 prendido = !prendido
-                com.sinteticalabs.app.datos.AvisosCelu.poner(contexto, vm.idRobot, if (prendido) avisos else null)
+                com.sinteticalabs.app.datos.AvisosCelu.poner(contexto, clave, if (prendido) avisos else null)
             }
         }, Modifier.weight(1f), habilitada = avisos.isNotEmpty())
         if (prendido && !permiso) Grabado("Sin permiso", color = C.sobrePlaca)
@@ -513,7 +515,7 @@ fun EscucharCelu(vm: RobotViewModel) {
             Tecla("Dar permiso", {
                 explicando = false
                 prendido = true
-                com.sinteticalabs.app.datos.AvisosCelu.poner(contexto, vm.idRobot, avisos)
+                com.sinteticalabs.app.datos.AvisosCelu.poner(contexto, clave, avisos)
                 runCatching { contexto.startActivity(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
             }, Modifier.fillMaxWidth(), acabado = Acabado.NARANJA)
             Tecla("Ahora no", { explicando = false }, Modifier.fillMaxWidth(), acabado = Acabado.NEGRA)

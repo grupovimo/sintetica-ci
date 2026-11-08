@@ -11,10 +11,15 @@ data class Accion(
     val texto: String? = null,      // telegram (con plantillas)
     val url: String? = null,        // webhook
     val robot: String? = null,      // robot: otro del mismo dueño ("bicho" en el JSON)
-    val expresion: String? = null,
+    val expresion: String? = null,  // robot, cara y decir (opcional)
+    val modo: String? = null,       // modo
 )
 
-data class Automatizacion(val id: String, val activa: Boolean, val cuando: String, val valor: String? = null, val hacer: List<Accion>)
+/** cuando "hora": a esa hora (HH:MM) los días que diga (L M X J V S D; null = todos). */
+data class Automatizacion(
+    val id: String, val activa: Boolean, val cuando: String, val valor: String? = null, val hacer: List<Accion>,
+    val hora: String? = null, val dias: String? = null,
+)
 
 data class Ejecucion(val evento: String, val accion: String, val ok: Boolean, val detalle: String, val en: String)
 
@@ -24,11 +29,23 @@ object Automatizaciones {
     const val MAXIMO = 20
     const val MAX_ACCIONES = 4
     val CUANDOS_DE_FABRICA = listOf("recordatorio", "bateria-baja", "desconectado", "conectado", "despierta", "duerme", "expresion")
-    val ACCIONES = listOf("telegram" to "Telegram", "webhook" to "URL", "robot" to "Otro robot")
+    /** Los que no dependen de lo que detecte la nube: van siempre primero. */
+    val CUANDOS_FIJOS = listOf("hora", "despertador")
+    val ACCIONES = listOf(
+        "decir" to "Decir", "cara" to "Cara", "modo" to "Modo", "despertar" to "Despertar",
+        "telegram" to "Telegram", "webhook" to "URL", "robot" to "Otro robot",
+    )
+    val MODOS = listOf("mascota" to "Compañía", "reloj" to "Reloj", "pomodoro" to "Pomodoro", "clima" to "Clima")
     val CARAS = listOf("contento", "sorpresa", "enamorado", "guino", "triste", "pensando", "dormido")
-    const val PLANTILLAS = "{robot} {bateria} {expresion} {texto} {hora}"
+    val PLANTILLAS = listOf("{robot}", "{dueno}", "{texto}", "{hora}", "{clima}", "{temp}", "{max}", "{min}", "{ciudad}", "{bateria}", "{expresion}")
+    private val DIAS = listOf("L", "M", "X", "J", "V", "S", "D")
+
+    /** Lo que se elige en "Cuando": la hora y el despertador, y lo que la API dice que detecta. */
+    fun cuandos(deLaApi: List<String>) = (CUANDOS_FIJOS + deLaApi).distinct()
 
     val NOMBRES_CUANDO = mapOf(
+        "hora" to "A una hora", "despertador" to "Suena el despertador", "juego" to "Termina un juego", "animo" to "Te pregunta cómo estás",
+        "bicho-cerca" to "Otro robot cerca",
         "recordatorio" to "Un recordatorio", "pomodoro" to "Fin de tanda", "bateria-baja" to "Poca batería",
         "desconectado" to "Se desconecta", "conectado" to "Se conecta", "despierta" to "Se despierta", "duerme" to "Se duerme",
         "expresion" to "Cambia de cara", "tacto" to "Lo tocan", "doble-toque" to "Doble toque", "caricia" to "Una caricia",
@@ -50,8 +67,10 @@ object Automatizaciones {
                 valor = a.texto("valor")?.takeIf { it.isNotEmpty() },
                 hacer = a.lista("hacer").orEmpty().mapNotNull { h ->
                     val x = h as? JsonObject ?: return@mapNotNull null
-                    Accion(x.texto("tipo").orEmpty(), x.texto("texto"), x.texto("url"), x.texto("bicho"), x.texto("expresion"))
+                    Accion(x.texto("tipo").orEmpty(), x.texto("texto"), x.texto("url"), x.texto("bicho"), x.texto("expresion"), x.texto("modo"))
                 },
+                hora = a.texto("hora")?.takeIf { it.isNotEmpty() },
+                dias = a.texto("dias")?.takeIf { it.isNotEmpty() },
             )
         }
         val historial = o.lista("historial").orEmpty().mapNotNull { e ->
@@ -67,12 +86,20 @@ object Automatizaciones {
         put("activa", a.activa)
         put("cuando", a.cuando)
         if (a.cuando == "expresion" && !a.valor.isNullOrEmpty()) put("valor", a.valor)
+        if (a.cuando == "hora") {
+            put("hora", a.hora ?: "08:00")
+            if (!a.dias.isNullOrEmpty() && a.dias.length < 7) put("dias", a.dias)
+        }
         put("hacer", JsonArray(a.hacer.map { h ->
             buildJsonObject {
                 put("tipo", h.tipo)
                 when (h.tipo) {
                     "telegram" -> put("texto", h.texto.orEmpty())
                     "webhook" -> put("url", h.url.orEmpty())
+                    "decir" -> { put("texto", h.texto?.ifEmpty { null } ?: "¡Hola!"); if (!h.expresion.isNullOrEmpty()) put("expresion", h.expresion) }
+                    "cara" -> put("expresion", h.expresion ?: "contento")
+                    "modo" -> put("modo", h.modo ?: "reloj")
+                    "despertar" -> {}
                     else -> { put("bicho", h.robot.orEmpty()); put("expresion", h.expresion ?: "contento") }
                 }
             }
@@ -89,11 +116,26 @@ object Automatizaciones {
     fun accionNueva(tipo: String, otro: String?): Accion = when (tipo) {
         "telegram" -> Accion(tipo, texto = "{robot}: {evento}")
         "webhook" -> Accion(tipo, url = "https://")
+        "decir" -> Accion(tipo, texto = "Buen día, {dueno}: {clima}")
+        "cara" -> Accion(tipo, expresion = "contento")
+        "modo" -> Accion(tipo, modo = "reloj")
+        "despertar" -> Accion(tipo)
         else -> Accion("robot", robot = otro.orEmpty(), expresion = "contento")
     }
 
     /** Cambia el "cuando"; el valor solo vale para "Cambia de cara". */
-    fun conCuando(a: Automatizacion, cuando: String) = a.copy(cuando = cuando, valor = if (cuando == "expresion") a.valor else null)
+    fun conCuando(a: Automatizacion, cuando: String) = a.copy(
+        cuando = cuando, valor = if (cuando == "expresion") a.valor else null,
+        hora = if (cuando == "hora") a.hora ?: "08:00" else null, dias = if (cuando == "hora") a.dias else null,
+    )
+
+    /** Prende o apaga un día de una a la hora (nunca ninguno; los siete = todos). */
+    fun alternarDia(a: Automatizacion, letra: String): Automatizacion {
+        val ya = a.dias ?: DIAS.joinToString("")
+        val nuevo = DIAS.filter { if (it == letra) !ya.contains(it) else ya.contains(it) }.joinToString("")
+        if (nuevo.isEmpty()) return a
+        return a.copy(dias = if (nuevo.length == 7) null else nuevo)
+    }
 
     fun sumarAccion(a: Automatizacion, tipo: String, otro: String?): Automatizacion =
         if (a.hacer.size >= MAX_ACCIONES || (tipo == "robot" && otro == null)) a else a.copy(hacer = a.hacer + accionNueva(tipo, otro))

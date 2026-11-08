@@ -336,6 +336,7 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
                     c.conectar()
                     c.autenticar(v.clave)
                     cliente = c
+                    com.sinteticalabs.app.datos.AvisosCelu.cerca[idRobot] = c
                     escucharCliente(c, c.estado.value?.perfil.orEmpty(), virtual = false, apodo = v.nombre)
                     iniciarVistaPrevia()
                     config.value = leerObjeto(c.pedirConfig())
@@ -786,6 +787,7 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
     fun marcarEncendido() { getApplication<Application>().getSharedPreferences("consola", 0).edit().putBoolean("encendido:$idRobot", true).apply() }
 
     override fun onCleared() {
+        if (via == Via.CERCA) cliente?.let { com.sinteticalabs.app.datos.AvisosCelu.cerca.remove(idRobot, it) }
         cliente?.cerrar()
         Instantaneas.pausado = false
     }

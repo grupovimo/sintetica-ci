@@ -23,6 +23,10 @@ import kotlinx.serialization.json.put
  * manda la app y el contacto de las que coinciden, nunca el texto.
  */
 object AvisosCelu {
+    /** Los robots conectados por BLE ahora (su id en las preferencias es "cerca:<id>"). */
+    val cerca = java.util.concurrent.ConcurrentHashMap<String, com.sinteticalabs.app.bicho.ClienteBicho>()
+    fun claveCerca(id: String) = "cerca:$id"
+
     private fun prefs(c: Context) = c.getSharedPreferences("avisos_celu", Context.MODE_PRIVATE)
 
     fun prendido(c: Context, robot: String) = prefs(c).contains(robot)
@@ -66,12 +70,23 @@ class EscuchaAvisos : NotificationListenerService() {
         ultimos[clave] = ahora
         val destino = robots.filter { (_, l) -> Acompanar.coincide(l, llamada, app, contacto) }.keys
         if (destino.isEmpty()) return
+        val a = com.sinteticalabs.app.consola.cortarBytes(app, 24)
+        val k = com.sinteticalabs.app.consola.cortarBytes(contacto, 24)
+        // Los que están cerca: el 0x44 directo por BLE.
+        for (r in destino.filter { it.startsWith("cerca:") }) {
+            val cliente = AvisosCelu.cerca[r.removePrefix("cerca:")] ?: continue
+            alcance.launch(Dispatchers.Main) {
+                runCatching { cliente.escribirCrudo(com.sinteticalabs.app.protocolo.Car.COMANDO, com.sinteticalabs.app.protocolo.Comando.aviso(llamada, a, k)) }
+            }
+        }
+        val porNube = destino.filter { !it.startsWith("cerca:") }
+        if (porNube.isEmpty()) return
         alcance.launch {
             val cuenta = Cuenta(this@EscuchaAvisos)
             val s = cuenta.actual()
             if (!s.activa) return@launch
             val api = cuenta.api(s)
-            for (r in destino) runCatching {
+            for (r in porNube) runCatching {
                 api.pedir("/v1/bichos/$r/aviso", "POST", buildJsonObject {
                     put("tipo", if (llamada) "llamada" else "notificacion")
                     put("app", com.sinteticalabs.app.consola.cortarBytes(app, 24))

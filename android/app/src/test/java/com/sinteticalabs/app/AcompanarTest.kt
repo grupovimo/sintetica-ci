@@ -93,4 +93,35 @@ class AcompanarTest {
         assertEquals("{contacto} te escribe", Acompanar.decirAviso("  {contacto}   te escribe "))
         assertNull(Acompanar.ponerAvisos(c, emptyList())["avisos"])
     }
+
+    @Test fun automatizacionesNuevas() {
+        val A = com.sinteticalabs.app.consola.Automatizaciones
+        // La hora y el despertador van primero; lo demás, lo que diga la API (sin repetir).
+        assertEquals(listOf("hora", "despertador", "juego", "bicho-cerca"), A.cuandos(listOf("despertador", "juego", "bicho-cerca")))
+        assertEquals("Otro robot cerca", A.nombreCuando("bicho-cerca"))
+        var a = A.conCuando(A.nueva(1), "hora")
+        assertEquals("08:00", a.hora)
+        a = A.alternarDia(a, "D")
+        assertEquals("LMXJVS", a.dias)
+        assertEquals(null, A.alternarDia(a, "D").dias) // los siete: todos
+        a = A.sumarAccion(a.copy(hacer = emptyList()), "decir", null)
+        a = A.sumarAccion(a, "cara", null)
+        a = A.sumarAccion(a, "modo", null)
+        a = A.sumarAccion(a, "despertar", null)
+        val j = A.aJson(a.copy(hora = "07:15")).toString()
+        assertTrue(j, j.contains(""""cuando":"hora","hora":"07:15","dias":"LMXJVS""""))
+        assertTrue(j, j.contains("""{"tipo":"decir","texto":"Buen día, {dueno}: {clima}"}"""))
+        assertTrue(j, j.contains("""{"tipo":"cara","expresion":"contento"}"""))
+        assertTrue(j, j.contains("""{"tipo":"modo","modo":"reloj"}"""))
+        assertTrue(j, j.contains("""{"tipo":"despertar"}"""))
+        // De vuelta, como lo da la API.
+        val l = A.leer(leerObjeto("""{"automatizaciones":[$j]}""")).lista.single()
+        assertEquals("07:15", l.hora)
+        assertEquals("reloj", l.hacer[2].modo)
+        // Al cambiar a otro cuando, la hora y los días se van.
+        val otra = A.conCuando(l, "juego")
+        assertNull(otra.hora)
+        assertFalse(A.aJson(otra).toString().contains("hora"))
+        assertTrue(A.PLANTILLAS.containsAll(listOf("{clima}", "{temp}", "{max}", "{min}", "{ciudad}", "{dueno}")))
+    }
 }

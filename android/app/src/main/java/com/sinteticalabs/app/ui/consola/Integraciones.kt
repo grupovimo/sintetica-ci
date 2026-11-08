@@ -244,9 +244,18 @@ fun ModIntegraciones(vm: RobotViewModel) {
             Bandeja {
                 Visor(Modifier.fillMaxWidth()) {
                     Grabado("Cuando")
-                    Selector(Automatizaciones.nombreCuando(a.cuando), cuandos.map { it to Automatizaciones.nombreCuando(it) }, { k -> cambiar(i) { Automatizaciones.conCuando(it, k) } })
+                    Selector(Automatizaciones.nombreCuando(a.cuando), Automatizaciones.cuandos(cuandos).map { it to Automatizaciones.nombreCuando(it) },
+                        { k -> cambiar(i) { Automatizaciones.conCuando(it, k) } })
                     if (a.cuando == "expresion") Selector(a.valor ?: "cualquiera", listOf("" to "cualquiera") + Automatizaciones.CARAS.map { it to it },
                         { k -> cambiar(i) { it.copy(valor = k.ifEmpty { null }) } }, estilo = T.dato.copy(color = C.brasa))
+                    if (a.cuando == "hora") {
+                        val h = a.hora ?: "08:00"
+                        Text(h, style = T.digitosChicos, modifier = Modifier.clickable {
+                            android.app.TimePickerDialog(contexto, { _, hh, mm -> cambiar(i) { it.copy(hora = "%02d:%02d".format(hh, mm)) } },
+                                com.sinteticalabs.app.consola.Editar.aMin(h) / 60, com.sinteticalabs.app.consola.Editar.aMin(h) % 60, true).show()
+                        })
+                        FilaDias(a.dias ?: "LMXJVSD") { l -> cambiar(i) { Automatizaciones.alternarDia(it, l) } }
+                    }
                 }
                 a.hacer.forEachIndexed { j, h ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -257,6 +266,32 @@ fun ModIntegraciones(vm: RobotViewModel) {
                                     Grabado("Telegram")
                                     CampoVisor(h.texto.orEmpty(), { v -> cambiar(i) { x -> x.copy(hacer = x.hacer.mapIndexed { k, y -> if (k == j) y.copy(texto = v) else y }) } },
                                         estilo = T.dato.copy(color = C.papel), maxBytes = 300)
+                                }
+                                "decir" -> {
+                                    Grabado("Dice")
+                                    CampoVisor(h.texto.orEmpty(), { v ->
+                                        val t = com.sinteticalabs.app.consola.cortarBytes(v.trim(), 60).ifEmpty { "¡Hola!" }
+                                        cambiar(i) { x -> x.copy(hacer = x.hacer.mapIndexed { k, y -> if (k == j) y.copy(texto = t) else y }) }
+                                    }, estilo = T.dato.copy(color = C.papel), maxBytes = 60)
+                                    Selector(h.expresion ?: "su cara", listOf("" to "su cara") + Automatizaciones.CARAS.map { it to it },
+                                        { v -> cambiar(i) { x -> x.copy(hacer = x.hacer.mapIndexed { k, y -> if (k == j) y.copy(expresion = v.ifEmpty { null }) else y }) } },
+                                        estilo = T.dato.copy(color = C.brasa))
+                                }
+                                "cara" -> {
+                                    Grabado("Pone la cara")
+                                    Selector(h.expresion ?: "contento", Automatizaciones.CARAS.map { it to it },
+                                        { v -> cambiar(i) { x -> x.copy(hacer = x.hacer.mapIndexed { k, y -> if (k == j) y.copy(expresion = v) else y }) } },
+                                        estilo = T.dato.copy(color = C.papel))
+                                }
+                                "modo" -> {
+                                    Grabado("Pasa a")
+                                    Selector(Automatizaciones.MODOS.firstOrNull { it.first == (h.modo ?: "reloj") }?.second ?: "Reloj", Automatizaciones.MODOS,
+                                        { v -> cambiar(i) { x -> x.copy(hacer = x.hacer.mapIndexed { k, y -> if (k == j) y.copy(modo = v) else y }) } },
+                                        estilo = T.dato.copy(color = C.papel))
+                                }
+                                "despertar" -> {
+                                    Grabado("Lo despierta")
+                                    Text("¡Buen día!", style = T.dato.copy(color = C.papel))
                                 }
                                 "webhook" -> {
                                     Grabado("URL")
@@ -295,7 +330,7 @@ fun ModIntegraciones(vm: RobotViewModel) {
                 }
             }
         }
-        Text(Automatizaciones.PLANTILLAS, style = T.dato.copy(fontSize = 12.sp), color = Color(0xB31A1714))
+        Text(Automatizaciones.PLANTILLAS.joinToString(" "), style = T.dato.copy(fontSize = 12.sp), color = Color(0xB31A1714))
 
         // El secreto de los webhooks: cada llamada va firmada (X-Sintetica-Firma: sha256=…, HMAC del cuerpo).
         Bandeja {
