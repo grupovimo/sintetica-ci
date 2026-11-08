@@ -17,8 +17,12 @@ class Guardado(raiz: File, private val red: Red, private val voz: Voz) : Nucleo.
 
     override fun leer(clave: String): ByteArray? = archivo(clave).takeIf { it.exists() }?.readBytes()
 
+    /** Cuando el núcleo aplica una config nueva (por ejemplo, para pedir el paquete de voz). */
+    @Volatile var alConfig: (() -> Unit)? = null
+
     override fun registrar(mensaje: String) {
         Log.i("Bicho", mensaje)
+        if (mensaje == "config nueva aplicada") alConfig?.invoke()
     }
 
     override fun notificar(caracteristica: Int, datos: ByteArray) = red.notificar(caracteristica, datos)

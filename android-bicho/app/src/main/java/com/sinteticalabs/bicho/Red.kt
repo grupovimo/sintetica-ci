@@ -75,6 +75,9 @@ class Red(private val raiz: File) {
     /** Lo que llega por bicho/{id}/audio y bicho/{id}/conversacion/url (hilo de MQTT). */
     @Volatile var alAudio: ((ByteArray) -> Unit)? = null
     @Volatile var alConversacion: ((String) -> Unit)? = null
+    @Volatile var alPaquete: ((String) -> Unit)? = null
+    /** Recién conectado a la nube (y suscripto). */
+    @Volatile var alConectar: (() -> Unit)? = null
 
     /** Si está conectado a la nube. */
     val enLinea get() = conectado && cliente.get() != null
@@ -215,6 +218,18 @@ class Red(private val raiz: File) {
      * En desarrollo la API le pasa la dirección de EMQX de adentro de Docker
      * ("emqx"), que el celu no conoce: en ese caso usa la compu que lo sumó.
      */
+    /**
+     * Una URL de la nube que el celu pueda abrir: en la nube local, la API dice
+     * "localhost" y eso es la Mac que lo sumó (el reclamante), no el celu.
+     */
+    fun alcanzable(url: String): String {
+        val u = runCatching { URI(url) }.getOrNull() ?: return url
+        if (u.host != "localhost" && u.host != "127.0.0.1") return url
+        val reclamante = File(raiz, "reclamante").takeIf { it.exists() }?.readText()?.trim()
+        if (reclamante.isNullOrEmpty()) return url
+        return URI(u.scheme, u.userInfo, reclamante, u.port, u.path, u.query, u.fragment).toString()
+    }
+
     private fun broker(url: String): String {
         val u = URI(url.replace("mqtts://", "ssl://").replace("mqtt://", "tcp://"))
         val host = u.host ?: return url
@@ -245,6 +260,10 @@ class Red(private val raiz: File) {
         }
     }
 
+    private fun suscribir(c: MqttClient, cual: String, alLlegar: (ByteArray) -> Unit) = runCatching {
+        c.subscribe("bicho/$id/$cual", 1) { _, m: MqttMessage -> alLlegar(m.payload) }
+    }.onFailure { Log.w("Bicho", "nube: sin bicho/$id/$cual (${(it as? org.eclipse.paho.client.mqttv3.MqttException)?.reasonCode})") }
+
     private fun conectar(broker: String, usuario: String, clave: String) {
         val c = MqttClient(broker, id, MemoryPersistence())
         val conexion = "bicho/$id/conexion"
@@ -256,16 +275,14 @@ class Red(private val raiz: File) {
                             val p = m.payload
                             if (p.size >= 2) vista.queueEvent { Nucleo.nubeEscribir(p[0].toInt() and 0xFF, p.copyOfRange(1, p.size)) }
                         }
-                        // La voz de la nube (ElevenLabs): los mp3 de los globos y la URL de la conversación.
                         c.publish(conexion, "1".toByteArray(), 1, true)
                         conectado = true
-                        // Una nube vieja (sin estos tópicos en la ACL) no tiene que dejarlo sin nube.
-                        runCatching {
-                            c.subscribe("bicho/$id/audio", 1) { _, m: MqttMessage -> alAudio?.invoke(m.payload) }
-                            c.subscribe("bicho/$id/conversacion/url", 1) { _, m: MqttMessage ->
-                                alConversacion?.invoke(String(m.payload, Charsets.UTF_8))
-                            }
-                        }.onFailure { Log.w("Bicho", "nube: sin la voz de la nube (${it.message}, ${(it as? org.eclipse.paho.client.mqttv3.MqttException)?.reasonCode})") }
+                        // La voz de la nube (los mp3, la conversación y el paquete). Una nube vieja
+                        // (sin estos tópicos en la ACL) no tiene que dejarlo sin nube: de a uno.
+                        suscribir(c, "audio") { alAudio?.invoke(it) }
+                        suscribir(c, "conversacion/url") { alConversacion?.invoke(String(it, Charsets.UTF_8)) }
+                        suscribir(c, "voz/paquete/url") { alPaquete?.invoke(String(it, Charsets.UTF_8)) }
+                        alConectar?.invoke()
                         val estado = enGl {
                             Nucleo.conexiones(true, true)
                             Nucleo.estado()

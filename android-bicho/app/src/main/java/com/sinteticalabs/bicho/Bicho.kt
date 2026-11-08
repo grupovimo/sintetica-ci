@@ -36,7 +36,13 @@ class Bicho : Activity() {
         val red = Red(filesDir)
         val archivos = java.io.File(filesDir, "archivos").apply { mkdirs() }.path
         voz = Voz(this)
-        val lienzo = Lienzo(ANCHO, ALTO, red.id, archivos, Guardado(filesDir, red, voz))
+        val guardado = Guardado(filesDir, red, voz)
+        val lienzo = Lienzo(ANCHO, ALTO, red.id, archivos, guardado)
+        val paquete = PaqueteVoz(filesDir, red::publicar, red::alcanzable)
+        voz.paquete = paquete
+        red.alPaquete = paquete::respuesta
+        red.alConectar = { paquete.pedir("conexion") }
+        guardado.alConfig = { paquete.pedir("config") }
         vista = GLSurfaceView(this).apply {
             setEGLContextClientVersion(2)
             setRenderer(lienzo)
@@ -70,6 +76,7 @@ class Bicho : Activity() {
             datos.leerNucleo()
             if (cuadro % 30 == 0) voz.config = Nucleo.voz()
             if (cuadro % 5 == 0) voz.globo(Nucleo.globo())
+            if (cuadro % 1800 == 900 && red.enLinea) voz.paquete?.pedir("dia")
             // Cada comportamiento nuevo al registro (para contar cuántos distintos hace en el día).
             if (cuadro % 15 == 0) Nucleo.comportamiento().takeIf { it.isNotEmpty() && it != comportamiento }?.let {
                 comportamiento = it

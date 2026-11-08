@@ -35,6 +35,9 @@ class Voz(private val contexto: Context) {
     private val colaHabla = Handler(hiloHabla.looper)
     val nube = VozNube().also { n -> n.alLlegar = { a -> colaHabla.post { audioDeLaNube(a) } } }
 
+    /** El paquete de voz sin internet (lo pone [Bicho]). */
+    @Volatile var paquete: PaqueteVoz? = null
+
     /** Mientras hay una conversación en tiempo real, el globo no se lee (habla el agente). */
     @Volatile var callada = false
     private val vibrador = contexto.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator?
@@ -97,7 +100,11 @@ class Voz(private val contexto: Context) {
         globoLimpio = Sintesis.paraLeer(texto)
         globoDicho = texto.isEmpty() || callada
         if (globoDicho) return
-        // El audio de la nube llega justo antes del Decir (origen 0).
+        // Primero el paquete del celu; después el audio que mandó la nube (llega justo antes del Decir).
+        paquete?.mp3(globoCrc)?.let {
+            Log.i("Bicho", "voz: del paquete")
+            return reproducirMp3(it)
+        }
         nube.tomar(globoCrc)?.let { return reproducirMp3(it) }
         // Los recordatorios y el despertador: la nube manda el suyo ~1 s después.
         if (nube.leeGlobos) colaHabla.postDelayed(esperaNube, ESPERA_NUBE_MS) else decirLocal()
@@ -112,11 +119,15 @@ class Voz(private val contexto: Context) {
     }
 
     private fun reproducirMp3(a: VozNube.Audio) {
+        if (config[0] > 0) reproducirMp3(java.io.File(contexto.cacheDir, "globo.mp3").apply { writeBytes(a.mp3) })
+        globoDicho = true
+    }
+
+    private fun reproducirMp3(archivo: java.io.File) {
         globoDicho = true
         if (config[0] <= 0) return
         habla?.stop()
         reproductor?.release()
-        val archivo = java.io.File(contexto.cacheDir, "globo.mp3").apply { writeBytes(a.mp3) }
         reproductor = runCatching {
             MediaPlayer().apply {
                 setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
