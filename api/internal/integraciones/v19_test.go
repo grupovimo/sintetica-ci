@@ -539,7 +539,7 @@ func TestCharlaConAnthropicFalso(t *testing.T) {
 		t.Fatalf("tope: %v", err)
 	}
 	// Lo que entiende el motor no gasta el tope: sigue andando.
-	if r, err := i.Charlar(ctx, u.ID, id, "hola", "web"); err != nil || r.Fuente != FuenteMotor {
+	if r, err := i.Charlar(ctx, u.ID, id, "hola", "web"); err != nil || r.Origen != OrigenMotor {
 		t.Fatalf("motor con el tope lleno: %+v %v", r, err)
 	}
 	vaciar(robots)

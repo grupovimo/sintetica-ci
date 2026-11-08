@@ -175,14 +175,14 @@ func TestCharlaMotorSinElRobot(t *testing.T) {
 
 	// Sin IA: contesta el motor, aunque no entienda.
 	r, err := sinIA.Charlar(ctx, u.ID, id, "¿qué opinás de la vida?", "web")
-	if err != nil || r.Fuente != FuenteMotor || r.Texto == "" || r.Enviado || r.Guardado {
+	if err != nil || r.Origen != OrigenMotor || r.Texto == "" || r.Enviado || r.Guardado {
 		t.Fatalf("sin IA: %+v %v", r, err)
 	}
 
 	// "despertame a las 7": mañana (martes) a las 7, en la config, con lo
 	// demás que tenía el despertador; la frase, para cuando se conecte.
 	r, err = sinIA.Charlar(ctx, u.ID, id, "despertame a las 7", "web")
-	if err != nil || r.Fuente != FuenteMotor || r.Accion != "alarma" || !r.Guardado || r.Enviado {
+	if err != nil || r.Origen != OrigenMotor || r.Accion != "alarma" || !r.Guardado || r.Enviado {
 		t.Fatalf("alarma: %+v %v", r, err)
 	}
 	m, autor := configDe(t, a, id)
@@ -234,19 +234,41 @@ func TestCharlaMotorSinElRobot(t *testing.T) {
 	}
 
 	// Con IA: lo que entiende el motor no la llama; lo que no, sí.
-	conIA := Nuevo(Opciones{V19: OpcionesV19{AnthropicClave: "sk-prueba", AnthropicURL: sia.URL}}, a, robots, eventos.Nuevo(), sinLog)
+	hub := eventos.Nuevo()
+	sse := hub.Suscribir(u.ID, "")
+	defer hub.Desuscribir(sse)
+	conIA := Nuevo(Opciones{V19: OpcionesV19{AnthropicClave: "sk-prueba", AnthropicURL: sia.URL}}, a, robots, hub, sinLog)
 	conIA.UsarConfig(configEnLaBase(a))
-	if r, err := conIA.Charlar(ctx, u.ID, id, "despertame todos los días a las 8", "web"); err != nil || r.Fuente != FuenteMotor ||
+	// El SSE "charla" dice de dónde vino cada respuesta.
+	origenSSE := func() any {
+		for {
+			select {
+			case e := <-sse.C:
+				if e.Tipo == "charla" {
+					return e.Datos.(map[string]any)["origen"]
+				}
+			case <-time.After(2 * time.Second):
+				return nil
+			}
+		}
+	}
+	if r, err := conIA.Charlar(ctx, u.ID, id, "despertame todos los días a las 8", "web"); err != nil || r.Origen != OrigenMotor ||
 		r.Quedan != CharlasPorDia || ia.cantidad() != 0 {
 		t.Fatalf("con IA, el motor: %+v %v (%d)", r, err, ia.cantidad())
+	}
+	if o := origenSSE(); o != OrigenMotor {
+		t.Fatalf("SSE del motor: %v", o)
 	}
 	m, _ = configDe(t, a, id)
 	if !iguales(m["despertador"], map[string]any{"hora": "08:00", "activo": true, "texto": "¡Arriba!"}) {
 		t.Fatalf("todos los días: %s", m["despertador"])
 	}
 	r, err = conIA.Charlar(ctx, u.ID, id, "¿qué opinás de la vida?", "web")
-	if err != nil || r.Fuente != FuenteIA || r.Texto != "Qué sé yo, la vida es linda." || ia.cantidad() != 1 || r.Quedan != CharlasPorDia-1 {
+	if err != nil || r.Origen != OrigenIA || r.Texto != "Qué sé yo, la vida es linda." || ia.cantidad() != 1 || r.Quedan != CharlasPorDia-1 {
 		t.Fatalf("con IA: %+v %v", r, err)
+	}
+	if o := origenSSE(); o != OrigenIA {
+		t.Fatalf("SSE de la IA: %v", o)
 	}
 	ia.mu.Lock()
 	sys, _ := json.Marshal(ia.pedidos[0]["system"])
@@ -274,7 +296,7 @@ func TestCharlaMotorConElRobot(t *testing.T) {
 
 	// Por HTTP: el robot contesta con su frase (la del 0xCC).
 	r, err := i.Charlar(ctx, u.ID, id, "despertame todos los días a las 7", "web")
-	if err != nil || r.Fuente != FuenteMotor || !r.Enviado || r.Accion != "alarma" || !strings.Contains(r.Texto, "7:00") || ia.cantidad() != 0 {
+	if err != nil || r.Origen != OrigenMotor || !r.Enviado || r.Accion != "alarma" || !strings.Contains(r.Texto, "7:00") || ia.cantidad() != 0 {
 		t.Fatalf("http: %+v %v", r, err)
 	}
 	m4c, _ := protocolo.Charlar("despertame todos los días a las 7")

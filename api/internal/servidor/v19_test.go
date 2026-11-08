@@ -29,7 +29,7 @@ func TestAgendaMusicaCharlaApagadas(t *testing.T) {
 	if cod, v := pedir(t, h, token, "GET", "/v1/charla", ""); cod != 200 || v["disponible"] != true || v["ia"] != false || v["quedan"] != -1.0 {
 		t.Fatalf("GET charla: %d %v", cod, v)
 	}
-	if cod, v := pedir(t, h, token, "POST", base+"/charla", `{"texto":"hola"}`); cod != 200 || v["fuente"] != "motor" || v["texto"] == "" {
+	if cod, v := pedir(t, h, token, "POST", base+"/charla", `{"texto":"hola"}`); cod != 200 || v["origen"] != "motor" || v["texto"] == "" {
 		t.Fatalf("charla sin clave: %d %v", cod, v)
 	}
 	if cod, v := pedir(t, h, token, "GET", "/v1/musica", ""); cod != 200 || v["disponible"] != false {
@@ -115,7 +115,7 @@ func TestCharlaHTTP(t *testing.T) {
 	}
 	cod, v := pedir(t, h, token, "POST", base+"/charla", `{"texto":"¿qué opinás de la vida?"}`)
 	if cod != 200 || v["texto"] != "¡Hola! Acá estoy." || v["expresion"] != "contento" || v["enviado"] != false || v["quedan"] != float64(integraciones.CharlasPorDia-1) ||
-		v["fuente"] != "ia" {
+		v["origen"] != "ia" {
 		t.Fatalf("charla: %d %v", cod, v)
 	}
 	for _, c := range []string{`{"texto":""}`, `{"texto":"` + strings.Repeat("a", 501) + `"}`, `{"otra":1}`} {
@@ -135,7 +135,7 @@ func TestCharlaHTTP(t *testing.T) {
 	}
 	antes := llamadas.Load()
 	cod, v = pedir(t, h, token, "POST", base+"/charla", `{"texto":"despertame a las 7"}`)
-	if cod != 200 || v["fuente"] != "motor" || v["accion"] != "alarma" || v["guardado"] != true || v["quedan"] != float64(integraciones.CharlasPorDia-1) ||
+	if cod != 200 || v["origen"] != "motor" || v["accion"] != "alarma" || v["guardado"] != true || v["quedan"] != float64(integraciones.CharlasPorDia-1) ||
 		llamadas.Load() != antes {
 		t.Fatalf("despertame: %d %v (%d llamadas)", cod, v, llamadas.Load()-antes)
 	}
@@ -145,13 +145,13 @@ func TestCharlaHTTP(t *testing.T) {
 	if cod != 200 || v["autor"] != integraciones.AutorCharla || des["hora"] != "07:00" || des["activo"] != true || cfg["nombre"] != "Pipo" {
 		t.Fatalf("config: %d %v", cod, v)
 	}
-	if cod, v := pedir(t, h, token, "POST", base+"/charla", `{"texto":"poné el modo reloj"}`); cod != 200 || v["fuente"] != "motor" || llamadas.Load() != antes {
+	if cod, v := pedir(t, h, token, "POST", base+"/charla", `{"texto":"poné el modo reloj"}`); cod != 200 || v["origen"] != "motor" || llamadas.Load() != antes {
 		t.Fatalf("modo: %d %v", cod, v)
 	}
 	if _, v := pedir(t, h, token, "GET", base+"/config", ""); v["config"].(map[string]any)["modo"] != "reloj" {
 		t.Fatalf("modo: %v", v["config"])
 	}
-	if cod, v := pedir(t, h, token, "POST", base+"/charla", `{"texto":"¿qué opinás de la vida?"}`); cod != 200 || v["fuente"] != "ia" || llamadas.Load() != antes+1 {
+	if cod, v := pedir(t, h, token, "POST", base+"/charla", `{"texto":"¿qué opinás de la vida?"}`); cod != 200 || v["origen"] != "ia" || llamadas.Load() != antes+1 {
 		t.Fatalf("a la IA: %d %v", cod, v)
 	}
 }

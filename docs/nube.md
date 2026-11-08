@@ -756,7 +756,7 @@ el tope de 60 por día por usuario es el mismo. Sin ninguno charla igual el
 false, "quedan": -1, "sin_tope": true}`.
 
 - `POST /v1/bichos/{id}/charla {"texto"}` (1 a 500 bytes) → `{"texto",
-  "expresion", "enviado", "quedan", "fuente": "motor" | "ia", "intencion",
+  "expresion", "enviado", "quedan", "origen": "motor" | "ia", "intencion",
   "accion", "guardado"}`: el robot contesta y lo dice en su pantalla si está
   conectado. `GET /v1/charla` → `{"disponible", "ia", "quedan", "porDia": 60}`.
 - El system prompt es corto y tiene solo lo de **ese** robot: su nombre, su
@@ -780,7 +780,7 @@ false, "quedan": -1, "sin_tope": true}`.
   casa o el Bluetooth del celu del dueño): publica en **`bicho/{id}/presencia`**
   `{"llegaste": bool}` y la nube solo la anota para los horarios y corre los
   cuandos (no le reenvía el `0x49`: ya se lo dijo a su núcleo).
-- SSE `charla` (`{texto, expresion, de, enviado, fuente}`; del motor, también `intencion` y `accion`).
+- SSE `charla` (`{texto, expresion, de, enviado, origen}`; del motor, también `intencion` y `accion`).
 
 **La clave de IA propia** (`integraciones/ia.go`, rutas en
 `servidor/ia_paquete.go`, migración `015_ia_propia.sql`): cualquiera puede

@@ -184,7 +184,7 @@ func (i *Integraciones) entender(ctx context.Context, usuario, bicho, texto stri
 
 // charlaDelMotor: lo entendió el motor (o no hay IA y contesta él igual).
 func (i *Integraciones) charlaDelMotor(ctx context.Context, usuario, bicho, texto, desde string, r nucleo.RespuestaCharla, m motorIA, conIA bool) RespuestaCharla {
-	res := RespuestaCharla{Texto: r.Frase, Expresion: r.Expresion, Quedan: -1, Fuente: FuenteMotor, Intencion: r.Intencion}
+	res := RespuestaCharla{Texto: r.Frase, Expresion: r.Expresion, Quedan: -1, Origen: OrigenMotor, Intencion: r.Intencion}
 	if conIA {
 		res.Propia = m.propia
 		res.Quedan = i.charlasQuedan(ctx, usuario, m.tope)
@@ -228,7 +228,7 @@ func (i *Integraciones) charlaDelMotor(ctx context.Context, usuario, bicho, text
 	}
 	i.alm.AnotarRobotCharla(ctx, usuario, bicho) //nolint:errcheck
 	i.hub.Publicar(usuario, eventos.Evento{Tipo: "charla", Bicho: bicho, Datos: map[string]any{
-		"texto": res.Texto, "expresion": res.Expresion, "de": desde, "enviado": res.Enviado, "fuente": FuenteMotor,
+		"texto": res.Texto, "expresion": res.Expresion, "de": desde, "enviado": res.Enviado, "origen": OrigenMotor,
 		"intencion": res.Intencion, "accion": res.Accion}})
 	return res
 }

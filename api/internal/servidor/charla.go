@@ -15,7 +15,7 @@ func (s *Servidor) verCharla(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /v1/bichos/{id}/charla {texto} → {texto, expresion, enviado, quedan,
-// fuente: "motor" | "ia", intencion, accion, guardado}: el robot contesta
+// origen: "motor" | "ia", intencion, accion, guardado}: el robot contesta
 // (con el motor propio y, si no entiende y hay IA, con la IA) y lo dice en su
 // pantalla si está conectado.
 func (s *Servidor) charlar(w http.ResponseWriter, r *http.Request) {

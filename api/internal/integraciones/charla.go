@@ -62,7 +62,7 @@ type RespuestaCharla struct {
 	Enviado   bool   `json:"enviado"`             // si le llegó al robot (estaba conectado)
 	Quedan    int    `json:"quedan"`              // charlas que le quedan hoy (-1: sin tope)
 	Propia    bool   `json:"propia"`              // con la clave de IA propia del usuario
-	Fuente    string `json:"fuente"`              // de dónde vino: "motor" (sin IA) o "ia"
+	Origen    string `json:"origen"`              // de dónde vino: "motor" (sin IA) o "ia"
 	Intencion string `json:"intencion,omitempty"` // lo que entendió el motor
 	Accion    string `json:"accion,omitempty"`    // lo que hizo ("alarma", "recordatorio"...)
 	Guardado  bool   `json:"guardado,omitempty"`  // sin el robot conectado: se guardó en la nube (le llega cuando vuelva)
@@ -70,8 +70,8 @@ type RespuestaCharla struct {
 
 // De dónde vino la respuesta.
 const (
-	FuenteMotor = "motor"
-	FuenteIA    = "ia"
+	OrigenMotor = "motor"
+	OrigenIA    = "ia"
 )
 
 // CharlaActiva: el servidor tiene IA (clave de Anthropic o un servicio
@@ -398,7 +398,7 @@ func (i *Integraciones) charlaConIA(ctx context.Context, usuario, bicho, texto, 
 		return RespuestaCharla{}, err
 	}
 	t, e = limpiarRespuesta(t, e, d.Expresiones)
-	r := RespuestaCharla{Texto: t, Expresion: e, Quedan: -1, Propia: mo.propia, Fuente: FuenteIA}
+	r := RespuestaCharla{Texto: t, Expresion: e, Quedan: -1, Propia: mo.propia, Origen: OrigenIA}
 	if mo.tope > 0 && n >= 0 {
 		r.Quedan = mo.tope - n
 	}
@@ -407,7 +407,7 @@ func (i *Integraciones) charlaConIA(ctx context.Context, usuario, bicho, texto, 
 	}
 	i.alm.AnotarRobotCharla(ctx, usuario, bicho) //nolint:errcheck
 	i.hub.Publicar(usuario, eventos.Evento{Tipo: "charla", Bicho: bicho, Datos: map[string]any{
-		"texto": t, "expresion": e, "de": desde, "enviado": r.Enviado, "fuente": FuenteIA}})
+		"texto": t, "expresion": e, "de": desde, "enviado": r.Enviado, "origen": OrigenIA}})
 	return r, nil
 }
 

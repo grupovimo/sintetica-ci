@@ -54,7 +54,7 @@ func TestIAPropiaAnthropic(t *testing.T) {
 		t.Fatalf("sin nada: %v", e)
 	}
 	// Sin IA contesta el motor propio.
-	if r, err := i.Charlar(ctx, u.ID, id, "¿qué opinás de la vida?", "web"); err != nil || r.Fuente != FuenteMotor || r.Texto == "" || falso.cantidad() != 0 {
+	if r, err := i.Charlar(ctx, u.ID, id, "¿qué opinás de la vida?", "web"); err != nil || r.Origen != OrigenMotor || r.Texto == "" || falso.cantidad() != 0 {
 		t.Fatalf("sin IA: %+v %v", r, err)
 	}
 
@@ -96,7 +96,7 @@ func TestIAPropiaAnthropic(t *testing.T) {
 		t.Fatalf("charla: %v", e)
 	}
 	r, err := i.Charlar(ctx, u.ID, id, "¿qué opinás de la vida?", "web")
-	if err != nil || r.Texto != "¡Con mi clave!" || !r.Propia || r.Quedan != -1 || r.Fuente != FuenteIA {
+	if err != nil || r.Texto != "¡Con mi clave!" || !r.Propia || r.Quedan != -1 || r.Origen != OrigenIA {
 		t.Fatalf("charlar: %+v %v", r, err)
 	}
 	// Por MQTT (el robot-celu) también, aunque el servidor no tenga IA.
