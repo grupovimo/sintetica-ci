@@ -136,7 +136,7 @@ class Sistema {
   // Una situación (las pide el motor): si el Hablador quiere, dice una frase.
   void hablar(Situacion s);
   // El texto del globo que se ve (o el del despertador).
-  const char* textoGlobo() const { return alarma_ ? alarmaTexto_ : globoTexto_; }
+  const char* textoGlobo() const { return globoTexto_; }
   // El despertador.
   bool alarmaSonando() const { return alarma_; }
   void sonarAlarma(bool porHora);
@@ -381,7 +381,7 @@ class Sistema {
   bool pomoCorriendo_ = false, pomoDescanso_ = false;
   uint32_t pomoRestanteMs_ = 0;
   // El globo (lo que dice), el despertador y el clima.
-  char globoTexto_[LARGO_TEXTO_AJUSTADO] = {};
+  char globoTexto_[LARGO_TEXTO_AJUSTADO] = {};  // también el del despertador (no se ven a la vez)
   char globoPendiente_[LARGO_TEXTO_AJUSTADO] = {};
   Config::Cara caraPendiente_;
   bool hayPendiente_ = false, globo_ = false, pendienteHablando_ = false;
@@ -391,7 +391,6 @@ class Sistema {
   uint32_t alarmaDesde_ = 0, alarmaTono_ = 0, alarmaToque_ = 0, pospuestaHasta_ = 0;
   int16_t alarmaMinuto_ = -1;
   uint16_t alarmaDia_ = 0;
-  char alarmaTexto_[LARGO_TEXTO_AJUSTADO] = {};
   DatosClima clima_;
   uint32_t proximaCaraClima_ = 0;
   // Cuidarte (v1.7).

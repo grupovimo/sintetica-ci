@@ -420,17 +420,19 @@ bool Hablador::quiere(Situacion s, uint32_t segundos, uint32_t dia, uint8_t frec
   if (dia ? dia != dia_ : segundos - diaDesde_ >= 86400u) {
     dia_ = dia, diaDesde_ = segundos, hoy_ = 0;
   }
+  const uint16_t ahora = static_cast<uint16_t>(segundos / 60u + 1u);
+  auto paso = [&](uint16_t desde) { return static_cast<uint16_t>(ahora - desde); };  // minutos
   if (!b->siempre) {
     if (frecuencia == 0) return false;
     const float f = frecuencia / 50.0f;  // 0,5 → ×1
     if (hoy_ >= static_cast<int>(FRASES_POR_DIA * f + 0.5f)) return false;
-    if (huboAlguna_ && segundos - ultimaCualquiera_ < static_cast<uint32_t>(FRASES_SEPARACION_S / f)) return false;
-    if (hubo_[i] && segundos - ultima_[i] < static_cast<uint32_t>(b->enfriamiento)) return false;
+    if (ultimaCualquiera_ && paso(ultimaCualquiera_) < static_cast<uint32_t>(FRASES_SEPARACION_S / 60 / f)) return false;
+    if (ultima_[i] && paso(ultima_[i]) < static_cast<uint32_t>(b->enfriamiento / 60)) return false;
     if (azar.real() >= minf(1, b->probabilidad / 100.0f * f)) return false;
     hoy_++;
-    ultimaCualquiera_ = segundos, huboAlguna_ = true;
+    ultimaCualquiera_ = ahora ? ahora : 1;
   }
-  ultima_[i] = segundos, hubo_[i] = true;
+  ultima_[i] = ahora ? ahora : 1;
   return true;
 }
 

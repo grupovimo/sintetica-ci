@@ -119,10 +119,10 @@ class Hablador {
   int hoy() const { return hoy_; }
 
  private:
-  uint32_t ultima_[N_SITUACIONES] = {};
-  bool hubo_[N_SITUACIONES] = {};
-  uint32_t ultimaCualquiera_ = 0;
-  bool huboAlguna_ = false;
+  // En minutos + 1 (0 = nunca), de 16 bits: el broche no tiene RAM de sobra.
+  // Da la vuelta a los 45 días; las cuentas son con resta sin signo.
+  uint16_t ultima_[N_SITUACIONES] = {};
+  uint16_t ultimaCualquiera_ = 0;
   uint32_t dia_ = 0;
   uint32_t diaDesde_ = 0;   // sin calendario: un "día" cada 24 h de reloj
   uint8_t hoy_ = 0;

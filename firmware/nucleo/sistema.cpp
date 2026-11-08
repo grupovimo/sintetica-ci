@@ -93,7 +93,7 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
   reiniciarPomodoro();
   faseProtector_ = 0;
   globo_ = hayPendiente_ = false;
-  globoTexto_[0] = alarmaTexto_[0] = 0;
+  globoTexto_[0] = 0;
   hablador_ = Hablador();
   alarma_ = alarmaApretado_ = tragarAlarma_ = false;
   pospuestaHasta_ = 0;
@@ -1276,14 +1276,14 @@ void Sistema::sonarAlarma(bool porHora) {
   else if (!elegirFrase(config_.habla, Situacion::Despertador, presetCercano(motor_.rasgos()), config_.vida.dueno, nombre(),
                         azar_, t, sizeof t))
     copiarTexto(t, sizeof t, "\xC2\xA1" "Buen d\xC3\xAD" "a!");
-  size_t n = copiarTexto(alarmaTexto_, sizeof alarmaTexto_, t);
+  size_t n = copiarTexto(globoTexto_, sizeof globoTexto_, t);
   // Y el clima, si hay (y entra).
   if (climaVigente()) {
     char c[40];
     const size_t k = textoClima(clima_, c, sizeof c);
-    if (n + 1 + k < sizeof alarmaTexto_) {
-      alarmaTexto_[n++] = ' ';
-      copiarTexto(alarmaTexto_ + n, sizeof alarmaTexto_ - n, c);
+    if (n + 1 + k < sizeof globoTexto_) {
+      globoTexto_[n++] = ' ';
+      copiarTexto(globoTexto_ + n, sizeof globoTexto_ - n, c);
     }
   }
   if (porHora) {
