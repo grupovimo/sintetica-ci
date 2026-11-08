@@ -27,6 +27,29 @@
     'cien-caricias': '100 caricias', 'cien-dias': '100 días', 'mil-caricias': '1000 caricias',
   };
 
+  // Su día (GET /resumen): lo de hoy contado. Si la nube todavía no lo tiene, no se muestra.
+  type Resumen = { texto?: string; juegos?: number; ganados?: number; suenos?: number; sonoCon?: string[]; animo?: number | string | null; espero?: number | string | null };
+  let resumen = $state<Resumen | null>(null);
+  async function cargarResumen() {
+    try { resumen = await api<Resumen>(`/v1/bichos/${b.id}/resumen`); } catch { resumen = null; }
+  }
+  const SUENOS: Record<string, string> = { corazon: '♥', estrella: '★', nota: '♪', oveja: '🐑', pesadilla: '⚡' };
+  const NOMBRE_SUENO: Record<string, string> = { corazon: 'Corazones', estrella: 'Estrellas', nota: 'Música', oveja: 'Ovejas', pesadilla: 'Pesadilla' };
+  // El ánimo puede venir como número (1 bien, 2 más o menos, 3 mal) o como palabra.
+  const animoHoy = $derived.by(() => {
+    const a = resumen?.animo;
+    const k = typeof a === 'number' ? ['', 'bien', 'medio', 'mal'][a] ?? '' : String(a ?? '').normalize('NFD').replace(/[^a-z]/gi, '').toLowerCase();
+    if (k.startsWith('bien')) return { cara: '😀', t: 'Bien' };
+    if (k === 'medio' || k.startsWith('mas')) return { cara: '😐', t: 'Más o menos' };
+    if (k.startsWith('mal')) return { cara: '😞', t: 'Mal' };
+    return null;
+  });
+  const espero = $derived.by(() => {
+    const e = resumen?.espero;
+    if (typeof e === 'number') return e > 0 ? `${e}:00` : '';
+    return e ? String(e) : '';
+  });
+
   async function cargarMemoria() {
     try {
       const r = await api<{ memoria: Memoria | null; actualizada: string | null; mudanzaPendiente: boolean }>(`/v1/bichos/${b.id}/memoria`);
@@ -40,12 +63,13 @@
 
   onMount(() => {
     cargarMemoria();
+    cargarResumen();
     api<{ bichos: Bicho[] }>('/v1/bichos').then((r) => (otros = r.bichos.filter((x) => x.id !== b.id))).catch(() => {});
     // El estado en vivo: cada 2 s mientras la pestaña está abierta.
     const pedir = () => { if (b.bicho?.conectado) b.pedirVida(); };
     pedir();
     const reloj = setInterval(pedir, 2000);
-    const relojMemoria = setInterval(cargarMemoria, 60000);
+    const relojMemoria = setInterval(() => { cargarMemoria(); cargarResumen(); }, 60000);
     return () => { clearInterval(reloj); clearInterval(relojMemoria); };
   });
 
@@ -131,6 +155,20 @@
     {/if}
   </section>
 
+  {#if resumen}
+    <section class="hoy chapa">
+      <span class="grabado">Su día</span>
+      <div class="hoy-visores">
+        <div class="visor"><span class="grabado">Juegos</span><span class="digitos">{resumen.juegos ?? 0}{#if resumen.ganados}<small> · ganó {resumen.ganados}</small>{/if}</span></div>
+        <div class="visor"><span class="grabado">Soñó</span>
+          <span class="suenos">{#each resumen.sonoCon ?? [] as s}<i title={NOMBRE_SUENO[s] ?? s} class:pesadilla={s === 'pesadilla'}>{SUENOS[s] ?? '·'}</i>{:else}<span class="digitos">{resumen.suenos ?? 0}</span>{/each}</span>
+        </div>
+        <div class="visor"><span class="grabado">Ánimo</span>{#if animoHoy}<span class="animo" title={animoHoy.t}>{animoHoy.cara}</span>{:else}<span class="digitos apagado">—</span>{/if}</div>
+        <div class="visor"><span class="grabado">Te esperó</span><span class="digitos" class:apagado={!espero}>{espero || '—'}</span></div>
+      </div>
+    </section>
+  {/if}
+
   <section class="mudanza chapa">
     <span class="grabado">Mudanza{mudanzaPendiente ? ' · en camino' : ''}</span>
     <div class="fila">
@@ -161,7 +199,7 @@
   .columna i.on.alto { background: #ffb347; box-shadow: 0 0 6px #ffb347; }
   .columna i.on.estres { background: #ff3b3b; box-shadow: 0 0 6px #ff3b3b; }
   .vu .grabado { font-size: 8.5px; letter-spacing: .06em; text-align: center; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .diario { grid-row: span 2; display: flex; flex-direction: column; gap: 16px; }
+  .diario { grid-row: span 3; display: flex; flex-direction: column; gap: 16px; }
   .contadores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .contadores .digitos { font-size: 40px; }
   .hitos, .fila-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -173,6 +211,17 @@
   .horas i { display: block; border-radius: 3px 3px 1px 1px; background: rgba(26,23,20,.55); }
   .horas i.pico { background: #1a1714; box-shadow: 0 -3px 0 #fff inset; }
   .ejes { display: flex; justify-content: space-between; font: 800 11px/1 var(--marca); color: rgba(26,23,20,.66); }
+  .hoy { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; }
+  .hoy-visores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .hoy .visor { padding: 12px 14px; gap: 8px; min-width: 0; }
+  .hoy .digitos { font-size: 30px; white-space: nowrap; }
+  .hoy .digitos small { font-size: 13px; color: var(--gris-claro); text-shadow: none; }
+  .hoy .apagado { color: #5a524a; text-shadow: none; }
+  .suenos { display: flex; flex-wrap: wrap; gap: 4px; min-height: 30px; align-items: center; }
+  .suenos i { font: normal 22px/1 var(--marca); color: #ffb347; text-shadow: 0 0 8px rgba(255,179,71,.6); }
+  .suenos i.pesadilla { color: #ff3b3b; }
+  .animo { font-size: 30px; line-height: 1; }
+
   .mudanza { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; }
   .fila { display: flex; gap: 10px; }
   .sel { flex: 1; min-width: 0; height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--hundido); color: var(--c-papel); font: 700 14px/1 var(--marca); }
