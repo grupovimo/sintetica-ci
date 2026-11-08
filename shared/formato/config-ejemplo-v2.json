@@ -35,5 +35,8 @@
   ],
   "voz": { "volumen": 0.7, "tipo": "media", "palabra": "Lucho", "conversar": false, "microfono": 0.6 },
   "pomodoro": { "trabajo": 25, "descanso": 5 },
-  "protector": { "imagen": 0, "espera": 10 }
+  "protector": { "imagen": 0, "espera": 10 },
+  "habla": { "frecuencia": 0.5, "propias": { "despertar": ["¡Arriba, {dueno}! Hoy se puede."], "caricia": ["Más, más."] } },
+  "despertador": { "hora": "07:30", "dias": "LMXJV", "activo": true, "sonido": true, "posponer": 9 },
+  "ubicacion": { "lat": -34.6037, "lon": -58.3816, "ciudad": "Buenos Aires" }
 }

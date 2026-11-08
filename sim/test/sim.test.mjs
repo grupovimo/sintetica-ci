@@ -393,3 +393,21 @@ test('cara de imagen: los sprites van a los espacios 8 a 19 y la cara de siempre
   assert.ok(maximo > 3000, `se ven los dos ojos (${maximo} px)`);
   assert.ok(minimo < maximo / 3, `parpadea (${minimo} de ${maximo})`);
 });
+
+test('v1.6: decir muestra un globo; el clima y la alarma por comando', async () => {
+  const { sim, notis, correr } = await nuevo();
+  sim.bleEscribir(Car.comando, comando.decir('¡Hola desde el sim!'));
+  assert.equal(leerRespuesta(notis.at(-1).b).ok, true);
+  correr(600);
+  assert.equal(leerEstado(sim.bleLeerEstado()).expresion, 'globo');
+  correr(5000);
+  assert.notEqual(leerEstado(sim.bleLeerEstado()).expresion, 'globo');
+  sim.bleEscribir(Car.comando, comando.clima({ temp: 18.4, codigo: 3, max: 22, min: 12, ciudad: 'Córdoba' }));
+  assert.equal(leerRespuesta(notis.at(-1).b).ok, true);
+  sim.bleEscribir(Car.comando, comando.alarma('probar'));
+  assert.equal(leerRespuesta(notis.at(-1).b).ok, true);
+  correr(600);
+  assert.equal(leerEstado(sim.bleLeerEstado()).expresion, 'despertador');
+  sim.bleEscribir(Car.comando, comando.alarma('apagar'));
+  assert.equal(leerRespuesta(notis.at(-1).b).ok, true);
+});

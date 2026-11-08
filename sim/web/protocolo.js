@@ -1,4 +1,4 @@
-// Protocolo de SintéticaOS v1.5 (BLE y nube), del lado de quien controla el bicho (app,
+// Protocolo de SintéticaOS v1.6 (BLE y nube), del lado de quien controla el bicho (app,
 // web, simulador). Ver docs/protocolo-ble.md. Sin dependencias: sirve en el
 // navegador y en Node.
 
@@ -19,6 +19,7 @@ export const Op = {
   cmdVincular: 0x13, cmdAutenticar: 0x14, cmdDesvincular: 0x15,
   cmdRed: 0x16, cmdNube: 0x17, cmdOlvidarRed: 0x18, cmdReproducir: 0x19,
   cmdHora: 0x1a, cmdVida: 0x1b, cmdMemoria: 0x1c, cmdRestaurar: 0x1d, cmdRegistro: 0x1e, cmdComportamiento: 0x1f,
+  cmdDecir: 0x40, cmdClima: 0x41, cmdAlarma: 0x42,
   imgInicio: 0x20, imgBloque: 0x21, imgFin: 0x22, imgBorrar: 0x23, imgListar: 0x24, imgPedir: 0x25, imgListarSprites: 0x26,
   otaInicio: 0x30, otaBloque: 0x31, otaFin: 0x32, otaDescargar: 0x33, otaProgreso: 0x34, otaCancelar: 0x35,
   respuesta: 0x80, configTrozo: 0x84, configCierre: 0x85, imgTrozo: 0xa7, imgCierre: 0xa8,
@@ -38,7 +39,15 @@ export const Eventos = [
   'caricia', 'muchos-toques', 'sacudida-suave', 'sacudida-fuerte', 'inclinado', 'caida', 'voz', 'nombre',
   'ruido', 'musica', 'silencio', 'notificacion', 'llamada', 'bateria-baja', 'bateria-critica', 'enchufado',
   'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito',
-  'recordatorio', 'pomodoro',
+  'recordatorio', 'pomodoro', 'despertador',
+];
+// Las acciones del comando Alarma (v1.6), en orden.
+export const AccionesAlarma = ['apagar', 'posponer', 'probar', 'despertar'];
+// Las situaciones de las frases (habla.propias y vida/frases.json).
+export const Situaciones = [
+  'despertar', 'buenas-noches', 'volviste', 'te-extrane', 'aburrido', 'sueno', 'bateria-baja', 'cargando',
+  'caricia', 'saludo', 'hito', 'cumple-dueno', 'cumple-robot', 'recordatorio-hecho', 'despertador', 'posponer',
+  'clima-frio', 'clima-calor', 'clima-lluvia', 'clima-lindo',
 ];
 // El estado interno y los rasgos, en el orden del protocolo (comando Vida).
 export const VariablesEstado = ['energia', 'animo', 'afecto', 'aburrimiento', 'curiosidad', 'sueno', 'estres'];
@@ -110,6 +119,36 @@ export const comando = {
   registro: () => Uint8Array.from([Op.cmdRegistro]),
   // Empieza un comportamiento ya (para probarlo).
   comportamiento: (nombre) => Uint8Array.from([Op.cmdComportamiento, ...texto.encode(nombre)]),
+  // Lo muestra en un globo (v1.6): texto de 1 a 60 bytes y, opcional, una expresión.
+  decir: (t, expresion = '') => {
+    const b = texto.encode(t), e = texto.encode(expresion);
+    if (b.length < 1 || b.length > 60) throw new Error('el texto es de 1 a 60 bytes');
+    return Uint8Array.from([Op.cmdDecir, e.length, ...e, ...b]);
+  },
+  // El clima (v1.6): °C actual (se manda en décimas), código WMO, máx, mín, si es de día y la ciudad.
+  clima: ({ temp, codigo, max, min, dia = true, ciudad = '' }) => {
+    let c = texto.encode(ciudad);
+    if (c.length > 24) c = c.slice(0, 24);
+    while (c.length && (c[c.length - 1] & 0xc0) === 0x80) c = c.slice(0, -1);
+    if (c.length && c[c.length - 1] >= 0xc0) c = c.slice(0, -1);
+    const b = new Uint8Array(8 + c.length);
+    b[0] = Op.cmdClima;
+    const v = new DataView(b.buffer);
+    v.setInt16(1, Math.round(temp * 10), true);
+    b[3] = codigo;
+    v.setInt8(4, max);
+    v.setInt8(5, min);
+    b[6] = dia ? 1 : 0;
+    b[7] = c.length;
+    b.set(c, 8);
+    return b;
+  },
+  // El despertador (v1.6): 'apagar', 'posponer', 'probar' o 'despertar'.
+  alarma: (accion) => {
+    const i = AccionesAlarma.indexOf(accion);
+    if (i < 0) throw new Error(`acción desconocida: ${accion}`);
+    return Uint8Array.from([Op.cmdAlarma, i]);
+  },
   evento: (nombreOIndice) => {
     const i = typeof nombreOIndice === 'number' ? nombreOIndice : Eventos.indexOf(nombreOIndice);
     if (i < 0) throw new Error(`evento desconocido: ${nombreOIndice}`);

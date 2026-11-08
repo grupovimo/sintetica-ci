@@ -118,6 +118,12 @@ const vectores = {
     { nombre: 'registro', hex: hex(comando.registro()) },
     { nombre: 'comportamiento practicar-caras', hex: hex(comando.comportamiento('practicar-caras')) },
     { nombre: 'restaurar', hex: hex(comando.restaurar(codificarMemoria(MEMORIA_PRUEBA))) },
+    { nombre: 'decir hola', texto: '¡Hola, Nahuel!', hex: hex(comando.decir('¡Hola, Nahuel!')) },
+    { nombre: 'decir con expresion', texto: 'Buen día', expresion: 'contento', hex: hex(comando.decir('Buen día', 'contento')) },
+    { nombre: 'clima', temp: -2.5, codigo: 73, max: 1, min: -4, dia: true, ciudad: 'Bariloche', hex: hex(comando.clima({ temp: -2.5, codigo: 73, max: 1, min: -4, dia: true, ciudad: 'Bariloche' })) },
+    { nombre: 'alarma probar', hex: hex(comando.alarma('probar')) },
+    { nombre: 'alarma posponer', hex: hex(comando.alarma('posponer')) },
+    { nombre: 'evento despertador', hex: hex(comando.evento('despertador')) },
     { nombre: 'ota cancelar', hex: hex(ota.cancelar()) },
   ],
   ota: {

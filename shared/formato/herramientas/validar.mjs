@@ -72,5 +72,27 @@ for (const m of malas) {
     console.log(`MAL  una cara de imagen inválida pasó: ${JSON.stringify(m)}`);
   } else console.log(`ok   rechaza ${JSON.stringify(m.expresiones)}`);
 }
+// Las frases de fábrica: las mismas situaciones que acepta "habla.propias", y
+// cada una entra como frase propia (así el usuario puede copiarlas).
+const frases = vida('frases.json');
+const situaciones = Object.keys(schema.properties.habla.properties.propias.properties);
+{
+  const faltan = situaciones.filter((s) => !frases.situaciones[s]);
+  const sobran = Object.keys(frases.situaciones).filter((s) => !situaciones.includes(s));
+  if (faltan.length || sobran.length) {
+    errores++;
+    console.log(`MAL  vida/frases.json: faltan ${faltan.join(', ') || '-'}; sobran ${sobran.join(', ') || '-'}`);
+  } else console.log('ok   vida/frases.json: las situaciones');
+}
+for (const [s, def] of Object.entries(frases.situaciones)) {
+  const todas = Object.values(def.frases).flat();
+  const largas = todas.filter((f) => new TextEncoder().encode(f).length > 60);
+  if (largas.length) {
+    errores++;
+    console.log(`MAL  vida/frases.json: ${s}: más de 60 bytes: ${largas.join(' | ')}`);
+  }
+  for (let i = 0; i < todas.length; i += 12)
+    revisar(`vida/frases.json: ${s} (${i / 12 + 1})`, validarConfig, { version: 2, habla: { propias: { [s]: todas.slice(i, i + 12) } } });
+}
 revisar('config-ejemplo-v2.json', validarConfig, JSON.parse(fs.readFileSync(path.join(formato, 'config-ejemplo-v2.json'), 'utf8')));
 process.exit(errores ? 1 : 0);
