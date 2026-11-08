@@ -1,0 +1,15 @@
+{
+ "version": 2,
+ "recordatorios": [
+  {
+   "hora": "23:59",
+   "dias": "LMXJVSD",
+   "texto": "Todos"
+  },
+  {
+   "hora": "00:00",
+   "dias": "",
+   "texto": "Vacío"
+  }
+ ]
+}

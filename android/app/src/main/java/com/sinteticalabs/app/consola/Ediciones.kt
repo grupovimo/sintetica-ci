@@ -11,6 +11,11 @@ import kotlinx.serialization.json.put
  * que los módulos de web/src/lib/consola). Todo puro: config en, config afuera.
  */
 object Editar {
+    const val MAX_LISTA = 16
+    const val MAX_PALABRA = 16
+    /** Nombres (del robot, del dueño, de expresiones y comportamientos), en bytes. */
+    const val MAX_NOMBRE = 24
+
     // --- Carácter ---
     val RASGOS = listOf("energia", "sociabilidad", "picardia", "timidez", "curiosidad", "malGenio")
     val NOMBRES_RASGO = mapOf(
@@ -115,7 +120,7 @@ object Editar {
     }
 
     fun ponerDueno(c: JsonObject, nombre: String): JsonObject {
-        val v = cortarBytes(nombre.trim(), 24).ifEmpty { null }
+        val v = cortarBytes(nombre.trim(), MAX_NOMBRE).ifEmpty { null }
         return c.en("dueno") { it.con("nombre", v) }
     }
 
@@ -142,7 +147,7 @@ object Editar {
     fun mostrar(c: JsonObject, espacio: Int, si: Boolean): JsonObject {
         val l = c.textos("lista").ifEmpty { listOf("cara:neutral") }
         val k = "imagen:$espacio"
-        val nueva = if (si) (if (k in l) l else (l + k).take(16)) else l.filter { it != k }
+        val nueva = if (si) (if (k in l) l else (l + k).take(MAX_LISTA)) else l.filter { it != k }
         return if (nueva == listOf("cara:neutral")) c.sin("lista") else c.con("lista", textosJson(nueva))
     }
 

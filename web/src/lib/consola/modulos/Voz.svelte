@@ -2,7 +2,7 @@
   // Voz: para los modelos con micrófono y parlante. Cómo suena, cuánto, a qué
   // nombre responde y si conversa.
   import { usarBicho } from '$lib/bicho.svelte';
-  import { cortarBytes } from '$lib/formato';
+  import { cortarBytes, MAX_PALABRA } from '$lib/formato';
   import { usarGuardado } from '../guardado.svelte';
   import type { Modelo } from '../modelo';
   import Perilla from '../Perilla.svelte';
@@ -47,7 +47,7 @@
         <label class="visor">
           <span class="grabado">Responde cuando le dicen</span>
           <input class="campo" maxlength="16" placeholder={nombre} value={v.palabra ?? ''}
-            onchange={(e) => { const t = cortarBytes(e.currentTarget.value.trim(), 16); poner((y) => { if (t) y.palabra = t; else delete y.palabra; }); }} />
+            onchange={(e) => { const t = cortarBytes(e.currentTarget.value.trim(), MAX_PALABRA); poner((y) => { if (t) y.palabra = t; else delete y.palabra; }); }} />
         </label>
         <button class="llave grande" aria-pressed={!!v.conversar} onclick={() => poner((y) => (y.conversar = !y.conversar))}>
           <span class="led"></span><span>Conversar<small>Charla con vos usando IA</small></span>

@@ -221,7 +221,7 @@ data class Regla(val si: String, val y: String? = null, val entonces: List<Strin
         }
 
         fun leer(c: JsonObject): List<Regla> = c.lista("reglas").orEmpty().mapNotNull { de(it) }
-        fun escribir(c: JsonObject, l: List<Regla>) = if (l.isEmpty()) c.sin("reglas") else c.con("reglas", JsonArray(l.take(24).map { it.aJson() }))
+        fun escribir(c: JsonObject, l: List<Regla>) = if (l.isEmpty()) c.sin("reglas") else c.con("reglas", JsonArray(l.take(Reflejos.MAX_REGLAS).map { it.aJson() }))
     }
 }
 

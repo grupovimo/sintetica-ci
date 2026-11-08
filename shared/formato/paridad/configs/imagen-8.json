@@ -1,0 +1,77 @@
+{
+ "version": 2,
+ "expresiones": {
+  "imagen-0": {
+   "sprites": {
+    "ojo": 0,
+    "ojo_cerrado": 1,
+    "boca": 2
+   },
+   "tamano": 0.4,
+   "boca_y": -0.3
+  },
+  "imagen-1": {
+   "sprites": {
+    "ojo": 1,
+    "ojo_cerrado": 2,
+    "boca": 3
+   },
+   "tamano": 0.4,
+   "boca_y": -0.3
+  },
+  "imagen-2": {
+   "sprites": {
+    "ojo": 2,
+    "ojo_cerrado": 3,
+    "boca": 4
+   },
+   "tamano": 0.4,
+   "boca_y": -0.3
+  },
+  "imagen-3": {
+   "sprites": {
+    "ojo": 3,
+    "ojo_cerrado": 4,
+    "boca": 5
+   },
+   "tamano": 0.4,
+   "boca_y": -0.3
+  },
+  "imagen-4": {
+   "sprites": {
+    "ojo": 4,
+    "ojo_cerrado": 5,
+    "boca": 6
+   },
+   "tamano": 0.4,
+   "boca_y": -0.3
+  },
+  "imagen-5": {
+   "sprites": {
+    "ojo": 5,
+    "ojo_cerrado": 6,
+    "boca": 7
+   },
+   "tamano": 0.4,
+   "boca_y": -0.3
+  },
+  "imagen-6": {
+   "sprites": {
+    "ojo": 6,
+    "ojo_cerrado": 7,
+    "boca": 8
+   },
+   "tamano": 0.4,
+   "boca_y": -0.3
+  },
+  "imagen-7": {
+   "sprites": {
+    "ojo": 7,
+    "ojo_cerrado": 8,
+    "boca": 9
+   },
+   "tamano": 0.4,
+   "boca_y": -0.3
+  }
+ }
+}

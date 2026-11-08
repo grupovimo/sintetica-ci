@@ -1,0 +1,13 @@
+{
+ "version": 2,
+ "comportamientos": {
+  "saludar_mucho": {
+   "pasos": [
+    {
+     "cara": "contento",
+     "dura": 1
+    }
+   ]
+  }
+ }
+}

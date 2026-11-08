@@ -4,7 +4,7 @@
   import { onMount } from 'svelte';
   import { api } from '$lib/api';
   import { usarBicho } from '$lib/bicho.svelte';
-  import { bytes, cortarBytes, type Ubicacion } from '$lib/formato';
+  import { bytes, cortarBytes, MAX_CIUDAD, type Ubicacion } from '$lib/formato';
   import { usarGuardado } from './guardado.svelte';
 
   const b = usarBicho();
@@ -40,7 +40,7 @@
     }
   }
   function elegir(l: Lugar) {
-    const u: Ubicacion = { lat: +l.lat.toFixed(4), lon: +l.lon.toFixed(4), ciudad: cortarBytes(l.ciudad || l.nombre, 40) };
+    const u: Ubicacion = { lat: +l.lat.toFixed(4), lon: +l.lon.toFixed(4), ciudad: cortarBytes(l.ciudad || l.nombre, MAX_CIUDAD) };
     g.cambiar((c) => (c.ubicacion = u));
     buscando = false;
     q = '';

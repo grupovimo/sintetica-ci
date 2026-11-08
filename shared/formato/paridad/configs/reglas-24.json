@@ -1,0 +1,149 @@
+{
+ "version": 2,
+ "reglas": [
+  {
+   "si": "tacto",
+   "entonces": [
+    "expresion:contento"
+   ]
+  },
+  {
+   "si": "caricia",
+   "entonces": [
+    "expresion:sorpresa"
+   ]
+  },
+  {
+   "si": "sacudida",
+   "entonces": [
+    "expresion:mareado"
+   ]
+  },
+  {
+   "si": "levantado",
+   "entonces": [
+    "expresion:contento"
+   ]
+  },
+  {
+   "si": "tacto",
+   "entonces": [
+    "expresion:sorpresa"
+   ]
+  },
+  {
+   "si": "caricia",
+   "entonces": [
+    "expresion:mareado"
+   ]
+  },
+  {
+   "si": "sacudida",
+   "entonces": [
+    "expresion:contento"
+   ]
+  },
+  {
+   "si": "levantado",
+   "entonces": [
+    "expresion:sorpresa"
+   ]
+  },
+  {
+   "si": "tacto",
+   "entonces": [
+    "expresion:mareado"
+   ]
+  },
+  {
+   "si": "caricia",
+   "entonces": [
+    "expresion:contento"
+   ]
+  },
+  {
+   "si": "sacudida",
+   "entonces": [
+    "expresion:sorpresa"
+   ]
+  },
+  {
+   "si": "levantado",
+   "entonces": [
+    "expresion:mareado"
+   ]
+  },
+  {
+   "si": "tacto",
+   "entonces": [
+    "expresion:contento"
+   ]
+  },
+  {
+   "si": "caricia",
+   "entonces": [
+    "expresion:sorpresa"
+   ]
+  },
+  {
+   "si": "sacudida",
+   "entonces": [
+    "expresion:mareado"
+   ]
+  },
+  {
+   "si": "levantado",
+   "entonces": [
+    "expresion:contento"
+   ]
+  },
+  {
+   "si": "tacto",
+   "entonces": [
+    "expresion:sorpresa"
+   ]
+  },
+  {
+   "si": "caricia",
+   "entonces": [
+    "expresion:mareado"
+   ]
+  },
+  {
+   "si": "sacudida",
+   "entonces": [
+    "expresion:contento"
+   ]
+  },
+  {
+   "si": "levantado",
+   "entonces": [
+    "expresion:sorpresa"
+   ]
+  },
+  {
+   "si": "tacto",
+   "entonces": [
+    "expresion:mareado"
+   ]
+  },
+  {
+   "si": "caricia",
+   "entonces": [
+    "expresion:contento"
+   ]
+  },
+  {
+   "si": "sacudida",
+   "entonces": [
+    "expresion:sorpresa"
+   ]
+  },
+  {
+   "si": "levantado",
+   "entonces": [
+    "expresion:mareado"
+   ]
+  }
+ ]
+}

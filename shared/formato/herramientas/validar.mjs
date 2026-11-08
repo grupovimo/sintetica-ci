@@ -95,4 +95,21 @@ for (const [s, def] of Object.entries(frases.situaciones)) {
     revisar(`vida/frases.json: ${s} (${i / 12 + 1})`, validarConfig, { version: 2, habla: { propias: { [s]: todas.slice(i, i + 12) } } });
 }
 revisar('config-ejemplo-v2.json', validarConfig, JSON.parse(fs.readFileSync(path.join(formato, 'config-ejemplo-v2.json'), 'utf8')));
+
+// El set de paridad (shared/formato/paridad): el schema dice lo mismo que el
+// núcleo, salvo donde el índice anota otra cosa ("esquema": lo que no puede
+// saber, como cuántas trae la base).
+const paridad = path.join(formato, 'paridad');
+for (const c of JSON.parse(fs.readFileSync(path.join(paridad, 'paridad.json'), 'utf8')).casos) {
+  const t = fs.readFileSync(path.join(paridad, 'configs', c.archivo), 'utf8');
+  let datos;
+  try { datos = JSON.parse(t); } catch { datos = undefined; }
+  const dice = datos !== undefined && validarConfig(datos);
+  const espera = c.esquema ?? c.acepta;
+  if (dice === espera) console.log(`ok   paridad/${c.archivo}`);
+  else {
+    errores++;
+    console.log(`MAL  paridad/${c.archivo}: el schema ${dice ? 'la acepta' : 'la rechaza'}`);
+  }
+}
 process.exit(errores ? 1 : 0);

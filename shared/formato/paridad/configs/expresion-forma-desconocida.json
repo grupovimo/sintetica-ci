@@ -1,0 +1,14 @@
+{
+ "version": 2,
+ "expresiones": {
+  "rara": {
+   "formas": [
+    {
+     "forma": "estrella",
+     "x": 0,
+     "y": 0
+    }
+   ]
+  }
+ }
+}

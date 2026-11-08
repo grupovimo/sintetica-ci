@@ -17,12 +17,13 @@ git -C "$raiz" archive HEAD ios firmware/nucleo firmware/api shared/protocolo sh
 cd "$destino"
 git pull -q --rebase 2>/dev/null || true
 rm -rf ios firmware shared .github
-mkdir -p firmware shared/protocolo shared/formato/vida shared/formato/caras shared/formato/animaciones .github/workflows
+mkdir -p firmware shared/protocolo shared/formato/paridad shared/formato/vida shared/formato/caras shared/formato/animaciones .github/workflows
 rsync -a --exclude 'Sintetica.xcodeproj' --exclude '.DS_Store' "$foto/ios/" ios/
 rsync -a --exclude '*.md' "$foto/firmware/nucleo/" firmware/nucleo/
 rsync -a --exclude 'cgo' "$foto/firmware/api/" firmware/api/
 cp "$foto/shared/protocolo/vectores.json" shared/protocolo/
 cp "$foto/shared/formato/config-ejemplo.json" shared/formato/
+cp "$foto/shared/formato/paridad/paridad.json" shared/formato/paridad/
 cp "$foto"/shared/formato/vida/*.json shared/formato/vida/
 cp "$foto"/shared/formato/caras/*.json shared/formato/caras/
 cp "$foto"/shared/formato/animaciones/*.json shared/formato/animaciones/

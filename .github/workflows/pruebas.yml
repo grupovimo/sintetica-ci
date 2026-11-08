@@ -83,7 +83,7 @@ jobs:
         run: docker compose logs --tail 200
 
   web:
-    name: Web (check y build)
+    name: Web (check, tests y build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,7 +92,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang lld
       - run: npm ci
         working-directory: web
-      - run: npm run check && npm run build
+      - run: npm run check && npm test && npm run build
         working-directory: web
 
   android:

@@ -38,6 +38,9 @@ en `docs/motor-de-vida.md` (cómo está hecho) y
   de `npm run test:nucleo` o `cmake --build build/nucleo`).
 - `node shared/protocolo/generar_vectores.mjs`: regenerar los vectores del
   protocolo después de tocar `sim/web/protocolo.js`.
+- `node shared/formato/paridad/generar.mjs`: regenerar el set de paridad de la
+  config (casos borde y límites que corren núcleo, cgo, wasm, web, Kotlin y
+  Swift) después de tocar un límite o un detalle de error del núcleo.
 - La nube: `docker compose up --build` (ver `docs/local.md`; la web corre con
   Vite en :5173, así que en la Mac `docker compose up -d --build --wait api
   bicho-virtual bicho-broche`); `SINTETICA_PRUEBAS_DB=postgres://sintetica:sintetica@localhost:5433/pruebas

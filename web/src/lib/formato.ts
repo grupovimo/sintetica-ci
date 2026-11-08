@@ -228,6 +228,13 @@ export const bytes = (t: string) => new TextEncoder().encode(t).length;
 // dias: letras de L M X J V S D (vacío = todos los días).
 export type Recordatorio = { hora: string; dias?: string; texto: string; expresion?: string; sonido?: boolean; activo?: boolean };
 export const MAX_RECORDATORIOS = 12;
+export const MAX_TEXTO_RECORDATORIO = 40;
+// Los demás topes del núcleo que cuida la web (los mismos de shared/formato/paridad/paridad.json).
+export const MAX_NOMBRE = 24; // bytes: el nombre del robot y el del dueño
+export const MAX_PALABRA = 16; // bytes: voz.palabra
+export const MAX_CIUDAD = 40; // bytes: ubicacion.ciudad
+export const MAX_LISTA = 16;
+export const MAX_REGLAS = 24;
 
 export const TIPOS_FORMA: { tipo: Forma['forma']; nombre: string; nueva: () => Forma }[] = [
   { tipo: 'pildora', nombre: 'Píldora', nueva: () => ({ forma: 'pildora', x: 0, y: 0, w: 0.15, h: 0.4 }) },

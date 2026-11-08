@@ -1,0 +1,10 @@
+{
+ "version": 2,
+ "expresiones": {
+  "a": {
+   "sprites": {
+    "boca": 1
+   }
+  }
+ }
+}

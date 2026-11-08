@@ -1,0 +1,12 @@
+{
+ "version": 2,
+ "reglas": [
+  {
+   "si": "tacto",
+   "y": "afecto>>0.6",
+   "entonces": [
+    "expresion:contento"
+   ]
+  }
+ ]
+}

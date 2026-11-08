@@ -17,6 +17,7 @@ object Acompanar {
     const val MAX_AVISOS = 8
     const val MAX_DECIR_AVISO = 40
     const val MAX_NOMBRE_AVISO = 24
+    const val MAX_CIUDAD = 40
     private val DIAS = listOf("L", "M", "X", "J", "V", "S", "D")
 
     // --- Habla ---
@@ -95,7 +96,7 @@ object Acompanar {
     }
 
     fun ponerUbicacion(c: JsonObject, lat: Double, lon: Double, ciudad: String) = c.con("ubicacion", buildJsonObject {
-        put("lat", redondo(lat, 4)); put("lon", redondo(lon, 4)); put("ciudad", cortarBytes(ciudad, 40))
+        put("lat", redondo(lat, 4)); put("lon", redondo(lon, 4)); put("ciudad", cortarBytes(ciudad, MAX_CIUDAD))
     })
 
     // --- Cuidado ---

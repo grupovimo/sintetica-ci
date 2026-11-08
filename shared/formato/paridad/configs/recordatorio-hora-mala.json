@@ -1,0 +1,9 @@
+{
+ "version": 2,
+ "recordatorios": [
+  {
+   "hora": "24:00",
+   "texto": "Tarde"
+  }
+ ]
+}

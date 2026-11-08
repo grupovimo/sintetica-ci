@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { api, ErrorApi } from '$lib/api';
   import { usarBicho } from '$lib/bicho.svelte';
+  import { cortarBytes, MAX_NOMBRE } from '$lib/formato';
   import { usarGuardado } from '../guardado.svelte';
   import { numeroDe, type Modelo } from '../modelo';
   import Perilla from '../Perilla.svelte';
@@ -21,7 +22,7 @@
       const r = await api<{ apodo: string }>(`/v1/bichos/${b.id}`, { metodo: 'PATCH', cuerpo: { apodo: v } });
       if (b.bicho) b.bicho.apodo = r.apodo;
       // El nombre también va a la config: es el que muestra y al que responde.
-      if (v) g.cambiar((c) => (c.nombre = v));
+      if (v) g.cambiar((c) => (c.nombre = cortarBytes(v, MAX_NOMBRE)));
       error = '';
     } catch (e) {
       error = e instanceof ErrorApi ? e.message : 'No pude guardar el nombre.';

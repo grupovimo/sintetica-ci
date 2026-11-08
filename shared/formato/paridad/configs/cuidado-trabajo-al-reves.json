@@ -1,0 +1,9 @@
+{
+ "version": 2,
+ "cuidado": {
+  "trabajo": {
+   "desde": "18:00",
+   "hasta": "09:00"
+  }
+ }
+}

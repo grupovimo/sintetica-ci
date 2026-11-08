@@ -1,0 +1,28 @@
+{
+ "version": 2,
+ "habla": {
+  "propias": {
+   "despertar": [
+    "Frase 0",
+    "Frase 4",
+    "Frase 8",
+    "Frase 12"
+   ],
+   "caricia": [
+    "Frase 1",
+    "Frase 5",
+    "Frase 9"
+   ],
+   "saludo": [
+    "Frase 2",
+    "Frase 6",
+    "Frase 10"
+   ],
+   "buen-dia": [
+    "Frase 3",
+    "Frase 7",
+    "Frase 11"
+   ]
+  }
+ }
+}

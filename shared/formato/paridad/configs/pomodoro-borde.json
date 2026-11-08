@@ -1,0 +1,7 @@
+{
+ "version": 2,
+ "pomodoro": {
+  "trabajo": 120,
+  "descanso": 60
+ }
+}

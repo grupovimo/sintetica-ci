@@ -3,7 +3,7 @@
   // despertador y los cumpleaños que festeja.
   import { api, ErrorApi } from '$lib/api';
   import { usarBicho } from '$lib/bicho.svelte';
-  import { cortarBytes, MAX_TEXTO, type Despertador } from '$lib/formato';
+  import { cortarBytes, MAX_NOMBRE, MAX_TEXTO, type Despertador } from '$lib/formato';
   import { usarGuardado } from '../guardado.svelte';
   import type { Modelo } from '../modelo';
 
@@ -145,7 +145,7 @@
     <div class="visor">
       <span class="grabado">Vos te llamás</span>
       <input class="campo claro" type="text" maxlength="24" placeholder="Tu nombre" value={b.config.dueno?.nombre ?? ''}
-        onchange={(e) => { const v = e.currentTarget.value.trim(); g.cambiar((c) => { c.dueno = { ...(c.dueno ?? {}), nombre: v || undefined }; if (!v) delete c.dueno.nombre; }); }} />
+        onchange={(e) => { const v = cortarBytes(e.currentTarget.value.trim(), MAX_NOMBRE); g.cambiar((c) => { c.dueno = { ...(c.dueno ?? {}), nombre: v || undefined }; if (!v) delete c.dueno.nombre; }); }} />
     </div>
     {#each [['dueno', 'Tu cumple', cumpleDueno], ['robot', 'Su cumple', cumpleRobot]] as [de, t, cu]}
       {@const p = cu as { m: number; d: number }}

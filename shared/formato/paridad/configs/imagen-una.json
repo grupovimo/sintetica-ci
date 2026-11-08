@@ -1,0 +1,21 @@
+{
+ "version": 2,
+ "cara": {
+  "expresion": "anime"
+ },
+ "expresiones": {
+  "anime": {
+   "sprites": {
+    "ojo": 0,
+    "ojo_cerrado": 1,
+    "boca": 2
+   },
+   "tamano": 0.4,
+   "boca_y": -0.3,
+   "ojo": {
+    "lt": 0.1
+   },
+   "movimiento": "rebote"
+  }
+ }
+}

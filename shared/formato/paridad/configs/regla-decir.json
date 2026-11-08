@@ -1,0 +1,13 @@
+{
+ "version": 2,
+ "reglas": [
+  {
+   "si": "caricia",
+   "y": "afecto>0.6,noche",
+   "entonces": [
+    "decir:caricia",
+    "estado.afecto+0.05"
+   ]
+  }
+ ]
+}

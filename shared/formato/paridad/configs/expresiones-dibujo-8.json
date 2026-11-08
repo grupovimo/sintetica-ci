@@ -1,0 +1,85 @@
+{
+ "version": 2,
+ "expresiones": {
+  "dibujo-0": {
+   "formas": [
+    {
+     "forma": "circulo",
+     "x": -0.3,
+     "y": 0,
+     "r": 0.1
+    }
+   ]
+  },
+  "dibujo-1": {
+   "formas": [
+    {
+     "forma": "circulo",
+     "x": -0.25,
+     "y": 0,
+     "r": 0.1
+    }
+   ]
+  },
+  "dibujo-2": {
+   "formas": [
+    {
+     "forma": "circulo",
+     "x": -0.19999999999999998,
+     "y": 0,
+     "r": 0.1
+    }
+   ]
+  },
+  "dibujo-3": {
+   "formas": [
+    {
+     "forma": "circulo",
+     "x": -0.14999999999999997,
+     "y": 0,
+     "r": 0.1
+    }
+   ]
+  },
+  "dibujo-4": {
+   "formas": [
+    {
+     "forma": "circulo",
+     "x": -0.09999999999999998,
+     "y": 0,
+     "r": 0.1
+    }
+   ]
+  },
+  "dibujo-5": {
+   "formas": [
+    {
+     "forma": "circulo",
+     "x": -0.04999999999999999,
+     "y": 0,
+     "r": 0.1
+    }
+   ]
+  },
+  "dibujo-6": {
+   "formas": [
+    {
+     "forma": "circulo",
+     "x": 5.551115123125783e-17,
+     "y": 0,
+     "r": 0.1
+    }
+   ]
+  },
+  "dibujo-7": {
+   "formas": [
+    {
+     "forma": "circulo",
+     "x": 0.050000000000000044,
+     "y": 0,
+     "r": 0.1
+    }
+   ]
+  }
+ }
+}

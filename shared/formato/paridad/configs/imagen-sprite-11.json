@@ -1,0 +1,13 @@
+{
+ "version": 2,
+ "expresiones": {
+  "a": {
+   "sprites": {
+    "ojo": 11,
+    "ojo_der": 0,
+    "ojo_der_cerrado": 1
+   },
+   "espejar_der": false
+  }
+ }
+}

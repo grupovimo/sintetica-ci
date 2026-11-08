@@ -7,7 +7,7 @@
   // según la app y el contacto (config.avisos).
   import { usarBicho } from '$lib/bicho.svelte';
   import {
-    bytes, COMPORTAMIENTOS_BASE, cortarBytes, EXPRESIONES_BASE, MAX_AVISOS, MAX_DECIR_AVISO, MAX_NOMBRE_AVISO, NOMBRES_EVENTO,
+    bytes, COMPORTAMIENTOS_BASE, cortarBytes, EXPRESIONES_BASE, MAX_AVISOS, MAX_DECIR_AVISO, MAX_NOMBRE_AVISO, MAX_REGLAS, NOMBRES_EVENTO,
     type Aviso, type Regla,
   } from '$lib/formato';
   import { usarGuardado } from '../guardado.svelte';
@@ -36,7 +36,7 @@
   function conectar(entrada: string, salida: string | null) {
     g.cambiar((c) => {
       const otras = (c.reglas ?? []).filter((r) => !(simple(r) && r.si === entrada));
-      c.reglas = salida ? [...otras, { si: entrada, entonces: [`reflejo:${salida}`] }].slice(0, 24) : otras;
+      c.reglas = salida ? [...otras, { si: entrada, entonces: [`reflejo:${salida}`] }].slice(0, MAX_REGLAS) : otras;
       if (!c.reglas.length) delete c.reglas;
     });
     elegida = null;

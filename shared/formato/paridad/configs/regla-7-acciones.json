@@ -1,0 +1,17 @@
+{
+ "version": 2,
+ "reglas": [
+  {
+   "si": "tacto",
+   "entonces": [
+    "estado.animo+0.1",
+    "estado.animo+0.1",
+    "estado.animo+0.1",
+    "estado.animo+0.1",
+    "estado.animo+0.1",
+    "estado.animo+0.1",
+    "estado.animo+0.1"
+   ]
+  }
+ ]
+}

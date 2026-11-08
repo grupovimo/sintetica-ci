@@ -1,0 +1,10 @@
+{
+ "version": 2,
+ "voz": {
+  "volumen": 0,
+  "tipo": "robot",
+  "palabra": "áááááááá",
+  "conversar": true,
+  "microfono": 1
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "version": 2,
+ "avisos": [
+  {
+   "tipo": "llamada",
+   "contacto": "áááááááááááá",
+   "comportamiento": "investigar",
+   "decir": "😀😀😀😀😀😀😀😀😀😀",
+   "sonido": false
+  }
+ ]
+}

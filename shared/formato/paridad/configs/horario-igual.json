@@ -1,0 +1,7 @@
+{
+ "version": 2,
+ "horario": {
+  "despierta": "08:00",
+  "duerme": "08:00"
+ }
+}

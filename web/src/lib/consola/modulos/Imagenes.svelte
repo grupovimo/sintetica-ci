@@ -4,6 +4,7 @@
   import { onMount } from 'svelte';
   import { api, conBinario, ErrorApi } from '$lib/api';
   import { usarBicho } from '$lib/bicho.svelte';
+  import { MAX_LISTA } from '$lib/formato';
   import { escuchar } from '$lib/eventos.svelte';
   import { animar, cuadrosAUrls, prepararImagen } from '$lib/imagenes';
   import { pantallaDe, type Imagen } from '$lib/tipos';
@@ -84,7 +85,7 @@
     g.cambiar((c) => {
       const l = c.lista?.length ? [...c.lista] : ['cara:neutral'];
       const k = `imagen:${espacio}`;
-      c.lista = si ? (l.includes(k) ? l : [...l, k].slice(0, 16)) : l.filter((x) => x !== k);
+      c.lista = si ? (l.includes(k) ? l : [...l, k].slice(0, MAX_LISTA)) : l.filter((x) => x !== k);
       if (c.lista.length === 1 && c.lista[0] === 'cara:neutral') delete c.lista;
     });
   }

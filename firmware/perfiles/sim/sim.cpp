@@ -57,7 +57,7 @@ uint16_t g_editorPx[640 * 480];
 Lienzo g_editorLienzo;
 Vista g_editorVista;
 Config g_editorConfig;
-char g_detalle[96];
+char g_detalle[128];  // como el de cgo: entran todos los detalles del núcleo
 char g_visible[LARGO_NOMBRE + 12];
 
 // 1.47B: 320 × 172 de una vez. Broche: 240 × 240 en franjas de 40 filas, como en la placa.

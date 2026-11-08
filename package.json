@@ -6,9 +6,9 @@
   "type": "module",
   "scripts": {
     "test": "npm run test:formato && npm run test:nucleo && npm run test:sim",
-    "test:formato": "node shared/formato/herramientas/validar.mjs",
+    "test:formato": "node shared/formato/herramientas/validar.mjs && node shared/formato/paridad/generar.mjs --verificar",
     "test:nucleo": "cmake -S firmware -B build/nucleo -DCMAKE_BUILD_TYPE=Release && cmake --build build/nucleo -j && ctest --test-dir build/nucleo --output-on-failure",
-    "test:sim": "sh sim/compilar.sh && node sim/empaquetar.mjs && node --test sim/test/sim.test.mjs",
+    "test:sim": "sh sim/compilar.sh && node sim/empaquetar.mjs && node --test sim/test/sim.test.mjs sim/test/paridad.test.mjs",
     "sim": "sh sim/compilar.sh && node sim/servir.mjs",
     "empaquetar": "sh sim/compilar.sh && node sim/empaquetar.mjs",
     "caras": "python3 shared/formato/herramientas/generar_caras.py && python3 firmware/herramientas/embeber_caras.py",

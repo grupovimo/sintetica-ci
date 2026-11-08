@@ -1,0 +1,95 @@
+{
+ "version": 2,
+ "comportamientos": {
+  "propio-0": {
+   "tipo": "reaccion",
+   "pasos": [
+    {
+     "cara": "contento",
+     "dura": 1
+    }
+   ]
+  },
+  "propio-1": {
+   "tipo": "reaccion",
+   "pasos": [
+    {
+     "cara": "contento",
+     "dura": 1.1
+    }
+   ]
+  },
+  "propio-2": {
+   "tipo": "reaccion",
+   "pasos": [
+    {
+     "cara": "contento",
+     "dura": 1.2
+    }
+   ]
+  },
+  "propio-3": {
+   "tipo": "reaccion",
+   "pasos": [
+    {
+     "cara": "contento",
+     "dura": 1.3
+    }
+   ]
+  },
+  "propio-4": {
+   "tipo": "reaccion",
+   "pasos": [
+    {
+     "cara": "contento",
+     "dura": 1.4
+    }
+   ]
+  },
+  "propio-5": {
+   "tipo": "reaccion",
+   "pasos": [
+    {
+     "cara": "contento",
+     "dura": 1.5
+    }
+   ]
+  },
+  "propio-6": {
+   "tipo": "reaccion",
+   "pasos": [
+    {
+     "cara": "contento",
+     "dura": 1.6
+    }
+   ]
+  },
+  "propio-7": {
+   "tipo": "reaccion",
+   "pasos": [
+    {
+     "cara": "contento",
+     "dura": 1.7000000000000002
+    }
+   ]
+  },
+  "propio-8": {
+   "tipo": "reaccion",
+   "pasos": [
+    {
+     "cara": "contento",
+     "dura": 1.8
+    }
+   ]
+  },
+  "propio-9": {
+   "tipo": "reaccion",
+   "pasos": [
+    {
+     "cara": "contento",
+     "dura": 1.9
+    }
+   ]
+  }
+ }
+}

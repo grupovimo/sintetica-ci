@@ -1,0 +1,59 @@
+{
+ "version": 2,
+ "avisos": [
+  {
+   "tipo": "notificacion",
+   "app": "App 0",
+   "expresion": "sorpresa",
+   "decir": "{app}"
+  },
+  {
+   "tipo": "llamada",
+   "app": "App 1",
+   "expresion": "sorpresa",
+   "decir": "{app}"
+  },
+  {
+   "tipo": "notificacion",
+   "app": "App 2",
+   "expresion": "sorpresa",
+   "decir": "{app}"
+  },
+  {
+   "tipo": "llamada",
+   "app": "App 3",
+   "expresion": "sorpresa",
+   "decir": "{app}"
+  },
+  {
+   "tipo": "notificacion",
+   "app": "App 4",
+   "expresion": "sorpresa",
+   "decir": "{app}"
+  },
+  {
+   "tipo": "llamada",
+   "app": "App 5",
+   "expresion": "sorpresa",
+   "decir": "{app}"
+  },
+  {
+   "tipo": "notificacion",
+   "app": "App 6",
+   "expresion": "sorpresa",
+   "decir": "{app}"
+  },
+  {
+   "tipo": "llamada",
+   "app": "App 7",
+   "expresion": "sorpresa",
+   "decir": "{app}"
+  },
+  {
+   "tipo": "notificacion",
+   "app": "App 8",
+   "expresion": "sorpresa",
+   "decir": "{app}"
+  }
+ ]
+}

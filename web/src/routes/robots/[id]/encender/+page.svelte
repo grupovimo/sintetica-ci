@@ -4,7 +4,7 @@
   import { goto } from '$app/navigation';
   import { api, conBinario, ErrorApi } from '$lib/api';
   import { usarBicho } from '$lib/bicho.svelte';
-  import { clonar, NOMBRES_PRESET, PRESETS, type Config } from '$lib/formato';
+  import { clonar, cortarBytes, MAX_NOMBRE, NOMBRES_PRESET, PRESETS, type Config } from '$lib/formato';
   import { prepararImagen } from '$lib/imagenes';
   import { pantallaDe } from '$lib/tipos';
   import Barra from '$lib/consola/Barra.svelte';
@@ -50,7 +50,7 @@
   const borrador = $derived.by(() => {
     const c = clonar($state.snapshot(b.config)) as Config;
     aV2(c);
-    if (nombre.trim()) c.nombre = nombre.trim().slice(0, 24);
+    if (nombre.trim()) c.nombre = cortarBytes(nombre.trim(), MAX_NOMBRE);
     c.personalidad = { preset, ...(PRESETS[preset] ?? {}) };
     c.horario = { despierta, duerme };
     return c;
@@ -92,7 +92,7 @@
       const c = $state.snapshot(borrador) as Config;
       if (tuNombre.trim() || (dia && mes)) {
         c.dueno = { ...(c.dueno ?? {}) };
-        if (tuNombre.trim()) c.dueno.nombre = tuNombre.trim().slice(0, 24);
+        if (tuNombre.trim()) c.dueno.nombre = cortarBytes(tuNombre.trim(), MAX_NOMBRE);
         if (dia && mes) c.dueno.cumple = `${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
       }
       if (nombre.trim()) {

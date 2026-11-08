@@ -1,0 +1,11 @@
+{
+ "version": 2,
+ "despertador": {
+  "hora": "07:30",
+  "dias": "LMXJV",
+  "activo": true,
+  "sonido": true,
+  "texto": "áááááááááááááááááááááááááááááá",
+  "posponer": 30
+ }
+}

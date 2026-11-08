@@ -1,0 +1,65 @@
+{
+ "version": 2,
+ "recordatorios": [
+  {
+   "hora": "08:00",
+   "dias": "LMXJV",
+   "texto": "Recordatorio 0"
+  },
+  {
+   "hora": "09:05",
+   "dias": "LMXJV",
+   "texto": "Recordatorio 1"
+  },
+  {
+   "hora": "10:10",
+   "dias": "LMXJV",
+   "texto": "Recordatorio 2"
+  },
+  {
+   "hora": "11:15",
+   "dias": "LMXJV",
+   "texto": "Recordatorio 3"
+  },
+  {
+   "hora": "12:20",
+   "dias": "LMXJV",
+   "texto": "Recordatorio 4"
+  },
+  {
+   "hora": "13:25",
+   "dias": "LMXJV",
+   "texto": "Recordatorio 5"
+  },
+  {
+   "hora": "14:30",
+   "dias": "LMXJV",
+   "texto": "Recordatorio 6"
+  },
+  {
+   "hora": "15:35",
+   "dias": "LMXJV",
+   "texto": "Recordatorio 7"
+  },
+  {
+   "hora": "16:40",
+   "dias": "LMXJV",
+   "texto": "Recordatorio 8"
+  },
+  {
+   "hora": "17:45",
+   "dias": "LMXJV",
+   "texto": "Recordatorio 9"
+  },
+  {
+   "hora": "18:50",
+   "dias": "LMXJV",
+   "texto": "Recordatorio 10"
+  },
+  {
+   "hora": "19:55",
+   "dias": "LMXJV",
+   "texto": "Recordatorio 11"
+  }
+ ]
+}

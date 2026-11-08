@@ -1,0 +1,49 @@
+{
+ "version": 2,
+ "expresiones": {
+  "propia-0": {
+   "extiende": "neutral",
+   "gy": 0
+  },
+  "propia-1": {
+   "extiende": "neutral",
+   "gy": 0.01
+  },
+  "propia-2": {
+   "extiende": "neutral",
+   "gy": 0.02
+  },
+  "propia-3": {
+   "extiende": "neutral",
+   "gy": 0.03
+  },
+  "propia-4": {
+   "extiende": "neutral",
+   "gy": 0.04
+  },
+  "propia-5": {
+   "extiende": "neutral",
+   "gy": 0.05
+  },
+  "propia-6": {
+   "extiende": "neutral",
+   "gy": 0.06
+  },
+  "propia-7": {
+   "extiende": "neutral",
+   "gy": 0.07
+  },
+  "propia-8": {
+   "extiende": "neutral",
+   "gy": 0.08
+  },
+  "propia-9": {
+   "extiende": "neutral",
+   "gy": 0.09
+  },
+  "propia-10": {
+   "extiende": "neutral",
+   "gy": 0.1
+  }
+ }
+}

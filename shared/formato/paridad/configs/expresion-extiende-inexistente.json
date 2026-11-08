@@ -1,0 +1,8 @@
+{
+ "version": 2,
+ "expresiones": {
+  "mia": {
+   "extiende": "no-existe"
+  }
+ }
+}
