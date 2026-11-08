@@ -334,6 +334,8 @@ struct ModVoz: View {
                 }
                 .foregroundStyle(Color.tinta)
             }
+            // Igual se puede conectar la voz: le hablás desde acá.
+            LeerVoz(modelo: modelo)
         } else {
             VStack(spacing: 16) {
                 Bandeja {
@@ -370,6 +372,8 @@ struct ModVoz: View {
                 }
             }
             .onAppear { palabra = modelo.config.voz["palabra"] as? String ?? "" }
+            LeerVoz(modelo: modelo)
+            if habla { PaqueteVozVista(modelo: modelo) }
         }
     }
 }
