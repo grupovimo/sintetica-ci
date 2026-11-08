@@ -364,6 +364,7 @@ int sintetica_voz(int* volumen, int* microfono, int* tipo, const char** palabra)
 }
 int sintetica_fps_sugerido(void) { return g_sistema.fpsSugerido(); }
 void sintetica_qr_por_mantener(int si) { g_sistema.qrPorMantener(si != 0); }
+void sintetica_mostrar_qr(void) { g_sistema.mostrarQr(); }
 void sintetica_seguir(float x, float y) { g_sistema.seguir(x, y); }
 void sintetica_depurar(int si) { g_sistema.depurar(si != 0); }
 }

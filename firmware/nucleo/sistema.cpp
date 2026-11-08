@@ -773,6 +773,11 @@ void Sistema::siguiente() {
   guardarAjustes();
 }
 
+void Sistema::mostrarQr() {
+  emparejando_ = true;
+  emparejarHasta_ = hal_.ahoraMs() + QR_POR_BOTON_MS;
+}
+
 void Sistema::dormir() {
   apagado_ = true;
   guardarAjustes();

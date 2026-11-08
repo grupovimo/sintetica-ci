@@ -159,6 +159,8 @@ int sintetica_voz(int* volumen, int* microfono, int* tipo, const char** palabra)
 int sintetica_fps_sugerido(void);
 /* 0 = mantener apretado no muestra el QR (por defecto sí). */
 void sintetica_qr_por_mantener(int si);
+/* Muestra el QR para vincular otro celu un rato (como mantener el botón). */
+void sintetica_mostrar_qr(void);
 /* Algo que mirar (una cara que ve la cámara), de -1 a 1; y hacia arriba es +. */
 void sintetica_seguir(float x, float y);
 /* La superposición de depuración del núcleo (comportamiento, estado, fps). */

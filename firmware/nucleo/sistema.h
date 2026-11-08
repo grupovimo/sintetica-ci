@@ -187,6 +187,8 @@ class Sistema {
   void dormir();
   const Perfil& perfil() const { return perfil_; }
   void qrPorMantener(bool si) { perfil_.qrPorMantener = si; }
+  // Muestra el QR para vincular otro celu un rato (lo mismo que mantener el botón).
+  void mostrarQr();
   // Imágenes guardadas: largo 0 = espacio vacío.
   uint32_t largoImagen(int espacio) const { return (espacio >= 0 && espacio < MAX_IMAGENES) ? imagenes_[espacio].largo : 0; }
   // La imagen que se ve ahora (-1 = una cara).
