@@ -46,7 +46,7 @@ class Bicho : Activity() {
         red.prender()
         depuracion = Depuracion(vista) { datos.alternar() }
         registerReceiver(depuracion, IntentFilter(Depuracion.ACCION))
-        sentidos = Sentidos(this, vista)
+        sentidos = Sentidos(this, vista, lienzo)
         datos = Datos(texto, lienzo, sentidos, depuracion)
         lienzo.alDibujar = { datos.leerNucleo() }
     }

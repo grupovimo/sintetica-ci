@@ -28,12 +28,19 @@ import kotlin.math.ln
  * oído (solo el nivel) y la luz (el brillo de la pantalla).
  * Todo lo que va al núcleo pasa por el hilo de GL.
  */
-class Sentidos(private val a: Activity, private val vista: GLSurfaceView) : SensorEventListener {
+class Sentidos(
+    private val a: Activity,
+    private val vista: GLSurfaceView,
+    private val lienzo: Lienzo,
+) : SensorEventListener {
     private val sensores = a.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private var oyendo: Thread? = null
     @Volatile private var escuchar = false
     private var enchufado: Boolean? = null
     private var brillo = -1f
+    /** Con la batería a más de 40 °C: la mitad de cuadros y menos brillo, hasta que baje de 38. */
+    @Volatile var caliente = false
+        private set
 
     /** Lo último que pasó, para la depuración. */
     @Volatile var temperatura = 0f
@@ -89,7 +96,7 @@ class Sentidos(private val a: Activity, private val vista: GLSurfaceView) : Sens
     /** Brillo según la luz: de noche casi apagado, con sol a pleno. Cambia de a poco. */
     private fun luz(valor: Float) {
         lux = valor
-        val objetivo = (0.04f + ln(1f + valor) / ln(1f + 400f)).coerceIn(0.04f, 1f)
+        val objetivo = (0.04f + ln(1f + valor) / ln(1f + 400f)).coerceIn(0.04f, if (caliente) 0.4f else 1f)
         brillo = if (brillo < 0) objetivo else brillo + (objetivo - brillo) * 0.2f
         val w = a.window
         w.attributes = w.attributes.apply { screenBrightness = brillo }
@@ -100,6 +107,11 @@ class Sentidos(private val a: Activity, private val vista: GLSurfaceView) : Sens
             val nivel = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
             val escala = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
             temperatura = i.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10f
+            if (!caliente && temperatura > 40f || caliente && temperatura < 38f) {
+                caliente = !caliente
+                lienzo.tope = if (caliente) 15 else 30
+                Log.w("Bicho", if (caliente) "batería a $temperatura °C: bajo a 15 fps" else "batería a $temperatura °C: vuelvo a 30 fps")
+            }
             if (nivel >= 0) Nucleo.bateria(nivel * 100 / escala)
             // Provisorio hasta que la API C tenga hal.cargando: el evento a mano.
             val ahora = i.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0

@@ -47,7 +47,7 @@ class Datos(
                 appendLine("%.1f fps".format(lienzo.fps))
                 appendLine("cara      $expresion")
                 appendLine("hora      %02d:%02d  ×%d".format(minuto / 60, minuto % 60, depuracion.factor))
-                appendLine("batería   %.1f °C".format(sentidos.temperatura))
+                appendLine("batería   %.1f °C%s".format(sentidos.temperatura, if (sentidos.caliente) "  (caliente: 15 fps)" else ""))
                 appendLine("luz       %.0f lux".format(sentidos.lux))
                 appendLine("ojos      " + (sentidos.cara?.let { "te veo %+.2f %+.2f".format(it.first, it.second) } ?: "·"))
                 append("oído      ").appendLine("▮".repeat((sentidos.nivelOido * 20).toInt()).ifEmpty { "·" })

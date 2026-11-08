@@ -67,9 +67,11 @@ class Lienzo(
 
     private var ultimo = 0L
 
-    /** Tope de 30 cuadros por segundo: el núcleo no pide más y el celu se calienta menos. */
+    /** Cuadros por segundo como máximo: 30 (lo que pide el núcleo), menos si hace calor. */
+    @Volatile var tope = 30
+
     private fun esperar() {
-        val falta = ultimo + PERIODO_NS - System.nanoTime()
+        val falta = ultimo + 1_000_000_000L / tope - System.nanoTime()
         if (falta > 1_000_000L) Thread.sleep(falta / 1_000_000L)
         ultimo = System.nanoTime()
     }
@@ -99,7 +101,6 @@ class Lienzo(
     }
 
     private companion object {
-        const val PERIODO_NS = 1_000_000_000L / 30
         val QUAD = ByteBuffer.allocateDirect(8 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply {
             put(floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f))
             position(0)
