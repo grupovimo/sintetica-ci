@@ -229,25 +229,6 @@
 
   <!-- 3b · Joyería electrónica: la vitrina. Mientras se scrollea, queda fija y
        las piezas pasan de a una bajo un foco. -->
-  <!-- En el celu, la vitrina es una tira que se desliza (sin el escenario fijo). -->
-  <section class="vitrina-movil hueso" aria-label="Joyería electrónica">
-    <div class="contenedor pila-32">
-      <span class="ficha arriba-sola">Joyería electrónica</span>
-      <h2 class="t-h2">Llevalo<br />puesto.</h2>
-    </div>
-    <div class="tira-joyas">
-      {#each JOYAS as j, i}
-        <article class="joya">
-          <img src={j.foto} alt={j.queMuestra} loading="lazy" decoding="async" />
-          <span class="v-numero chico">#{String(i + 1).padStart(3, '0')}</span>
-          <b class="t-h3">{j.nombre}</b>
-          <p class="t-cuerpo">{j.frase}</p>
-          <div class="fila"><a class="inflado mini" href="/piezas/{j.clave}">Ver</a><a class="inflado contorno-claro mini" href="#reservar" onclick={() => elegirPieza(j.clave)}>Reservar</a></div>
-        </article>
-      {/each}
-    </div>
-  </section>
-
   <section id="joyeria" class="vitrina" style:--n={JOYAS.length} bind:this={vitrina}>
     <div class="escenario-v">
       <div class="foco" aria-hidden="true"></div>
@@ -587,16 +568,8 @@
   .corazon.c2 { animation-delay: 0.2s; } .corazon.c3 { animation-delay: 0.4s; }
   @keyframes latir { 0%, 100% { transform: scale(0.8); opacity: 0.6; } 50% { transform: scale(1.15); opacity: 1; } }
   .pantallita.gif em { position: absolute; right: 18px; bottom: 16px; padding: 4px 8px; border-radius: 6px; background: #ff5a1f; color: #111; font: 900 12px/1 'Archivo', sans-serif; font-style: normal; letter-spacing: 0.08em; }
-  .vitrina-movil { display: none; }
-  .tira-joyas { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 8px 16px 24px; scrollbar-width: none; }
-  .tira-joyas::-webkit-scrollbar { display: none; }
-  .joya { flex: none; width: 78%; scroll-snap-align: center; display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 28px; background: #f3eeea; box-shadow: 0 30px 50px -40px rgba(0, 0, 0, 0.5); }
-  .joya img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 20px; mix-blend-mode: darken; }
-  .v-numero.chico { font-size: 28px; }
 
   @media (max-width: 720px) {
-    .vitrina { display: none; }
-    .vitrina-movil { display: flex; flex-direction: column; gap: 24px; padding: 72px 0 40px; }
     .reserva .t-display { font-size: 15vw; }
     .selector { flex-wrap: wrap; border-radius: 28px; padding: 8px; row-gap: 12px; }
     .selector .relleno { flex-basis: 100%; height: 0; }
