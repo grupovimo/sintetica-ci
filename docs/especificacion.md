@@ -214,6 +214,19 @@ se sube nada al VPS (ver [local.md](local.md) y [nube.md](nube.md)).
 - **Producción**: por ahora solo la landing en `sintetica.grupovimo.com.ar`
   (modo `SOLO_LANDING=1`, reservas por Telegram). La nube completa espera el
   token de GHCR y el dominio propio.
+- **Una sola placa por producto**: el cubito lleva nuestro firmware; de
+  xiaozhi se toma el protocolo de voz y piezas (ver `docs/xiaozhi.md`).
+- **El robot como caché, la biblioteca afuera** (decidido el 8/11): sin
+  microSD, el cubito guarda en su flash (4–6 MB de datos) solo lo que muestra y
+  lo próximo (imágenes, GIFs, videitos, el paquete de voz con las frases más
+  usadas) y lo demás lo baja cuando le toca: por wifi de la nube, por wifi
+  local del celu o por Bluetooth del celu. La memoria larga vive en la nube y
+  en el celu. Se arma con el perfil del cubito.
+- **Marketplace de rostros y personalidades** (idea de negocio, 8/11): como
+  caras, comportamientos, frases, voces y animaciones son **datos** validados
+  por el núcleo, se pueden empaquetar y vender (creadores con reparto, cobro
+  por Mercado Pago). La biblioteca de afuera es lo que lo hace posible en los
+  robots con poca memoria. Pendiente de diseño.
 
 ### Diferencias con el ejemplo del doc
 
