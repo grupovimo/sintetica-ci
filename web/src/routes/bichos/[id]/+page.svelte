@@ -30,7 +30,7 @@
     quitando = true;
     try {
       await api(`/v1/bichos/${b.id}`, { metodo: 'DELETE' });
-      goto('/');
+      goto('/bichos');
     } catch (err) {
       aviso = err instanceof ErrorApi ? err.message : 'No pude sacarlo.';
       quitando = false;

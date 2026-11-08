@@ -19,7 +19,9 @@ export async function load({ fetch, url }) {
   } catch {
     /* la API no responde: se ve en cada página */
   }
-  if (!usuario && !url.pathname.startsWith('/entrar')) {
+  // Públicas: la landing y entrar.
+  const publica = url.pathname === '/' || url.pathname.startsWith('/entrar');
+  if (!usuario && !publica) {
     redirect(307, `/entrar?volver=${encodeURIComponent(url.pathname + url.search)}`);
   }
   return { usuario, desarrollo };

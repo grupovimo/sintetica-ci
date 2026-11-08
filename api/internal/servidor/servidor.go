@@ -100,6 +100,10 @@ func (s *Servidor) Rutas() http.Handler {
 	m.HandleFunc("POST /v1/biblioteca", s.conSesion(s.guardarPieza))
 	m.HandleFunc("DELETE /v1/biblioteca/{id}", s.conSesion(s.borrarPieza))
 
+	m.HandleFunc("POST /v1/reservas", s.reservar)
+	m.HandleFunc("GET /v1/reservas", s.conSesion(s.listarReservas))
+	m.HandleFunc("PATCH /v1/reservas/{id}", s.conSesion(s.marcarReserva))
+
 	m.HandleFunc("GET /v1/firmwares", s.conSesion(s.listarFirmwares))
 	m.HandleFunc("POST /v1/firmwares", s.conSesion(s.subirFirmware))
 	m.HandleFunc("DELETE /v1/firmwares/{id}", s.conSesion(s.borrarFirmware))

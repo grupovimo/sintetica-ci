@@ -20,7 +20,7 @@ func abrirPrueba(t *testing.T) *Almacen {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, tabla := range []string{"memorias", "actualizaciones", "firmwares", "biblioteca", "sincro", "imagenes", "configs", "credenciales", "bichos", "sesiones", "enlaces", "usuarios"} {
+	for _, tabla := range []string{"reservas", "memorias", "actualizaciones", "firmwares", "biblioteca", "sincro", "imagenes", "configs", "credenciales", "bichos", "sesiones", "enlaces", "usuarios"} {
 		if _, err := a.db.Exec(ctx, "delete from "+tabla); err != nil {
 			t.Fatal(err)
 		}
@@ -186,5 +186,31 @@ func TestMemoriaYMudanza(t *testing.T) {
 	m, _ = a.LeerMemoria(ctx, "BBBBBBBBBBBB")
 	if len(m.Datos) != 3 || m.Deseada != nil || m.Actualizada == nil {
 		t.Fatalf("recibida: %+v", m)
+	}
+}
+
+func TestReservas(t *testing.T) {
+	a := abrirPrueba(t)
+	ctx := context.Background()
+	antes := time.Now().Add(-time.Minute)
+	id, err := a.CrearReserva(ctx, Reserva{Nombre: "Nahuel", Contacto: "n@ejemplo.com", Color: "naranja"}, "1.2.3.4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, err := a.ReservasDeIP(ctx, "1.2.3.4", antes); err != nil || n != 1 {
+		t.Fatalf("de la IP: %d %v", n, err)
+	}
+	if n, _ := a.ReservasDeIP(ctx, "5.6.7.8", antes); n != 0 {
+		t.Fatalf("otra IP: %d", n)
+	}
+	if err := a.MarcarReserva(ctx, id, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.MarcarReserva(ctx, id+1000, true); err != ErrNoEncontrado {
+		t.Fatalf("inexistente: %v", err)
+	}
+	l, err := a.Reservas(ctx, 10)
+	if err != nil || len(l) != 1 || !l[0].Atendida || l[0].Color != "naranja" {
+		t.Fatalf("lista: %+v %v", l, err)
 	}
 }

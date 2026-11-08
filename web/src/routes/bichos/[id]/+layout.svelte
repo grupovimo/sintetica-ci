@@ -34,7 +34,7 @@
 <svelte:head><title>{nombre} · Sintética</title></svelte:head>
 
 <div class="contenedor">
-  <a class="volver etiqueta" href="/">← Mis bichos</a>
+  <a class="volver etiqueta" href="/bichos">← Mis bichos</a>
   {#if b.error}
     <p class="aviso-caja error">{b.error}</p>
   {:else if b.bicho}
