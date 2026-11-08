@@ -9,12 +9,14 @@
     lineas = false,
     video = false,
     radio = '40px',
-  }: { src?: string; alt: string; proporcion?: string; clara?: boolean; lineas?: boolean; video?: boolean; radio?: string } = $props();
+    encuadre = 'center',
+    prioridad = false,
+  }: { src?: string; alt: string; proporcion?: string; clara?: boolean; lineas?: boolean; video?: boolean; radio?: string; encuadre?: string; prioridad?: boolean } = $props();
 </script>
 
 <div class="foto" class:clara style:aspect-ratio={proporcion} style:border-radius={radio}>
   {#if src}
-    <img {src} {alt} loading="lazy" decoding="async" />
+    <img {src} {alt} loading={prioridad ? 'eager' : 'lazy'} fetchpriority={prioridad ? 'high' : 'auto'} decoding="async" style:object-position={encuadre} />
   {:else}
     <div class="marca" role="img" aria-label={'Lugar para ' + (video ? 'un video' : 'una foto') + ': ' + alt}>
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

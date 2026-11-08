@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Pagina from '$lib/consola/Pagina.svelte';
   import { onMount } from 'svelte';
   import { api, ErrorApi } from '$lib/api';
   import type { Firmware } from '$lib/tipos';
@@ -45,10 +46,8 @@
   }
 </script>
 
-<svelte:head><title>Firmwares · Sintética</title></svelte:head>
-
-<div class="contenedor grilla" style="max-width: 900px">
-  <div><p class="etiqueta">Administración</p><h1>Firmwares</h1></div>
+<Pagina titulo="Firmwares">
+<div>
   {#if !data.usuario?.admin}
     <p class="aviso-caja">Solo los administradores (ADMIN_EMAILS) suben firmwares.</p>
   {:else}
@@ -86,6 +85,7 @@
     {/each}
   </section>
 </div>
+</Pagina>
 
 <style>
   .version { justify-content: space-between; border-top: 1px solid var(--linea); padding-top: 10px; }

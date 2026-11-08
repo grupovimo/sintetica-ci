@@ -13,7 +13,8 @@
   ];
   const activa = (ruta: string) => page.url.pathname.startsWith(ruta);
   // La landing (/) y la consola de los robots (/robots) tienen su propia barra y su propio diseño.
-  const landing = $derived(page.url.pathname === '/' || page.url.pathname.startsWith('/piezas') || page.url.pathname.startsWith('/robots') || page.url.pathname === '/entrar');
+  const landing = $derived(page.url.pathname === '/' || page.url.pathname.startsWith('/piezas') || page.url.pathname.startsWith('/robots') || page.url.pathname === '/entrar' ||
+    ['/caras', '/animaciones', '/firmwares', '/reservas'].some((r) => page.url.pathname.startsWith(r)));
 
   async function salir() {
     await api('/v1/sesion', { metodo: 'DELETE' }).catch(() => {});

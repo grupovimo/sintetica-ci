@@ -169,7 +169,7 @@
       <h1 class="t-display aparece">Tu propio<br /><span class="cromo">robot.</span></h1>
       <div class="dos">
         <div class="foto-hero aparece">
-          <Foto alt="el Broche en una campera, de noche" proporcion="auto" lineas />
+          <Foto src="/landing/hero.jpg" alt="El Broche en una campera, bajo la lluvia, de noche" proporcion="auto" encuadre="59% 60%" prioridad />
         </div>
         <div class="tarjeta-negra aparece">
           <p class="t-lead">Robots y joyería electrónica.<br /><span class="naranja">Ya es normal tener uno.</span></p>

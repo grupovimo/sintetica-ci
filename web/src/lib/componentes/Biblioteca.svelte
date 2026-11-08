@@ -90,7 +90,7 @@
   </div>
 {:else}
   <div class="grilla">
-    <div><p class="etiqueta">Tu biblioteca</p><h1>{tipo === 'cara' ? 'Caras' : 'Animaciones'}</h1></div>
+    <span class="etiqueta">Tu biblioteca</span>
     {#if aviso}<p class="aviso-caja ok">{aviso}</p>{/if}
     {#if error}<p class="aviso-caja error">{error}</p>{/if}
     {#if piezas.length}

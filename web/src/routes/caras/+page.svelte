@@ -1,5 +1,6 @@
 <script lang="ts">
   import Biblioteca from '$lib/componentes/Biblioteca.svelte';
+  import Pagina from '$lib/consola/Pagina.svelte';
 </script>
-<svelte:head><title>Caras · Sintética</title></svelte:head>
-<div class="contenedor"><Biblioteca tipo="cara" /></div>
+
+<Pagina titulo="Caras"><Biblioteca tipo="cara" /></Pagina>

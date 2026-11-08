@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Pagina from '$lib/consola/Pagina.svelte';
   import { onMount } from 'svelte';
   import { api, ErrorApi } from '$lib/api';
 
@@ -34,10 +35,8 @@
   }
 </script>
 
-<svelte:head><title>Reservas · Sintética</title></svelte:head>
-
-<div class="contenedor grilla" style="max-width: 900px">
-  <div><p class="etiqueta">Administración</p><h1>Reservas</h1></div>
+<Pagina titulo="Reservas">
+<div>
   {#if !data.usuario?.admin}
     <p class="aviso-caja">Solo los administradores (ADMIN_EMAILS) ven las reservas.</p>
   {:else}
@@ -59,6 +58,7 @@
     {/each}
   {/if}
 </div>
+</Pagina>
 
 <style>
   .reserva { display: flex; justify-content: space-between; gap: 16px; align-items: start; }
