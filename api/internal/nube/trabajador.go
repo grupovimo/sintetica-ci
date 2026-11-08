@@ -157,11 +157,14 @@ func (t *trabajador) correr() {
 			t.n.log.Debug("no puedo sincronizar todavía", "bicho", t.id, "conectado", t.conectado, "estado", t.estado != nil)
 		}
 		if t.pendiente && t.puede() && time.Now().After(t.proximoIntento) && time.Since(t.avisoEn) > time.Second {
+			// Se baja antes: mientras sincroniza, esperar() sigue atendiendo
+			// mensajes y un cambio que llegue en el medio vuelve a subirlo (si
+			// se bajara después, ese cambio se perdía).
+			t.pendiente = false
 			if err := t.sincronizar(); err != nil {
 				t.n.log.Warn("sincronización", "bicho", t.id, "error", err)
+				t.pendiente = true
 				t.proximoIntento = time.Now().Add(20 * time.Second)
-			} else {
-				t.pendiente = false
 			}
 		}
 	}
