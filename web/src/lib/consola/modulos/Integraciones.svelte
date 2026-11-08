@@ -35,6 +35,7 @@
     sacudida: 'Lo sacuden', 'sacudida-suave': 'Sacudida suave', 'sacudida-fuerte': 'Sacudida fuerte', 'boca-abajo': 'Lo ponen boca abajo',
     inclinado: 'Lo inclinan', caida: 'Se cae', voz: 'Le hablan', nombre: 'Dicen su nombre', ruido: 'Un ruido fuerte', musica: 'Suena música',
     cargando: 'Lo enchufan', desenchufado: 'Lo desenchufan', cargado: 'Termina de cargar', volvio: 'Volvés después de un rato', hito: 'Un hito (cumple, días juntos)',
+    juego: 'Termina un juego', animo: 'Te pregunta cómo estás',
   };
   let cuandos = $state<string[]>(['recordatorio', 'bateria-baja', 'desconectado', 'conectado', 'despierta', 'duerme', 'expresion']);
   const CUANDO = $derived([...new Set(['hora', 'despertador', ...cuandos])].map((k) => [k, NOMBRES_CUANDO[k] ?? k] as [string, string]));

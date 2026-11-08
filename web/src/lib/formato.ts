@@ -11,6 +11,7 @@ export const EVENTOS = [
   'caricia', 'muchos-toques', 'sacudida-suave', 'sacudida-fuerte', 'inclinado', 'caida', 'voz', 'nombre',
   'ruido', 'musica', 'silencio', 'notificacion', 'llamada', 'bateria-baja', 'bateria-critica', 'enchufado',
   'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito', 'recordatorio', 'pomodoro', 'despertador',
+  'juego', 'animo',
 ] as const;
 export const NOMBRES_EVENTO: Record<string, string> = {
   tacto: 'Lo tocan', 'doble-toque': 'Doble toque', levantado: 'Lo levantan', sacudida: 'Lo sacuden (cualquiera)',
@@ -22,6 +23,7 @@ export const NOMBRES_EVENTO: Record<string, string> = {
   enchufado: 'Lo enchufan', desenchufado: 'Lo desenchufan', cargado: 'Carga completa', 'sin-wifi': 'Se queda sin WiFi',
   'cambio-de-cara': 'Le cambian la cara', 'bicho-cerca': 'Otro robot cerca', volvio: 'Volvés después de un rato',
   hito: 'Un hito (días juntos, caricias, cumpleaños)', recordatorio: 'Muestra un recordatorio', pomodoro: 'Termina una tanda', despertador: 'Suena el despertador',
+  juego: 'Termina un juego', animo: 'Le contás cómo estás',
 };
 
 // El robot cuenta los textos en bytes UTF-8 (una tilde ocupa 2): se corta sin partir una letra.
@@ -163,7 +165,41 @@ export type Config = {
   despertador?: Despertador;
   // Para el clima (la usa la nube).
   ubicacion?: Ubicacion;
+  cuidado?: Cuidado;
+  avisos?: Aviso[];
 };
+
+// Cuidarte: agua cada X horas, pausa activa en horario de trabajo, "¿Cómo estás?"
+// una vez por día, y por Telegram "te extraño" y cómo fue su día.
+export type Cuidado = {
+  agua?: number; // horas (0 = nunca; 1 a 8)
+  pausa?: number; // minutos sin tocarlo (0 = nunca; 30 a 240)
+  trabajo?: { desde?: string; hasta?: string; dias?: string };
+  animo?: boolean;
+  extranar?: boolean;
+  extranarDias?: number; // 1 a 7
+  resumen?: boolean;
+};
+export const CUIDADO_BASE: Required<Omit<Cuidado, 'trabajo'>> & { trabajo: { desde: string; hasta: string; dias: string } } = {
+  agua: 0, pausa: 0, trabajo: { desde: '09:00', hasta: '18:00', dias: 'LMXJV' },
+  animo: true, extranar: true, extranarDias: 2, resumen: false,
+};
+
+// Cómo reacciona a un aviso del celu (el primero que coincide gana; app y
+// contacto vacíos = cualquiera). En `decir`, {app} y {contacto} se reemplazan.
+export type Aviso = {
+  tipo: 'notificacion' | 'llamada'; app?: string; contacto?: string;
+  expresion?: string; comportamiento?: string; decir?: string; sonido?: boolean;
+};
+export const MAX_AVISOS = 8;
+export const MAX_DECIR_AVISO = 40;
+export const MAX_NOMBRE_AVISO = 24;
+
+// Los juegos (protocolo 0x43): lo que se manda a POST /v1/bichos/{id}/jugar.
+export const JUEGOS = [
+  ['ppt', 'Piedra, papel o tijera'], ['reflejos', 'Reflejos'], ['mirada', 'Seguí la mirada'], ['dado', 'Dado'], ['moneda', 'Moneda'],
+] as const;
+export type Juego = (typeof JUEGOS)[number][0];
 
 // Un solo despertador por robot: suena creciente y se pospone.
 export type Despertador = { hora: string; dias?: string; activo?: boolean; sonido?: boolean; texto?: string; posponer?: number };
