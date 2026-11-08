@@ -19,7 +19,7 @@
   <img src={e.src} alt={e.alt} style="width: {e.foto.ancho}%; left: {e.foto.izq}%; top: {e.foto.arriba}%" />
   <div class="pantalla" class:redonda={modelo.redonda}
     style="left: {e.pantalla.izq}%; top: {e.pantalla.arriba}%; width: {e.pantalla.ancho}%; height: {e.pantalla.alto}%">
-    <div class="encastre" class:apaisada={!modelo.redonda && e.pantalla.alto * 5 > e.pantalla.ancho * 4}>
+    <div class="encastre" class:apaisada={!modelo.redonda && e.pantalla.alto * 5 > e.pantalla.ancho * 4 * 1.5}>
       <Pantalla {config} {visible} redonda={modelo.redonda} desnuda etiqueta="Pantalla de {etiqueta || 'tu robot'}, en vivo (tocala)" />
     </div>
   </div>

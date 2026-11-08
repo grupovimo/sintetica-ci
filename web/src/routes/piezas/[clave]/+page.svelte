@@ -38,7 +38,6 @@
             {#each p.fichas as f}<span class="ficha">{f}</span>{/each}
           </div>
           <div class="entre">
-            <span class="precio">[PRECIO]</span>
             <a class="inflado" href="/?pieza={p.clave}#reservar">Reservar</a>
           </div>
         </div>
@@ -74,7 +73,6 @@
   .foto-grande :global(.foto) { box-shadow: 0 32px 48px -32px rgba(0, 0, 0, 0.6); }
   /* Que la palabra más larga entre entera en la columna (~600 px). */
   .texto .t-display { font-size: min(112px, calc(600px / var(--largo) * 1.05), calc(9vw * 8 / var(--largo))); }
-  .precio { font: 900 32px/1 'Archivo', sans-serif; font-stretch: 120%; }
   .nada { padding: 96px 40px; }
   .otras { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 24px; }
   .otra .t-h4 { font-size: clamp(20px, 1.8vw, 26px); overflow-wrap: anywhere; }

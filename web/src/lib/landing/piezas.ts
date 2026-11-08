@@ -20,8 +20,8 @@ export const PIEZAS: Pieza[] = [
     nombre: 'Unidad',
     tipo: 'Robot',
     frase: 'Tu robot de escritorio.',
-    foto: '',
-    queMuestra: 'la Unidad en el escritorio',
+    foto: '/landing/unidad.jpg',
+    queMuestra: 'La Unidad, un cubo naranja con dos ojos, sobre el escritorio',
     fichas: ['Cara en pantalla', 'WiFi + Bluetooth', 'Siente el movimiento', 'Se actualiza sola', 'Nº grabado'],
   },
   {

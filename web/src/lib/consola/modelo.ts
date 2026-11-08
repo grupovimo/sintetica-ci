@@ -24,12 +24,13 @@ export type Encuadre = {
   fondo: string;
 };
 
+// La Unidad (pantalla rectangular): el cubo naranja sobre el escritorio.
 const RECTANGULAR: Encuadre = {
-  src: '/landing/hebilla.jpg',
-  alt: 'El robot puesto en un cinturón',
-  foto: { ancho: 155.56, izq: -27.78, arriba: -25.56 },
-  pantalla: { izq: 36.11, arriba: 23.33, ancho: 25, alto: 42.78 },
-  fondo: '#0e0d0b',
+  src: '/landing/unidad.jpg',
+  alt: 'La Unidad sobre un escritorio',
+  foto: { ancho: 100, izq: 0, arriba: 0 },
+  pantalla: { izq: 23.5, arriba: 29.5, ancho: 43.5, alto: 39.5 },
+  fondo: '#e9e2d8',
 };
 
 const REDONDA: Encuadre = {
