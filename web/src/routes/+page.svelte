@@ -256,7 +256,7 @@
         </div>
       </div>
       <div class="vivo aparece">
-        <Pantalla config={configVivo} etiqueta="La cara de un robot de verdad, en vivo, con la personalidad elegida" />
+        <Pantalla config={configVivo} ancho={640} etiqueta="La cara de un robot de verdad, en vivo, con la personalidad elegida" />
         <span class="ficha"><i class="punto"></i>En vivo</span>
       </div>
     </div>
@@ -395,7 +395,8 @@
 <style>
   .landing { position: relative; overflow-x: clip; background: #ff5a1f; color: #111; font-family: 'Archivo', system-ui, sans-serif; -webkit-font-smoothing: antialiased; color-scheme: light; }
   .landing :global(*) { box-sizing: border-box; }
-  .landing a { color: inherit; text-decoration: none; }
+  .landing a { text-decoration: none; }
+  .landing a:not(.inflado):not(.tienda) { color: inherit; }
   .landing :global(:focus-visible) { outline: 3px solid #fff; outline-offset: 3px; }
 
   /* Textura: grano que se mueve y la trama de puntos. */
@@ -404,8 +405,8 @@
   .puntos { position: absolute; inset: -80px 0; pointer-events: none; opacity: 0.5; background-image: radial-gradient(rgba(0, 0, 0, 0.16) 1.2px, transparent 1.6px); background-size: 8px 8px; transform: translateY(var(--py, 0)); }
 
   /* Escala tipográfica (200 / 128 / 64 / 36) y grilla de 8 px. */
-  .t-display { margin: 0; font: 900 clamp(72px, 11.7vw, 168px) / 0.82 'Archivo', sans-serif; font-stretch: 125%; letter-spacing: -0.05em; text-transform: uppercase; }
-  .t-h2 { margin: 0; font: 900 clamp(56px, 8.9vw, 128px) / 0.84 'Archivo', sans-serif; font-stretch: 125%; letter-spacing: -0.05em; text-transform: uppercase; }
+  .t-display { margin: 0; font: 900 clamp(72px, 11.7vw, 168px) / 0.9 'Archivo', sans-serif; font-stretch: 125%; letter-spacing: -0.05em; text-transform: uppercase; }
+  .t-h2 { margin: 0; font: 900 clamp(56px, 8.9vw, 128px) / 0.92 'Archivo', sans-serif; font-stretch: 125%; letter-spacing: -0.05em; text-transform: uppercase; }
   .t-h3 { margin: 0; font: 900 clamp(40px, 4.4vw, 64px) / 0.9 'Archivo', sans-serif; font-stretch: 125%; letter-spacing: -0.04em; text-transform: uppercase; }
   .t-h4 { margin: 0; font: 900 clamp(28px, 2.5vw, 36px) / 0.95 'Archivo', sans-serif; font-stretch: 120%; letter-spacing: -0.03em; text-transform: uppercase; }
   .t-lead { margin: 0; font: 800 clamp(28px, 3vw, 44px) / 1.02 'Archivo', sans-serif; font-stretch: 110%; letter-spacing: -0.03em; }
@@ -478,6 +479,7 @@
   .caras img { width: 100%; height: 100%; object-fit: cover; border-radius: 20px; }
   .personalidad { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap: 48px; align-items: center; padding-top: 128px; border-top: 1px solid #2a2a2a; }
   .vivo { position: relative; padding: 16px; border-radius: 40px; background: #1d1d1d; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+  .vivo :global(.placa) { width: 100% !important; max-width: none; }
   .vivo :global(canvas) { width: 100%; height: auto; border-radius: 28px; display: block; }
   .vivo .ficha { position: absolute; left: 32px; top: 32px; }
   .punto { width: 8px; height: 8px; border-radius: 50%; background: #e5402b; box-shadow: 0 0 10px #e5402b; }
@@ -485,6 +487,8 @@
   /* 6 · La app */
   .app { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap: 64px; align-items: center; }
   .pila-40 { display: flex; flex-direction: column; gap: 40px; }
+  /* En media columna el título va un escalón más chico: si no, no entra. */
+  .app .t-h2, .personalidad .t-h2 { font-size: clamp(48px, 5.6vw, 80px); }
   .funciones { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
   .funciones li { display: flex; align-items: center; gap: 16px; }
   .funciones .t-h4 { font-size: 28px; }
@@ -546,7 +550,7 @@
   .abajo { align-items: flex-end; }
   .abajo .fila { padding-bottom: 16px; }
   .formulario { display: flex; flex-direction: column; gap: 16px; padding: 32px; border-radius: 40px; background: #111; color: #fff; box-shadow: 0 32px 48px -32px rgba(0, 0, 0, 0.7); }
-  .formulario.banda { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); align-items: end; padding: 24px; }
+  .formulario.banda { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto minmax(180px, 220px); align-items: end; padding: 24px; }
   .formulario label, .formulario legend { display: flex; flex-direction: column; gap: 8px; font: 700 15px 'Archivo', sans-serif; color: #c4c4c4; }
   .formulario legend { padding: 0 0 8px; }
   .formulario input { min-height: 56px; padding: 0 24px; border-radius: 999px; border: 0; background: #262626; color: #fff; font: 600 18px 'Archivo', sans-serif; }
@@ -567,6 +571,7 @@
     .contenedor { padding: 0 16px; }
     .seccion { padding: 96px 0; }
     .tarjeta-negra, .paso, .formulario { padding: 24px; }
+    .formulario.banda { grid-template-columns: 1fr; }
     .nav nav .ficha:not(:last-child) { display: none; }
     .escenario { height: 600px; }
     .telefono.izq, .telefono.der { display: none; }
