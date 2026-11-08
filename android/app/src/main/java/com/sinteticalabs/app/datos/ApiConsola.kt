@@ -237,3 +237,90 @@ suspend fun ApiSintetica.resumen(id: String): String? = runCatching { pedir("/v1
 
 /** La memoria cruda (para el marcador de los juegos). */
 suspend fun ApiSintetica.memoriaCruda(id: String): JsonObject? = pedir("/v1/bichos/$id/memoria").obj("memoria")
+
+// --- v1.9: amigos, agenda, presencia, hábitos, avisos de afuera, música y charla ---
+
+data class Amigo(val id: Long, val nombre: String, val robots: List<String>, val todos: Boolean, val conectado: Boolean)
+data class Invitacion(val codigo: String, val link: String, val telegram: String?, val vence: Long?)
+data class EventoAgenda(val titulo: String, val inicio: String, val todoElDia: Boolean)
+data class Agenda(val conectada: Boolean, val ics: String, val aviso: Int, val proximos: List<EventoAgenda>, val error: String?)
+data class Horarios(val llegas: String?, val salis: String?, val dormis: String?, val seguridad: Double, val dias: Int)
+data class HabitoVista(val indice: Int, val nombre: String, val racha: Int, val hoy: Boolean, val dias: Set<String>)
+data class Entrantes(val url: String?, val token: String?, val mercadoPago: Boolean, val regenerar: Boolean)
+data class Suena(val sonando: Boolean, val titulo: String, val artista: String)
+data class Musica(val disponible: Boolean, val conectada: Boolean, val nombre: String, val suena: Suena?)
+data class Charla(val disponible: Boolean, val quedan: Int, val porDia: Int)
+data class RespuestaCharla(val texto: String, val expresion: String?, val quedan: Int)
+
+private fun amigoDe(o: JsonObject) = Amigo(o.numero("id")?.toLong() ?: 0, o.texto("nombre").orEmpty().ifEmpty { "Tu amigo" },
+    o.lista("robots").orEmpty().mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }, o.si("todos") ?: true, o.si("conectado") ?: false)
+
+suspend fun ApiSintetica.amigos(): List<Amigo> = pedir("/v1/amigos").lista("amigos").orEmpty().mapNotNull { (it as? JsonObject)?.let(::amigoDe) }
+suspend fun ApiSintetica.invitar(): Invitacion = pedir("/v1/amigos/invitacion", "POST").let {
+    Invitacion(it.texto("codigo").orEmpty(), it.texto("link").orEmpty(), it.texto("telegram"), it.texto("vence")?.let(::fechaMs))
+}
+suspend fun ApiSintetica.aceptarAmigo(codigo: String): Amigo = amigoDe(pedir("/v1/amigos", "POST", buildJsonObject { put("codigo", codigo) }))
+suspend fun ApiSintetica.borrarAmigo(id: Long) { crudo("/v1/amigos/$id", "DELETE") }
+
+/** null = todos los míos. */
+suspend fun ApiSintetica.amigoRecibe(id: Long, robots: List<String>?) {
+    pedir("/v1/amigos/$id", "PUT", buildJsonObject {
+        put("robots", robots?.let { l -> kotlinx.serialization.json.JsonArray(l.map { kotlinx.serialization.json.JsonPrimitive(it) }) } ?: kotlinx.serialization.json.JsonNull)
+    })
+}
+
+/** El toque: a cuántos robots llegó y si fue por Telegram. */
+suspend fun ApiSintetica.tocar(id: Long, tipo: String, expresion: String?, desde: String?): Pair<Int, Boolean> {
+    val r = pedir("/v1/amigos/$id/toque", "POST", buildJsonObject {
+        put("tipo", tipo); if (expresion != null) put("expresion", expresion); if (desde != null) put("desde", desde)
+    })
+    return (r.numero("robots")?.toInt() ?: 0) to (r.si("telegram") ?: false)
+}
+
+private fun agendaDe(o: JsonObject) = Agenda(o.si("conectada") ?: false, o.texto("ics").orEmpty(), o.numero("aviso")?.toInt() ?: 10,
+    o.lista("proximos").orEmpty().mapNotNull { e -> (e as? JsonObject)?.let { EventoAgenda(it.texto("titulo").orEmpty(), it.texto("inicio").orEmpty(), it.si("todoElDia") ?: false) } },
+    o.texto("error")?.ifEmpty { null })
+
+suspend fun ApiSintetica.agenda(): Agenda = agendaDe(pedir("/v1/agenda"))
+suspend fun ApiSintetica.conectarAgenda(ics: String): Agenda = agendaDe(pedir("/v1/agenda", "PUT", buildJsonObject { put("ics", ics) }))
+suspend fun ApiSintetica.avisoAgenda(minutos: Int) { pedir("/v1/agenda", "PUT", buildJsonObject { put("aviso", minutos) }) }
+suspend fun ApiSintetica.sacarAgenda() { crudo("/v1/agenda", "DELETE") }
+
+suspend fun ApiSintetica.presencia(id: String, llegaste: Boolean) { pedir("/v1/bichos/$id/presencia", "POST", buildJsonObject { put("llegaste", llegaste) }) }
+suspend fun ApiSintetica.horarios(id: String): Horarios = pedir("/v1/bichos/$id/horarios").let {
+    Horarios(it.texto("llegas"), it.texto("salis"), it.texto("dormis"), it.numero("seguridad") ?: 0.0, it.numero("dias")?.toInt() ?: 0)
+}
+
+private fun habitoDe(o: JsonObject) = HabitoVista(o.numero("indice")?.toInt() ?: 0, o.texto("nombre").orEmpty(), o.numero("racha")?.toInt() ?: 0,
+    o.si("hoy") ?: false, o.obj("dias").orEmpty().filterValues { (it as? kotlinx.serialization.json.JsonPrimitive)?.content == "true" }.keys)
+
+/** El GET devuelve una lista suelta. */
+suspend fun ApiSintetica.habitos(id: String): List<HabitoVista> {
+    val e = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(String(crudo("/v1/bichos/$id/habitos"))) }.getOrNull()
+    return (e as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(::habitoDe) }
+}
+suspend fun ApiSintetica.marcarHabito(id: String, i: Int, hecho: Boolean): HabitoVista? =
+    pedir("/v1/bichos/$id/habitos/$i", "POST", buildJsonObject { put("hecho", hecho) }).obj("habito")?.let(::habitoDe)
+
+private fun entrantesDe(o: JsonObject) = Entrantes(o.texto("url"), o.texto("token"), o.si("mercadoPago") ?: false, o.si("regenerar") ?: false)
+suspend fun ApiSintetica.entrantes(): Entrantes = entrantesDe(pedir("/v1/entrantes"))
+suspend fun ApiSintetica.regenerarEntrantes(): Entrantes = entrantesDe(pedir("/v1/entrantes", "POST"))
+suspend fun ApiSintetica.mercadoPago(token: String?) {
+    if (token == null) crudo("/v1/entrantes/mercadopago", "DELETE") else pedir("/v1/entrantes/mercadopago", "PUT", buildJsonObject { put("accessToken", token) })
+}
+/** Probar un tipo: a cuántos robots llegó. */
+suspend fun ApiSintetica.probarEntrante(token: String, tipo: String, titulo: String, de: String, robot: String): Int =
+    pedir("/v1/entrantes/$token", "POST", buildJsonObject { put("tipo", tipo); put("titulo", titulo); put("de", de); put("robot", robot) }).numero("robots")?.toInt() ?: 0
+
+fun suenaDe(o: JsonObject?) = o?.let { Suena(it.si("sonando") ?: false, it.texto("titulo").orEmpty(), it.texto("artista").orEmpty()) }
+suspend fun ApiSintetica.musica(): Musica = pedir("/v1/musica").let { Musica(it.si("disponible") ?: false, it.si("conectada") ?: false, it.texto("nombre").orEmpty(), suenaDe(it.obj("suena"))) }
+suspend fun ApiSintetica.urlSpotify(): String = pedir("/v1/musica/spotify").texto("url").orEmpty()
+suspend fun ApiSintetica.sacarSpotify() { crudo("/v1/musica/spotify", "DELETE") }
+suspend fun ApiSintetica.mandarMusica(id: String, sonando: Boolean, titulo: String, artista: String) {
+    pedir("/v1/bichos/$id/musica", "POST", buildJsonObject { put("sonando", sonando); put("titulo", titulo); put("artista", artista) })
+}
+
+suspend fun ApiSintetica.charla(): Charla = pedir("/v1/charla").let { Charla(it.si("disponible") ?: false, it.numero("quedan")?.toInt() ?: 0, it.numero("porDia")?.toInt() ?: 60) }
+suspend fun ApiSintetica.charlar(id: String, texto: String): RespuestaCharla = pedir("/v1/bichos/$id/charla", "POST", buildJsonObject { put("texto", texto) }).let {
+    RespuestaCharla(it.texto("texto").orEmpty(), it.texto("expresion"), it.numero("quedan")?.toInt() ?: 0)
+}

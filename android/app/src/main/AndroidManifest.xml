@@ -10,7 +10,12 @@
     <!-- Android 10 y 11: buscar dispositivos BLE pide ubicación. -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
+    <!-- También la geocerca de casa (opcional): la ubicación, y en segundo plano. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Que el sistema avise cuando el robot está cerca (la presencia, sin una conexión abierta). -->
+    <uses-permission android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE" />
+    <uses-feature android:name="android.software.companion_device_setup" android:required="false" />
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- La cuenta y los bichos lejos (la API). -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -49,6 +54,15 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+        <service
+            android:name=".datos.PresenciaCompanera"
+            android:exported="true"
+            android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
+            <intent-filter>
+                <action android:name="android.companion.CompanionDeviceService" />
+            </intent-filter>
+        </service>
+        <receiver android:name=".datos.GeocercaCasa" android:exported="false" />
         <!-- El modelo de QR de ML Kit va dentro de la app (sin descargas de Play Services). -->
         <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode" />
     </application>

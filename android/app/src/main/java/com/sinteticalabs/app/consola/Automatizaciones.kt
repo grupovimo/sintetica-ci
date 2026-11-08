@@ -47,7 +47,8 @@ object Automatizaciones {
 
     val NOMBRES_CUANDO = mapOf(
         "hora" to "A una hora", "despertador" to "Suena el despertador", "juego" to "Termina un juego", "animo" to "Te pregunta cómo estás",
-        "bicho-cerca" to "Otro robot cerca",
+        "bicho-cerca" to "Otro robot cerca", "llegaste" to "Llegás a casa", "te-fuiste" to "Te vas", "habito" to "Marcás un hábito",
+        "agenda" to "Se viene un evento",
         "recordatorio" to "Un recordatorio", "pomodoro" to "Fin de tanda", "bateria-baja" to "Poca batería",
         "desconectado" to "Se desconecta", "conectado" to "Se conecta", "despierta" to "Se despierta", "duerme" to "Se duerme",
         "expresion" to "Cambia de cara", "tacto" to "Lo tocan", "doble-toque" to "Doble toque", "caricia" to "Una caricia",

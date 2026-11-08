@@ -50,6 +50,9 @@ class ParidadTest {
         assertEquals(limite("reglasUsuario"), Reflejos.MAX_REGLAS)
         assertEquals(limite("sprites"), CarasDeImagen.MAX_SPRITES)
         assertEquals(limite("sprites"), com.sinteticalabs.app.protocolo.MAX_SPRITES)
+        assertEquals(limite("habitos"), com.sinteticalabs.app.consola.Compania.MAX_HABITOS)
+        assertEquals(limite("bytesHabito"), com.sinteticalabs.app.consola.Compania.MAX_NOMBRE_HABITO)
+        assertEquals(limite("bytesPresencia"), com.sinteticalabs.app.consola.Compania.MAX_TEXTO_PRESENCIA)
     }
 
     @Test fun cortes() {
@@ -76,6 +79,13 @@ class ParidadTest {
         }
         for (c in deTope(limite("bytesCiudad"))) {
             assertEquals(c.resultado, Acompanar.ponerUbicacion(VACIO, -34.6, -58.4, c.texto).obj("ubicacion")?.texto("ciudad"))
+        }
+        for (c in deTope(limite("bytesHabito"))) {
+            val h = com.sinteticalabs.app.consola.Compania.Habito("x")
+            assertEquals(c.resultado.ifEmpty { "x" }, com.sinteticalabs.app.consola.Compania.conNombre(h, c.texto).nombre)
+        }
+        for (c in deTope(limite("bytesPresencia"))) {
+            assertEquals(c.resultado, com.sinteticalabs.app.consola.Compania.presencia(com.sinteticalabs.app.consola.Compania.ponerPresencia(VACIO) { it.copy(texto = c.texto) }).texto)
         }
         for (c in deTope(limite("bytesNombre"))) {
             assertEquals(c.resultado.ifEmpty { null }, Editar.ponerDueno(VACIO, c.texto).obj("dueno")?.texto("nombre"))

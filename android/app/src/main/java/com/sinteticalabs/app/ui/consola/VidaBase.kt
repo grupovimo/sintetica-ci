@@ -21,6 +21,8 @@ object VidaBase {
     var reglas: List<Regla> = emptyList(); private set
     var dibujos: List<Pair<String, JsonObject>> = emptyList(); private set
     var animaciones: List<Pair<String, JsonObject>> = emptyList(); private set
+    /** Las situaciones de frases.json (de fábrica): para las fichas y el ejemplo de cada una. */
+    var frases: JsonObject = JsonObject(emptyMap()); private set
     private var cargada = false
 
     /** Primero las de siempre, como en el archivo. */
@@ -39,6 +41,7 @@ object VidaBase {
         val a = contexto.assets
         fun leer(ruta: String) = a.open(ruta).bufferedReader().use { it.readText() }
         runCatching { reglas = Json.parseToJsonElement(leer("vida/reglas.json")).jsonArray.mapNotNull { Regla.de(it) } }
+        runCatching { frases = leerObjeto(leer("vida/frases.json")).let { (it["situaciones"] as? JsonObject) ?: JsonObject(emptyMap()) } }
         runCatching {
             dibujos = a.list("caras").orEmpty().sorted().map { leerObjeto(leer("caras/$it")) }
                 .filter { it["formas"] != null && it.texto("nombre") != null }

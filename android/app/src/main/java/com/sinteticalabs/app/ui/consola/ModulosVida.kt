@@ -91,6 +91,7 @@ fun DecileAlgo(vm: RobotViewModel, conectado: Boolean) {
 
 // --- Habla: cuánto habla solo y sus frases propias por situación ---
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ModHabla(vm: RobotViewModel) {
     val c by vm.config.collectAsState()
@@ -113,8 +114,11 @@ fun ModHabla(vm: RobotViewModel) {
                     Grabado("Cuando")
                     Grabado("$total/${Acompanar.MAX_FRASES}", color = if (total >= Acompanar.MAX_FRASES) C.brasa else C.grisOscuro)
                 }
-                Selector(Acompanar.SITUACIONES.firstOrNull { it.first == situacion }?.second ?: situacion,
-                    Acompanar.SITUACIONES.map { (k, n) -> k to (n + Acompanar.frases(c, k).size.let { if (it > 0) " · $it" else "" }) }, { situacion = it })
+                val nombres = Acompanar.SITUACIONES.toMap() + com.sinteticalabs.app.consola.Compania.NOMBRES_NUEVOS
+                val agrupadas = com.sinteticalabs.app.consola.Compania.GRUPOS_HABLA.flatMap { (g, l) -> l.map { it to g } }
+                val resto = Acompanar.SITUACIONES.map { it.first }.filter { k -> agrupadas.none { it.first == k } }.map { it to "Más" }
+                Selector(nombres[situacion] ?: situacion,
+                    (agrupadas + resto).map { (k, g) -> k to ("$g · " + (nombres[k] ?: k) + Acompanar.frases(c, k).size.let { if (it > 0) " · $it" else "" }) }, { situacion = it })
             }
         }
         if (frases.isEmpty()) Text("Usa las suyas", style = T.texto, color = SOBRE)
@@ -140,13 +144,15 @@ fun ModHabla(vm: RobotViewModel) {
                 Grabado("Nueva")
                 Grabado("${largoBytes(nueva)}/${Acompanar.MAX_TEXTO}", color = C.grisOscuro)
             }
-            CampoVisor(nueva, { nueva = it }, placeholder = Acompanar.EJEMPLO[situacion] ?: "Frase nueva", estilo = T.campoClaro,
+            val fabrica = VidaBase.frases[situacion] as? kotlinx.serialization.json.JsonObject
+            CampoVisor(nueva, { nueva = it }, placeholder = Acompanar.EJEMPLO[situacion] ?: com.sinteticalabs.app.consola.Compania.deFabrica(fabrica) ?: "Frase nueva", estilo = T.campoClaro,
                 maxBytes = Acompanar.MAX_TEXTO, alEscribir = { nueva = it })
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                listOf("{dueno}", "{robot}").forEach { f ->
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                com.sinteticalabs.app.consola.Compania.fichas(fabrica).forEach { f ->
                     Tecla(f, { nueva = cortarBytes("$nueva$f", Acompanar.MAX_TEXTO) }, acabado = Acabado.NEGRA, chica = true, alto = 34.dp)
                 }
-                Spacer(Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 Tecla("+ Sumar", { val t = nueva; vm.cambiar { Acompanar.sumarFrase(it, situacion, t) }; nueva = "" }, acabado = Acabado.NARANJA, chica = true,
                     habilitada = nueva.isNotBlank() && total < Acompanar.MAX_FRASES)
             }

@@ -291,6 +291,7 @@ fun ModDia(vm: RobotViewModel) {
         }
         Bandeja { Barra24(despierta, duerme) }
         SeccionDespertador(vm)
+        SeccionPresencia(vm)
         Visor(Modifier.fillMaxWidth()) {
             Grabado("Vos")
             CampoVisor(c.obj("dueno")?.texto("nombre").orEmpty(), { v -> vm.cambiar { Editar.ponerDueno(it, v) } }, placeholder = "Tu nombre", estilo = T.campoClaro)
@@ -577,13 +578,13 @@ fun ModVoz(vm: RobotViewModel, modelo: Modelo) {
         }
         if (escucha) {
             Visor(Modifier.fillMaxWidth()) {
-                Grabado("Responde a")
+                Grabado("Responde a · una palabra común")
                 CampoVisor(v.texto("palabra").orEmpty(), { t ->
                     val x = cortarBytes(t.trim(), Editar.MAX_PALABRA)
                     vm.cambiar { Editar.ponerVoz(it) { y -> if (x.isEmpty()) y.sin("palabra") else y.con("palabra", x) } }
                 }, placeholder = nombre, maxBytes = Editar.MAX_PALABRA)
             }
-            Llave("Conversar", v.si("conversar") == true, { vm.cambiar { Editar.ponerVoz(it) { y -> y.con("conversar", !(y.si("conversar") ?: false)) } } })
+            Llave("Charlar · después de su nombre", v.si("conversar") == true, { vm.cambiar { Editar.ponerVoz(it) { y -> y.con("conversar", !(y.si("conversar") ?: false)) } } })
             Text("“${v.texto("palabra") ?: nombre}, ¿qué hora es?”", style = T.texto, color = Color(0xCC1A1714))
         }
     }

@@ -54,6 +54,11 @@ object Op {
     const val AVISO = 0x44
     const val ANIMO = 0x45
     const val MIRAR = 0x46
+    const val TOQUE = 0x47          // v1.9
+    const val AGENDA = 0x48
+    const val PRESENCIA = 0x49
+    const val HABITO = 0x4A
+    const val MUSICA = 0x4B
     const val IMG_INICIO = 0x20
     const val IMG_BLOQUE = 0x21
     const val IMG_FIN = 0x22
@@ -81,7 +86,22 @@ val EVENTOS = listOf(
     "ruido", "musica", "silencio", "notificacion", "llamada", "bateria-baja", "bateria-critica", "enchufado",
     "desenchufado", "cargado", "sin-wifi", "cambio-de-cara", "bicho-cerca", "volvio", "hito",
     "recordatorio", "pomodoro", "despertador", "juego", "animo",
+    "cara-detectada", "oscuridad", "mano-cerca",                                              // v1.8
+    "toque-recibido", "devolver-toque", "agenda", "llegaste", "te-fuiste", "habito",          // v1.9
 )
+
+/** v1.9: los tipos de toque (0x47) y de aviso (0x44), en el orden del protocolo. */
+val TIPOS_TOQUE = listOf("toque", "abrazo", "beso", "carita")
+val TIPOS_AVISO = listOf("notificacion", "llamada", "pago", "mail", "github", "pedido", "otro")
+
+/** Hasta `max` bytes de UTF-8 sin partir una letra (para los marcos que cortan solos). */
+private fun recorte(s: String, max: Int): ByteArray {
+    val b = s.toByteArray()
+    if (b.size <= max) return byteArrayOf(b.size.toByte()) + b
+    var n = max
+    while (n > 0 && (b[n].toInt() and 0xC0) == 0x80) n--
+    return byteArrayOf(n.toByte()) + b.copyOf(n)
+}
 
 /** Los juegos (0x43), en el orden del protocolo. */
 val JUEGOS = listOf("ppt", "reflejos", "mirada", "dado", "moneda")
@@ -167,8 +187,40 @@ object Comando {
     }
 
     /** v1.7: una notificación (o llamada) del celu, con su app y su contacto (hasta 24 bytes cada uno). */
-    fun aviso(llamada: Boolean, app: String, contacto: String) =
-        byteArrayOf(Op.AVISO.toByte(), (if (llamada) 1 else 0).toByte()) + corto(app, 24) + corto(contacto, 24)
+    fun aviso(llamada: Boolean, app: String, contacto: String) = aviso(if (llamada) "llamada" else "notificacion", app, contacto)
+
+    /**
+     * v1.9: con los tipos nuevos (pago, mail, github, pedido, otro), `app` es el
+     * título corto ("$12.000", "PR #12") y `contacto` quién. Cada texto se corta a 24 bytes.
+     */
+    fun aviso(tipo: String, app: String, contacto: String): ByteArray {
+        val t = TIPOS_AVISO.indexOf(tipo)
+        require(t >= 0) { "tipo de aviso desconocido: $tipo" }
+        return byteArrayOf(Op.AVISO.toByte(), t.toByte()) + recorte(app.trim(), 24) + recorte(contacto.trim(), 24)
+    }
+
+    /** v1.9: un toque de un amigo (`de`, 1 a 24 bytes; la expresión, solo con carita). */
+    fun toque(tipo: String, de: String, expresion: String = ""): ByteArray {
+        val t = TIPOS_TOQUE.indexOf(tipo)
+        require(t >= 0) { "tipo de toque desconocido: $tipo" }
+        return byteArrayOf(Op.TOQUE.toByte(), t.toByte()) + recorte(de, 24) + corto(expresion, 24)
+    }
+
+    /** El próximo evento: cuántos minutos faltan, cuánto dura y el título (1 a 40 bytes). */
+    fun agenda(minutos: Int, duracion: Int, titulo: String) =
+        byteArrayOf(Op.AGENDA.toByte()) + u16(minutos and 0xFFFF) + u16(duracion and 0xFFFF) + recorte(titulo, 40)
+
+    /** El resumen de mañana: el mismo marco con 0xFFFF, la cantidad y el primero. */
+    fun agendaManana(cantidad: Int, primero: String) = agenda(0xFFFF, cantidad, primero)
+
+    fun presencia(llegaste: Boolean) = byteArrayOf(Op.PRESENCIA.toByte(), (if (llegaste) 0 else 1).toByte())
+
+    fun habito(indice: Int, hecho: Boolean, racha: Int) =
+        byteArrayOf(Op.HABITO.toByte(), indice.toByte(), (if (hecho) 0 else 1).toByte(), racha.coerceIn(0, 255).toByte())
+
+    /** Lo que suena: bpm (0 = no se sabe), si está sonando, el título (40 bytes) y el artista (24). */
+    fun musica(bpm: Int, sonando: Boolean, titulo: String, artista: String) =
+        byteArrayOf(Op.MUSICA.toByte(), bpm.coerceIn(0, 255).toByte(), (if (sonando) 1 else 0).toByte()) + recorte(titulo, 40) + recorte(artista, 24)
 
     /** 0 bien, 1 más o menos, 2 mal. */
     fun animo(valor: Int) = byteArrayOf(Op.ANIMO.toByte(), valor.toByte())

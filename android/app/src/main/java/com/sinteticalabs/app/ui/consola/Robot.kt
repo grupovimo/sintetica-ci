@@ -50,6 +50,7 @@ import com.sinteticalabs.app.datos.ponerApodo
 import com.sinteticalabs.app.datos.quitar
 import com.sinteticalabs.app.datos.robot
 import com.sinteticalabs.app.datos.subirImagen
+import com.sinteticalabs.app.datos.marcarHabito
 import com.sinteticalabs.app.datos.sprites as listaSprites
 import com.sinteticalabs.app.datos.sprite
 import com.sinteticalabs.app.datos.subirSprite as subirSpriteApi
@@ -407,6 +408,17 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun escucharNube() = viewModelScope.launch {
         EnVivo.eventos.collect { e ->
+            // v1.9: los toques de amigos y lo que suena pueden venir sin robot (son de la cuenta).
+            val deEste = e.robot == idRobot || e.robot.isEmpty()
+            if (e.tipo == "toque" && deEste && (e.datos.texto("robot")?.uppercase()?.let { it == idRobot } != false)) {
+                val (t, icono) = com.sinteticalabs.app.consola.textoDeToque(e.datos)
+                avisar(t, icono)
+                return@collect
+            }
+            if (e.tipo == "musica" && deEste && e.datos["titulo"] != null) {
+                suena.value = if (e.datos.si("sonando") == true) com.sinteticalabs.app.datos.Suena(true, e.datos.texto("titulo").orEmpty(), e.datos.texto("artista").orEmpty()) else null
+                return@collect
+            }
             if (e.robot != idRobot) return@collect
             val r = robot.value ?: return@collect
             when (e.tipo) {
@@ -569,6 +581,27 @@ class RobotViewModel(app: Application) : AndroidViewModel(app) {
         return enVivo("aviso", buildJsonObject { put("tipo", if (llamada) "llamada" else "notificacion"); put("app", a); put("contacto", k) }) {
             Comando.aviso(llamada, a, k)
         }
+    }
+
+    // --- v1.9: lo que suena, la presencia, los hábitos, la música y la charla ---
+
+    /** Lo que suena ahora (Spotify o el celu), para verlo al lado de él. */
+    val suena = MutableStateFlow<com.sinteticalabs.app.datos.Suena?>(null)
+
+    /** Llegaste o te fuiste: por la nube, la ruta; de cerca, el 0x49. */
+    suspend fun presencia(llegaste: Boolean): String? =
+        enVivo("presencia", buildJsonObject { put("llegaste", llegaste) }) { Comando.presencia(llegaste) }
+
+    /** Marca un hábito: por la nube (que calcula la racha) o, de cerca, el 0x4A directo. */
+    suspend fun marcarHabito(i: Int, hecho: Boolean): Pair<com.sinteticalabs.app.datos.HabitoVista?, String?> = try {
+        when (via) {
+            Via.NUBE -> api!!.marcarHabito(idRobot, i, hecho) to null
+            else -> { cliente!!.escribirCrudo(Car.COMANDO, Comando.habito(i, hecho, 0)); null to null }
+        }
+    } catch (e: ErrorApi) {
+        null to if (e.estado == 404) "Guardando… probá en un segundo" else (e.message ?: "No pude")
+    } catch (e: Exception) {
+        null to (e.message ?: "No pude")
     }
 
     // --- Imágenes ---

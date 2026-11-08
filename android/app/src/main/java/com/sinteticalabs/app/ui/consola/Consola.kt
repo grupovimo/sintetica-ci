@@ -71,7 +71,8 @@ import kotlinx.coroutines.launch
 /** Los diez módulos del teclado (como routes/robots/[id]/+page.svelte). */
 enum class Modulo(val nombre: String, val necesita: Set<Capacidad> = emptySet()) {
     CARACTER("Carácter"), CARA("Cara"), IMAGENES("Imágenes"), DIA("Su día"), CUIDADO("Cuidado"), RECORDATORIOS("Recordatorios"),
-    MODOS("Modos"), REFLEJOS("Reflejos"), INTEGRACIONES("Integraciones"), HABLA("Habla"), JUGAR("Jugar"),
+    HABITOS("Hábitos"), AGENDA("Agenda"), MODOS("Modos"), REFLEJOS("Reflejos"), INTEGRACIONES("Integraciones"),
+    AMIGOS("Amigos"), AVISOS("Avisos"), HABLA("Habla"), JUGAR("Jugar"),
     VOZ("Voz", setOf(Capacidad.MICROFONO, Capacidad.PARLANTE)), AJUSTES("Ajustes"),
 }
 
@@ -231,7 +232,7 @@ private fun Consola(vm: RobotViewModel, modelo: Modelo, alVolver: () -> Unit, al
                 Tecla("Jugar", { actual = Modulo.JUGAR }, habilitada = conectado)
                 if (sePuedeSoltar(estado)) Tecla("Soltar", { hacer(null, "", "Vuelve a ser él") }, acabado = Acabado.NEGRA, habilitada = conectado)
             }
-            DecileAlgo(vm, conectado)
+            DecileOCharla(vm, conectado)
             respuesta?.let { AvisoLinea(it) }
             if (!conectado) Text("Le llega cuando vuelva.", style = T.texto)
         }
@@ -250,6 +251,10 @@ private fun Consola(vm: RobotViewModel, modelo: Modelo, alVolver: () -> Unit, al
                 Modulo.REFLEJOS -> ModReflejos(vm, modelo)
                 Modulo.INTEGRACIONES -> ModIntegraciones(vm)
                 Modulo.CUIDADO -> ModCuidado(vm)
+                Modulo.HABITOS -> ModHabitos(vm)
+                Modulo.AGENDA -> ModAgenda(vm)
+                Modulo.AMIGOS -> ModAmigos(vm, modelo)
+                Modulo.AVISOS -> ModAvisos(vm)
                 Modulo.HABLA -> ModHabla(vm)
                 Modulo.JUGAR -> ModJugar(vm)
                 Modulo.VOZ -> ModVoz(vm, modelo)

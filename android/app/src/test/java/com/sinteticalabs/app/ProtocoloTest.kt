@@ -87,6 +87,30 @@ class ProtocoloTest {
         assertEquals(s(porNombre["animo medio"]!!, "hex"), hex(Comando.animo(1)))
         val mirar = porNombre["mirar derecha"]!!
         assertEquals(s(mirar, "hex"), hex(Comando.mirar(mirar["x"]!!.jsonPrimitive.double, mirar["y"]!!.jsonPrimitive.double)))
+        // v1.9: toques, agenda, presencia, hábitos, música y los avisos nuevos.
+        fun b(o: JsonObject, k: String) = o[k]!!.jsonPrimitive.boolean
+        fun n(o: JsonObject, k: String) = o[k]!!.jsonPrimitive.int
+        for (k in listOf("toque abrazo", "toque carita")) {
+            val t = porNombre[k]!!
+            assertEquals(k, s(t, "hex"), hex(Comando.toque(s(t, "tipo"), s(t, "de"), s(t, "expresion"))))
+        }
+        val ag = porNombre["agenda"]!!
+        assertEquals(s(ag, "hex"), hex(Comando.agenda(n(ag, "minutos"), n(ag, "duracion"), s(ag, "titulo"))))
+        val man = porNombre["agenda manana"]!!
+        assertEquals(s(man, "hex"), hex(Comando.agendaManana(n(man, "cantidad"), s(man, "titulo"))))
+        for (k in listOf("presencia llegaste", "presencia te fuiste")) assertEquals(k, s(porNombre[k]!!, "hex"), hex(Comando.presencia(b(porNombre[k]!!, "llegaste"))))
+        val hab = porNombre["habito hecho"]!!
+        assertEquals(s(hab, "hex"), hex(Comando.habito(n(hab, "indice"), b(hab, "hecho"), n(hab, "racha"))))
+        for (k in listOf("musica", "musica parar")) {
+            val m = porNombre[k]!!
+            assertEquals(k, s(m, "hex"), hex(Comando.musica(n(m, "bpm"), b(m, "sonando"), s(m, "titulo"), s(m, "artista"))))
+        }
+        for (k in listOf("aviso pago", "aviso github", "aviso whatsapp")) {
+            val a = porNombre[k]!!
+            assertEquals(k, s(a, "hex"), hex(Comando.aviso(s(a, "tipo"), s(a, "app"), s(a, "contacto"))))
+        }
+        assertEquals(44, com.sinteticalabs.app.protocolo.EVENTOS.indexOf("habito"))
+        assertEquals(39, com.sinteticalabs.app.protocolo.EVENTOS.indexOf("toque-recibido"))
         // Los eventos nuevos van al final.
         assertEquals(33, com.sinteticalabs.app.protocolo.EVENTOS.indexOf("despertador"))
         assertEquals(35, com.sinteticalabs.app.protocolo.EVENTOS.indexOf("animo"))

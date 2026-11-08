@@ -201,6 +201,9 @@ fun ModIntegraciones(vm: RobotViewModel) {
             }
         }
 
+        // La música: Spotify (si la nube lo tiene) y la del celu.
+        SeccionMusica(vm)
+
         // Telegram: te avisa y le escribís.
         Bandeja {
             val t = telegram
@@ -336,7 +339,7 @@ fun ModIntegraciones(vm: RobotViewModel) {
                 }
             }
         }
-        Text(Automatizaciones.PLANTILLAS.joinToString(" "), style = T.dato.copy(fontSize = 12.sp), color = Color(0xB31A1714))
+        Text((Automatizaciones.PLANTILLAS + autos.flatMap { com.sinteticalabs.app.consola.Compania.PLANTILLAS_CUANDO[it.cuando].orEmpty() }).distinct().joinToString(" "), style = T.dato.copy(fontSize = 12.sp), color = Color(0xB31A1714))
 
         // El secreto de los webhooks: cada llamada va firmada (X-Sintetica-Firma: sha256=…, HMAC del cuerpo).
         Bandeja {
