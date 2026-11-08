@@ -12,7 +12,7 @@ settings:
     CLANG_CXX_LANGUAGE_STANDARD: c++17
     GCC_ENABLE_CPP_EXCEPTIONS: NO
     GCC_ENABLE_CPP_RTTI: NO
-    DEVELOPMENT_TEAM: ""  # completar con tu equipo para correr en el iPhone
+    DEVELOPMENT_TEAM: M6935MSNQB
 targets:
   Sintetica:
     type: application
@@ -38,6 +38,12 @@ targets:
         INFOPLIST_FILE: Sintetica/Info.plist
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: NO
+      configs:
+        # Para TestFlight (el CI de grupovimo/sintetica-ios): firma manual.
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Apple Distribution
+          PROVISIONING_PROFILE_SPECIFIER: Sintetica App Store
   SinteticaTests:
     type: bundle.unit-test
     platform: iOS

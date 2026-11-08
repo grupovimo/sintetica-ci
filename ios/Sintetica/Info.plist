@@ -41,10 +41,12 @@
 	<string>Para hablar con el servidor de Sintética en tu red (en desarrollo).</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Para encontrar tu bicho, vincularlo y cambiarle la cara.</string>
+	<string>Para encontrar tu robot, vincularlo y cambiarle la cara.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Para escanear el QR que muestra tu bicho.</string>
+	<string>Para escanear el QR que muestra tu robot.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Fraunces.ttf</string>

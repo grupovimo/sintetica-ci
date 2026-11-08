@@ -271,9 +271,6 @@ PRUEBA("imagen: el estado trae el tamaño y la forma de la pantalla") {
 
 namespace {
 uint32_t azul(int, int) { return 0x1A50F5; }
-uint16_t a565(uint32_t c) {
-  return static_cast<uint16_t>((((c >> 16) & 0xF8) << 8) | (((c >> 8) & 0xFC) << 3) | ((c & 0xFF) >> 3));
-}
 // Arma una animación con estos cuadros (QOI) y duraciones.
 std::vector<uint8_t> sani(int w, int h, const std::vector<std::vector<uint8_t>>& cuadros, const std::vector<uint16_t>& ms) {
   std::vector<uint8_t> o = {'s', 'a', 'n', 'i', 1, uint8_t(cuadros.size()), uint8_t(w), uint8_t(w >> 8), uint8_t(h), uint8_t(h >> 8)};
