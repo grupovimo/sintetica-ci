@@ -13,6 +13,7 @@ data class Accion(
     val robot: String? = null,      // robot: otro del mismo dueño ("bicho" en el JSON)
     val expresion: String? = null,  // robot, cara y decir (opcional)
     val modo: String? = null,       // modo
+    val juego: String? = null,      // jugar: ppt, reflejos, mirada, dado o moneda
 )
 
 /** cuando "hora": a esa hora (HH:MM) los días que diga (L M X J V S D; null = todos). */
@@ -32,9 +33,10 @@ object Automatizaciones {
     /** Los que no dependen de lo que detecte la nube: van siempre primero. */
     val CUANDOS_FIJOS = listOf("hora", "despertador")
     val ACCIONES = listOf(
-        "decir" to "Decir", "cara" to "Cara", "modo" to "Modo", "despertar" to "Despertar",
+        "decir" to "Decir", "cara" to "Cara", "modo" to "Modo", "despertar" to "Despertar", "jugar" to "Jugar",
         "telegram" to "Telegram", "webhook" to "URL", "robot" to "Otro robot",
     )
+    val JUEGOS = listOf("ppt" to "Piedra, papel o tijera", "reflejos" to "Reflejos", "mirada" to "Seguí la mirada", "dado" to "Dado", "moneda" to "Moneda")
     val MODOS = listOf("mascota" to "Compañía", "reloj" to "Reloj", "pomodoro" to "Pomodoro", "clima" to "Clima")
     val CARAS = listOf("contento", "sorpresa", "enamorado", "guino", "triste", "pensando", "dormido")
     val PLANTILLAS = listOf("{robot}", "{dueno}", "{texto}", "{hora}", "{clima}", "{temp}", "{max}", "{min}", "{ciudad}", "{bateria}", "{expresion}")
@@ -67,7 +69,7 @@ object Automatizaciones {
                 valor = a.texto("valor")?.takeIf { it.isNotEmpty() },
                 hacer = a.lista("hacer").orEmpty().mapNotNull { h ->
                     val x = h as? JsonObject ?: return@mapNotNull null
-                    Accion(x.texto("tipo").orEmpty(), x.texto("texto"), x.texto("url"), x.texto("bicho"), x.texto("expresion"), x.texto("modo"))
+                    Accion(x.texto("tipo").orEmpty(), x.texto("texto"), x.texto("url"), x.texto("bicho"), x.texto("expresion"), x.texto("modo"), x.texto("juego"))
                 },
                 hora = a.texto("hora")?.takeIf { it.isNotEmpty() },
                 dias = a.texto("dias")?.takeIf { it.isNotEmpty() },
@@ -100,6 +102,7 @@ object Automatizaciones {
                     "cara" -> put("expresion", h.expresion ?: "contento")
                     "modo" -> put("modo", h.modo ?: "reloj")
                     "despertar" -> {}
+                    "jugar" -> put("juego", h.juego ?: "dado")
                     else -> { put("bicho", h.robot.orEmpty()); put("expresion", h.expresion ?: "contento") }
                 }
             }
@@ -120,6 +123,7 @@ object Automatizaciones {
         "cara" -> Accion(tipo, expresion = "contento")
         "modo" -> Accion(tipo, modo = "reloj")
         "despertar" -> Accion(tipo)
+        "jugar" -> Accion(tipo, juego = "dado")
         else -> Accion("robot", robot = otro.orEmpty(), expresion = "contento")
     }
 

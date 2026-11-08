@@ -293,6 +293,12 @@ fun ModIntegraciones(vm: RobotViewModel) {
                                     Grabado("Lo despierta")
                                     Text("¡Buen día!", style = T.dato.copy(color = C.papel))
                                 }
+                                "jugar" -> {
+                                    Grabado("Te invita a")
+                                    Selector(Automatizaciones.JUEGOS.firstOrNull { it.first == (h.juego ?: "dado") }?.second ?: "Dado", Automatizaciones.JUEGOS,
+                                        { v -> cambiar(i) { x -> x.copy(hacer = x.hacer.mapIndexed { k, y -> if (k == j) y.copy(juego = v) else y }) } },
+                                        estilo = T.dato.copy(color = C.papel))
+                                }
                                 "webhook" -> {
                                     Grabado("URL")
                                     CampoVisor(h.url.orEmpty(), { v -> cambiar(i) { x -> x.copy(hacer = x.hacer.mapIndexed { k, y -> if (k == j) y.copy(url = v.trim()) else y }) } },

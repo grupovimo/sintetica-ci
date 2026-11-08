@@ -124,4 +124,16 @@ class AcompanarTest {
         assertFalse(A.aJson(otra).toString().contains("hora"))
         assertTrue(A.PLANTILLAS.containsAll(listOf("{clima}", "{temp}", "{max}", "{min}", "{ciudad}", "{dueno}")))
     }
+
+    @Test fun automatizacionJugar() {
+        val A = com.sinteticalabs.app.consola.Automatizaciones
+        assertEquals("jugar", A.ACCIONES[A.ACCIONES.indexOfFirst { it.first == "despertar" } + 1].first)
+        val a = A.sumarAccion(A.nueva(2).copy(hacer = emptyList()), "jugar", null)
+        assertEquals("dado", a.hacer.single().juego)
+        val j = A.aJson(a.copy(hacer = listOf(a.hacer.single().copy(juego = "ppt")))).toString()
+        assertTrue(j, j.contains("""{"tipo":"jugar","juego":"ppt"}"""))
+        val l = A.leer(leerObjeto("""{"automatizaciones":[$j]}""")).lista.single()
+        assertEquals("ppt", l.hacer.single().juego)
+        assertEquals(j, A.aJson(l).toString())
+    }
 }
