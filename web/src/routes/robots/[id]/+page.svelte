@@ -191,7 +191,7 @@
                 <button type="button" role="radio" aria-checked={!charlando} onclick={() => (charlando = false)}>Decile algo</button>
                 <button type="button" role="radio" aria-checked={charlando} onclick={() => { charlando = true; frase = cortarBytes(frase, MAX_CHARLA); }}>Charlar</button>
               </div>
-              {#if charlando}<span class="grabado quedan" aria-label="Quedan {charla.quedan} de {charla.porDia} hoy">{charla.quedan}/{charla.porDia} hoy</span>{/if}
+              {#if charlando && charla.quedan >= 0}<span class="grabado quedan" aria-label="Quedan {charla.quedan} de {charla.porDia} hoy">{charla.quedan}/{charla.porDia} hoy</span>{/if}
             {:else}<span class="grabado">Decile algo</span>{/if}
           </div>
           {#if charlando && respuesta}
