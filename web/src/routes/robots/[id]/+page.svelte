@@ -83,7 +83,7 @@
 {:else if b.bicho && modelo}
   <main class="caja">
     {#if b.aviso}
-      <div class="aviso-robot" role="status"><span class="campana" aria-hidden="true">⏰</span><b>{b.aviso.texto}</b><button class="tecla negra chica" onclick={() => (b.aviso = null)}>OK</button></div>
+      <div class="aviso-robot" role="status"><span class="campana" aria-hidden="true">{b.aviso.icono}</span><b>{b.aviso.texto}</b><button class="tecla negra chica" onclick={() => (b.aviso = null)}>OK</button></div>
     {/if}
     <section class="heroe">
       <div class="foto">

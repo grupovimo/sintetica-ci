@@ -68,7 +68,8 @@ export type Evento =
   | { tipo: 'marco'; bicho: string; datos: { car: number; datos: string } }
   | { tipo: 'bicho'; bicho: string; datos: { accion: 'sumado' | 'quitado' | 'actual'; bicho?: Bicho } }
   | { tipo: 'automatizacion'; bicho: string; datos: { id: string; cuando: string; evento: string; resultados: unknown; en: string } }
-  | { tipo: 'telegram'; bicho?: string; datos: { vinculado: boolean; nombre?: string } };
+  | { tipo: 'telegram'; bicho?: string; datos: { vinculado: boolean; nombre?: string } }
+  | { tipo: 'mcp'; bicho: string; datos: { cliente: string; herramienta: string; en: string } };
 
 // Cómo ve la pantalla cada perfil (también los virtuales).
 export function pantallaDe(b: { perfil: string; estado: Estado | null }) {

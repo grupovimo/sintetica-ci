@@ -21,7 +21,7 @@ export class BichoAbierto {
   vida = $state<ReturnType<typeof leerVida> | null>(null);
   vidaEn = $state(0);
   // Lo que el robot acaba de avisar solo (un recordatorio, el fin de un pomodoro), para mostrarlo al toque.
-  aviso = $state<{ texto: string; cuando: number } | null>(null);
+  aviso = $state<{ texto: string; cuando: number; icono: string } | null>(null);
   private dejar: (() => void) | null = null;
 
   constructor(public id: string) {}
@@ -52,6 +52,7 @@ export class BichoAbierto {
         case 'sincro': this.bicho.sincro = e.datos; break;
         case 'config': if (e.datos.version !== this.versionConfig) this.cargarConfig(); break;
         case 'ota': this.ota = e.datos; break;
+        case 'mcp': this.avisar(`${e.datos.cliente || 'Tu IA'}: ${e.datos.herramienta.replaceAll('_', ' ')}`, '✦'); break;
         case 'marco': {
           const b = Uint8Array.from(atob(e.datos.datos), (c) => c.charCodeAt(0));
           if (e.datos.car === 2 && b[0] === 0x9b && b[1] === 0) {
@@ -80,10 +81,10 @@ export class BichoAbierto {
     });
   }
 
-  private avisar(texto: string) {
+  private avisar(texto: string, icono = '⏰') {
     const cuando = Date.now();
-    this.aviso = { texto, cuando };
-    setTimeout(() => { if (this.aviso?.cuando === cuando) this.aviso = null; }, 15000);
+    this.aviso = { texto, cuando, icono };
+    setTimeout(() => { if (this.aviso?.cuando === cuando) this.aviso = null; }, icono === '⏰' ? 15000 : 5000);
   }
 
   cerrar() { this.dejar?.(); }
