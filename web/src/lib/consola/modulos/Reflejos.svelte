@@ -3,8 +3,13 @@
   // reacciona; un cable los une. Se guardan como reglas propias simples
   // ({si, entonces: ["reflejo:x"]}), que se suman a las de fábrica. Las reglas
   // más complejas se editan en el Laboratorio y acá no se tocan.
+  // Abajo, los avisos del celu: cómo reacciona a una notificación o llamada
+  // según la app y el contacto (config.avisos).
   import { usarBicho } from '$lib/bicho.svelte';
-  import { NOMBRES_EVENTO, type Regla } from '$lib/formato';
+  import {
+    bytes, COMPORTAMIENTOS_BASE, cortarBytes, EXPRESIONES_BASE, MAX_AVISOS, MAX_DECIR_AVISO, MAX_NOMBRE_AVISO, NOMBRES_EVENTO,
+    type Aviso, type Regla,
+  } from '$lib/formato';
   import { usarGuardado } from '../guardado.svelte';
   import type { Modelo } from '../modelo';
 
@@ -42,6 +47,30 @@
   }
   const y = (i: number) => i * FILA + FILA / 2;
   const necesitaMovimiento = (e: string) => ['levantado', 'sacudida-fuerte', 'boca-abajo', 'caida'].includes(e);
+
+  // Avisos del celu.
+  const avisos = $derived(b.config.avisos ?? []);
+  const caras = $derived([...new Set([...Object.keys(EXPRESIONES_BASE), ...Object.keys(b.config.expresiones ?? {})])].sort());
+  const comportamientos = $derived([...new Set([...Object.keys(COMPORTAMIENTOS_BASE), ...Object.keys(b.config.comportamientos ?? {})])].sort());
+  function ponerAviso(i: number, f: (a: Aviso) => void) {
+    g.cambiar((c) => {
+      const l = [...(c.avisos ?? [])];
+      const a = { ...l[i] };
+      f(a);
+      for (const k of ['app', 'contacto', 'expresion', 'comportamiento', 'decir'] as const) if (!a[k]) delete a[k];
+      if (a.sonido !== false) delete a.sonido;
+      l[i] = a;
+      c.avisos = l;
+    });
+  }
+  function sumarAviso() {
+    g.cambiar((c) => { c.avisos = [...(c.avisos ?? []), { tipo: 'notificacion' as const, expresion: 'sorpresa', decir: '{app}' }].slice(0, MAX_AVISOS); });
+  }
+  function borrarAviso(i: number) {
+    g.cambiar((c) => { c.avisos = (c.avisos ?? []).filter((_, j) => j !== i); if (!c.avisos.length) delete c.avisos; });
+  }
+  const nombre = (v: string) => cortarBytes(v.trim(), MAX_NOMBRE_AVISO);
+  const decir = (v: string) => cortarBytes(v.replace(/\s+/g, ' ').trim(), MAX_DECIR_AVISO);
 </script>
 
 <div class="reflejos">
@@ -74,6 +103,49 @@
     </div>
   </div>
   {#if sinMovimiento}<p class="texto">Este modelo no siente el movimiento.</p>{/if}
+
+  <div class="celu">
+    <div class="titulo">
+      <span class="grabado">Del celu · {avisos.length}/{MAX_AVISOS}</span>
+      <button class="tecla negra chica" disabled={avisos.length >= MAX_AVISOS} onclick={sumarAviso}>+ Aviso</button>
+    </div>
+    {#each avisos as a, i (i)}
+      <div class="aviso-celu visor">
+        <div class="fila">
+          <div class="tipo" role="group" aria-label="Tipo">
+            {#each [['notificacion', 'Mensaje'], ['llamada', 'Llamada']] as [t, n]}
+              <button class="tecla chica" class:naranja={a.tipo === t} aria-pressed={a.tipo === t} onclick={() => ponerAviso(i, (x) => (x.tipo = t as Aviso['tipo']))}>{n}</button>
+            {/each}
+          </div>
+          <input class="campo claro" aria-label="App" placeholder="App" value={a.app ?? ''} onchange={(e) => { const v = nombre(e.currentTarget.value); e.currentTarget.value = v; ponerAviso(i, (x) => (x.app = v)); }} />
+          <input class="campo claro" aria-label="Contacto" placeholder="Contacto" value={a.contacto ?? ''} onchange={(e) => { const v = nombre(e.currentTarget.value); e.currentTarget.value = v; ponerAviso(i, (x) => (x.contacto = v)); }} />
+          <button class="tecla negra cuadrada" aria-label="Borrar este aviso" onclick={() => borrarAviso(i)}>✕</button>
+        </div>
+        <div class="fila">
+          <span class="flecha" aria-hidden="true">→</span>
+          <select class="campo claro" aria-label="Cara" value={a.expresion ?? ''} onchange={(e) => { const v = e.currentTarget.value; ponerAviso(i, (x) => (x.expresion = v)); }}>
+            <option value="">Su cara</option>{#each caras as c}<option value={c}>{c}</option>{/each}
+          </select>
+          <select class="campo claro" aria-label="Qué hace" value={a.comportamiento ?? ''} onchange={(e) => { const v = e.currentTarget.value; ponerAviso(i, (x) => (x.comportamiento = v)); }}>
+            <option value="">Nada más</option>{#each comportamientos as c}<option value={c}>{c.replaceAll('-', ' ')}</option>{/each}
+          </select>
+          <button class="llave" aria-pressed={a.sonido !== false} onclick={() => ponerAviso(i, (x) => (x.sonido = x.sonido === false))}><span class="led"></span>Sonido</button>
+        </div>
+        <div class="fila">
+          <span class="flecha" aria-hidden="true">“</span>
+          <input class="campo claro" aria-label="Qué dice" placeholder="{'{contacto}'} te escribe" value={a.decir ?? ''}
+            oninput={(e) => { const v = cortarBytes(e.currentTarget.value, MAX_DECIR_AVISO); if (v !== e.currentTarget.value) e.currentTarget.value = v; }}
+            onchange={(e) => { const v = decir(e.currentTarget.value); ponerAviso(i, (x) => (x.decir = v)); }} />
+          <span class="cuenta">{bytes(a.decir ?? '')}/{MAX_DECIR_AVISO}</span>
+          {#each ['{app}', '{contacto}'] as f}
+            <button type="button" class="ficha" disabled={bytes((a.decir ?? '') + f) > MAX_DECIR_AVISO} onclick={() => ponerAviso(i, (x) => (x.decir = decir(`${x.decir ?? ''} ${f}`)))}>{f}</button>
+          {/each}
+        </div>
+      </div>
+    {:else}
+      <p class="vacio">Mamá en WhatsApp → enamorado</p>
+    {/each}
+  </div>
 </div>
 
 <style>
@@ -96,5 +168,18 @@
   .cables { width: 100%; overflow: visible; }
   .cables path { fill: none; stroke: #ff6a33; stroke-width: 5; stroke-linecap: round; filter: drop-shadow(0 4px 3px rgba(0,0,0,.6)); }
   .cables path.viva { stroke: #ffb347; }
+  .celu { display: flex; flex-direction: column; gap: 10px; padding-top: 8px; }
+  .titulo { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .aviso-celu { gap: 10px; padding: 12px 12px 12px 16px; }
+  .fila { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .fila .campo { flex: 1 1 120px; min-width: 0; font-size: 17px; border-bottom: 1px solid #2c2925; }
+  .tipo { display: flex; gap: 6px; padding-bottom: 4px; }
+  .flecha { width: 18px; color: var(--brasa); font: 900 18px/1 var(--marca); text-align: center; }
+  .cuenta { flex: none; font: 800 11px/1 var(--marca); color: #5a524a; font-variant-numeric: tabular-nums; }
+  .ficha { padding: 7px 10px; border: 0; border-radius: 8px; cursor: pointer; background: var(--chapa); color: var(--brasa);
+    font: 800 12px/1 var(--marca); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 3px 0 #000; }
+  .ficha:active { transform: translateY(2px); box-shadow: 0 1px 0 #000; }
+  .ficha:disabled { opacity: .4; cursor: default; }
+  .vacio { margin: 0; padding: 10px 4px; font: 800 11px/1 var(--marca); letter-spacing: .14em; text-transform: uppercase; color: rgba(26,23,20,.6); }
   @media (max-width: 560px) { .jack { font-size: 12px; } .bahia { padding: 10px 6px; grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr); } }
 </style>
