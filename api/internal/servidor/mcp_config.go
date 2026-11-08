@@ -259,10 +259,16 @@ func validarConfig(o *objeto) ([]byte, error) {
 // guarda como versión nueva por el mismo camino que PUT /v1/bichos/{id}/config
 // (autor "mcp:<cliente>", evento "config" para la web y sincronización).
 func (s *Servidor) cambiarConfig(ctx context.Context, q quien, v VistaBicho, f func(o *objeto) error) (almacen.Config, error) {
-	m := s.mcp.candado(v.ID)
+	return s.cambiarConfigDe(ctx, v.ID, q.usuario, q.autor(), f)
+}
+
+// cambiarConfigDe: lo mismo con el autor que se quiera (las automatizaciones
+// usan "automatizacion"). El bicho tiene que ser del usuario (no se revisa acá).
+func (s *Servidor) cambiarConfigDe(ctx context.Context, bicho, usuario, autor string, f func(o *objeto) error) (almacen.Config, error) {
+	m := s.mcp.candado(bicho)
 	m.Lock()
 	defer m.Unlock()
-	o, err := s.configObjeto(ctx, v.ID)
+	o, err := s.configObjeto(ctx, bicho)
 	if err != nil {
 		return almacen.Config{}, err
 	}
@@ -273,7 +279,7 @@ func (s *Servidor) cambiarConfig(ctx context.Context, q quien, v VistaBicho, f f
 	if err != nil {
 		return almacen.Config{}, err
 	}
-	return s.nube.GuardarConfig(ctx, v.ID, string(b), q.autor(), q.usuario)
+	return s.nube.GuardarConfig(ctx, bicho, string(b), autor, usuario)
 }
 
 // guardada: lo que se le cuenta a la IA después de guardar.

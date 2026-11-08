@@ -130,11 +130,13 @@ func correr(log *slog.Logger) error {
 	c := &correo.Correo{Servidor: env("SMTP_SERVIDOR", "localhost:1025"), Usuario: os.Getenv("SMTP_USUARIO"),
 		Clave: os.Getenv("SMTP_CLAVE"), De: env("SMTP_DE", "Sintética Labs <hola@sinteticalabs.com>")}
 	// Las integraciones: Telegram (sin TELEGRAM_TOKEN queda apagado),
-	// automatizaciones y webhooks. Ver docs/nube.md, "Integraciones".
+	// automatizaciones, webhooks y el clima. Ver docs/nube.md, "Integraciones".
 	integ := integraciones.Nuevo(integraciones.Opciones{
 		TelegramToken: os.Getenv("TELEGRAM_TOKEN"),
 		TelegramBot:   env("TELEGRAM_BOT", "sinteticalabs_bot"),
 		TelegramURL:   os.Getenv("TELEGRAM_API_URL"),
+		ClimaURL:      os.Getenv("CLIMA_API_URL"),
+		GeocodingURL:  os.Getenv("GEOCODING_API_URL"),
 		Desarrollo:    desarrollo,
 		HostsPropios:  []string{op.WebURL, env("API_URL_PUBLICA", ""), env("API_URL_INTERNA", "")},
 	}, alm, n, hub, log)
