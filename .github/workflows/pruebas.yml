@@ -49,6 +49,27 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  fuzz:
+    name: Fuzzing del núcleo (60 s por blanco)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang cmake
+      # Regresiones y semillas primero (ctest), después 60 s de libFuzzer por blanco.
+      - run: JUNTOS=1 firmware/fuzz/correr.sh 60
+        env: { CXX: clang++ }
+      - if: always()
+        run: tail -n 40 build/fuzz/*.log || true
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-fallas
+          path: |
+            build/fuzz/fallas/
+            build/fuzz/*.log
+          if-no-files-found: ignore
+          retention-days: 30
+
   go:
     name: API y cgo
     runs-on: ubuntu-latest
