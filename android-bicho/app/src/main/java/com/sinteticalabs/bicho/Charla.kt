@@ -134,11 +134,12 @@ class Charla(
         fun contienePalabra(oido: String, palabra: String) =
             palabra.isNotEmpty() && normalizar(oido).split(' ').contains(palabra)
 
-        /** La frase sin la palabra del principio ("lucho qué hora es" → "qué hora es"). */
+        /** La frase sin la palabra del principio, de hasta 200 bytes ("lucho qué hora es" → "qué hora es"). */
         fun sinPalabra(frase: String, palabra: String): String {
             val p = frase.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
             val resto = if (p.isNotEmpty() && normalizar(p[0]) == palabra) p.drop(1) else p
-            return resto.joinToString(" ").take(200)
+            // La nube acepta hasta 200 bytes UTF-8: se corta sin partir letras.
+            return String(Avisos.recortar(resto.joinToString(" "), 200), Charsets.UTF_8)
         }
     }
 }

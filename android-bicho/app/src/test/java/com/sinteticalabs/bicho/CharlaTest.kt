@@ -17,5 +17,8 @@ class CharlaTest {
         assertEquals("qué hora es", Charla.sinPalabra("lucho qué hora es", "lucho"))
         assertEquals("", Charla.sinPalabra("lucho", "lucho"))
         assertEquals("che lucho", Charla.sinPalabra("che lucho", "lucho"))
+        val larga = Charla.sinPalabra("lucho " + "ñ".repeat(150), "lucho")
+        assertEquals(200, larga.toByteArray().size)
+        assertEquals("ñ".repeat(100), larga)
     }
 }
