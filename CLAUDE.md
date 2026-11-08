@@ -42,6 +42,8 @@ en `docs/motor-de-vida.md` (cómo está hecho) y
   `go test ./api/... ./firmware/api/cgo/`; `go test -tags e2e ./api/e2e/`.
 - La web: `cd web && npm run check && npm run build`.
 - Android: `cd android && ./gradlew testDebugUnitTest`.
+- iOS a TestFlight: `sh herramientas/publicar-ios.sh` (publica HEAD en `grupovimo/sintetica-ios`; compila Actions).
+- La landing a producción: `sh herramientas/desplegar-landing.sh` (HEAD → sintetica.grupovimo.com.ar).
 
 ## Memoria del proyecto (estado al 8/11/2026)
 
