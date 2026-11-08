@@ -327,6 +327,7 @@ func (i *Integraciones) Charlar(ctx context.Context, usuario, bicho, texto, desd
 // que le dijeron por voz). La respuesta va por su cmd (0x40). No bloquea.
 func (i *Integraciones) CharlaMQTT(bicho string, datos []byte) {
 	if !i.CharlaActiva() {
+		i.log.Info("charla por MQTT sin IA configurada (ANTHROPIC_API_KEY o CHARLA_URL)", "bicho", bicho)
 		return
 	}
 	var p struct {
