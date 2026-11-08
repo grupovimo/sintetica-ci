@@ -7,13 +7,13 @@
   let { data, children } = $props();
 
   const secciones = [
-    { ruta: '/bichos', nombre: 'Mis bichos' },
+    { ruta: '/robots', nombre: 'Mis robots' },
     { ruta: '/caras', nombre: 'Caras' },
     { ruta: '/animaciones', nombre: 'Animaciones' },
   ];
   const activa = (ruta: string) => page.url.pathname.startsWith(ruta);
-  // La landing (/) tiene su propia barra y su propio diseño.
-  const landing = $derived(page.url.pathname === '/' || page.url.pathname.startsWith('/piezas'));
+  // La landing (/) y la consola de los robots (/robots) tienen su propia barra y su propio diseño.
+  const landing = $derived(page.url.pathname === '/' || page.url.pathname.startsWith('/piezas') || page.url.pathname.startsWith('/robots'));
 
   async function salir() {
     await api('/v1/sesion', { metodo: 'DELETE' }).catch(() => {});
@@ -30,7 +30,7 @@
 {#if data.usuario}
   <header>
     <div class="contenedor barra">
-      <a class="marca" href="/bichos" aria-label="Sintética, inicio">
+      <a class="marca" href="/robots" aria-label="Sintética, inicio">
         <svg viewBox="0 0 40 24" width="34" height="20" aria-hidden="true"><rect x="3" y="2" width="11" height="20" rx="5.5" fill="var(--naranja)"/><rect x="26" y="2" width="11" height="20" rx="5.5" fill="var(--naranja)"/></svg>
         <span>Sintética</span>
       </a>

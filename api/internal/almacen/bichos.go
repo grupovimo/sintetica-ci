@@ -185,6 +185,7 @@ func borrarDatos(ctx context.Context, tx pgx.Tx, bichoID string) error {
 		`delete from configs where bicho_id = $1`, `delete from imagenes where bicho_id = $1`,
 		`delete from sincro where bicho_id = $1`, `delete from actualizaciones where bicho_id = $1`,
 		`delete from memorias where bicho_id = $1`,
+		`delete from automatizaciones where bicho_id = $1`, `delete from automatizaciones_historial where bicho_id = $1`,
 	} {
 		if _, err := tx.Exec(ctx, q, bichoID); err != nil {
 			return err

@@ -51,7 +51,32 @@ type Nube struct {
 
 	ctx      context.Context
 	cancelar context.CancelFunc
+
+	oyente Oyente
 }
+
+// Oyente se entera de lo que les pasa a los bichos (las automatizaciones).
+// Evento no puede bloquear: lo llama el trabajador del bicho.
+type Oyente interface {
+	// Evento: "conectado", "desconectado", "bateria-baja", "expresion",
+	// "duerme", "despierta" y los del registro (ver nube.EventosRegistro).
+	Evento(bicho, evento string, datos map[string]any)
+	// QuiereRegistro: si hay que pedirle el registro al bicho (cada 10 s)
+	// para enterarse de sus eventos (tacto, sacudida, recordatorio…).
+	QuiereRegistro(bicho string) bool
+}
+
+// Escuchar suma el oyente (antes de Conectar).
+func (n *Nube) Escuchar(o Oyente) { n.oyente = o }
+
+func (n *Nube) avisar(bicho, evento string, datos map[string]any) {
+	if n.oyente != nil {
+		n.oyente.Evento(bicho, evento, datos)
+	}
+}
+
+// Zona es la zona horaria de los bichos (la de Argentina, por ahora).
+func Zona() *time.Location { return zonaBichos }
 
 // Nuevo prepara la nube (no se conecta hasta Conectar).
 func Nuevo(op Opciones, alm *almacen.Almacen, hub *eventos.Hub, log *slog.Logger) *Nube {
@@ -149,7 +174,9 @@ func (n *Nube) alLlegar(_ mqtt.Client, m mqtt.Message) {
 	case "state":
 		e = entrada{tipo: entEstado, datos: d}
 	case "conexion":
-		e = entrada{tipo: entConexion, conectado: string(d) == "1"}
+		// Retenido = lo que ya estaba cuando la API se suscribió (al arrancar):
+		// no es que se acabe de conectar.
+		e = entrada{tipo: entConexion, conectado: string(d) == "1", retenido: m.Retained()}
 	case "resp":
 		if len(d) < 2 {
 			return

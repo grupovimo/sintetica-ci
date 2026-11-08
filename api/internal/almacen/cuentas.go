@@ -140,12 +140,15 @@ func (a *Almacen) BorrarSesion(ctx context.Context, tokenHash []byte) error {
 	return err
 }
 
-// Limpiar borra links y sesiones vencidos.
+// Limpiar borra links, sesiones y códigos de Telegram vencidos.
 func (a *Almacen) Limpiar(ctx context.Context) error {
 	if _, err := a.db.Exec(ctx, `delete from enlaces where vence < now() - interval '1 day'`); err != nil {
 		return err
 	}
 	if _, err := a.db.Exec(ctx, `delete from sesiones where vence < now()`); err != nil {
+		return err
+	}
+	if _, err := a.db.Exec(ctx, `delete from telegram_codigos where vence < now() - interval '1 day'`); err != nil {
 		return err
 	}
 	_, err := a.db.Exec(ctx, `delete from credenciales where estado = 'pendiente' and vence < now() - interval '1 day'`)

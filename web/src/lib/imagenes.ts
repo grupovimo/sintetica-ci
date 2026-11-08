@@ -1,4 +1,4 @@
-// Prepara una foto (o un GIF animado) para el bicho: recortada al tamaño
+// Prepara una foto (o un GIF animado, o un video corto) para el robot: recortada al tamaño
 // exacto de su pantalla (llenando, centrada), en el broche redonda (afuera del
 // círculo, el color de la pantalla) y en QOI de 3 canales; un GIF, como
 // animación "sani" (cada cuadro en QOI). Como en las apps (PrepararImagen).
@@ -36,6 +36,7 @@ export async function prepararImagen(
   alto: number,
   redonda: boolean,
 ): Promise<{ qoi: Uint8Array; vista: string; cuadros: number }> {
+  if (archivo.type.startsWith('video/')) return empaquetar(await cuadrosDeVideo(archivo, ancho, alto, redonda), ancho, alto);
   const bytes = new Uint8Array(await archivo.arrayBuffer());
   const esGif = bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46;
   if (!esGif) {
@@ -53,18 +54,57 @@ export async function prepararImagen(
     if (!vista) vista = c.toDataURL();
     cuadros.push({ rgba: c.getContext('2d')!.getImageData(0, 0, ancho, alto).data, ms: q.ms });
   }
+  return empaquetar({ cuadros, vista }, ancho, alto);
+}
+
+type Cuadros = { cuadros: { rgba: Uint8ClampedArray; ms: number }[]; vista: string };
+
+function empaquetar({ cuadros, vista }: Cuadros, ancho: number, alto: number) {
   if (cuadros.length === 1) return { qoi: codificarQoi(cuadros[0].rgba, ancho, alto), vista, cuadros: 1 };
   // Si no entra (o son demasiados cuadros), se saltea uno de cada dos y el que
   // queda dura lo de los dos: la animación sigue durando lo mismo.
   let sani = codificarAnimacion(cuadros.slice(0, MAX_CUADROS), ancho, alto);
   while (cuadros.length > MAX_CUADROS || sani.length > limite(ancho, alto)) {
-    if (cuadros.length <= 2) throw new Error('El GIF es demasiado pesado para la pantalla: probá con uno más simple.');
+    if (cuadros.length <= 2) throw new Error('El GIF es demasiado pesado para la pantalla: probá con uno más simple o más corto.');
     const menos: typeof cuadros = [];
     for (let i = 0; i < cuadros.length; i += 2) menos.push({ rgba: cuadros[i].rgba, ms: cuadros[i].ms + (cuadros[i + 1]?.ms ?? 0) });
     cuadros = menos;
     sani = codificarAnimacion(cuadros.slice(0, MAX_CUADROS), ancho, alto);
   }
   return { qoi: sani, vista, cuadros: cuadros.length };
+}
+
+// Un video corto: se toman hasta 6 segundos desde el principio, a 12 cuadros
+// por segundo como mucho (después empaquetar saltea los que no entren).
+const SEGUNDOS_VIDEO = 6;
+async function cuadrosDeVideo(archivo: Blob, ancho: number, alto: number, redonda: boolean): Promise<Cuadros> {
+  const url = URL.createObjectURL(archivo);
+  const v = document.createElement('video');
+  v.muted = true;
+  v.playsInline = true;
+  v.preload = 'auto';
+  v.src = url;
+  try {
+    await new Promise<void>((listo, mal) => {
+      v.onloadeddata = () => listo();
+      v.onerror = () => mal(new Error('El GIF o video no se pudo leer: probá con otro formato (mp4 o webm).'));
+    });
+    const dura = Math.min(isFinite(v.duration) ? v.duration : SEGUNDOS_VIDEO, SEGUNDOS_VIDEO);
+    const paso = Math.max(1 / 12, dura / MAX_CUADROS);
+    const ms = Math.round(paso * 1000);
+    const cuadros: Cuadros['cuadros'] = [];
+    let vista = '';
+    for (let t = 0; t < dura - 0.001 && cuadros.length < MAX_CUADROS; t += paso) {
+      await new Promise<void>((listo) => { v.onseeked = () => listo(); v.currentTime = t; });
+      const c = dibujar(v, v.videoWidth, v.videoHeight, ancho, alto, redonda);
+      if (!vista) vista = c.toDataURL();
+      cuadros.push({ rgba: c.getContext('2d')!.getImageData(0, 0, ancho, alto).data, ms });
+    }
+    if (!cuadros.length) throw new Error('El GIF o video está vacío.');
+    return { cuadros, vista };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 // Un QOI (o el primer cuadro de una animación) a una URL para un <img>.

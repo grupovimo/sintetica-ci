@@ -127,7 +127,17 @@ export type Config = {
   modo?: string;
   lista?: string[];
   rotar?: number;
+  recordatorios?: Recordatorio[];
+  voz?: { volumen?: number; tipo?: 'grave' | 'media' | 'aguda' | 'robot'; palabra?: string; conversar?: boolean; microfono?: number };
+  pomodoro?: { trabajo?: number; descanso?: number };
+  // Protector de pantalla: tras `espera` segundos sin que pase nada, muestra esa imagen; cualquier cosa vuelve a la cara.
+  protector?: { imagen: number; espera?: number };
 };
+
+// Un recordatorio: a la hora, el robot lo muestra en su pantalla hasta que lo tocan.
+// dias: letras de L M X J V S D (vacío = todos los días).
+export type Recordatorio = { hora: string; dias?: string; texto: string; expresion?: string; sonido?: boolean; activo?: boolean };
+export const MAX_RECORDATORIOS = 12;
 
 export const TIPOS_FORMA: { tipo: Forma['forma']; nombre: string; nueva: () => Forma }[] = [
   { tipo: 'pildora', nombre: 'Píldora', nueva: () => ({ forma: 'pildora', x: 0, y: 0, w: 0.15, h: 0.4 }) },

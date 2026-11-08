@@ -7,7 +7,8 @@ import (
 )
 
 // Evento es un mensaje para los clientes. Tipos: "estado", "conexion",
-// "marco", "sincro", "config", "imagenes", "ota", "bicho".
+// "marco", "sincro", "config", "imagenes", "ota", "memoria", "bicho",
+// "automatizacion" (corrió una) y "telegram" (se vinculó o desvinculó).
 type Evento struct {
 	Tipo  string `json:"tipo"`
 	Bicho string `json:"bicho,omitempty"`

@@ -10,6 +10,7 @@
     redonda = false,
     ancho = 320,
     etiqueta = 'Pantalla del bicho',
+    desnuda = false,
     alError = (_: string | null) => {},
   }: {
     config?: unknown;
@@ -17,10 +18,12 @@
     redonda?: boolean;
     ancho?: number;
     etiqueta?: string;
+    // Sin la placa de alrededor: el canvas llena su caja (para encastrarlo en la foto del robot).
+    desnuda?: boolean;
     alError?: (e: string | null) => void;
   } = $props();
 
-  let canvas: HTMLCanvasElement;
+  let canvas = $state<HTMLCanvasElement>();
   let sim: VistaPrevia | null = null;
   let cuadro: number | null = null;
   let aplicado = '';
@@ -76,7 +79,17 @@
   });
 </script>
 
+{#if desnuda}
+  <canvas class="desnuda" class:redonda bind:this={canvas} width={redonda ? 240 : 320} height={redonda ? 240 : 172} aria-label={etiqueta}
+    onpointerdown={() => sim?.tacto(true)} onpointerup={() => sim?.tacto(false)} onpointerleave={() => sim?.tacto(false)}></canvas>
+{:else}
 <div class="placa" class:redonda style="width: {ancho + (redonda ? 32 : 28)}px">
   <canvas bind:this={canvas} width={redonda ? 240 : 320} height={redonda ? 240 : 172} aria-label={etiqueta}
     onpointerdown={() => sim?.tacto(true)} onpointerup={() => sim?.tacto(false)} onpointerleave={() => sim?.tacto(false)}></canvas>
 </div>
+{/if}
+
+<style>
+  canvas.desnuda { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; touch-action: none; }
+  canvas.desnuda.redonda { border-radius: 50%; }
+</style>

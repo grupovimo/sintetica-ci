@@ -8,11 +8,11 @@
 
   onMount(async () => {
     const token = page.url.searchParams.get('t') ?? '';
-    const volver = page.url.searchParams.get('volver') ?? '/bichos';
+    const volver = page.url.searchParams.get('volver') ?? '/robots';
     try {
       await api('/v1/sesion/canjear', { cuerpo: { token } });
       await invalidateAll();
-      goto(volver.startsWith('/') && !volver.startsWith('//') ? volver : '/bichos', { replaceState: true });
+      goto(volver.startsWith('/') && !volver.startsWith('//') ? volver : '/robots', { replaceState: true });
     } catch (e) {
       error = e instanceof ErrorApi ? e.message : 'Algo salió mal.';
     }

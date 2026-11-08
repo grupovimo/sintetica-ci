@@ -27,6 +27,9 @@ x-api-entorno: &api-entorno
   BICHOS_VIRTUALES: http://bicho-virtual:8090,http://bicho-broche:8090
   EMQX_API_URL: http://emqx:18083
   EMQX_API_CLAVE: sintetica:clave-local-de-la-api-de-emqx
+  # El bot de Telegram (sin token, las integraciones de Telegram quedan apagadas).
+  TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
+  TELEGRAM_BOT: ${TELEGRAM_BOT:-sinteticalabs_bot}
 
 services:
   postgres:

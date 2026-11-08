@@ -27,6 +27,7 @@ type entrada struct {
 	car       byte
 	datos     []byte
 	conectado bool
+	retenido  bool
 }
 
 // Progreso de la sincronización: "al-dia", "enviando", "trayendo", "error",
@@ -65,6 +66,8 @@ type trabajador struct {
 	horaEn          time.Time // cuándo se le mandó la hora (en cada conexión, y cada 6 h)
 	memoriaEn       time.Time // cuándo se le pidió la memoria (cada 5 min)
 	mudanzaEn       time.Time // cuándo se le mandó una memoria de otra placa
+	registroEn      time.Time // cuándo se le pidió el registro (cada 10 s, si hay automatizaciones)
+	registro        lectorRegistro
 }
 
 // La zona horaria de los bichos (por ahora, la de Argentina; la hora la
@@ -96,6 +99,11 @@ func (t *trabajador) vida() {
 			}
 		}
 	}
+	if o := t.n.oyente; o != nil && ahora.Sub(t.registroEn) > 10*time.Second && o.QuiereRegistro(t.id) {
+		if t.n.enviar(t.id, protocolo.CarComando, protocolo.PedirRegistro()) == nil {
+			t.registroEn = ahora
+		}
+	}
 	if ahora.Sub(t.memoriaEn) > 5*time.Minute {
 		if t.n.enviar(t.id, protocolo.CarComando, protocolo.PedirMemoria()) == nil {
 			t.memoriaEn = ahora
@@ -118,6 +126,14 @@ func (t *trabajador) respuestaVida(d []byte) {
 			return
 		}
 		t.n.publicar(t.id, eventos.Evento{Tipo: "memoria", Datos: m})
+	case len(d) >= 3 && d[0] == protocolo.CmdRegistro|protocolo.Respuesta && d[1] == protocolo.Ok:
+		l, err := protocolo.LeerRegistro(d)
+		if err != nil {
+			return
+		}
+		for _, ev := range t.registro.nuevas(l) {
+			t.n.avisar(t.id, ev.nombre, ev.datos)
+		}
 	case len(d) >= 2 && d[0] == protocolo.CmdRestaurar|protocolo.Respuesta:
 		if d[1] != protocolo.Ok {
 			t.n.log.Warn("el bicho rechazó la mudanza", "bicho", t.id, "codigo", d[1])
@@ -201,6 +217,12 @@ func (t *trabajador) manejar(e entrada) {
 			return
 		}
 		cambioConfig := t.estado == nil || t.estado.CrcConfig != est.CrcConfig
+		if t.estado != nil {
+			t.cambiosDeEstado(*t.estado, est)
+			if est.Encendido < t.estado.Encendido {
+				t.registro.reiniciar() // reinició: el registro empieza de cero
+			}
+		}
 		if t.esperandoAviso {
 			t.avisoEn = time.Now()
 		}
@@ -233,6 +255,14 @@ func (t *trabajador) manejar(e entrada) {
 			t.n.log.Warn("no pude guardar la conexión", "bicho", t.id, "error", err)
 		}
 		t.n.publicar(t.id, eventos.Evento{Tipo: "conexion", Datos: map[string]bool{"conectado": e.conectado}})
+		t.registro.reiniciar()
+		if !e.retenido {
+			if e.conectado {
+				t.n.avisar(t.id, "conectado", map[string]any{})
+			} else {
+				t.n.avisar(t.id, "desconectado", map[string]any{})
+			}
+		}
 		if e.conectado {
 			t.pendiente = true
 			t.proximoIntento = time.Time{}

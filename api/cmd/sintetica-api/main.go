@@ -20,6 +20,7 @@ import (
 	"sintetica/api/internal/correo"
 	"sintetica/api/internal/eventos"
 	"sintetica/api/internal/firma"
+	"sintetica/api/internal/integraciones"
 	"sintetica/api/internal/nube"
 	"sintetica/api/internal/servidor"
 )
@@ -127,7 +128,17 @@ func correr(log *slog.Logger) error {
 	}, alm, hub, log)
 	c := &correo.Correo{Servidor: env("SMTP_SERVIDOR", "localhost:1025"), Usuario: os.Getenv("SMTP_USUARIO"),
 		Clave: os.Getenv("SMTP_CLAVE"), De: env("SMTP_DE", "Sintética Labs <hola@sinteticalabs.com>")}
-	srv = servidor.Nuevo(op, alm, n, hub, c, firmador, log)
+	// Las integraciones: Telegram (sin TELEGRAM_TOKEN queda apagado),
+	// automatizaciones y webhooks. Ver docs/nube.md, "Integraciones".
+	integ := integraciones.Nuevo(integraciones.Opciones{
+		TelegramToken: os.Getenv("TELEGRAM_TOKEN"),
+		TelegramBot:   env("TELEGRAM_BOT", "sinteticalabs_bot"),
+		TelegramURL:   os.Getenv("TELEGRAM_API_URL"),
+		Desarrollo:    desarrollo,
+		HostsPropios:  []string{op.WebURL, env("API_URL_PUBLICA", ""), env("API_URL_INTERNA", "")},
+	}, alm, n, hub, log)
+	n.Escuchar(integ)
+	srv = servidor.Nuevo(op, alm, n, integ, hub, c, firmador, log)
 
 	publico := &http.Server{Addr: env("DIRECCION", ":8080"), Handler: srv.Rutas(), ReadHeaderTimeout: 10 * time.Second}
 	interno := &http.Server{Addr: env("DIRECCION_INTERNA", ":8081"), Handler: srv.RutasInternas(), ReadHeaderTimeout: 5 * time.Second}
@@ -145,6 +156,8 @@ func correr(log *slog.Logger) error {
 	go func() { errores <- interno.Serve(lInterno) }()
 	go func() { errores <- publico.Serve(lPublico) }()
 	log.Info("API escuchando", "publica", publico.Addr, "interna", interno.Addr, "desarrollo", desarrollo)
+
+	go integ.Correr(ctx)
 
 	if err := n.Conectar(); err != nil {
 		log.Warn("todavía no me conecté al broker (sigo intentando)", "error", err)

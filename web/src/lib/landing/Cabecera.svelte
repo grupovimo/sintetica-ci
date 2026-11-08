@@ -12,7 +12,7 @@
   <nav aria-label="Secciones">
     <a class="ficha" href="{base}#piezas">Unidades</a>
     <a class="ficha" href="{base}#app">App</a>
-    <a class="ficha" href={usuario ? '/bichos' : '/entrar'}>{usuario ? 'Mis robots' : 'Entrar'}</a>
+    <a class="ficha" href={usuario ? '/robots' : '/entrar'}>{usuario ? 'Mis robots' : 'Entrar'}</a>
   </nav>
   <a class="inflado" href="{base}#reservar">Reservar</a>
 </header>

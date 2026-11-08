@@ -98,7 +98,8 @@ núcleo), no se reintenta hasta que cambie.
   desde la base; los comandos van al bicho y su respuesta llega por los eventos.
 - **Eventos en vivo** (SSE): `GET /v1/eventos` (todos los bichos de la cuenta) o
   `GET /v1/bichos/{id}/eventos`: `estado` (con los bytes crudos en `crudo`),
-  `conexion`, `sincro`, `config`, `imagenes`, `ota`, `marco`, `memoria` y `bicho`.
+  `conexion`, `sincro`, `config`, `imagenes`, `ota`, `marco`, `memoria`, `bicho`,
+  `automatizacion` y `telegram` (ver "Integraciones").
 
 ## El motor de vida (v1.4)
 
@@ -136,6 +137,140 @@ núcleo), no se reintenta hasta que cambie.
    `confirmada` (30 s andando con la versión nueva) o `fallida` (volvió con la
    anterior).
 
+## Integraciones
+
+Lo que hace que el bicho sirva fuera de su pantalla (`api/internal/integraciones`,
+migración `005_integraciones.sql`): el bot de Telegram, las automatizaciones
+por bicho y los recordatorios que la nube manda cuando el bicho no está.
+
+### Telegram (@sinteticalabs_bot)
+
+- **Long polling** (`getUpdates`, 30 s), no webhook entrante: anda igual en
+  local y en el VPS sin exponer nada. Un solo trabajador en la API, con backoff
+  (1 s → 1 min, o lo que diga `retry_after`); se apaga con el contexto. El
+  offset se guarda en `telegram_offset` (un reinicio no repite comandos).
+  Solo `net/http`; la URL base se puede cambiar (`TELEGRAM_API_URL`, para los
+  tests). El token va en el camino de cada pedido y nunca se loguea (los errores
+  de red se limpian de la URL).
+- **Sin `TELEGRAM_TOKEN`** todo lo de Telegram queda apagado: las rutas
+  responden `{"activo": false}` y el resto de la API anda igual.
+- **Vincular**: `POST /v1/telegram/vincular` → `{"enlace":"https://t.me/sinteticalabs_bot?start=<código>","vence":"ISO"}`
+  (un solo uso, 15 min, se guarda solo el hash; 10 por hora). Al recibir
+  `/start <código>`, el bot guarda el chat para ese usuario, saluda y emite el
+  evento `telegram` (`{vinculado: true, nombre}`). Un chat es de un solo
+  usuario: vincularlo en otra cuenta lo pasa a esa.
+  `GET /v1/telegram` → `{"activo","bot","vinculado","nombre"}` (`nombre`: el
+  `@usuario` o el nombre de Telegram). `DELETE /v1/telegram` desvincula
+  (evento `telegram` con `vinculado: false`) y responde como el GET.
+- **Comandos** (solo chats privados y vinculados; a cualquier otro chat le
+  explica cómo vincularse; 30 mensajes por minuto por chat):
+  `/robots` (cada uno con conectado, batería, cara y ánimo, y botones para ver
+  su estado), `/estado [nombre]`, `/cara <expresión> [nombre]` (el mismo camino
+  que `POST /v1/bichos/{id}/comando {expresion}`; sin expresión, un teclado
+  inline con las caras; `auto` vuelve a la automática), `/decir <texto> [nombre]`,
+  `/ayuda`. Con un solo robot el nombre no hace falta; con varios, si no se
+  dice, aparece un teclado para elegirlo. El nombre es el apodo (o el nombre
+  del bicho, o su id), sin importar mayúsculas ni tildes.
+- **Pendiente: `/decir`**. El núcleo todavía no tiene un comando para mostrar
+  un texto que llega de afuera. Por ahora le manda el evento `notificacion` (el
+  bicho reacciona) y contesta que el texto en pantalla llega con los
+  recordatorios.
+
+### Automatizaciones
+
+"Cuando pasa X en el bicho → hacer Y". Rutas (el dueño):
+
+- `GET /v1/bichos/{id}/automatizaciones` → `{"automatizaciones":[…],"historial":[…],"cuandos":[…]}`
+  (`historial`: las últimas 50 ejecuciones, la más nueva primero:
+  `{automatizacion, evento, accion, ok, detalle, en}`; `cuandos`: los eventos
+  que se pueden usar).
+- `PUT /v1/bichos/{id}/automatizaciones {"automatizaciones":[…]}` reemplaza la
+  lista entera (máximo 20; inválida → 400 con el motivo en `detalle`).
+- `POST /v1/bichos/{id}/automatizaciones/{n}/probar` la corre ya, como si
+  hubiera pasado su evento (`{n}`: la posición desde 0 o el id). Responde
+  `{"ok", "resultados":[{tipo, ok, detalle}]}`; 429 si corrió hace muy poco.
+
+```json
+{"automatizaciones":[
+ {"id":"a1","activa":true,"cuando":"bateria-baja","hacer":[
+   {"tipo":"telegram","texto":"{robot} tiene {bateria}% de batería"},
+   {"tipo":"webhook","url":"https://ejemplo.com/gancho"},
+   {"tipo":"robot","bicho":"<id de otro robot propio>","expresion":"sorpresa"}
+ ]}
+]}
+```
+
+- `id`: 1 a 40 de `[A-Za-z0-9_-]`, sin repetir. `hacer`: de 1 a 5 acciones.
+  `valor` (opcional) solo con `"cuando": "expresion"`: cuál.
+- **Plantillas** en los textos: `{robot}` (apodo, nombre o id), `{bateria}`,
+  `{expresion}`, `{evento}`, `{texto}` (el del recordatorio), `{hora}` (HH:MM,
+  hora del bicho).
+- **`telegram`**: le escribe al chat vinculado del dueño (texto de 1 a 1000 bytes).
+- **`robot`**: solo a bichos de la misma cuenta (se valida al guardar y al
+  correr); le pone esa expresión (el mismo comando que la web).
+- **`webhook`**: `POST` JSON `{"evento","robot":{"id","nombre"},"datos":{…},"en":"ISO"}`
+  con `X-Sintetica-Firma: sha256=<HMAC-SHA256 del cuerpo en hex>` (y
+  `X-Sintetica-Evento`). El secreto es por usuario: `GET /v1/webhooks/secreto`
+  → `{"secreto":"whsec_…"}` (se crea la primera vez), `POST` lo rota. Solo
+  `http`/`https`, sin usuario ni clave en la URL; 5 s de timeout; no sigue
+  redirecciones ni usa proxies. **Destinos internos bloqueados** (salvo
+  `DESARROLLO=1`): loopback, privadas, link-local (169.254.169.254 incluida),
+  CGNAT, multicast, reservadas, de documentación, IPv6 con una IPv4 adentro
+  (NAT64, 6to4), nombres sin punto (los de Docker: `api`, `postgres`…),
+  `localhost`, `.local`, `.internal`, `.lan`, y el propio servicio (los hosts de
+  `WEB_URL`, `API_URL_PUBLICA`, `API_URL_INTERNA` y las IPs a las que
+  resuelven). El DNS se resuelve al conectar, se validan **todas** las IPs y la
+  conexión va a la IP validada (contra DNS rebinding).
+- **Límite de disparos**: cada automatización corre como mucho una vez cada
+  10 s y 200 veces por día (en memoria; `probar` cuenta). Así no sirve de cañón
+  ni se arman bucles entre robots.
+- Cada vez que una corre: entradas en el historial (una por acción) y el
+  evento `automatizacion` por SSE: `{id, cuando, evento, resultados, en}`.
+- Si el bicho pasa a otra cuenta, sus automatizaciones y su historial se borran.
+
+**Los `cuando` que se detectan de verdad:**
+
+| `cuando` | De dónde sale |
+| --- | --- |
+| `conectado`, `desconectado` | `bicho/{id}/conexion` (no los retenidos que llegan cuando arranca la API) |
+| `bateria-baja` | el estado: la batería cruza de ≥ 15 % a < 15 % |
+| `expresion` (opcional `valor`) | el estado: cambió la cara visible (`datos.valor`, `datos.antes`) |
+| `duerme`, `despierta` | el estado: el bit de dormido |
+| `tacto`, `doble-toque`, `caricia`, `muchos-toques`, `levantado`, `sacudida`, `sacudida-suave`, `sacudida-fuerte`, `boca-abajo`, `inclinado`, `caida`, `voz`, `nombre`, `ruido`, `musica`, `cargando` (= `enchufado`), `desenchufado`, `cargado`, `volvio` | el registro del motor de vida (`0x1E`, tipo 0) |
+| `hito` | el registro (tipo 3) |
+| `recordatorio` | el aviso que el bicho manda solo al mostrar uno (ver abajo) |
+| `pomodoro` | el aviso que el bicho manda solo al terminar un tramo del pomodoro |
+
+Los del registro: la API le pide el registro (`0x1E`) cada 10 s **solo** a los
+bichos conectados que tienen alguna automatización activa que lo necesita, y
+avisa cada entrada nueva una vez (la primera lectura después de conectarse o
+de un reinicio solo marca el punto de partida). Los avisos (un `0x9E` que el
+bicho manda solo por `bicho/{id}/resp`, ver protocolo-ble.md, "Eventos que avisa
+el bicho solo") se atienden siempre, sin pedir el registro, y no se repiten
+cuando después aparecen en él. Si en 10 s pasan más de 28
+cosas, las más viejas se pierden. `bateria-baja` del registro no se usa (sale
+del estado, con el umbral de arriba).
+
+### Recordatorios
+
+- **El evento que espera la API**: el aviso `[0x9E][0x00][0x02][u32 s][0x00][0x1F][u32 s][0x04][u8 índice]`
+  que el bicho manda solo al mostrar un recordatorio (evento `31` recordatorio +
+  entrada de registro de **tipo 4** con su índice en `recordatorios`, desde 0).
+  Cuenta como un solo `recordatorio` (sale de la entrada de tipo 4). Si el
+  aviso se perdiera y la API está leyendo el registro, la entrada de tipo 4
+  también lo dispara. El texto se busca en la config (`{texto}`; en el
+  webhook, `datos.texto`, `datos.hora` y `datos.indice`).
+- **Si el bicho no está conectado**: cada minuto la nube revisa los
+  recordatorios activos de la config (`recordatorios`, arriba de todo o en
+  `vida`: `[{hora:"08:30", dias:"LMXJV", texto, expresion, sonido, activo}]`;
+  días L M X J V S D, vacío = todos) de los bichos desconectados de los
+  usuarios con Telegram, y los manda por Telegram ("Recordatorio de Pipo
+  (08:30): …"); quedan en el historial como `recordatorio-nube`. La hora es la
+  de los bichos (`America/Argentina/Buenos_Aires`, la misma con la que la API
+  les manda la hora). Si la API estuvo parada, se pone al día como mucho 3
+  minutos. Ojo: un bicho que nunca se conecta a la nube (un broche sin WiFi)
+  cuenta como desconectado.
+
 ## Variables de la API
 
 | Variable | Para qué | En local |
@@ -154,6 +289,9 @@ núcleo), no se reintenta hasta que cambie.
 | `BICHOS_VIRTUALES` | dónde están los virtuales | los dos del compose |
 | `EMQX_API_URL`, `EMQX_API_CLAVE` | para echar a un bicho | `http://emqx:18083`, la de `emqx/api-claves.txt` |
 | `COOKIE_SEGURA` | cookie solo por HTTPS | `0` |
+| `TELEGRAM_TOKEN` | el token del bot (de @BotFather); vacío = Telegram apagado | el de `.env` (nunca en el repo) |
+| `TELEGRAM_BOT` | el usuario del bot, sin `@` | `sinteticalabs_bot` |
+| `TELEGRAM_API_URL` | la API de Telegram (para tests) | vacío = `https://api.telegram.org` |
 
 ## Antes de ponerlo en el VPS
 

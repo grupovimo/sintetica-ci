@@ -30,7 +30,7 @@
     quitando = true;
     try {
       await api(`/v1/bichos/${b.id}`, { metodo: 'DELETE' });
-      goto('/bichos');
+      goto('/robots');
     } catch (err) {
       aviso = err instanceof ErrorApi ? err.message : 'No pude sacarlo.';
       quitando = false;
@@ -85,7 +85,7 @@
         <label style="flex: 1"><span class="etiqueta">Nombre del bicho (comando, hasta que cambie la config)</span><input bind:value={nombreNuevo} maxlength="24" /></label>
         <button style="align-self: end" disabled={!conectado || !nombreNuevo}>Cambiar</button>
       </form>
-      <p class="nota">Para que quede siempre, cambialo en <a href="/bichos/{b.id}/config">Config</a>.</p>
+      <p class="nota">Para que quede siempre, cambialo en <a href="/robots/{b.id}/config">Config</a>.</p>
     </div>
     <div class="tarjeta grilla">
       <h2>Cuenta</h2>

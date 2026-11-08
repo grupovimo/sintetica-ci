@@ -1,5 +1,5 @@
 // El bicho abierto en la web: su estado en vivo y su config. Lo comparten las
-// pestañas de /bichos/[id] por contexto.
+// pestañas de /robots/[id] por contexto.
 import { getContext, setContext } from 'svelte';
 import { api, ErrorApi } from './api';
 import { escuchar } from './eventos.svelte';

@@ -1,6 +1,7 @@
 // Package servidor es la API HTTP de SintéticaOS: cuentas con link mágico,
 // bichos (config, imágenes, comandos, estado en vivo), la biblioteca de caras
-// y animaciones, los firmwares, y los endpoints internos que usa EMQX.
+// y animaciones, los firmwares, las integraciones (Telegram, automatizaciones,
+// webhooks) y los endpoints internos que usa EMQX.
 package servidor
 
 import (
@@ -24,6 +25,7 @@ import (
 	"sintetica/api/internal/correo"
 	"sintetica/api/internal/eventos"
 	"sintetica/api/internal/firma"
+	"sintetica/api/internal/integraciones"
 	"sintetica/api/internal/nube"
 )
 
@@ -52,11 +54,12 @@ type Servidor struct {
 	firmador *firma.Firmador
 	log      *slog.Logger
 	limites  *limitador
+	integ    *integraciones.Integraciones
 }
 
 // Nuevo arma el servidor.
-func Nuevo(op Opciones, alm *almacen.Almacen, n *nube.Nube, hub *eventos.Hub, c *correo.Correo, f *firma.Firmador, log *slog.Logger) *Servidor {
-	return &Servidor{op: op, alm: alm, nube: n, relevo: nube.NuevoRelevo(n), hub: hub, correo: c, firmador: f, log: log, limites: nuevoLimitador()}
+func Nuevo(op Opciones, alm *almacen.Almacen, n *nube.Nube, i *integraciones.Integraciones, hub *eventos.Hub, c *correo.Correo, f *firma.Firmador, log *slog.Logger) *Servidor {
+	return &Servidor{op: op, alm: alm, nube: n, relevo: nube.NuevoRelevo(n), hub: hub, correo: c, firmador: f, log: log, limites: nuevoLimitador(), integ: i}
 }
 
 // Rutas es la API pública.
@@ -95,6 +98,15 @@ func (s *Servidor) Rutas() http.Handler {
 	m.HandleFunc("GET /v1/bichos/{id}/actualizaciones", s.conBicho(s.listarActualizaciones))
 	m.HandleFunc("GET /v1/bichos/{id}/memoria", s.conBicho(s.verMemoria))
 	m.HandleFunc("POST /v1/bichos/{id}/mudar", s.conBicho(s.mudar))
+	m.HandleFunc("GET /v1/bichos/{id}/automatizaciones", s.conBicho(s.verAutomatizaciones))
+	m.HandleFunc("PUT /v1/bichos/{id}/automatizaciones", s.conBicho(s.guardarAutomatizaciones))
+	m.HandleFunc("POST /v1/bichos/{id}/automatizaciones/{n}/probar", s.conBicho(s.probarAutomatizacion))
+
+	m.HandleFunc("GET /v1/telegram", s.conSesion(s.verTelegram))
+	m.HandleFunc("POST /v1/telegram/vincular", s.conSesion(s.vincularTelegram))
+	m.HandleFunc("DELETE /v1/telegram", s.conSesion(s.desvincularTelegram))
+	m.HandleFunc("GET /v1/webhooks/secreto", s.conSesion(s.verSecretoWebhook))
+	m.HandleFunc("POST /v1/webhooks/secreto", s.conSesion(s.rotarSecretoWebhook))
 
 	m.HandleFunc("GET /v1/biblioteca", s.conSesion(s.listarBiblioteca))
 	m.HandleFunc("POST /v1/biblioteca", s.conSesion(s.guardarPieza))

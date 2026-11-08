@@ -30,6 +30,9 @@ x-api-entorno: &api-entorno
   DESARROLLO: "0"
   EMQX_API_URL: http://emqx:18083
   EMQX_API_CLAVE: ${EMQX_API_CLAVE:?falta EMQX_API_CLAVE}
+  # El bot de Telegram (sin token, las integraciones de Telegram quedan apagadas).
+  TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
+  TELEGRAM_BOT: ${TELEGRAM_BOT:-sinteticalabs_bot}
 
 services:
   postgres:

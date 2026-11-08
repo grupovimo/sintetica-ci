@@ -107,6 +107,7 @@ var Eventos = []string{
 	"caricia", "muchos-toques", "sacudida-suave", "sacudida-fuerte", "inclinado", "caida", "voz", "nombre",
 	"ruido", "musica", "silencio", "notificacion", "llamada", "bateria-baja", "bateria-critica", "enchufado",
 	"desenchufado", "cargado", "sin-wifi", "cambio-de-cara", "bicho-cerca", "volvio", "hito",
+	"recordatorio", "pomodoro", // los genera el sistema (y los avisa solo: ver docs/protocolo-ble.md)
 }
 
 // VariablesEstado y Rasgos: el estado interno y la personalidad, en el orden del protocolo.
@@ -663,3 +664,36 @@ func TamanoImagen(b []byte) (ancho, alto int, ok bool) {
 
 // MaxCuadros: cuántos cuadros puede tener una imagen animada.
 const MaxCuadros = 64
+
+// Tipos de las entradas del registro (comando 0x1E).
+const (
+	RegistroEvento         = 0
+	RegistroComportamiento = 1
+	RegistroDormir         = 2 // dato 1 = se durmió, 0 = se despertó
+	RegistroHito           = 3
+	RegistroRecordatorio   = 4 // el bicho mostró un recordatorio (dato: su índice en la config)
+)
+
+// EntradaRegistro es una entrada del registro del motor de vida.
+type EntradaRegistro struct {
+	Segundos uint32 `json:"segundos"` // desde que arrancó
+	Tipo     uint8  `json:"tipo"`
+	Dato     uint8  `json:"dato"`
+}
+
+// LeerRegistro decodifica [0x9E][0x00][n][n × (u32 segundos, u8 tipo, u8 dato)].
+func LeerRegistro(b []byte) ([]EntradaRegistro, error) {
+	if len(b) < 3 || b[0] != CmdRegistro|Respuesta || b[1] != Ok {
+		return nil, errors.New("no es una respuesta de Registro")
+	}
+	n := int(b[2])
+	if len(b) < 3+6*n {
+		return nil, errors.New("registro: corto")
+	}
+	l := make([]EntradaRegistro, 0, n)
+	for i := 0; i < n; i++ {
+		e := b[3+6*i:]
+		l = append(l, EntradaRegistro{binary.LittleEndian.Uint32(e), e[4], e[5]})
+	}
+	return l, nil
+}

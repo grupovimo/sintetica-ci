@@ -1,0 +1,118 @@
+/* La consola: el panel de cada robot como un equipo de hardware. Teclas
+   mecánicas, LEDs, visores hundidos y una placa naranja anodizada. Todo vive
+   bajo .consola para no pisar el resto de la web. */
+.consola {
+  --marca: 'Archivo', system-ui, sans-serif;
+  --fondo: #16140f;
+  --chapa: #211e1a;
+  --hundido: #0e0d0b;
+  --c-papel: #f3eee8;
+  --gris: #8f877c;
+  --gris-claro: #b9b1a6;
+  --c-naranja: #ff5a1f;
+  --brasa: #ff8a5c;
+  --led: #ff6a33;
+  --verde: #4ade80;
+  --ambar: #ffb347;
+  min-height: 100vh;
+  background: radial-gradient(120% 70% at 60% 0%, #2a2622 0%, var(--fondo) 62%);
+  background-attachment: fixed;
+  color: var(--c-papel);
+  font-family: var(--marca);
+  -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
+}
+.consola *, .consola *::before, .consola *::after { box-sizing: border-box; }
+.consola a { color: inherit; }
+:where(.consola) :is(h1, h2, h3):where(:not(.monitor *)) { font-family: var(--marca); margin: 0; }
+.consola :focus-visible { outline: 3px solid var(--brasa); outline-offset: 3px; }
+
+/* Lo de la web de siempre (botones píldora, letra monoespaciada) no entra acá:
+   cada pieza de la consola trae su estilo. */
+:where(.consola) button:where(:not(.monitor *)) { font: inherit; letter-spacing: normal; text-transform: none; border-radius: 0; padding: 0; border: 0; background: none;
+  color: inherit; display: revert; gap: 0; align-items: normal; justify-content: normal; text-align: inherit; white-space: normal; transition: none; }
+:where(.consola) button:where(:not(.monitor *)):hover { border-color: transparent; }
+:where(.consola) button:where(:not(.monitor *))[aria-pressed='true'] { box-shadow: none; }
+:where(.consola) label:where(:not(.monitor *)) { display: revert; }
+
+.consola .caja { max-width: 1280px; margin: 0 auto; padding: 0 40px; }
+@media (max-width: 700px) { .consola .caja { padding: 0 16px; } }
+
+/* Títulos grabados en la chapa */
+.consola .grabado { font: 800 11px/1 var(--marca); font-stretch: 115%; letter-spacing: .14em; text-transform: uppercase; color: var(--gris); }
+.consola .titular { font: 900 clamp(48px, 9vw, 104px)/.88 var(--marca); font-stretch: 125%; letter-spacing: -.05em; text-transform: uppercase; overflow-wrap: anywhere; }
+
+/* Teclas mecánicas: se hunden al apretarlas */
+.consola .tecla {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 0 22px;
+  border: 0; border-radius: 15px; cursor: pointer; text-decoration: none; white-space: nowrap;
+  font: 800 13px/1 var(--marca); font-stretch: 115%; letter-spacing: .06em; text-transform: uppercase;
+  color: #1a1714; background: linear-gradient(180deg, #fbf9f5 0%, #e9e4dc 100%);
+  box-shadow: inset 0 1px 0 #fff, inset 0 -3px 0 rgba(0,0,0,.12), 0 6px 0 #a39c90, 0 10px 16px -4px rgba(0,0,0,.45);
+  transition: transform .08s, box-shadow .08s, filter .15s;
+}
+.consola .tecla:hover { filter: brightness(1.04); }
+.consola .tecla:active, .consola .tecla[aria-pressed='true'] { transform: translateY(5px); box-shadow: inset 0 1px 0 #fff, 0 1px 0 #a39c90; }
+.consola .tecla:disabled { cursor: not-allowed; opacity: .45; transform: none; }
+.consola .tecla.negra { color: var(--c-papel); background: linear-gradient(180deg, #3a3632 0%, #1d1b18 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), inset 0 -3px 0 rgba(0,0,0,.4), 0 6px 0 #000, 0 10px 16px -4px rgba(0,0,0,.6); }
+.consola .tecla.negra:active, .consola .tecla.negra[aria-pressed='true'] { box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 1px 0 #000; }
+.consola .tecla.naranja { color: #1a1714; background: linear-gradient(180deg, #ff8a5c 0%, #f2541a 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 -3px 0 rgba(0,0,0,.18), 0 6px 0 #9a3209, 0 10px 16px -4px rgba(0,0,0,.5); }
+.consola .tecla.naranja:active, .consola .tecla.naranja[aria-pressed='true'] { box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 0 #9a3209; }
+.consola .tecla.chica { min-height: 40px; padding: 0 14px; border-radius: 11px; font-size: 11px; }
+.consola .tecla.cuadrada { width: 44px; min-height: 44px; padding: 0; font-size: 18px; }
+
+/* LEDs */
+.consola .led { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #4a443e; flex: none; }
+.consola .led.on { background: var(--led); box-shadow: 0 0 10px var(--led); }
+.consola .led.verde { background: var(--verde); box-shadow: 0 0 8px var(--verde); }
+.consola .led.ambar { background: var(--ambar); box-shadow: 0 0 8px var(--ambar); }
+
+/* Visores hundidos */
+.consola .visor { display: flex; flex-direction: column; gap: 10px; padding: 16px 20px; border-radius: 18px; background: var(--hundido);
+  box-shadow: inset 0 3px 10px rgba(0,0,0,.8), 0 1px 0 rgba(255,255,255,.08); min-width: 0; }
+.consola .digitos { font: 900 48px/1 var(--marca); font-stretch: 110%; font-variant-numeric: tabular-nums; color: var(--brasa);
+  text-shadow: 0 0 18px rgba(255,106,51,.45); }
+.consola .digitos.chicos { font-size: 22px; }
+.consola .campo { width: 100%; min-width: 0; background: none; border: 0; padding: 0; color: var(--brasa); font: 900 28px/1.1 var(--marca);
+  font-stretch: 110%; letter-spacing: -.01em; text-shadow: 0 0 14px rgba(255,106,51,.3); }
+.consola .campo.claro { color: var(--c-papel); text-shadow: none; font-size: 20px; }
+.consola .campo::placeholder { color: #5a524a; text-shadow: none; }
+.consola .campo:focus { outline: none; }
+.consola .visor:focus-within { box-shadow: inset 0 3px 10px rgba(0,0,0,.8), 0 0 0 2px var(--brasa); }
+.consola select.campo { cursor: pointer; appearance: none; }
+.consola select.campo option { background: var(--hundido); color: var(--c-papel); }
+
+/* La placa naranja anodizada, con trama */
+.consola .placa-naranja { position: relative; border-radius: 36px; padding: 22px;
+  background: linear-gradient(180deg, #ff7039 0%, #f2541a 55%, #d9450f 100%);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.35), inset 0 -3px 0 rgba(0,0,0,.18), 0 40px 60px -34px rgba(0,0,0,.9); color: #1a1714; }
+.consola .placa-naranja::before { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background-image: radial-gradient(rgba(0,0,0,.14) 1px, transparent 1.4px); background-size: 7px 7px; }
+.consola .placa-naranja > * { position: relative; }
+.consola .placa-naranja .grabado { color: rgba(26,23,20,.66); }
+.consola .placa-naranja :is(.visor, .dato, .hueco, .ejec) .grabado { color: var(--gris); }
+.consola .bandeja { border-radius: 22px; padding: 16px; background: rgba(26,23,20,.12); box-shadow: inset 0 2px 6px rgba(0,0,0,.2); }
+
+/* Chapa oscura (tarjetas del dock, módulos del laboratorio) */
+.consola .chapa { border-radius: 28px; background: linear-gradient(180deg, #2c2925 0%, #1c1a17 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.1), inset 0 -2px 0 rgba(0,0,0,.5), 0 30px 50px -30px rgba(0,0,0,.9); }
+
+/* Interruptor con LED */
+.consola .llave { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; cursor: pointer;
+  background: var(--hundido); color: var(--gris-claro); font: 800 11px/1 var(--marca); letter-spacing: .1em; text-transform: uppercase;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.8); }
+.consola .llave[aria-pressed='true'] { color: var(--c-papel); }
+.consola .llave[aria-pressed='true'] .led { background: var(--led); box-shadow: 0 0 10px var(--led); }
+
+.consola .texto { font: 600 16px/1.45 var(--marca); color: var(--gris-claro); margin: 0; }
+.consola .placa-naranja .texto { color: rgba(26,23,20,.8); }
+.consola .aviso { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 12px; background: var(--hundido); color: var(--c-papel);
+  font: 700 14px/1.35 var(--marca); }
+.consola .aviso.error .led { background: #ff4d4d; box-shadow: 0 0 8px #ff4d4d; }
+.consola .solo-lectores { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .consola *, .consola *::before, .consola *::after { transition: none !important; animation: none !important; }
+}

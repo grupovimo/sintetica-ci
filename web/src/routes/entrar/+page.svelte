@@ -8,7 +8,7 @@
   let enviado = $state(false);
   let ocupado = $state(false);
   let error = $state('');
-  const volver = $derived(page.url.searchParams.get('volver') ?? '/bichos');
+  const volver = $derived(page.url.searchParams.get('volver') ?? '/robots');
 
   async function pedir(e: Event) {
     e.preventDefault();
@@ -31,7 +31,7 @@
     try {
       await api('/v1/sesion/canjear', { cuerpo: { email, codigo } });
       await invalidateAll();
-      goto(volver.startsWith('/') && !volver.startsWith('//') ? volver : '/bichos');
+      goto(volver.startsWith('/') && !volver.startsWith('//') ? volver : '/robots');
     } catch (err) {
       error = err instanceof ErrorApi ? err.message : 'Algo salió mal.';
     } finally {

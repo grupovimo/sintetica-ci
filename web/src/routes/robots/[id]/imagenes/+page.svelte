@@ -71,7 +71,7 @@
           <span class="mono">{e}{img ? ` · ${(img.largo / 1024).toFixed(0)} KB` : ''}{enLista(e) ? ' · en la lista' : ''}</span>
           <span class="fila">
             <label class="boton chico">{subiendo === e ? 'Subiendo…' : img ? 'Cambiar' : 'Subir'}
-              <input class="solo-lectores" type="file" accept="image/*,.gif" disabled={subiendo >= 0} onchange={(ev) => subir(e, ev.currentTarget.files?.[0])} />
+              <input class="solo-lectores" type="file" accept="image/*,.gif,video/*" disabled={subiendo >= 0} onchange={(ev) => subir(e, ev.currentTarget.files?.[0])} />
             </label>
             {#if img}<button class="chico peligro" onclick={() => borrar(e)}>Borrar</button>{/if}
           </span>
