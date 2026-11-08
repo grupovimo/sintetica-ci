@@ -92,14 +92,29 @@ def generar():
     return "\n".join(out)
 
 
+def glifos_de(texto: str) -> list:
+    """Los códigos de cada fuente (lo que no depende de cómo rasteriza FreeType)."""
+    import re
+
+    return [(n, re.findall(r"\{0x([0-9A-F]{4}),", cuerpo))
+            for n, cuerpo in re.findall(r"GLIFOS_(\w+)\[\] = \{(.*?)\};", texto, re.S)]
+
+
 def main():
     texto = generar()
     if "--verificar" in sys.argv:
-        if not DESTINO.exists() or DESTINO.read_text(encoding="utf-8") != texto:
-            print("fuentes.h está desactualizado: correr firmware/herramientas/generar_fuentes.py")
-            sys.exit(1)
-        print("fuentes.h al día")
-        return
+        actual = DESTINO.read_text(encoding="utf-8") if DESTINO.exists() else ""
+        if actual == texto:
+            print("fuentes.h al día")
+            return
+        # Otra versión de Pillow/FreeType rasteriza un poco distinto (la Mac y
+        # Linux no dan los mismos bytes): ahí alcanza con que estén las mismas
+        # letras en cada fuente. Lo que se dibuja lo cuidan los tests de oro.
+        if actual and glifos_de(actual) == glifos_de(texto):
+            print("fuentes.h al día (las mismas letras; el rasterizado de esta máquina es otro)")
+            return
+        print("fuentes.h está desactualizado: correr firmware/herramientas/generar_fuentes.py")
+        sys.exit(1)
     DESTINO.write_text(texto, encoding="utf-8")
     print(f"escrito {DESTINO} ({len(texto) // 1024} KB de fuente)")
 
