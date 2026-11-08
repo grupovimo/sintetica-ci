@@ -185,6 +185,13 @@ object Sintesis {
         "llamada" -> List(8) { Nota(if (it % 2 == 0) 1.5f else 2f, if (it % 2 == 0) 1.5f else 2f, 60, 10) }
         "recordatorio" -> listOf(Nota(1f, 1f, 150), Nota(1.26f, 1.26f, 150), Nota(1.5f, 1.5f, 250))
         "pomodoro" -> listOf(Nota(1.5f, 1.5f, 200), Nota(1f, 1f, 300))
+        // v1.9: los toques de amigos, la agenda, los pagos y los hábitos.
+        "toque" -> listOf(Nota(1.4f, 1.8f, 70, 40, 0.7f), Nota(1.6f, 2f, 70, 0, 0.7f))
+        "abrazo" -> listOf(Nota(0.9f, 1.2f, 250, 40, 0.6f), Nota(1.2f, 1f, 350, 0, 0.5f))
+        "beso" -> listOf(Nota(2.2f, 1.6f, 60, 20, 0.6f))
+        "agenda" -> listOf(Nota(1.26f, 1.26f, 120, 60), Nota(1.26f, 1.26f, 120, 60), Nota(1f, 1f, 200))
+        "pago" -> listOf(Nota(1.5f, 1.5f, 70, 20), Nota(2f, 2f, 70, 20), Nota(2.5f, 2.5f, 220))
+        "habito" -> listOf(Nota(1f, 1.25f, 110, 20), Nota(1.5f, 1.5f, 220))
         "ronroneo", "ronquido", "dado" -> emptyList()  // de ruido: ver sonido()
         else -> listOf(Nota(1f, 1.3f, 120))  // cualquier otro: un piquito
     }
