@@ -106,7 +106,7 @@
           <button class="tecla" disabled={!conectado} onclick={() => hacer({ evento: 'caricia' }, 'Le gustó')}>Acariciar</button>
           <button class="tecla" disabled={!conectado} onclick={() => hacer({ evento: 'nombre' }, 'Te escuchó')}>Llamarlo</button>
           <button class="tecla naranja" disabled={!conectado} onclick={() => hacer({ evento: 'muchos-toques' }, 'Se rió')}>Cosquillas</button>
-          {#if b.bicho.estado?.fija}<button class="tecla negra" disabled={!conectado} onclick={() => hacer({ expresion: '' }, 'Vuelve a ser él')}>Soltar la cara</button>{/if}
+          {#if b.bicho.estado?.fija && !/^(recordatorio|pomodoro|reloj):/.test(b.bicho.estado.expresion)}<button class="tecla negra" disabled={!conectado} onclick={() => hacer({ expresion: '' }, 'Vuelve a ser él')}>Soltar la cara</button>{/if}
         </div>
         {#if aviso}<p class="aviso" aria-live="polite"><span class="led on"></span>{aviso}</p>{/if}
         {#if !conectado}<p class="texto chico">Le llega cuando vuelva.</p>{/if}

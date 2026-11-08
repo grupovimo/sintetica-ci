@@ -54,7 +54,10 @@
       alError(sim.aplicar(texto));
       fijado = '';
     }
-    if (visible !== fijado) {
+    // Los estados del sistema (un recordatorio, el pomodoro, el reloj, una imagen) no son
+    // caras: la vista previa los arma sola con la misma config y la misma hora.
+    const delSistema = /^(recordatorio|pomodoro|reloj|imagen|protector):/.test(visible);
+    if (visible !== fijado && !delSistema) {
       fijado = visible;
       fijar(sim, visible);
     }

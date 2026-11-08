@@ -84,7 +84,7 @@ export class BichoAbierto {
   private avisar(texto: string, icono = '⏰') {
     const cuando = Date.now();
     this.aviso = { texto, cuando, icono };
-    setTimeout(() => { if (this.aviso?.cuando === cuando) this.aviso = null; }, icono === '⏰' ? 15000 : 5000);
+    setTimeout(() => { if (this.aviso?.cuando === cuando) this.aviso = null; }, icono === '⏰' ? 120000 : 5000);
   }
 
   cerrar() { this.dejar?.(); }
