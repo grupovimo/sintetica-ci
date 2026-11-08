@@ -35,7 +35,7 @@
   .encastre { width: 100%; height: 100%; }
   /* Una pantalla apaisada en una caja de pie: se agranda para que la cara
      llene el ancho (los costados, que suelen estar vacíos, quedan afuera). */
-  .encastre.apaisada { position: absolute; left: 50%; top: 50%; width: 220%; height: auto; aspect-ratio: 320 / 172; transform: translate(-50%, -50%); }
+  .encastre.apaisada { position: absolute; left: 50%; top: 50%; width: 185%; height: auto; aspect-ratio: 320 / 172; transform: translate(-50%, -50%); }
   .apagado img { filter: grayscale(.7) brightness(.62); }
   .apagado .pantalla { opacity: .25; }
   .cartel { position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 10px; min-height: 40px;

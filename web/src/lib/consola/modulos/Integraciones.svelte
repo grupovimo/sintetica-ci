@@ -53,6 +53,35 @@
   let guardando = $state<'listo' | 'guardando' | 'guardado'>('listo');
   let probado = $state<Record<number, string>>({});
 
+  // Tu IA (MCP): las IAs conectadas por OAuth y los tokens para Claude Code.
+  type Cliente = { id: string; cliente: string; creada: string; usada: string | null };
+  type TokenIA = { id: string; nombre: string; creado: string; usado: string | null };
+  let mcpUrl = $state('');
+  let clientes = $state<Cliente[]>([]);
+  let tokens = $state<TokenIA[]>([]);
+  let tokenNuevo = $state('');
+  let copiado = $state('');
+  async function cargarIA() {
+    try {
+      const c = await api<{ clientes: Cliente[]; url: string }>('/v1/mcp/clientes');
+      clientes = c.clientes ?? [];
+      mcpUrl = c.url;
+      tokens = (await api<{ tokens: TokenIA[] }>('/v1/mcp/tokens')).tokens ?? [];
+    } catch { /* sin MCP en esta nube */ }
+  }
+  async function crearToken() {
+    try {
+      tokenNuevo = (await api<{ token: string }>('/v1/mcp/tokens', { metodo: 'POST', cuerpo: { nombre: 'Claude Code' } })).token;
+      await cargarIA();
+    } catch (e) { error = texto(e, 'No pude crear el token.'); }
+  }
+  async function borrarToken(id: string) { await api(`/v1/mcp/tokens/${id}`, { metodo: 'DELETE' }).catch(() => {}); await cargarIA(); }
+  async function desconectar(id: string) { await api(`/v1/mcp/clientes/${id}`, { metodo: 'DELETE' }).catch(() => {}); await cargarIA(); }
+  async function copiar(t: string, que: string) {
+    try { await navigator.clipboard.writeText(t); copiado = que; setTimeout(() => (copiado = ''), 1800); } catch { /* sin portapapeles */ }
+  }
+  const comandoClaude = $derived(`claude mcp add --transport http sintetica ${mcpUrl} --header "Authorization: Bearer ${tokenNuevo}"`);
+
   const texto = (e: unknown, por: string) => (e instanceof ErrorApi ? `${e.message}${e.detalle ? ': ' + e.detalle : ''}` : por);
 
   async function cargar() {
@@ -71,9 +100,11 @@
   }
   onMount(() => {
     cargar();
+    cargarIA();
     return escuchar((e) => {
       const t = (e as { tipo: string; bicho?: string }).tipo;
       if (t === 'telegram' || (t === 'automatizacion' && e.bicho === b.id)) cargar();
+      if (t === 'mcp') cargarIA();
     });
   });
 
@@ -147,6 +178,35 @@
   {#if sinNube}
     <p class="aviso"><span class="led ambar"></span>Las integraciones todavía no están en esta nube.</p>
   {:else}
+    <div class="ia bandeja">
+      <div class="logo ia-logo" aria-hidden="true">✦</div>
+      <div class="que">
+        <span class="grabado">Tu IA · Claude o ChatGPT</span>
+        <b>{clientes.length ? `${clientes.length} conectada${clientes.length > 1 ? 's' : ''}` : 'Que la maneje tu IA'}</b>
+        {#if mcpUrl}
+          <button class="url" onclick={() => copiar(mcpUrl, 'url')} title="Copiar">{mcpUrl}<span class="grabado">{copiado === 'url' ? 'Copiada' : 'Copiar'}</span></button>
+          <p class="texto">Agregala como conector.</p>
+        {/if}
+      </div>
+      <button class="tecla negra chica" onclick={crearToken} title="Token para Claude Code">+ Token</button>
+      {#if tokenNuevo}
+        <div class="token-nuevo">
+          <span class="grabado">Se ve una sola vez</span>
+          <button class="url" onclick={() => copiar(comandoClaude, 'cmd')}><code>{comandoClaude}</code><span class="grabado">{copiado === 'cmd' ? 'Copiado' : 'Copiar'}</span></button>
+        </div>
+      {/if}
+      {#if clientes.length || tokens.length}
+        <div class="conectadas">
+          {#each clientes as c (c.id)}
+            <div class="ejec"><span class="led verde"></span><span>{c.cliente}</span><span class="que-paso">{c.usada ? `usó ${hora(c.usada)}` : 'sin usar'}</span><button class="tecla negra chica" onclick={() => desconectar(c.id)}>Desconectar</button></div>
+          {/each}
+          {#each tokens as t (t.id)}
+            <div class="ejec"><span class="led"></span><span>{t.nombre}</span><span class="que-paso">{t.usado ? `usó ${hora(t.usado)}` : 'sin usar'}</span><button class="tecla negra chica" onclick={() => borrarToken(t.id)}>Borrar</button></div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+
     <div class="telegram bandeja">
       <div class="logo" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="30" height="30"><path fill="#f3eee8" d="M9.8 15.3 9.6 19c.4 0 .6-.2.8-.4l2-1.9 4 3c.7.4 1.3.2 1.5-.7l2.7-12.6c.3-1.1-.4-1.6-1.1-1.3L3.6 10.9c-1.1.4-1.1 1.1-.2 1.4l4 1.2 9.3-5.9c.4-.3.8-.1.5.2z" /></svg>
@@ -251,6 +311,14 @@
 
 <style>
   .integraciones { display: flex; flex-direction: column; gap: 14px; }
+  .ia { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px 18px; align-items: center; }
+  .ia-logo { background: linear-gradient(180deg, #2a2622, #151310) !important; color: #ff8a5c; font-size: 26px; box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 5px 0 #000 !important; }
+  .url { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; max-width: 100%; padding: 10px 12px; border-radius: 10px; cursor: pointer;
+    background: #0e0d0b; color: #ff8a5c; font: 700 13px/1.3 ui-monospace, monospace; text-align: left; overflow: hidden; }
+  .url code { background: none; padding: 0; color: #f3eee8; overflow-wrap: anywhere; font-size: 12px; }
+  .url .grabado { flex: none; }
+  .token-nuevo, .conectadas { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
+  .conectadas .ejec { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; }
   .telegram { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: center; }
   .qr { grid-column: 1 / -1; justify-self: center; width: 200px; padding: 10px; border-radius: 18px; background: #f3eee8; box-shadow: 0 6px 0 #a39c90; }
   .qr :global(svg) { display: block; width: 100%; height: auto; }
