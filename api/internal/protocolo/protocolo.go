@@ -109,9 +109,9 @@ var Eventos = []string{
 	"ruido", "musica", "silencio", "notificacion", "llamada", "bateria-baja", "bateria-critica", "enchufado",
 	"desenchufado", "cargado", "sin-wifi", "cambio-de-cara", "bicho-cerca", "volvio", "hito",
 	"recordatorio", "pomodoro", // los genera el sistema (y los avisa solo: ver docs/protocolo-ble.md)
-	"despertador", // v1.6: empezó a sonar la alarma (también lo avisa solo)
-	"juego",       // v1.7: terminó una partida (lo avisa solo, con una entrada de tipo 5)
-	"animo",       // v1.7: respondió el "¿Cómo estás?" (lo avisa solo, con una entrada de tipo 6)
+	"despertador",                               // v1.6: empezó a sonar la alarma (también lo avisa solo)
+	"juego",                                     // v1.7: terminó una partida (lo avisa solo, con una entrada de tipo 5)
+	"animo",                                     // v1.7: respondió el "¿Cómo estás?" (lo avisa solo, con una entrada de tipo 6)
 	"cara-detectada", "oscuridad", "mano-cerca", // v1.8: los sentidos del bicho-celu (cámara, luz, proximidad)
 }
 

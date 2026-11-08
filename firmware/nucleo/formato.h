@@ -189,13 +189,14 @@ struct Accion {
   char argumento[LARGO_NOMBRE] = {};
   int8_t indice = -1;     // la cara, el comportamiento, la partícula o la situación ya resueltos
   int8_t variable = -1;   // Estado: la VarVida
-  float delta = 0;        // Estado: cuánto
+  int8_t cent = 0;        // Estado: cuánto, en centésimos (como los pasos; sin float, entra en el broche)
+  float delta() const { return cent / 100.0f; }
 };
 
 struct Regla {
   Condicion si;
-  uint8_t nY = 0;
   CondVida y[MAX_Y];      // condiciones extra ("y": "afecto>0.6,noche")
+  uint8_t nY = 0;
   uint8_t nAcciones = 0;
   Accion entonces[MAX_ACCIONES];
 };

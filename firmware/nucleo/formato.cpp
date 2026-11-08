@@ -234,7 +234,8 @@ bool leerAccion(const char* s, Accion* a) {
     if (d < 0 || d > 1) return false;
     a->tipo = Accion::Tipo::Estado;
     a->variable = static_cast<int8_t>(v);
-    a->delta = *op == '-' ? -d : d;
+    const float delta = *op == '-' ? -d : d;
+    a->cent = static_cast<int8_t>(delta * 100 + (delta < 0 ? -0.5f : 0.5f));
     copiarTexto(a->argumento, sizeof a->argumento, s + 7);
     return true;
   }
