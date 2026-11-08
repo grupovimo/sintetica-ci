@@ -14,8 +14,13 @@ import android.util.Log
  *   adb shell am broadcast -a sintetica.EVENT --es tipo depuracion          (muestra u oculta los datos)
  *   adb shell am broadcast -a sintetica.EVENT --es tipo comando --es hex 4202  (un comando del protocolo, como de la nube)
  *   adb shell am broadcast -a sintetica.EVENT --es tipo silencio --ez si true  (calla la voz; el despertador suena igual)
+ *   adb shell am broadcast -a sintetica.EVENT --es tipo duenio --es wifi aa:bb:.. --es bt 11:22:..  (el celu del dueño)
  */
-class Depuracion(private val vista: GLSurfaceView, private val alternar: () -> Unit) : BroadcastReceiver() {
+class Depuracion(
+    private val vista: GLSurfaceView,
+    private val presencia: Presencia,
+    private val alternar: () -> Unit,
+) : BroadcastReceiver() {
     @Volatile var factor = 1
         private set
 
@@ -23,6 +28,7 @@ class Depuracion(private val vista: GLSurfaceView, private val alternar: () -> U
         val tipo = intent.getStringExtra("tipo") ?: return
         if (tipo == "depuracion") return alternar()
         if (tipo == "silencio") return Voz.silenciar(contexto, intent.getBooleanExtra("si", true))
+        if (tipo == "duenio") return presencia.configurar(intent.getStringExtra("wifi"), intent.getStringExtra("bt"))
         vista.queueEvent {
             val ok = when (tipo) {
                 "vincular" -> Nucleo.vincularSolo()

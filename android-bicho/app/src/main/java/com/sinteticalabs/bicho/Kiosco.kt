@@ -67,7 +67,8 @@ object Kiosco {
     /**
      * El celu es solo el bicho (ver herramientas/ajustar.sh para lo que va por
      * adb): hora automática, wifi siempre prendido, sin actualizaciones del
-     * sistema que lo reinicien, bluetooth apagado, sin sonidos del sistema y la
+     * sistema que lo reinicien, bluetooth apagado (salvo que haya un celu del dueño
+     * para la presencia), sin sonidos del sistema y la
      * voz del bicho al máximo (el volumen lo elige él, con voz.volumen).
      */
     @Suppress("DEPRECATION")
@@ -76,7 +77,11 @@ object Kiosco {
         d.setGlobalSetting(adm, Settings.Global.AUTO_TIME_ZONE, "1")
         d.setGlobalSetting(adm, Settings.Global.WIFI_SLEEP_POLICY, Settings.Global.WIFI_SLEEP_POLICY_NEVER.toString())
         d.setSystemUpdatePolicy(adm, SystemUpdatePolicy.createPostponeInstallPolicy())
-        runCatching { BluetoothAdapter.getDefaultAdapter()?.takeIf { it.isEnabled }?.disable() }
+        runCatching {
+            val bt = BluetoothAdapter.getDefaultAdapter()
+            if (Presencia.conBluetooth(a)) bt?.takeIf { !it.isEnabled }?.enable()
+            else bt?.takeIf { it.isEnabled }?.disable()
+        }
         val audio = a.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         for (canal in intArrayOf(AudioManager.STREAM_RING, AudioManager.STREAM_NOTIFICATION, AudioManager.STREAM_SYSTEM))
             runCatching { audio.setStreamVolume(canal, 0, 0) }

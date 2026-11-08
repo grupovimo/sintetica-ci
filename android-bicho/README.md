@@ -52,6 +52,12 @@ Por wifi (para dejarlo en el cargador de pared): con el cable puesto,
 6. Los avisos de notificaciones: `adb shell settings put secure
    enabled_notification_listeners com.sinteticalabs.bicho/com.sinteticalabs.bicho.Avisos`.
 
+7. La presencia (si estás en casa): el celu del dueño por wifi y/o Bluetooth.
+   `adb shell am broadcast -a sintetica.EVENT --es tipo duenio --es wifi
+   <MAC del celu en el wifi> --es bt <MAC de Bluetooth>`. Con `bt`, el
+   bluetooth del bicho queda prendido; para emparejarlos, la primera vez, desde
+   los ajustes (salida secreta). Si se va 15 min, "te fuiste"; al volver, "llegaste".
+
 Con el celu enchufado las 24 h, conviene un enchufe con horario (que cargue
 unas horas y descanse otras): sin root no se puede limitar la carga, y una
 batería vieja siempre al 100 % se gasta y se puede hinchar.

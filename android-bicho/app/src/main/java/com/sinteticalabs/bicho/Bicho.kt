@@ -24,6 +24,7 @@ class Bicho : Activity() {
     private lateinit var datos: Datos
     private lateinit var raiz: FrameLayout
     private lateinit var voz: Voz
+    private lateinit var presencia: Presencia
     private var menu: View? = null
     private val secreto by lazy { Secreto(resources.displayMetrics.density * 80) { abrirMenu() } }
 
@@ -47,7 +48,11 @@ class Bicho : Activity() {
         setContentView(raiz)
         red.vista = vista
         red.prender()
-        depuracion = Depuracion(vista) { datos.alternar() }
+        presencia = Presencia(this) { llegaste ->
+            vista.queueEvent { Nucleo.nubeEscribir(2, byteArrayOf(0x49, if (llegaste) 0 else 1)) }
+        }
+        presencia.prender()
+        depuracion = Depuracion(vista, presencia) { datos.alternar() }
         registerReceiver(depuracion, IntentFilter(Depuracion.ACCION))
         sentidos = Sentidos(this, vista, lienzo)
         datos = Datos(texto, lienzo, sentidos, depuracion)
@@ -63,6 +68,7 @@ class Bicho : Activity() {
 
     override fun onDestroy() {
         Avisos.alAviso = null
+        presencia.apagar()
         voz.apagar()
         unregisterReceiver(depuracion)
         super.onDestroy()
