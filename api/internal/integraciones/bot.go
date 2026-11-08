@@ -19,6 +19,7 @@ var comandosBot = []map[string]string{
 	{"command": "decir", "description": "Que un robot diga algo en su pantalla"},
 	{"command": "clima", "description": "El clima donde está un robot"},
 	{"command": "jugar", "description": "Jugar con un robot (dado, moneda, ppt, reflejos, mirada)"},
+	{"command": "habito", "description": "Marcar un hábito de hoy"},
 	{"command": "ayuda", "description": "Qué puedo hacer"},
 }
 
@@ -30,6 +31,7 @@ const textoAyuda = `Esto es lo que puedo hacer:
 /decir <texto> [nombre]: tu robot lo dice en su pantalla (hasta 60 letras)
 /clima [nombre]: el clima donde está tu robot
 /jugar [dado|moneda|ppt|reflejos|mirada] [nombre]: juega con vos en su pantalla
+/habito [hábito] [nombre]: marca un hábito de hoy (sin decir cuál, te muestra los que hay)
 /ayuda: esto
 
 Si tenés un solo robot, el nombre no hace falta. Los avisos (batería baja, recordatorios…) se arman en la web, en Automatizaciones.`
@@ -260,6 +262,10 @@ func (i *Integraciones) atenderMensaje(ctx context.Context, m *mensaje) {
 	}
 	resto = strings.TrimSpace(resto)
 
+	if comando == "/start" && strings.HasPrefix(strings.ToLower(resto), "amigo-") {
+		i.responder(ctx, chat, i.aceptarDesdeTelegram(ctx, chat, resto[len("amigo-"):]), nil)
+		return
+	}
 	if comando == "/start" && resto != "" {
 		if _, err := i.Vincular(ctx, resto, chat, nombreTG(m.From)); err != nil {
 			if errors.Is(err, almacen.ErrCodigoInvalido) {
@@ -366,6 +372,33 @@ func (i *Integraciones) atenderMensaje(ctx context.Context, m *mensaje) {
 			return
 		}
 		i.responder(ctx, chat, i.jugar(*r, juego), nil)
+	case "/habito", "/habitos", "/hábito":
+		r, cual := elegir(rs, resto)
+		if r == nil && resto != "" {
+			// "/habito agua" con varios robots: el primero que tenga ese hábito.
+			for k := range rs {
+				if _, ok := i.habitoPorNombre(ctx, rs[k].ID, resto); ok {
+					r, cual = &rs[k], resto
+					break
+				}
+			}
+		}
+		if r == nil {
+			i.responder(ctx, chat, "¿De cuál?", tecladoRobots(rs, "habitos:"))
+			return
+		}
+		if cual == "" {
+			t, teclado := i.listarHabitos(ctx, *r)
+			i.responder(ctx, chat, t, teclado)
+			return
+		}
+		k, ok := i.habitoPorNombre(ctx, r.ID, cual)
+		if !ok {
+			t, teclado := i.listarHabitos(ctx, *r)
+			i.responder(ctx, chat, "No encontré ese hábito. "+t, teclado)
+			return
+		}
+		i.responder(ctx, chat, i.marcarDesdeTelegram(ctx, *r, k), nil)
 	default:
 		i.responder(ctx, chat, "No entendí. "+textoAyuda, nil)
 	}
@@ -499,6 +532,18 @@ func (i *Integraciones) atenderBoton(ctx context.Context, c *callback) {
 		i.responder(ctx, chat, i.decir(*r, texto), nil)
 	case "juegos":
 		i.responder(ctx, chat, "¿A qué jugamos con "+r.nombre+"?", tecladoJuegos(r.ID))
+	case "habitos":
+		t, teclado := i.listarHabitos(ctx, *r)
+		i.responder(ctx, chat, t, teclado)
+	case "habito":
+		k := -1
+		if len(partes) == 3 {
+			fmt.Sscan(partes[2], &k) //nolint:errcheck
+		}
+		if k < 0 || k >= protocolo.MaxHabitos {
+			return
+		}
+		i.responder(ctx, chat, i.marcarDesdeTelegram(ctx, *r, k), nil)
 	case "jugar":
 		juego := ""
 		if len(partes) == 3 {

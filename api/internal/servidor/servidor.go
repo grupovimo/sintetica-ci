@@ -42,6 +42,7 @@ type Opciones struct {
 	BichosVirtuales []string // URLs de los bichos virtuales (desarrollo)
 	CookieSegura    bool
 	URLPublica      string // la base pública de la API (API_URL_PUBLICA): el issuer y el recurso del MCP
+	MercadoPagoURL  string // la API de Mercado Pago (vacía, la de siempre; los tests ponen un servidor falso)
 }
 
 // Servidor tiene todo lo que usan los handlers.
@@ -120,6 +121,7 @@ func (s *Servidor) Rutas() http.Handler {
 	m.HandleFunc("POST /v1/bichos/{id}/jugar", s.conBicho(s.jugar))          // v1.7 (cuidado.go)
 	m.HandleFunc("POST /v1/bichos/{id}/aviso", s.conBicho(s.aviso))          // v1.7
 	m.HandleFunc("GET /v1/bichos/{id}/resumen", s.conBicho(s.resumenDelDia)) // v1.7
+	s.rutasCompania(m)                                                       // v1.9: amigos, presencia, hábitos y entrantes (amigos.go)
 
 	m.HandleFunc("GET /v1/telegram", s.conSesion(s.verTelegram))
 	m.HandleFunc("POST /v1/telegram/vincular", s.conSesion(s.vincularTelegram))

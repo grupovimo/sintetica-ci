@@ -79,6 +79,8 @@ type Integraciones struct {
 	cambiarConfig CambiarConfig
 
 	cuid estadoCuidado // lo de la v1.7 (cuidado.go)
+
+	toques estadoToques // los últimos toques, para devolverlos (amigos.go)
 }
 
 type entradaCache struct {
@@ -169,7 +171,23 @@ func (i *Integraciones) Evento(bicho, evento string, datos map[string]any) {
 		i.anotarJuego(bicho, datos)
 	case "bicho-cerca":
 		go i.saludarEntreRobots(bicho)
+	case "duerme":
+		go i.anotarDormida(bicho)
+	case "devolver-toque": // v1.9 (amigos.go)
+		go i.devolverToque(bicho)
+		return
+	case "llegaste", "te-fuiste": // v1.9: los avisa el robot (presencia.go)
+		go i.presenciaDelRobot(bicho, evento)
+		return
+	case "habito": // v1.9: lo marcó con un toque (habitos.go)
+		go i.habitoDelRobot(bicho, datos)
+		return
 	}
+	i.encolar(bicho, evento, datos)
+}
+
+// encolar: si el bicho tiene automatizaciones para ese evento, las corre.
+func (i *Integraciones) encolar(bicho, evento string, datos map[string]any) {
 	if !i.tieneAutomatizacionPara(bicho, evento) {
 		return
 	}
@@ -306,6 +324,8 @@ func (i *Integraciones) Probar(ctx context.Context, usuario, bicho, n string) ([
 		datos["juego"], datos["resultado"] = "dado", "gano"
 	case "animo":
 		datos["valor"] = "bien"
+	case "habito":
+		datos["indice"], datos["habito"], datos["racha"] = 0, "agua", 3
 	}
 	return i.correr(ctx, usuario, bicho, *a, a.Cuando, datos)
 }

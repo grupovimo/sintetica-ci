@@ -143,7 +143,9 @@ núcleo), no se reintenta hasta que cambie.
 - **Eventos en vivo** (SSE): `GET /v1/eventos` (todos los bichos de la cuenta) o
   `GET /v1/bichos/{id}/eventos`: `estado` (con los bytes crudos en `crudo`),
   `conexion`, `sincro`, `config`, `imagenes`, `sprites`, `ota`, `marco`, `memoria`, `bicho`,
-  `automatizacion`, `telegram` (ver "Integraciones") y `mcp` (ver "MCP").
+  `automatizacion`, `telegram` (ver "Integraciones"), `mcp` (ver "MCP") y,
+  de la v1.9, `toque` y `entrante` (ver "Amigos, presencia, hábitos y avisos
+  entrantes").
 
 ## Sprites de las caras de imagen (v1.5)
 
@@ -501,6 +503,125 @@ mandar.
   (`[i8 x][i8 y]`, −100 a 100) están en `protocolo` (`Animo`, `Mirar`); el
   primero lo usa el bot, el segundo es para los modelos con dos micrófonos.
 
+### Amigos, presencia, hábitos y avisos entrantes (protocolo v1.9)
+
+Código: `api/internal/integraciones/{amigos,presencia,habitos}.go` (la lógica,
+el bot y lo que llega de los robots), `api/internal/servidor/amigos.go` (las
+rutas, con una sola línea en el router: `rutasCompania`),
+`servidor/entrantes.go` y `servidor/mcp_compania.go`; las tablas, en las
+migraciones `009_amigos.sql` y `010_presencia_habitos.sql`; los marcos, en
+`api/internal/protocolo/compania.go`.
+
+**Amigos y toques.** Los toques van solo entre amigos aceptados y de un amigo
+se ve solo su nombre (el que puso en su cuenta; si no, "Tu amigo"): ni su
+email ni los ids de sus robots.
+
+- `POST /v1/amigos/invitacion` → `{codigo, link, telegram?, vence}`: 8 letras
+  sin I ni O (24 posibles: ~10¹¹ códigos), 48 h, un solo uso; en la base solo
+  el hash. `link` es `WEB_URL/robots?amigo=CODIGO`; `telegram`,
+  `https://t.me/<bot>?start=amigo-CODIGO` (el bot lo acepta si el chat está
+  vinculado y le avisa al que invitó). Hasta 20 por día por usuario.
+- `POST /v1/amigos {codigo}` acepta (sin importar mayúsculas, espacios ni
+  guiones) → el amigo. 400 si no existe, venció, se usó o es propio; 409 si ya
+  son amigos (no gasta el código). 10 intentos por hora por usuario y 30 por
+  IP.
+- `GET /v1/amigos` → `{amigos: [{id, nombre, robots, todos, conectado, creada}]}`:
+  `robots` son los míos que reciben sus toques, `todos` si es "todos los
+  míos" (también los que sume después) y `conectado` si tiene algún robot
+  conectado que reciba los míos.
+- `PUT /v1/amigos/{id} {robots: [ids míos] | null}` (null = todos; `[]` =
+  ninguno). `DELETE /v1/amigos/{id}`: dejan de ser amigos los dos. Un id que
+  no es tuyo es 404.
+- `POST /v1/amigos/{id}/toque {tipo: toque|abrazo|beso|carita, expresion?, desde?}`
+  → `{robots, telegram}`: el `0x47` a sus robots conectados que reciben mis
+  toques, con `de` = el nombre de mi robot `desde` (tiene que ser mío) o el mío
+  ("Un amigo" si no puse). `expresion` solo con `carita` (y obligatoria). Si no
+  llegó a ningún robot y vinculó Telegram: "Ana te mandó un abrazo 🤗". Tope:
+  30 por hora por par, en cada sentido (en memoria). Evento SSE `toque`
+  `{de, tipo, robot}` para el que lo recibe.
+- **Devolver**: cuando un robot avisa `devolver-toque` (evento 40, lo avisa
+  solo), la nube busca el último toque que le llegó (en memoria, 10 min, una
+  sola vez) y se lo manda de vuelta al robot `desde` (si sigue conectado) o a
+  los del que tocó que reciben los toques de este dueño, con `de` = el nombre
+  del robot que lo devolvió; el evento `toque` lleva `devuelto: true` y, si no
+  llega a ninguno, el Telegram dice "Pipo te devolvió el abrazo 🤗". Cuenta
+  para el tope y no se vuelve a devolver (sin ping-pong).
+
+**Presencia.** La detecta la app del celu (cercanía de Bluetooth con el robot
+o una geocerca) o el robot mismo (eventos 42 `llegaste` y 43 `te-fuiste`, que
+avisa solo).
+
+- `POST /v1/bichos/{id}/presencia {llegaste: bool}` → `{ok, nueva, enviado}`.
+  Si en los últimos 2 min ya se anotó lo mismo (por el robot o por la app), es
+  la misma: `nueva: false` y no pasa nada más. Si es nueva, se anota, se le
+  manda al robot el `0x49` (`enviado`: si estaba conectado) y corren los
+  `cuando` `llegaste` / `te-fuiste`. 60 por hora por robot.
+- La nube también anota cuándo se duerme el robot (el `duerme` del estado).
+  Se guarda 60 días.
+- `GET /v1/bichos/{id}/horarios` → `{llegas, salis, dormis, seguridad, dias}`
+  (HH:MM o null): de los últimos 14 días, por día la ausencia más larga (de 30
+  min a 20 h) da la salida y la llegada; por noche, la primera dormida después
+  de las 20 (o antes de las 5). De cada uno, la mediana. `seguridad` (0 a 1)
+  es el promedio de los tres de `min(1, días/7) · max(0, 1 − desvío/90 min)`
+  (el desvío es la mediana de las distancias a la mediana).
+
+**Hábitos.** Los de `habitos` de la config (hasta 4).
+
+- `GET /v1/bichos/{id}/habitos` → `[{indice, nombre, icono, hora?, racha, hoy, dias: {"YYYY-MM-DD": true}}]`
+  (los días de los últimos 60, para el calendario de puntitos).
+- `POST /v1/bichos/{id}/habitos/{i} {hecho: bool}` → `{habito, enviado}`:
+  anota (o borra) el de hoy, calcula la racha y le manda al robot el `0x4A`
+  con ella. Si quedó hecho, corre el `cuando` `habito` (plantillas `{habito}`
+  y `{racha}`). 404 si no hay un hábito en ese lugar; 60 por minuto.
+- **La racha**: los días seguidos hechos hasta hoy (si hoy todavía no, hasta
+  ayer); los días que no tocan según `dias` no la cortan (y si se hizo igual,
+  suman). Los días se guardan con el nombre del hábito: si en ese lugar se
+  pone otro, empieza de cero. Se guardan 400 días.
+- Si lo marca el robot (a la hora del hábito, con un toque: registro tipo 8,
+  que avisa solo), la nube lo anota y corre el `cuando`, pero no le manda el
+  `0x4A` (ya lo festejó).
+- Telegram: `/habito` (sin decir cuál, la lista con la racha y un botón por
+  hábito: datos `habito:<id>:<i>`), `/habito agua [robot]` lo marca.
+
+**Avisos entrantes.** Una dirección secreta por usuario,
+`POST /v1/entrantes/{token}` (sin sesión: el token es la llave). El token
+(`ent_` + 32 caracteres) es un HMAC del `SECRETO` del servidor con una
+semilla al azar del usuario: en la base están solo la semilla y el hash del
+token (se lo busca por hash), y así `GET` lo puede volver a mostrar. Si
+cambia el `SECRETO`, la dirección vieja sigue andando pero no se puede
+mostrar (`regenerar: true`).
+
+- `GET /v1/entrantes` → `{url, token, mercadoPago, creado}` (la primera vez
+  la crea). `POST /v1/entrantes` la regenera (la vieja deja de andar; 10 por
+  hora). `PUT /v1/entrantes/mercadopago {accessToken}` guarda el access token
+  de Mercado Pago (cifrado con AES-GCM, con una clave que sale del `SECRETO`);
+  `DELETE` lo saca.
+- Lo que acepta (hasta 2 MB; 120 por minuto por IP antes de buscar el token
+  y 30 por minuto por usuario):
+  - **JSON propio** `{tipo: pago|mail|github|pedido|otro, titulo (1 a 200
+    bytes), de?, robot?}` (robot: el id o el apodo de uno suyo; si no, todos).
+  - **GitHub** tal cual (con `X-GitHub-Event`): en el repo, Webhooks, la
+    dirección con `application/json` y el **mismo token como secreto**; la
+    firma `X-Hub-Signature-256` se compara en tiempo constante (sin firma o
+    con otra, 401). `ping` → 200. PR abierto ("PR #12"), mergeado ("PR #12
+    mergeado"), review ("PR #12 aprobado", "Cambios en PR #12"), issue
+    ("Issue #5"), estrella ("★ repo") y CI fallido (`workflow_run` o
+    `check_suite` con `failure`: "CI falló", de = el repo); `de` es el que lo
+    hizo. Lo demás, 202 `{ignorado: true}`.
+  - **Mercado Pago** (`type`/`topic` `payment`, en el cuerpo o en la URL):
+    sin access token, "¡Te pagaron!" (de "Mercado Pago"), solo con
+    `payment.created`; con el access token, la nube lee el pago
+    (`GET api.mercadopago.com/v1/payments/{id}`, el id solo números) y avisa
+    solo los aprobados con el monto ("$12.000") y el nombre del que pagó. Una
+    vez por pago (48 h, en memoria).
+- Manda el `0x44` con el tipo nuevo (`app` = el título corto, `contacto` =
+  de) a los robots conectados del usuario → `{ok, robots}` (cuántos lo
+  recibieron) y el evento SSE `entrante` `{tipo, titulo, de, origen: json|github|mercadopago, robots}`.
+
+**Cuandos nuevos** para las automatizaciones: `llegaste`, `te-fuiste` y
+`habito` (con `{habito}` y `{racha}`). Los avisa el robot solo o salen de las
+rutas de arriba: no hace falta pedirle el registro.
+
 ## MCP: que una IA maneje los robots
 
 La API es un **servidor MCP remoto**: cada usuario conecta su Claude
@@ -597,6 +718,11 @@ conectan desde sus servidores: necesitan **HTTPS público**; en local
 | `cuidado` | `ver` (lo de la config y los valores por defecto) / `poner` (`agua` 0 a 8 h, `pausa` 0 o 30 a 240 min, `trabajo {desde, hasta, dias}`, `animo`, `extranar`, `extranarDias` 1 a 7, `resumen`), en `cuidado` de la config |
 | `avisos` | `listar` / `agregar` (`tipo` notificacion o llamada, `app` y `contacto` ≤ 24 bytes, `expresion` y `comportamiento` que existan, `decir` ≤ 40 bytes con `{app}` y `{contacto}`, `sonido`; hasta 8) / `borrar` (`indice`), en `avisos` de la config |
 | `resumen` | Cómo fue su día (lo mismo que `GET /v1/bichos/{id}/resumen`) |
+| `amigos` | `listar` / `invitar` (el código y los links) / `aceptar` (`codigo`) / `borrar` (`amigo`: nombre o id) |
+| `tocar` | `{amigo?, tipo, expresion? (carita), robot? (desde cuál)}`: un toque a los robots de un amigo (o por Telegram si no tiene ninguno conectado) |
+| `habitos` | `ver` (con la racha y los días) / `marcar` / `deshacer` (`habito`: nombre o número) |
+| `horarios` | Lo que aprendió la nube: `llegas`, `salis`, `dormis` y `seguridad` |
+| `entrantes` | `ver` (la dirección secreta y cómo usarla con GitHub, Mercado Pago o un JSON) / `regenerar` |
 
 Además, el recurso **`sintetica://guia/caras`** (qué hace cada parámetro, sus
 límites, consejos y ejemplos, armado desde el schema, y la sección "Caras de

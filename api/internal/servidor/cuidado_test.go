@@ -32,7 +32,7 @@ func TestJugarAvisoYResumenHTTP(t *testing.T) {
 	if cod, _ := pedir(t, h, otro, "POST", base+"/jugar", `{"juego":"dado"}`); cod != http.StatusNotFound {
 		t.Fatalf("jugar ajeno: %d", cod)
 	}
-	if cod, _ := pedir(t, h, token, "POST", base+"/aviso", `{"tipo":"mail"}`); cod != http.StatusBadRequest {
+	if cod, _ := pedir(t, h, token, "POST", base+"/aviso", `{"tipo":"fax"}`); cod != http.StatusBadRequest {
 		t.Fatalf("aviso raro: %d", cod)
 	}
 	if cod, _ := pedir(t, h, token, "POST", base+"/aviso", `{"tipo":"notificacion","app":"whatsapp","contacto":"Mamá"}`); cod != http.StatusConflict {

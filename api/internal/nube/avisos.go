@@ -13,7 +13,9 @@ import (
 //   - De los avisos que el bicho manda solo (un 0x9E sin que nadie lo pida):
 //     "recordatorio" (con el índice en la config), "pomodoro", "despertador"
 //     (al empezar a sonar la alarma, v1.6), "juego" (terminó una partida:
-//     registro tipo 5) y "animo" (respondió el "¿Cómo estás?": tipo 6), v1.7.
+//     registro tipo 5) y "animo" (respondió el "¿Cómo estás?": tipo 6), v1.7;
+//     "devolver-toque", "habito" (registro tipo 8, con su índice), "llegaste"
+//     y "te-fuiste", v1.9.
 //   - Del registro del motor de vida (comando 0x1E, que la API le pide cada
 //     10 s solo a los bichos con automatizaciones que lo necesitan): los
 //     eventos de EventosRegistro y "hito".
@@ -29,12 +31,14 @@ var EventosRegistro = map[string]string{
 	"voz": "voz", "nombre": "nombre", "ruido": "ruido", "musica": "musica",
 	"enchufado": "cargando", "desenchufado": "desenchufado", "cargado": "cargado", "volvio": "volvio",
 	"pomodoro": "pomodoro", "despertador": "despertador", "bicho-cerca": "bicho-cerca",
+	"llegaste": "llegaste", "te-fuiste": "te-fuiste", // v1.9: la presencia que avisa el robot
 }
 
 // avisaSolo: los eventos que el bicho avisa solo (no hace falta pedirle el registro).
 func avisaSolo(evento string) bool {
 	switch evento {
-	case "recordatorio", "pomodoro", "despertador", "juego", "animo":
+	case "recordatorio", "pomodoro", "despertador", "juego", "animo",
+		"devolver-toque", "habito", "llegaste", "te-fuiste": // v1.9
 		return true
 	}
 	return false
@@ -99,7 +103,8 @@ func (l *lectorRegistro) reiniciar() { *l = lectorRegistro{} }
 // esAviso: solo trae entradas que el bicho avisa solo.
 func esAviso(r []protocolo.EntradaRegistro) bool {
 	for _, e := range r {
-		if e.Tipo == protocolo.RegistroRecordatorio || e.Tipo == protocolo.RegistroJuego || e.Tipo == protocolo.RegistroAnimo {
+		if e.Tipo == protocolo.RegistroRecordatorio || e.Tipo == protocolo.RegistroJuego || e.Tipo == protocolo.RegistroAnimo ||
+			e.Tipo == protocolo.RegistroToque || e.Tipo == protocolo.RegistroHabito {
 			continue
 		}
 		if e.Tipo == protocolo.RegistroEvento && int(e.Dato) < len(protocolo.Eventos) {
@@ -178,6 +183,10 @@ func traducirRegistro(e protocolo.EntradaRegistro) (eventoRegistro, bool) {
 		if int(e.Dato) >= len(protocolo.Eventos) {
 			return eventoRegistro{}, false
 		}
+		if protocolo.Eventos[e.Dato] == "devolver-toque" {
+			// v1.9: no es un "cuando": la nube se lo devuelve al amigo.
+			return eventoRegistro{"devolver-toque", map[string]any{}}, true
+		}
 		c, ok := EventosRegistro[protocolo.Eventos[e.Dato]]
 		return eventoRegistro{c, map[string]any{}}, ok
 	case protocolo.RegistroHito:
@@ -192,6 +201,12 @@ func traducirRegistro(e protocolo.EntradaRegistro) (eventoRegistro, bool) {
 			return eventoRegistro{}, false
 		}
 		return eventoRegistro{"animo", map[string]any{"valor": protocolo.Animos[e.Dato]}}, true
+	case protocolo.RegistroHabito:
+		// v1.9: lo marcó con un toque (el evento 44 que viene al lado no se avisa).
+		if int(e.Dato) >= protocolo.MaxHabitos {
+			return eventoRegistro{}, false
+		}
+		return eventoRegistro{"habito", map[string]any{"indice": int(e.Dato)}}, true
 	}
 	return eventoRegistro{}, false
 }

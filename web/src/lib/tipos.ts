@@ -70,7 +70,10 @@ export type Evento =
   | { tipo: 'bicho'; bicho: string; datos: { accion: 'sumado' | 'quitado' | 'actual'; bicho?: Bicho } }
   | { tipo: 'automatizacion'; bicho: string; datos: { id: string; cuando: string; evento: string; resultados: unknown; en: string } }
   | { tipo: 'telegram'; bicho?: string; datos: { vinculado: boolean; nombre?: string } }
-  | { tipo: 'mcp'; bicho: string; datos: { cliente: string; herramienta: string; en: string } };
+  | { tipo: 'mcp'; bicho: string; datos: { cliente: string; herramienta: string; en: string } }
+  // v1.9: un toque de un amigo (o el que te devolvió) y un aviso entrante (GitHub, Mercado Pago, JSON propio).
+  | { tipo: 'toque'; bicho: string; datos: { de: string; tipo: 'toque' | 'abrazo' | 'beso' | 'carita'; robot: string; devuelto?: boolean } }
+  | { tipo: 'entrante'; bicho?: string; datos: { tipo: 'pago' | 'mail' | 'github' | 'pedido' | 'otro'; titulo: string; de: string; origen: 'json' | 'github' | 'mercadopago'; robots: string[] } };
 
 // Cómo ve la pantalla cada perfil (también los virtuales).
 export function pantallaDe(b: { perfil: string; estado: Estado | null }) {

@@ -67,8 +67,8 @@ var CuandoDeEstado = []string{"conectado", "desconectado", "bateria-baja", "expr
 // Cuandos devuelve todos los "cuando" que la API detecta de verdad.
 func Cuandos() []string {
 	l := append([]string{}, CuandoDeEstado...)
-	l = append(l, "recordatorio", "hito", "hora", "despertador", "juego", "animo")
-	vistos := map[string]bool{"recordatorio": true, "hito": true, "hora": true, "despertador": true, "juego": true, "animo": true}
+	l = append(l, "recordatorio", "hito", "hora", "despertador", "juego", "animo", "habito")
+	vistos := map[string]bool{"recordatorio": true, "hito": true, "hora": true, "despertador": true, "juego": true, "animo": true, "habito": true}
 	for _, e := range protocolo.Eventos {
 		if c, ok := nube.EventosRegistro[e]; ok && !vistos[c] {
 			vistos[c] = true
@@ -338,11 +338,13 @@ func (i *Integraciones) mandarRobot(ctx context.Context, usuario, id, expresion 
 // contexto es lo que se puede usar en los textos: {robot}, {bateria},
 // {expresion}, {evento}, {texto}, {hora}, {dueno}, {ciudad}, los del clima
 // ({clima}, {temp}, {max}, {min}; solo si el robot tiene ubicación) y los de
-// la v1.7: {juego} y {resultado} (cuando: juego) y {animo} (cuando: animo).
+// la v1.7: {juego} y {resultado} (cuando: juego) y {animo} (cuando: animo);
+// y de la v1.9, {habito} y {racha} (cuando: habito).
 type contexto struct {
 	bichoID, robot, bateria, expresion, evento, texto, hora string
 	dueno, ciudad, clima, temp, max, min                    string
 	juego, resultado, animo                                 string
+	habito, racha                                           string
 	ubicacion                                               *clima.Ubicacion
 	datos                                                   map[string]any
 }
@@ -382,6 +384,10 @@ func (i *Integraciones) contexto(ctx context.Context, bicho, evento string, dato
 	if v, ok := datos["valor"].(string); ok && evento == "animo" {
 		c.animo = v
 	}
+	c.habito, _ = datos["habito"].(string)
+	if v, ok := datos["racha"].(int); ok {
+		c.racha = strconv.Itoa(v)
+	}
 	cfg, errCfg := i.alm.UltimaConfig(ctx, bicho)
 	if errCfg == nil {
 		d := leerDatosConfig(cfg.Texto)
@@ -407,5 +413,6 @@ func (c contexto) completar(s string) string {
 	return strings.NewReplacer("{robot}", c.robot, "{bateria}", c.bateria, "{expresion}", c.expresion,
 		"{evento}", c.evento, "{texto}", c.texto, "{hora}", c.hora, "{dueno}", c.dueno, "{ciudad}", c.ciudad,
 		"{clima}", c.clima, "{temp}", c.temp, "{max}", c.max, "{min}", c.min,
-		"{juego}", c.juego, "{resultado}", c.resultado, "{animo}", c.animo).Replace(s)
+		"{juego}", c.juego, "{resultado}", c.resultado, "{animo}", c.animo,
+		"{habito}", c.habito, "{racha}", c.racha).Replace(s)
 }
