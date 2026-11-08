@@ -54,6 +54,7 @@ class Lienzo(
     override fun onDrawFrame(gl: GL10?) {
         esperar()
         Nucleo.tick()
+        sugerido = Nucleo.fpsSugerido()
         glBindTexture(GL_TEXTURE_2D, textura)
         Nucleo.subirCuadro(!creada)
         creada = true
@@ -68,11 +69,14 @@ class Lienzo(
 
     private var ultimo = 0L
 
-    /** Cuadros por segundo como máximo: 30 (lo que pide el núcleo), menos si hace calor. */
+    /** Cuadros por segundo como máximo: 30, menos si hace calor. */
     @Volatile var tope = 30
+    /** Lo que pide el núcleo (dormido, 5). */
+    private var sugerido = 30
 
     private fun esperar() {
-        val falta = ultimo + 1_000_000_000L / tope - System.nanoTime()
+        val fps = minOf(tope, sugerido).coerceAtLeast(1)
+        val falta = ultimo + 1_000_000_000L / fps - System.nanoTime()
         if (falta > 1_000_000L) Thread.sleep(falta / 1_000_000L)
         ultimo = System.nanoTime()
     }

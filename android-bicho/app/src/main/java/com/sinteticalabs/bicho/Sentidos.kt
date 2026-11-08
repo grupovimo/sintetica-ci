@@ -25,7 +25,8 @@ import kotlin.math.ln
 /**
  * Los sentidos del celu, convertidos a lo que entiende el núcleo: el
  * acelerómetro (en g y en ejes de la pantalla), la batería y el cargador, el
- * oído (solo el nivel) y la luz (el brillo de la pantalla).
+ * oído (solo el nivel), la luz (el brillo de la pantalla y "oscuridad"), la
+ * proximidad ("mano-cerca") y los ojos (la mirada y "cara-detectada").
  * Todo lo que va al núcleo pasa por el hilo de GL.
  */
 class Sentidos(
@@ -36,8 +37,10 @@ class Sentidos(
     private val sensores = a.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private var oyendo: Thread? = null
     @Volatile private var escuchar = false
-    private var enchufado: Boolean? = null
     private var brillo = -1f
+    private val luces = Luces()
+    private var cercaDesde = 0L
+    private var manoAntes = 0L
     /** Con la batería a más de 40 °C: la mitad de cuadros y menos brillo, hasta que baje de 38. */
     @Volatile var caliente = false
         private set
@@ -63,6 +66,9 @@ class Sentidos(
         sensores.getDefaultSensor(Sensor.TYPE_LIGHT)?.let {
             sensores.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
+        sensores.getDefaultSensor(Sensor.TYPE_PROXIMITY)?.let {
+            sensores.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+        }
         a.registerReceiver(bateria, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         oir()
         if (permiso(Manifest.permission.CAMERA)) ojos.prender()
@@ -85,6 +91,7 @@ class Sentidos(
                 vista.queueEvent { Nucleo.imu(x / g, y / g, e.values[2] / g) }
             }
             Sensor.TYPE_LIGHT -> luz(e.values[0])
+            Sensor.TYPE_PROXIMITY -> proximidad(e.values[0] < e.sensor.maximumRange)
         }
     }
 
@@ -100,6 +107,22 @@ class Sentidos(
         brillo = if (brillo < 0) objetivo else brillo + (objetivo - brillo) * 0.2f
         val w = a.window
         w.attributes = w.attributes.apply { screenBrightness = brillo }
+        if (luces.medir(valor, android.os.SystemClock.elapsedRealtime())) evento("oscuridad")
+    }
+
+    /** Una mano que se acerca (no el celu boca abajo: eso lo ve el acelerómetro). Una vez cada 20 s. */
+    private fun proximidad(cerca: Boolean) {
+        val ahora = android.os.SystemClock.elapsedRealtime()
+        if (!cerca) {
+            cercaDesde = 0L
+            return
+        }
+        if (cercaDesde != 0L) return
+        cercaDesde = ahora
+        if (ahora - manoAntes > 20_000) {
+            manoAntes = ahora
+            evento("mano-cerca")
+        }
     }
 
     private val bateria = object : BroadcastReceiver() {
@@ -113,17 +136,12 @@ class Sentidos(
                 Log.w("Bicho", if (caliente) "batería a $temperatura °C: bajo a 15 fps" else "batería a $temperatura °C: vuelvo a 30 fps")
             }
             if (nivel >= 0) Nucleo.bateria(nivel * 100 / escala)
-            // Provisorio hasta que la API C tenga hal.cargando: el evento a mano.
-            val ahora = i.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
-            if (enchufado != null && enchufado != ahora) evento(if (ahora) "enchufado" else "desenchufado")
-            enchufado = ahora
+            // Enchufado y desenchufado los saca el núcleo de acá (hal.cargando).
+            Nucleo.cargando(i.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0)
         }
     }
 
-    /**
-     * Lo que ven los ojos. Provisorio hasta que el núcleo tenga "cara-detectada"
-     * y una entrada para la mirada: por ahora solo se registra.
-     */
+    /** Lo que ven los ojos: te mira, y si hacía un rato que no te veía, "cara-detectada". */
     private fun ver(c: Pair<Float, Float>?) {
         val ahora = android.os.SystemClock.elapsedRealtime()
         if (c != null && cara == null) {
@@ -133,6 +151,7 @@ class Sentidos(
         }
         if (c == null && cara != null) sinCaraDesde = ahora
         cara = c
+        if (c != null) vista.queueEvent { Nucleo.seguir((c.first * 1.5f).coerceIn(-1f, 1f), (c.second * 1.5f).coerceIn(-1f, 1f)) }
     }
 
     private fun evento(nombre: String) = vista.queueEvent { Nucleo.eventoPorNombre(nombre) }
@@ -187,6 +206,29 @@ class Sentidos(
         }
         a.requestPermissions(arrayOf(cual), 1)
         return false
+    }
+
+    /**
+     * Cuándo se apagó la luz: había luz de cuarto (más de 15 lux) un rato y
+     * de golpe casi nada (menos de 3). Una vez cada 10 min.
+     */
+    class Luces {
+        private var conLuzDesde = 0L
+        private var ultima = -600_000L
+
+        fun medir(lux: Float, ahora: Long): Boolean {
+            if (lux > 15f) {
+                if (conLuzDesde == 0L) conLuzDesde = ahora
+                return false
+            }
+            val habiaLuz = conLuzDesde != 0L && ahora - conLuzDesde > 30_000
+            if (lux < 3f) conLuzDesde = 0L
+            if (lux < 3f && habiaLuz && ahora - ultima > 600_000) {
+                ultima = ahora
+                return true
+            }
+            return false
+        }
     }
 
     companion object {

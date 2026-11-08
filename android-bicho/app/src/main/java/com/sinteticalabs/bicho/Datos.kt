@@ -16,6 +16,8 @@ class Datos(
     private val reloj = Handler(Looper.getMainLooper())
     @Volatile private var expresion = ""
     @Volatile private var minuto = 0
+    @Volatile private var comportamiento = ""
+    @Volatile private var estado = FloatArray(0)
     var visible = false
         private set
 
@@ -39,6 +41,8 @@ class Datos(
         if (!visible) return
         expresion = Nucleo.expresionVisible()
         minuto = Nucleo.minutoDelDia()
+        comportamiento = Nucleo.comportamiento()
+        estado = Nucleo.estadoInterno()
     }
 
     private val paso = object : Runnable {
@@ -46,6 +50,10 @@ class Datos(
             texto.text = buildString {
                 appendLine("%.1f fps".format(lienzo.fps))
                 appendLine("cara      $expresion")
+                appendLine("hace      " + comportamiento.ifEmpty { "·" })
+                estado.forEachIndexed { i, v ->
+                    appendLine("%-9s %s".format(ESTADO.getOrElse(i) { "?" }, "▮".repeat((v * 10).toInt()).ifEmpty { "·" }))
+                }
                 appendLine("hora      %02d:%02d  ×%d".format(minuto / 60, minuto % 60, depuracion.factor))
                 appendLine("batería   %.1f °C%s".format(sentidos.temperatura, if (sentidos.caliente) "  (caliente: 15 fps)" else ""))
                 appendLine("luz       %.0f lux".format(sentidos.lux))
@@ -54,5 +62,9 @@ class Datos(
             }
             reloj.postDelayed(this, 500)
         }
+    }
+
+    private companion object {
+        val ESTADO = listOf("energía", "ánimo", "afecto", "aburrido", "curioso", "sueño", "estrés")
     }
 }

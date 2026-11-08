@@ -19,7 +19,7 @@
 namespace {
 JNIEnv* g_env = nullptr;
 jobject g_anfitrion = nullptr;  // referencia global
-jmethodID g_guardar, g_leer, g_registrar, g_notificar, g_notificarNube, g_redCambio;
+jmethodID g_guardar, g_leer, g_registrar, g_notificar, g_notificarNube, g_redCambio, g_sonido;
 char g_id[13] = "000000000000";
 std::string g_carpeta;  // archivos grandes (imágenes, sprites): <filesDir>/archivos
 
@@ -49,6 +49,7 @@ int borrar(void*, const char* clave) {
 std::mt19937 g_azar{std::random_device{}()};
 const auto g_inicio = std::chrono::steady_clock::now();
 std::atomic<int> g_bateria{-1};  // la escribe el hilo principal
+std::atomic<int> g_cargando{-1};
 bool g_listo = false;             // hasta iniciar, el núcleo no acepta nada
 
 uint32_t ahoraMs(void*) {
@@ -80,6 +81,7 @@ uint32_t epoch(void*) {
   return static_cast<uint32_t>(t + l.tm_gmtoff);
 }
 int bateria(void*) { return g_bateria.load(); }
+int cargando(void*) { return g_cargando.load(); }
 
 int guardar(void*, const char* clave, const uint8_t* d, size_t n) {
   if (!g_anfitrion) return 0;
@@ -121,6 +123,13 @@ void redCambio(void*) {
   if (g_anfitrion) g_env->CallVoidMethod(g_anfitrion, g_redCambio);
 }
 
+void sonido(void*, const char* nombre) {
+  if (!g_anfitrion) return;
+  jstring s = g_env->NewStringUTF(nombre);
+  g_env->CallVoidMethod(g_anfitrion, g_sonido, s);
+  g_env->DeleteLocalRef(s);
+}
+
 void registrar(void*, const char* m) {
   __android_log_print(ANDROID_LOG_INFO, "SinteticaOS", "%s", m);
   if (!g_anfitrion) return;
@@ -145,6 +154,7 @@ void JNI(iniciarNativo)(JNIEnv* env, jobject, jint ancho, jint alto, jstring id,
   g_notificar = env->GetMethodID(k, "notificar", "(I[B)V");
   g_notificarNube = env->GetMethodID(k, "notificarNube", "(I[B)V");
   g_redCambio = env->GetMethodID(k, "redCambio", "()V");
+  g_sonido = env->GetMethodID(k, "sonido", "(Ljava/lang/String;)V");
   const char* cp = env->GetStringUTFChars(carpeta, nullptr);
   g_carpeta = cp;
   env->ReleaseStringUTFChars(carpeta, cp);
@@ -157,6 +167,8 @@ void JNI(iniciarNativo)(JNIEnv* env, jobject, jint ancho, jint alto, jstring id,
   h.minuto_del_dia = minuto;
   h.epoch = epoch;
   h.bateria = bateria;
+  h.cargando = cargando;
+  h.sonido = sonido;
   h.guardar = guardar;
   h.leer = leer;
   h.registrar = registrar;
@@ -169,6 +181,8 @@ void JNI(iniciarNativo)(JNIEnv* env, jobject, jint ancho, jint alto, jstring id,
   h.borrar = borrar;
   h.perfil = "celu";
   sintetica_iniciar(&h, ancho, alto);
+  // En el celu, dejar el dedo es acariciarlo: el QR sale del menú secreto.
+  sintetica_qr_por_mantener(0);
   g_listo = true;
 }
 
@@ -297,6 +311,40 @@ jboolean JNI(vincularSolo)(JNIEnv* env, jobject) {
 }
 
 void JNI(bateria)(JNIEnv*, jobject, jint nivel) { g_bateria.store(nivel); }
+void JNI(cargando)(JNIEnv*, jobject, jboolean si) { g_cargando.store(si ? 1 : 0); }
+jstring JNI(comportamiento)(JNIEnv* env, jobject) { return env->NewStringUTF(g_listo ? sintetica_comportamiento() : ""); }
+jfloatArray JNI(estadoInterno)(JNIEnv* env, jobject) {
+  float e[16] = {};
+  const int n = g_listo ? sintetica_estado_interno(e, 16) : 0;
+  jfloatArray a = env->NewFloatArray(n);
+  env->SetFloatArrayRegion(a, 0, n, e);
+  return a;
+}
+// {volumen, micrófono, tipo, conversa}
+jintArray JNI(voz)(JNIEnv* env, jobject) {
+  jint v[4] = {70, 60, 1, 0};
+  if (g_listo) v[3] = sintetica_voz(&v[0], &v[1], &v[2], nullptr);
+  jintArray a = env->NewIntArray(4);
+  env->SetIntArrayRegion(a, 0, 4, v);
+  return a;
+}
+jstring JNI(palabra)(JNIEnv* env, jobject) {
+  const char* p = "";
+  if (g_listo) sintetica_voz(nullptr, nullptr, nullptr, &p);
+  return env->NewStringUTF(p);
+}
+void JNI(mostrarQr)(JNIEnv*, jobject) {
+  if (g_listo) sintetica_mostrar_qr();
+}
+jint JNI(fpsSugerido)(JNIEnv*, jobject) { return g_listo ? sintetica_fps_sugerido() : 30; }
+void JNI(seguir)(JNIEnv* env, jobject, jfloat x, jfloat y) {
+  if (!g_listo) return;
+  g_env = env;
+  sintetica_seguir(x, y);
+}
+void JNI(depurar)(JNIEnv*, jobject, jboolean si) {
+  if (g_listo) sintetica_depurar(si ? 1 : 0);
+}
 jstring JNI(expresionVisible)(JNIEnv* env, jobject) { return env->NewStringUTF(sintetica_expresion_visible()); }
 jstring JNI(version)(JNIEnv* env, jobject) { return env->NewStringUTF(sintetica_version()); }
 }

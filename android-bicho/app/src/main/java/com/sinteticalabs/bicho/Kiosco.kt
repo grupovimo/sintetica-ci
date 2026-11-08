@@ -67,7 +67,8 @@ object Kiosco {
     /**
      * El celu es solo el bicho (ver herramientas/ajustar.sh para lo que va por
      * adb): hora automática, wifi siempre prendido, sin actualizaciones del
-     * sistema que lo reinicien, bluetooth apagado y sin sonidos del sistema.
+     * sistema que lo reinicien, bluetooth apagado, sin sonidos del sistema y la
+     * voz del bicho al máximo (el volumen lo elige él, con voz.volumen).
      */
     @Suppress("DEPRECATION")
     private fun celuDedicado(a: Activity, d: DevicePolicyManager, adm: ComponentName) {
@@ -79,6 +80,7 @@ object Kiosco {
         val audio = a.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         for (canal in intArrayOf(AudioManager.STREAM_RING, AudioManager.STREAM_NOTIFICATION, AudioManager.STREAM_SYSTEM))
             runCatching { audio.setStreamVolume(canal, 0, 0) }
+        Voz.canales(audio)
     }
 
     /** La salida secreta: suelta todo y abre los ajustes. */

@@ -186,10 +186,8 @@ class Red(private val raiz: File) {
 
     /** Como mantener apretado 5 s: muestra el QR para vincular. */
     private fun mostrarQr(): JSONObject {
-        enGl { Nucleo.tacto(true) }
-        Thread.sleep(5200)
         val qr = enGl {
-            Nucleo.tacto(false)
+            Nucleo.mostrarQr()
             Nucleo.qr()
         }
         return JSONObject().put("qr", qr ?: "")

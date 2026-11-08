@@ -20,6 +20,8 @@ object Nucleo {
         fun notificar(caracteristica: Int, datos: ByteArray)
         fun notificarNube(caracteristica: Int, datos: ByteArray)
         fun redCambio()
+        /** Un sonido del núcleo por nombre ("despertador:3", "ronquido", "dado"…). */
+        fun sonido(nombre: String)
     }
 
     /** Una sola vez por proceso: si GL recrea la superficie, el núcleo sigue igual. */
@@ -56,6 +58,22 @@ object Nucleo {
     external fun nube(): Array<String>?
     external fun qr(): String
     external fun bateria(nivel: Int)
+    external fun cargando(si: Boolean)
+    /** El comportamiento que corre ("" = ninguno). */
+    external fun comportamiento(): String
+    /** Energía, ánimo, afecto, aburrimiento, curiosidad, sueño, estrés (0 a 1). */
+    external fun estadoInterno(): FloatArray
+    /** {volumen, micrófono, tipo (0 grave, 1 media, 2 aguda, 3 robot), conversa}. */
+    external fun voz(): IntArray
+    /** La palabra que lo llama (su nombre si no hay otra). */
+    external fun palabra(): String
+    external fun fpsSugerido(): Int
+    /** El QR para vincular otro celu, un par de minutos. */
+    external fun mostrarQr()
+    /** Algo que mirar (la cara que ve), de -1 a 1; y hacia arriba. */
+    external fun seguir(x: Float, y: Float)
+    /** La superposición del núcleo: comportamiento, estado interno y fps. */
+    external fun depurar(si: Boolean)
     external fun expresionVisible(): String
     external fun version(): String
 }

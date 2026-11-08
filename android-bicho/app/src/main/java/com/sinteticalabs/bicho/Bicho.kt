@@ -23,6 +23,7 @@ class Bicho : Activity() {
     private lateinit var sentidos: Sentidos
     private lateinit var datos: Datos
     private lateinit var raiz: FrameLayout
+    private lateinit var voz: Voz
     private var menu: View? = null
     private val secreto by lazy { Secreto(resources.displayMetrics.density * 80) { abrirMenu() } }
 
@@ -31,7 +32,8 @@ class Bicho : Activity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val red = Red(filesDir)
         val archivos = java.io.File(filesDir, "archivos").apply { mkdirs() }.path
-        val lienzo = Lienzo(ANCHO, ALTO, red.id, archivos, Guardado(filesDir, red))
+        voz = Voz(this)
+        val lienzo = Lienzo(ANCHO, ALTO, red.id, archivos, Guardado(filesDir, red, voz))
         vista = GLSurfaceView(this).apply {
             setEGLContextClientVersion(2)
             setRenderer(lienzo)
@@ -49,10 +51,17 @@ class Bicho : Activity() {
         registerReceiver(depuracion, IntentFilter(Depuracion.ACCION))
         sentidos = Sentidos(this, vista, lienzo)
         datos = Datos(texto, lienzo, sentidos, depuracion)
-        lienzo.alDibujar = { datos.leerNucleo() }
+        var cuadro = 0
+        lienzo.alDibujar = {
+            datos.leerNucleo()
+            if (cuadro++ % 30 == 0) voz.config = Nucleo.voz()
+        }
+        Avisos.alAviso = { comando -> vista.queueEvent { Nucleo.nubeEscribir(2, comando) } }
     }
 
     override fun onDestroy() {
+        Avisos.alAviso = null
+        voz.apagar()
         unregisterReceiver(depuracion)
         super.onDestroy()
     }
@@ -78,28 +87,13 @@ class Bicho : Activity() {
 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         if (menu != null || secreto.mirar(e)) return true
+        // Mantener no muestra el QR (qrPorMantener = 0 en el puente): el QR se
+        // pide desde el menú secreto o por la red (/mostrar-qr).
         when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                soltadoAntes = false
-                vista.queueEvent { Nucleo.tacto(true) }
-                reloj.postDelayed(soltarLargo, TOQUE_MAX_MS)
-            }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                reloj.removeCallbacks(soltarLargo)
-                if (!soltadoAntes) vista.queueEvent { Nucleo.tacto(false) }
-            }
+            MotionEvent.ACTION_DOWN -> vista.queueEvent { Nucleo.tacto(true) }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> vista.queueEvent { Nucleo.tacto(false) }
         }
         return true
-    }
-
-    // En el núcleo, mantener 5 s muestra el QR (como el botón de la placa); en el
-    // celu, dejar el dedo es acariciarlo. Al núcleo le llega soltado antes de eso;
-    // el QR se pide desde el menú secreto o por la red (/mostrar-qr).
-    private val reloj = android.os.Handler(android.os.Looper.getMainLooper())
-    private var soltadoAntes = false
-    private val soltarLargo = Runnable {
-        soltadoAntes = true
-        vista.queueEvent { Nucleo.tacto(false) }
     }
 
     /** El menú de la salida secreta (sin diálogos del sistema). */
@@ -122,8 +116,7 @@ class Bicho : Activity() {
         }
         boton("Mostrar el QR para vincular") {
             cerrarMenu()
-            vista.queueEvent { Nucleo.tacto(true) }
-            reloj.postDelayed({ vista.queueEvent { Nucleo.tacto(false) } }, 5200)
+            vista.queueEvent { Nucleo.mostrarQr() }
         }
         boton("Salir del kiosco") {
             cerrarMenu()
@@ -164,6 +157,5 @@ class Bicho : Activity() {
         // La mitad de 1280×720: el núcleo dibuja acá y GL lo estira ×2.
         const val ANCHO = 640
         const val ALTO = 360
-        const val TOQUE_MAX_MS = 4500L
     }
 }

@@ -12,7 +12,9 @@ con el NDK. Esta app solo pone el anfitrión:
 |---|---|
 | `app/src/main/cpp/puente.cpp` | JNI ↔ API C (`firmware/api/sintetica_c.h`), el hal (hora, guardar, batería) y la subida del cuadro a GL |
 | `Lienzo.kt` | GL ES 2.0: el núcleo dibuja a 640×360 (RGB565), se sube como textura y se estira a 1280×720; tope de 30 fps |
-| `Sentidos.kt` | Acelerómetro (en g, ejes de la pantalla), batería y cargador, luz → brillo, oído |
+| `Sentidos.kt` | Acelerómetro (en g, ejes de la pantalla), batería y cargador, luz → brillo y `oscuridad`, proximidad → `mano-cerca`, ojos → la mirada y `cara-detectada`, oído |
+| `Voz.kt` | La voz de criatura: los sonidos del núcleo (`despertador:1..5`, `dado`, `ronquido`…) sintetizados, sin archivos; el tono según `voz.tipo` |
+| `Avisos.kt` | Las notificaciones del propio celu como comando Aviso (`0x44`): la app y quién, nada del texto |
 | `Oido.kt` | Del micrófono solo el nivel (dBFS): voz, ruido, música, silencio largo. No guarda audio |
 | `Kiosco.kt` | Dueño del dispositivo: pantalla de inicio, lock task, sin barra ni bloqueo, prendido enchufado |
 | `Secreto.kt` | La salida secreta |
@@ -47,6 +49,8 @@ Por wifi (para dejarlo en el cargador de pared): con el cable puesto,
    silencio y posterga las actualizaciones del sistema.
 5. Vincularlo: `adb shell am broadcast -a sintetica.EVENT --es tipo vincular`
    (provisorio, hasta que hable con la nube).
+6. Los avisos de notificaciones: `adb shell settings put secure
+   enabled_notification_listeners com.sinteticalabs.bicho/com.sinteticalabs.bicho.Avisos`.
 
 Con el celu enchufado las 24 h, conviene un enchufe con horario (que cargue
 unas horas y descanse otras): sin root no se puede limitar la carga, y una
@@ -66,6 +70,7 @@ de ser dueño del dispositivo; para devolverlo a la normalidad, después
 adb shell am broadcast -a sintetica.EVENT --es tipo sacudida-fuerte  # cualquier evento por su nombre del JSON
 adb shell am broadcast -a sintetica.EVENT --es tipo depuracion        # datos en pantalla
 adb shell am broadcast -a sintetica.EVENT --es tipo tiempo --ei x 720 # un día en 2 minutos (x 1 = normal)
+adb shell am broadcast -a sintetica.EVENT --es tipo comando --es hex 4202  # un comando (acá, sonar el despertador; 4200 lo apaga, 4303 el dado)
 adb logcat -s Bicho SinteticaOS
 adb exec-out screencap -p > captura.png
 ```
@@ -73,4 +78,6 @@ adb exec-out screencap -p > captura.png
 ## Privacidad
 
 El micrófono se lee en tramos de 50 ms de los que solo se mide el nivel; el
-tramo se borra enseguida. Nada se graba, se guarda ni sale del celu.
+tramo se borra enseguida. Nada se graba, se guarda ni sale del celu. De la
+cámara solo sale dónde está la cara (para mirarte); de las notificaciones,
+solo la app y el título.
