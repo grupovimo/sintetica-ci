@@ -42,8 +42,31 @@ class Charla(
     /** Lo llama el hilo del oído con cada tramo (se copia: el original se borra). */
     fun oir(tramo: ShortArray, n: Int) {
         if (voz.config[3] != 1) return
-        cola.offer(tramo.copyOf(n))
+        val t = tramo.copyOf(n)
+        // Esperando la palabra, solo cuando hay sonido; escuchando una frase o conversando, todo.
+        if (atento) return run { cola.offer(t) }
+        val db = Oido.dbfs(t, n)
+        val pasan = compuerta.tramo(t, db)
+        niveles[tramos % niveles.size] = db
+        pasan.forEach { cola.offer(it) }
+        // Cada minuto, cuánto deja pasar la compuerta (lo que gasta Vosk).
+        tramos++
+        if (pasan.isNotEmpty()) abiertos++
+        if (tramos == 1200) {
+            val o = niveles.sorted()
+            Log.i("Bicho", "charla: compuerta abierta ${abiertos * 100 / tramos} % · fondo ${compuerta.fondo.toInt()} dB · " +
+                "niveles ${o[0].toInt()}/${o[o.size / 2].toInt()}/${o[o.size * 9 / 10].toInt()}/${o.last().toInt()}")
+            tramos = 0
+            abiertos = 0
+        }
     }
+
+    private var tramos = 0
+    private val niveles = FloatArray(1200)
+    private var abiertos = 0
+
+    private val compuerta = Compuerta()
+    @Volatile private var atento = false
 
     /** Lo que llega por bicho/{id}/conversacion/url. */
     fun respuesta(json: String) {
@@ -91,8 +114,13 @@ class Charla(
                 val antes = previo.toList()
                 previo.clear()
                 // Con conversación (null) ya está; si no, Vosk con lo que se oyó mientras tanto.
-                val resto = conversar(antes)
-                if (resto != null) frase(model, palabra, antes + resto)
+                atento = true
+                try {
+                    val resto = conversar(antes)
+                    if (resto != null) frase(model, palabra, antes + resto)
+                } finally {
+                    atento = false
+                }
                 cola.clear()
             }
         } catch (_: InterruptedException) {

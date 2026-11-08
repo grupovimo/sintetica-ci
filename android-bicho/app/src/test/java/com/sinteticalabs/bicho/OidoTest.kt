@@ -40,3 +40,27 @@ class OidoTest {
         assertEquals(-6f, Oido.dbfs(m, m.size), 0.1f)
     }
 }
+
+class CompuertaTest {
+    private val t = ShortArray(800)
+
+    @Test fun enSilencioNoPasaNada() {
+        val c = Compuerta()
+        repeat(200) { org.junit.Assert.assertTrue(c.tramo(t, -60f).isEmpty()) }
+    }
+
+    @Test fun alHablarPasaConElSegundoDeAntes() {
+        val c = Compuerta(antes = 20, despues = 30)
+        repeat(100) { c.tramo(t, -70f) }
+        org.junit.Assert.assertTrue(c.tramo(t, -30f).isEmpty())  // un golpecito solo no abre
+        org.junit.Assert.assertEquals(21, c.tramo(t, -30f).size)
+        org.junit.Assert.assertEquals(1, c.tramo(t, -30f).size)
+        repeat(30) { org.junit.Assert.assertEquals(1, c.tramo(t, -70f).size) }  // la cola de 1,5 s
+        org.junit.Assert.assertTrue(c.tramo(t, -70f).isEmpty())
+    }
+
+    @Test fun losClicsSueltosNoAbren() {
+        val c = Compuerta()
+        repeat(400) { i -> org.junit.Assert.assertTrue(c.tramo(t, if (i % 7 == 0) -40f else -76f).isEmpty()) }
+    }
+}

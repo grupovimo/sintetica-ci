@@ -83,3 +83,50 @@ class Oido(private val tramoMs: Int = 50) {
         }
     }
 }
+
+/**
+ * Para no gastar CPU reconociendo silencio: deja pasar los tramos solo cuando
+ * hay sonido sobre el piso (y 1,5 s después), con el último segundo de antes
+ * para no cortar el principio de la palabra.
+ */
+class Compuerta(
+    private val antes: Int = 20,
+    private val despues: Int = 30,
+    private val sobrePiso: Float = 12f,
+    /** Nunca abre por debajo de esto (en una pieza muy callada, un clic suelto no es voz). */
+    private val minimo: Float = -60f,
+    /** Tramos seguidos con sonido para abrir: una sílaba dura más que un golpecito. */
+    private val seguidos: Int = 2,
+) {
+    private var fuertes = 0
+    /** El ruido de fondo que estima (para la depuración). */
+    val fondo get() = piso
+
+    private val previos = ArrayDeque<ShortArray>()
+    private var piso = -60f
+    private var quedan = 0
+
+    /** Lo que hay que pasar con este tramo (nada, él solo o los de antes y él). */
+    fun tramo(t: ShortArray, db: Float): List<ShortArray> {
+        // El piso es el ruido de fondo: baja más rápido de lo que sube, pero sin
+        // irse al fondo por un tramo suelto muy callado.
+        piso += (if (db < piso) 0.05f else 0.002f) * (db - piso)
+        val fuerte = db > maxOf(piso + sobrePiso, minimo)
+        fuertes = if (fuerte) fuertes + 1 else 0
+        if (fuerte && (quedan > 0 || fuertes >= seguidos)) {
+            val abria = quedan > 0
+            quedan = despues
+            if (abria) return listOf(t)
+            val todo = previos.toList() + listOf(t)
+            previos.clear()
+            return todo
+        }
+        if (quedan > 0) {
+            quedan--
+            return listOf(t)
+        }
+        previos.addLast(t)
+        if (previos.size > antes) previos.removeFirst()
+        return emptyList()
+    }
+}
