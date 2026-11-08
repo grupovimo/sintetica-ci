@@ -50,6 +50,8 @@ PRUEBA("formato: la base trae las 16 caras y las reglas del manual") {
                            "curioso", "bateria-baja", "actualizando", "glitch"};
   for (int i = 0; i < 16; i++) VERIFICAR(g_c.indiceExpresion(nombres[i]) == i);
   VERIFICAR(g_c.nReglas >= 30);
+  // Con las 24 del usuario no se tiene que caer ninguna base.
+  VERIFICAR(g_c.nReglas + MAX_REGLAS_USUARIO <= MAX_REGLAS);
   VERIFICAR(!g_c.expresiones[g_c.indiceExpresion("dormido")].parpadea);
 }
 
