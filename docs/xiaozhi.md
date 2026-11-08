@@ -5,6 +5,14 @@ repos (links al final). Lo que no pude comprobar dice **a verificar**.
 
 ## La recomendación
 
+> **Una sola placa y un solo producto** (decisión de Nahuel, 8/11): el cubito
+> lleva **nuestro firmware** (la cara viva, el motor de vida, todo). De xiaozhi
+> se toma solo el **protocolo de voz** (WebSocket + Opus contra nuestra nube) y
+> piezas del firmware (audio, AEC). Flashearle xiaozhi tal cual es solo una
+> prueba de un día del audio, en la misma placa, y después va el nuestro. La
+> "puerta xiaozhi" para placas ajenas es un extra opcional, no algo que el
+> producto necesite.
+
 1. **Sí a una "puerta xiaozhi" en nuestra API, solo por WebSocket.** La nube
    de Sintética habla el protocolo de xiaozhi y cualquier placa con el
    firmware de xiaozhi (más de 50 fabricantes, más de 100 placas) se vincula como un
