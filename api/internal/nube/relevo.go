@@ -287,19 +287,17 @@ func (n *Nube) GuardarConfig(ctx context.Context, bichoID, texto, autor, usuario
 	return c, nil
 }
 
-// ErrImagen: no es un QOI del tamaño de la pantalla del bicho.
-var ErrImagen = errors.New("tiene que ser un QOI del tamaño de la pantalla del bicho")
+// ErrImagen: no es un QOI (o una animación) del tamaño de la pantalla del bicho.
+var ErrImagen = errors.New("tiene que ser un QOI o una animación del tamaño de la pantalla del bicho")
 
 // GuardarImagen guarda una imagen (verifica la cabecera QOI) y la manda a sincronizar.
 func (n *Nube) GuardarImagen(ctx context.Context, bichoID string, espacio int, qoi []byte) error {
-	if len(qoi) < 22 || string(qoi[:4]) != "qoif" {
+	w, h, ok := protocolo.TamanoImagen(qoi)
+	if !ok {
 		return ErrImagen
 	}
-	if est, ok := n.EstadoDe(bichoID); ok {
-		w, h := binary.BigEndian.Uint32(qoi[4:]), binary.BigEndian.Uint32(qoi[8:])
-		if int(w) != est.Pantalla.Ancho || int(h) != est.Pantalla.Alto {
-			return ErrImagen
-		}
+	if est, conocido := n.EstadoDe(bichoID); conocido && (w != est.Pantalla.Ancho || h != est.Pantalla.Alto) {
+		return ErrImagen
 	}
 	if err := n.alm.GuardarImagen(ctx, bichoID, espacio, qoi, protocolo.Crc32(qoi)); err != nil {
 		return err

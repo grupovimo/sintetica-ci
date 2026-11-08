@@ -172,6 +172,10 @@ class Sistema {
   void guardarImagenes();
   int imagenParaMostrar(uint32_t ahora);
   bool dibujarImagen(int espacio);
+  bool leerArchivo(const char* clave, uint32_t desplazamiento, uint8_t* destino, size_t n);
+  bool imagenValida(const char* clave, uint32_t largo, const char** porQue);
+  bool prepararImagen(int espacio, uint32_t ahora);
+  bool cargarCuadro(int espacio, int cuadro, uint32_t ahora);
   static int leerParaQoi(void* contexto, uint32_t desplazamiento, uint8_t* destino, size_t n);
   bool bloqueado(uint32_t ahora) const;
   void falla(uint32_t ahora);
@@ -229,6 +233,11 @@ class Sistema {
   int mostrandoImagen_ = -1;
   bool imagenSucia_ = true;
   int imagenLeyendo_ = -1;
+  // La imagen que se ve, si es animada: qué cuadro va, cuándo pasa al
+  // siguiente y desde dónde se lee el cuadro (0 en una imagen suelta).
+  int imagenPreparada_ = -1;
+  uint8_t animCuadros_ = 0, animCuadro_ = 0;
+  uint32_t animProximo_ = 0, baseImagen_ = 0;
   uint32_t proximaVueltaCara_ = 0, vueltaCaraHasta_ = 0;
   Azar azar_;
   DecodificadorQoi qoi_;

@@ -108,20 +108,34 @@ final class ModeloBicho {
         miniaturas = minis
     }
 
-    func subirImagen(_ espacio: Int, _ fuente: UIImage) async {
+    func subirImagen(_ espacio: Int, _ datos: Data) async {
         guard let c = cliente else { return }
         progreso = 0
         defer { progreso = nil }
         let p = pantalla
-        let recortada = PrepararImagen.recortar(fuente, ancho: p.ancho, alto: p.alto, redonda: p.redonda)
-        let qoi = PrepararImagen.qoi(recortada)
-        // En el modo demo el núcleo ya está al doble: la misma imagen sirve para las dos.
-        let vista = esDemo ? qoi : PrepararImagen.qoi(PrepararImagen.recortar(fuente, ancho: p.ancho * 2, alto: p.alto * 2, redonda: p.redonda))
+        let qoi: [UInt8], vista: [UInt8], recortada: UIImage
+        do {
+            if PrepararImagen.esGif(datos) {
+                // Un GIF: animado. En el modo demo el núcleo ya está al doble.
+                let g = try PrepararImagen.gif(datos, ancho: p.ancho, alto: p.alto, redonda: p.redonda)
+                (qoi, recortada) = (g.bytes, g.primero)
+                vista = esDemo ? qoi : try PrepararImagen.gif(datos, ancho: p.ancho * 2, alto: p.alto * 2, redonda: p.redonda).bytes
+            } else {
+                guard let fuente = UIImage(data: datos) else { aviso = "No pude leer la imagen."; return }
+                recortada = PrepararImagen.recortar(fuente, ancho: p.ancho, alto: p.alto, redonda: p.redonda)
+                qoi = PrepararImagen.qoi(recortada)
+                // En el modo demo el núcleo ya está al doble: la misma imagen sirve para las dos.
+                vista = esDemo ? qoi : PrepararImagen.qoi(PrepararImagen.recortar(fuente, ancho: p.ancho * 2, alto: p.alto * 2, redonda: p.redonda))
+            }
+        } catch {
+            aviso = error.localizedDescription
+            return
+        }
         do {
             try await c.subirImagen(espacio, qoi) { [weak self] v in self?.progreso = v }
             CacheImagenes.guardar(id, espacio, mandada: qoi, vistaPrevia: vista, miniatura: recortada)
             await refrescarImagenes()
-            aviso = "Imagen guardada en el espacio \(espacio)."
+            aviso = Animacion.esAnimacion(qoi) ? "GIF guardado en el espacio \(espacio) (\(Animacion.cuadros(qoi).count) cuadros)." : "Imagen guardada en el espacio \(espacio)."
         } catch {
             aviso = error.localizedDescription
         }
@@ -518,8 +532,8 @@ private struct SeccionImagenes: View {
         .onChange(of: foto) { _, item in
             guard let item else { return }
             Task {
-                if let datos = try? await item.loadTransferable(type: Data.self), let imagen = UIImage(data: datos) {
-                    await modelo.subirImagen(elegido, imagen)
+                if let datos = try? await item.loadTransferable(type: Data.self) {
+                    await modelo.subirImagen(elegido, datos)
                 }
                 foto = nil
             }

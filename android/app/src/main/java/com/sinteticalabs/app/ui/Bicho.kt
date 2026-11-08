@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import com.sinteticalabs.app.bicho.Gif
+import com.sinteticalabs.app.protocolo.Animacion
 import com.sinteticalabs.app.bicho.PrepararImagen
 import com.sinteticalabs.app.datos.CacheImagenes
 import com.sinteticalabs.app.protocolo.EspacioImagen
@@ -203,10 +205,16 @@ class BichoViewModel(app: Application) : AndroidViewModel(app) {
         try {
             progreso.value = 0f
             val (qoi, vista) = withContext(Dispatchers.Default) {
-                val fuente = ImageDecoder.decodeBitmap(ImageDecoder.createSource(getApplication<Application>().contentResolver, uri)) { d, _, _ ->
+                val p = pantalla
+                val crudo = getApplication<Application>().contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("No pude leer la imagen.")
+                if (Gif.esGif(crudo)) {
+                    // Un GIF: animado. En el modo demo el núcleo ya está al doble.
+                    val q = PrepararImagen.gif(crudo, p.ancho, p.alto, p.redonda)
+                    return@withContext q to (if (esDemo) q else PrepararImagen.gif(crudo, p.ancho * 2, p.alto * 2, p.redonda))
+                }
+                val fuente = ImageDecoder.decodeBitmap(ImageDecoder.createSource(java.nio.ByteBuffer.wrap(crudo))) { d, _, _ ->
                     d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                 }
-                val p = pantalla
                 val q = PrepararImagen.qoi(PrepararImagen.recortar(fuente, p.ancho, p.alto, p.redonda))
                 // En el modo demo el núcleo ya está al doble: la misma imagen sirve para las dos.
                 q to (if (esDemo) q else PrepararImagen.qoi(PrepararImagen.recortar(fuente, p.ancho * 2, p.alto * 2, p.redonda)))
@@ -214,7 +222,7 @@ class BichoViewModel(app: Application) : AndroidViewModel(app) {
             c.subirImagen(espacio, qoi) { progreso.value = it }
             cache.guardar(id, espacio, qoi, vista)
             refrescarImagenes()
-            _aviso.value = "Imagen guardada en el espacio $espacio."
+            _aviso.value = if (Animacion.esAnimacion(qoi)) "GIF guardado en el espacio $espacio (${Animacion.cuadros(qoi).size} cuadros)." else "Imagen guardada en el espacio $espacio."
         } catch (e: Exception) {
             _aviso.value = e.message ?: "No pude mandar la imagen."
         } finally {

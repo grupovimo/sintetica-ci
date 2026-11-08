@@ -626,3 +626,40 @@ func LeerQr(texto string) (DatosQr, bool) {
 
 // IDValido: 12 caracteres hexadecimales en mayúscula.
 var IDValido = regexp.MustCompile(`^[0-9A-F]{12}$`).MatchString
+
+// TamanoImagen dice de qué tamaño es una imagen para la pantalla: un QOI o una
+// animación "sani" (la cabecera, la tabla de cuadros y los cuadros en QOI; ver
+// firmware/nucleo/qoi.h). ok = false si está mal armada.
+func TamanoImagen(b []byte) (ancho, alto int, ok bool) {
+	qoi := func(c []byte) (int, int, bool) {
+		if len(c) < 22 || string(c[:4]) != "qoif" || (c[12] != 3 && c[12] != 4) {
+			return 0, 0, false
+		}
+		w, h := binary.BigEndian.Uint32(c[4:]), binary.BigEndian.Uint32(c[8:])
+		return int(w), int(h), w > 0 && h > 0 && w <= 4096 && h <= 4096
+	}
+	if len(b) < 10 || string(b[:4]) != "sani" {
+		return qoi(b)
+	}
+	cuadros := int(b[5])
+	ancho, alto = int(binary.LittleEndian.Uint16(b[6:])), int(binary.LittleEndian.Uint16(b[8:]))
+	tabla := 10 + 10*cuadros
+	if b[4] != 1 || cuadros < 1 || cuadros > MaxCuadros || len(b) < tabla {
+		return 0, 0, false
+	}
+	for i := 0; i < cuadros; i++ {
+		e := b[10+10*i:]
+		ms := binary.LittleEndian.Uint16(e)
+		off, largo := int(binary.LittleEndian.Uint32(e[2:])), int(binary.LittleEndian.Uint32(e[6:]))
+		if ms < 20 || off < tabla || largo < 22 || off > len(b) || largo > len(b)-off {
+			return 0, 0, false
+		}
+		if w, h, ok := qoi(b[off : off+largo]); !ok || w != ancho || h != alto {
+			return 0, 0, false
+		}
+	}
+	return ancho, alto, true
+}
+
+// MaxCuadros: cuántos cuadros puede tener una imagen animada.
+const MaxCuadros = 64

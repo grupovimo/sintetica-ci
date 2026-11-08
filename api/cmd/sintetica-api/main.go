@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -131,9 +132,18 @@ func correr(log *slog.Logger) error {
 	publico := &http.Server{Addr: env("DIRECCION", ":8080"), Handler: srv.Rutas(), ReadHeaderTimeout: 10 * time.Second}
 	interno := &http.Server{Addr: env("DIRECCION_INTERNA", ":8081"), Handler: srv.RutasInternas(), ReadHeaderTimeout: 5 * time.Second}
 	errores := make(chan error, 2)
-	// Primero el puerto interno: EMQX lo necesita para dejar entrar a la API misma.
-	go func() { errores <- interno.ListenAndServe() }()
-	go func() { errores <- publico.ListenAndServe() }()
+	// Los puertos se abren antes de conectarse al broker: EMQX le pregunta a la
+	// API (por el interno) si la deja entrar y suscribirse.
+	lInterno, err := net.Listen("tcp", interno.Addr)
+	if err != nil {
+		return fmt.Errorf("puerto interno: %w", err)
+	}
+	lPublico, err := net.Listen("tcp", publico.Addr)
+	if err != nil {
+		return fmt.Errorf("puerto público: %w", err)
+	}
+	go func() { errores <- interno.Serve(lInterno) }()
+	go func() { errores <- publico.Serve(lPublico) }()
 	log.Info("API escuchando", "publica", publico.Addr, "interna", interno.Addr, "desarrollo", desarrollo)
 
 	if err := n.Conectar(); err != nil {

@@ -67,11 +67,7 @@ func (n *Nube) Conectar() error {
 		SetCleanSession(true).SetOrderMatters(true)
 	o.SetOnConnectHandler(func(c mqtt.Client) {
 		n.log.Info("conectado al broker", "url", n.op.URL)
-		for _, t := range []string{"bicho/+/state", "bicho/+/resp", "bicho/+/conexion"} {
-			if tk := c.Subscribe(t, 1, n.alLlegar); tk.WaitTimeout(10*time.Second) && tk.Error() != nil {
-				n.log.Error("no me pude suscribir", "topico", t, "error", tk.Error())
-			}
-		}
+		go n.suscribir(c)
 	})
 	o.SetConnectionLostHandler(func(_ mqtt.Client, err error) { n.log.Warn("se cortó el broker", "error", err) })
 	n.cli = mqtt.NewClient(o)
@@ -82,6 +78,37 @@ func (n *Nube) Conectar() error {
 	}
 	go n.limpieza()
 	return nil
+}
+
+// suscribir se suscribe a lo de los bichos. Si EMQX la rechaza (por ejemplo,
+// porque al arrancar todavía no le podía preguntar a la API si la deja),
+// reintenta: sin estas suscripciones la API no ve a ningún bicho.
+func (n *Nube) suscribir(c mqtt.Client) {
+	for {
+		rechazadas := 0
+		for _, t := range []string{"bicho/+/state", "bicho/+/resp", "bicho/+/conexion"} {
+			tk := c.Subscribe(t, 1, n.alLlegar)
+			ok := tk.WaitTimeout(10*time.Second) && tk.Error() == nil
+			if st, es := tk.(*mqtt.SubscribeToken); ok && es && st.Result()[t] == 0x80 {
+				ok = false // el SUBACK dice que no
+			}
+			if !ok {
+				rechazadas++
+				n.log.Warn("no me pude suscribir (reintento)", "topico", t, "error", tk.Error())
+			}
+		}
+		if rechazadas == 0 {
+			return
+		}
+		select {
+		case <-n.ctx.Done():
+			return
+		case <-time.After(2 * time.Second):
+		}
+		if !c.IsConnectionOpen() {
+			return // al reconectar se vuelve a llamar
+		}
+	}
 }
 
 // Cerrar se desconecta.

@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import com.sinteticalabs.app.protocolo.Animacion
 import com.sinteticalabs.app.protocolo.Qoi
 
 /** Recorta y escala una imagen a la pantalla del bicho, y la codifica en QOI. */
@@ -36,8 +37,31 @@ object PrepararImagen {
         return Qoi.codificar(rgb, b.width, b.height)
     }
 
-    /** Para las miniaturas: decodifica un QOI a Bitmap. */
-    fun decodificar(q: ByteArray): Bitmap? {
+    /**
+     * Un GIF a la pantalla: cada cuadro recortado como una foto, en una animación
+     * "sani" (o un QOI si tiene un solo cuadro). Si no entra en un espacio, se
+     * saltea uno de cada dos cuadros y el que queda dura lo de los dos, como la web.
+     */
+    fun gif(bytes: ByteArray, ancho: Int, alto: Int, redonda: Boolean): ByteArray {
+        val g = Gif.decodificar(bytes)
+        var cuadros = g.cuadros.map { c ->
+            val fuente = Bitmap.createBitmap(c.argb, g.ancho, g.alto, Bitmap.Config.ARGB_8888)
+            Animacion.Cuadro(qoi(recortar(fuente, ancho, alto, redonda)), c.ms)
+        }
+        if (cuadros.size == 1) return cuadros[0].qoi
+        val limite = ancho * alto * 4 + 22
+        var sani = Animacion.codificar(cuadros.take(Animacion.MAX_CUADROS), ancho, alto)
+        while (cuadros.size > Animacion.MAX_CUADROS || sani.size > limite) {
+            require(cuadros.size > 2) { "El GIF es demasiado pesado para la pantalla: probá con uno más simple." }
+            cuadros = cuadros.chunked(2).map { par -> Animacion.Cuadro(par[0].qoi, par.sumOf { it.ms }) }
+            sani = Animacion.codificar(cuadros.take(Animacion.MAX_CUADROS), ancho, alto)
+        }
+        return sani
+    }
+
+    /** Para las miniaturas: decodifica un QOI (o el primer cuadro de una animación) a Bitmap. */
+    fun decodificar(imagen: ByteArray): Bitmap? {
+        val q = Animacion.cuadros(imagen).first().qoi
         if (q.size < 22 || q[0] != 'q'.code.toByte()) return null
         fun be(i: Int) = ((q[i].toInt() and 255) shl 24) or ((q[i + 1].toInt() and 255) shl 16) or ((q[i + 2].toInt() and 255) shl 8) or (q[i + 3].toInt() and 255)
         val w = be(4); val h = be(8)

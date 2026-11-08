@@ -102,4 +102,32 @@ bool DecodificadorQoi::saltarFilas(uint32_t n) {
   return true;
 }
 
+namespace animacion {
+
+namespace {
+inline uint16_t le16(const uint8_t* b) { return static_cast<uint16_t>(b[0] | b[1] << 8); }
+inline uint32_t le32(const uint8_t* b) {
+  return static_cast<uint32_t>(b[0]) | static_cast<uint32_t>(b[1]) << 8 | static_cast<uint32_t>(b[2]) << 16 |
+         static_cast<uint32_t>(b[3]) << 24;
+}
+}  // namespace
+
+bool leerCabecera(const uint8_t* b, size_t n, int* cuadros, uint32_t* ancho, uint32_t* alto) {
+  if (n < CABECERA || !es(b, n) || b[4] != 1) return false;
+  *cuadros = b[5];
+  *ancho = le16(b + 6);
+  *alto = le16(b + 8);
+  return *cuadros >= 1 && *cuadros <= MAX_CUADROS && *ancho > 0 && *alto > 0;
+}
+
+Cuadro leerCuadro(const uint8_t* b) {
+  Cuadro c;
+  c.ms = le16(b);
+  c.desplazamiento = le32(b + 2);
+  c.largo = le32(b + 6);
+  return c;
+}
+
+}  // namespace animacion
+
 }  // namespace sintetica

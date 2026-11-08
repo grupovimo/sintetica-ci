@@ -325,7 +325,81 @@ int Sistema::leerParaQoi(void* contexto, uint32_t desplazamiento, uint8_t* desti
   if (!s->hal_.leerTrozo) return -1;
   char clave[6];
   claveImagen(clave, s->imagenLeyendo_);
-  return s->hal_.leerTrozo(clave, desplazamiento, destino, n);
+  return s->hal_.leerTrozo(clave, s->baseImagen_ + desplazamiento, destino, n);
+}
+
+// Lee exactamente n bytes de un archivo (la lectura puede venir de a partes).
+bool Sistema::leerArchivo(const char* clave, uint32_t desplazamiento, uint8_t* destino, size_t n) {
+  if (!hal_.leerTrozo) return false;
+  size_t leidos = 0;
+  while (leidos < n) {
+    const int m = hal_.leerTrozo(clave, desplazamiento + static_cast<uint32_t>(leidos), destino + leidos, n - leidos);
+    if (m <= 0) return false;
+    leidos += static_cast<size_t>(m);
+  }
+  return true;
+}
+
+// Un QOI del tamaño de la pantalla, o una animación cuyos cuadros lo son.
+bool Sistema::imagenValida(const char* clave, uint32_t largo, const char** porQue) {
+  const uint32_t w = static_cast<uint32_t>(perfil_.ancho), h = static_cast<uint32_t>(perfil_.alto);
+  *porQue = "tiene que ser un QOI del tamaño de la pantalla";
+  uint8_t cab[14];
+  if (!leerArchivo(clave, 0, cab, animacion::CABECERA)) return false;
+  if (!animacion::es(cab, animacion::CABECERA)) {
+    uint32_t qw = 0, qh = 0;
+    return leerArchivo(clave, 0, cab, sizeof cab) && DecodificadorQoi::leerCabecera(cab, sizeof cab, &qw, &qh) &&
+           qw == w && qh == h;
+  }
+  *porQue = "la animación no es válida o no es del tamaño de la pantalla";
+  int cuadros = 0;
+  uint32_t aw = 0, ah = 0;
+  if (!animacion::leerCabecera(cab, animacion::CABECERA, &cuadros, &aw, &ah) || aw != w || ah != h) return false;
+  const uint32_t tabla = static_cast<uint32_t>(animacion::CABECERA + animacion::POR_CUADRO * cuadros);
+  for (int i = 0; i < cuadros; i++) {
+    uint8_t e[animacion::POR_CUADRO];
+    if (!leerArchivo(clave, static_cast<uint32_t>(animacion::CABECERA + animacion::POR_CUADRO * i), e, sizeof e))
+      return false;
+    const animacion::Cuadro c = animacion::leerCuadro(e);
+    if (c.ms < animacion::MIN_MS || c.desplazamiento < tabla || c.largo < 22 || c.desplazamiento > largo ||
+        c.largo > largo - c.desplazamiento)
+      return false;
+    uint32_t qw = 0, qh = 0;
+    if (!leerArchivo(clave, c.desplazamiento, cab, sizeof cab) ||
+        !DecodificadorQoi::leerCabecera(cab, sizeof cab, &qw, &qh) || qw != w || qh != h)
+      return false;
+  }
+  return true;
+}
+
+// Al empezar a mostrar una imagen: si es animada, su primer cuadro.
+bool Sistema::prepararImagen(int espacio, uint32_t ahora) {
+  imagenPreparada_ = espacio;
+  animCuadros_ = animCuadro_ = 0;
+  baseImagen_ = 0;
+  char clave[6];
+  claveImagen(clave, espacio);
+  uint8_t cab[animacion::CABECERA];
+  if (!leerArchivo(clave, 0, cab, sizeof cab)) return false;
+  if (!animacion::es(cab, sizeof cab)) return true;
+  int cuadros = 0;
+  uint32_t w = 0, h = 0;
+  if (!animacion::leerCabecera(cab, sizeof cab, &cuadros, &w, &h)) return false;
+  animCuadros_ = static_cast<uint8_t>(cuadros);
+  return cargarCuadro(espacio, 0, ahora);
+}
+
+bool Sistema::cargarCuadro(int espacio, int cuadro, uint32_t ahora) {
+  char clave[6];
+  claveImagen(clave, espacio);
+  uint8_t e[animacion::POR_CUADRO];
+  if (!leerArchivo(clave, static_cast<uint32_t>(animacion::CABECERA + animacion::POR_CUADRO * cuadro), e, sizeof e))
+    return false;
+  const animacion::Cuadro c = animacion::leerCuadro(e);
+  animCuadro_ = static_cast<uint8_t>(cuadro);
+  baseImagen_ = c.desplazamiento;
+  animProximo_ = ahora + (c.ms < animacion::MIN_MS ? animacion::MIN_MS : c.ms);
+  return true;
 }
 
 // Decodifica la imagen en la franja actual del lienzo. false si no se puede leer.
@@ -377,6 +451,7 @@ void Sistema::bleImagen(uint8_t op, const uint8_t* d, size_t n) {
       imagenes_[subiendo_] = MetaImagen();
       guardarImagenes();
       imagenSucia_ = true;
+      imagenPreparada_ = -1;
       return responder(car, op, Ok);
     }
     case ImgBloque: {
@@ -404,18 +479,16 @@ void Sistema::bleImagen(uint8_t op, const uint8_t* d, size_t n) {
         if (hal_.borrar) hal_.borrar(clave);
         return responder(car, op, subidaRecibido_ != subidaLargo_ ? FueraDeOrden : CrcDistinto);
       }
-      uint8_t cab[14];
-      uint32_t w = 0, h = 0;
-      const bool cabeceraOk = hal_.leerTrozo && hal_.leerTrozo(clave, 0, cab, sizeof cab) == 14 &&
-                              DecodificadorQoi::leerCabecera(cab, sizeof cab, &w, &h);
-      if (!cabeceraOk || w != static_cast<uint32_t>(perfil_.ancho) || h != static_cast<uint32_t>(perfil_.alto)) {
+      const char* porQue = "";
+      if (!imagenValida(clave, subidaLargo_, &porQue)) {
         if (hal_.borrar) hal_.borrar(clave);
-        return responder(car, op, ImagenInvalida, "tiene que ser un QOI del tamaño de la pantalla");
+        return responder(car, op, ImagenInvalida, porQue);
       }
       imagenes_[espacio].largo = subidaLargo_;
       imagenes_[espacio].crc = subidaCrc_;
       guardarImagenes();
       imagenSucia_ = true;
+      imagenPreparada_ = -1;
       log("imagen guardada");
       return responder(car, op, Ok);
     }
@@ -426,6 +499,7 @@ void Sistema::bleImagen(uint8_t op, const uint8_t* d, size_t n) {
       imagenes_[d[1]] = MetaImagen();
       guardarImagenes();
       imagenSucia_ = true;
+      imagenPreparada_ = -1;
       return responder(car, op, Ok);
     }
     case ImgListar: {
@@ -649,7 +723,18 @@ void Sistema::tick() {
 
   if (vistaPrevia_) emparejando_ = false;
   elegirAnimacion(ahora);
-  const int imagen = imagenParaMostrar(ahora);
+  int imagen = imagenParaMostrar(ahora);
+  if (imagen >= 0 && imagen != imagenPreparada_ && !prepararImagen(imagen, ahora)) {
+    // No se pudo leer: se marca vacía para no intentarlo en cada cuadro.
+    imagenes_[imagen] = MetaImagen();
+    imagen = -1;
+    log("no pude leer la imagen; la saco");
+  }
+  if (imagen >= 0 && imagen == mostrandoImagen_ && animCuadros_ > 1 && static_cast<int32_t>(ahora - animProximo_) >= 0) {
+    // Una animación: el cuadro que sigue.
+    if (cargarCuadro(imagen, (animCuadro_ + 1) % animCuadros_, ahora)) imagenSucia_ = true;
+  }
+  if (imagen < 0) imagenPreparada_ = -1;
   if (imagen >= 0 && imagen == mostrandoImagen_ && !imagenSucia_) {
     // La imagen ya está en la pantalla: no hace falta redibujarla.
     notificarEstadoSiCambio();

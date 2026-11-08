@@ -11,7 +11,8 @@ import {
   ArmadorDeConfig, Car, comando, escriturasDeConfig, escriturasDeImagen, idDeAnuncio, imagen, leerEstado, leerListaImagenes,
   leerQr, leerRespuesta, pedirConfig,
 } from '../web/protocolo.js';
-import { codificarQoi, decodificarQoi } from '../web/qoi.js';
+import { codificarAnimacion, codificarQoi, cuadrosDe, decodificarQoi, esAnimacion } from '../web/qoi.js';
+import { decodificarGif } from '../web/gif.js';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
 const wasm = fs.readFileSync(path.join(aqui, '../dist/sinteticaos.wasm'));
@@ -291,4 +292,66 @@ test('E5: el editor dibuja un rostro paramétrico', async () => {
   let naranjas = 0;
   for (let k = 0; k < rgba.length; k += 4) if (rgba[k] > 200 && rgba[k + 1] > 80) naranjas++;
   assert.ok(naranjas > 500, `píxeles naranjas: ${naranjas}`);
+});
+
+// Un GIF armado a mano: LZW sin comprimir (un "limpiar" cada dos píxeles, así el
+// código queda siempre de 3 bits). paleta: [[r,g,b]…] (4 colores).
+function gifDePrueba(ancho, alto, paleta, cuadros) {
+  const b = [...Buffer.from('GIF89a'), ancho & 255, ancho >> 8, alto & 255, alto >> 8, 0x81, 0, 0];
+  for (const c of paleta) b.push(...c);
+  for (const q of cuadros) {
+    b.push(0x21, 0xf9, 4, (q.reemplazo ?? 0) << 2, q.cs & 255, q.cs >> 8, 0, 0);
+    b.push(0x2c, q.x & 255, q.x >> 8, q.y & 255, q.y >> 8, q.w & 255, q.w >> 8, q.h & 255, q.h >> 8, 0, 2);
+    const codigos = [];
+    q.indices.forEach((k, i) => { if (i % 2 === 0) codigos.push(4); codigos.push(k); });
+    codigos.push(5);
+    const datos = [];
+    let acc = 0, bits = 0;
+    for (const c of codigos) { acc |= c << bits; bits += 3; while (bits >= 8) { datos.push(acc & 255); acc >>= 8; bits -= 8; } }
+    if (bits) datos.push(acc & 255);
+    for (let i = 0; i < datos.length; i += 255) { const t = datos.slice(i, i + 255); b.push(t.length, ...t); }
+    b.push(0);
+  }
+  b.push(0x3b);
+  return new Uint8Array(b);
+}
+
+test('GIF: los cuadros se componen (el segundo pinta solo un rectángulo) con su duración', () => {
+  const gif = gifDePrueba(4, 2, [[255, 0, 0], [0, 0, 255], [0, 255, 0], [0, 0, 0]], [
+    { x: 0, y: 0, w: 4, h: 2, cs: 5, indices: [0, 0, 0, 0, 0, 0, 0, 0] },
+    { x: 2, y: 0, w: 2, h: 2, cs: 0, indices: [1, 1, 2, 2] },
+  ]);
+  const { ancho, alto, cuadros } = decodificarGif(gif);
+  assert.deepEqual([ancho, alto, cuadros.length], [4, 2, 2]);
+  assert.equal(cuadros[0].ms, 50);
+  assert.equal(cuadros[1].ms, 100);  // sin demora: 100 ms, como los navegadores
+  const px = (c, x, y) => [...c.rgba.subarray((y * 4 + x) * 4, (y * 4 + x) * 4 + 3)];
+  assert.deepEqual(px(cuadros[0], 3, 1), [255, 0, 0]);
+  assert.deepEqual(px(cuadros[1], 0, 0), [255, 0, 0]);  // lo de antes queda
+  assert.deepEqual(px(cuadros[1], 2, 0), [0, 0, 255]);
+  assert.deepEqual(px(cuadros[1], 3, 1), [0, 255, 0]);
+  assert.throws(() => decodificarGif(new Uint8Array([1, 2, 3])));
+});
+
+test('imagen animada: se sube al núcleo y pasa de cuadro', async () => {
+  const reloj = { t: 0 };
+  let pantalla = null;
+  const sim = await crearSimulador({
+    wasm, perfil: 'broche', ahora: () => reloj.t, semilla: () => 7, minutoDelDia: () => 12 * 60,
+    alPresentar: (rgba) => { pantalla = rgba.slice(); },
+  });
+  sim.vistaPrevia();
+  const correr = (ms) => { for (let i = 0; i < ms; i += 20) { reloj.t += 20; sim.tick(); } };
+  const lleno = (r, g, b) => { const x = new Uint8Array(240 * 240 * 4); for (let i = 0; i < x.length; i += 4) x.set([r, g, b, 255], i); return x; };
+  const anim = codificarAnimacion([{ rgba: lleno(245, 80, 26), ms: 120 }, { rgba: lleno(26, 80, 245), ms: 120 }], 240, 240);
+  assert.equal(esAnimacion(anim), true);
+  assert.equal(cuadrosDe(anim).length, 2);
+  for (const e of escriturasDeImagen(0, anim)) sim.bleEscribir(Car.imagen, e);
+  for (const e of escriturasDeConfig({ version: 1, lista: ['imagen:0'] })) sim.bleEscribir(Car.config, e);
+  correr(60);
+  assert.equal(sim.imagenVisible(), 0, 'se ve la animación');
+  const rojo = pantalla[(120 * 240 + 120) * 4];
+  correr(140);
+  const despues = pantalla[(120 * 240 + 120) * 4];
+  assert.ok(rojo > 200 && despues < 60, `pasa de cuadro (${rojo} → ${despues})`);
 });

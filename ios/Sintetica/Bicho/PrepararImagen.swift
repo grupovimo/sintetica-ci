@@ -1,3 +1,4 @@
+import ImageIO
 import UIKit
 
 /// Recorta y escala una imagen a la pantalla del bicho, y la codifica en QOI.
@@ -15,6 +16,52 @@ enum PrepararImagen {
             let k = max(tam.width / fuente.size.width, tam.height / fuente.size.height)
             let w = fuente.size.width * k, h = fuente.size.height * k
             fuente.draw(in: CGRect(x: (tam.width - w) / 2, y: (tam.height - h) / 2, width: w, height: h))
+        }
+    }
+
+    static func esGif(_ datos: Data) -> Bool { datos.starts(with: [0x47, 0x49, 0x46]) }
+
+    /// Un GIF a la pantalla: cada cuadro recortado como una foto, en una
+    /// animación "sani" (o un QOI si tiene un solo cuadro), y el primer cuadro
+    /// recortado para la miniatura. Si no entra en un espacio, se saltea uno de
+    /// cada dos cuadros y el que queda dura lo de los dos, como la web.
+    static func gif(_ datos: Data, ancho: Int, alto: Int, redonda: Bool) throws -> (bytes: [UInt8], primero: UIImage) {
+        guard let fuente = CGImageSourceCreateWithData(datos as CFData, nil), CGImageSourceGetCount(fuente) > 0 else {
+            throw ErrorImagen.noEsGif
+        }
+        var cuadros: [Animacion.Cuadro] = []
+        var primero: UIImage?
+        for i in 0 ..< CGImageSourceGetCount(fuente) {
+            guard let cg = CGImageSourceCreateImageAtIndex(fuente, i, nil) else { continue }
+            let recortada = recortar(UIImage(cgImage: cg), ancho: ancho, alto: alto, redonda: redonda)
+            if primero == nil { primero = recortada }
+            let props = CGImageSourceCopyPropertiesAtIndex(fuente, i, nil) as? [CFString: Any]
+            let gif = props?[kCGImagePropertyGIFDictionary] as? [CFString: Any]
+            let segundos = (gif?[kCGImagePropertyGIFUnclampedDelayTime] as? Double) ?? (gif?[kCGImagePropertyGIFDelayTime] as? Double) ?? 0.1
+            // Como los navegadores: menos de 20 ms se toma como 100.
+            cuadros.append(Animacion.Cuadro(qoi: qoi(recortada), ms: segundos < 0.02 ? 100 : Int(segundos * 1000)))
+        }
+        guard let primero, !cuadros.isEmpty else { throw ErrorImagen.noEsGif }
+        if cuadros.count == 1 { return (cuadros[0].qoi, primero) }
+        let limite = ancho * alto * 4 + 22
+        var sani = Animacion.codificar(Array(cuadros.prefix(Animacion.maxCuadros)), ancho: ancho, alto: alto)
+        while cuadros.count > Animacion.maxCuadros || sani.count > limite {
+            guard cuadros.count > 2 else { throw ErrorImagen.muyPesado }
+            cuadros = stride(from: 0, to: cuadros.count, by: 2).map { i in
+                Animacion.Cuadro(qoi: cuadros[i].qoi, ms: cuadros[i].ms + (i + 1 < cuadros.count ? cuadros[i + 1].ms : 0))
+            }
+            sani = Animacion.codificar(Array(cuadros.prefix(Animacion.maxCuadros)), ancho: ancho, alto: alto)
+        }
+        return (sani, primero)
+    }
+
+    enum ErrorImagen: LocalizedError {
+        case noEsGif, muyPesado
+        var errorDescription: String? {
+            switch self {
+            case .noEsGif: "No pude leer el GIF."
+            case .muyPesado: "El GIF es demasiado pesado para la pantalla: probá con uno más simple."
+            }
         }
     }
 

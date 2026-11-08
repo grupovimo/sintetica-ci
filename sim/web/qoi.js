@@ -72,3 +72,39 @@ export function decodificarQoi(bytes) {
   }
   return { ancho, alto, rgba };
 }
+
+// Una imagen animada ("sani", ver firmware/nucleo/qoi.h): la cabecera, la tabla
+// de cuadros y cada cuadro en QOI. cuadros: [{ rgba, ms }].
+export function codificarAnimacion(cuadros, ancho, alto) {
+  const qois = cuadros.map((c) => codificarQoi(c.rgba, ancho, alto));
+  const tabla = 10 + 10 * qois.length;
+  const total = tabla + qois.reduce((s, q) => s + q.length, 0);
+  const salida = new Uint8Array(total);
+  const v = new DataView(salida.buffer);
+  salida.set([0x73, 0x61, 0x6e, 0x69, 1, qois.length]); // "sani", versión 1
+  v.setUint16(6, ancho, true);
+  v.setUint16(8, alto, true);
+  let off = tabla;
+  qois.forEach((q, i) => {
+    v.setUint16(10 + 10 * i, Math.max(20, Math.min(65535, Math.round(cuadros[i].ms))), true);
+    v.setUint32(12 + 10 * i, off, true);
+    v.setUint32(16 + 10 * i, q.length, true);
+    salida.set(q, off);
+    off += q.length;
+  });
+  return salida;
+}
+
+export const esAnimacion = (b) => b.length >= 10 && b[0] === 0x73 && b[1] === 0x61 && b[2] === 0x6e && b[3] === 0x69;
+
+// Los cuadros de una animación (o la imagen sola, con ms 0): [{ qoi, ms }].
+export function cuadrosDe(b) {
+  if (!esAnimacion(b)) return [{ qoi: b, ms: 0 }];
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  const salida = [];
+  for (let i = 0; i < b[5]; i++) {
+    const off = v.getUint32(12 + 10 * i, true);
+    salida.push({ qoi: b.subarray(off, off + v.getUint32(16 + 10 * i, true)), ms: v.getUint16(10 + 10 * i, true) });
+  }
+  return salida;
+}

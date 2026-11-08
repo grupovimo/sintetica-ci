@@ -25,4 +25,10 @@ declare module '$compartido/protocolo.js' {
 declare module '$compartido/qoi.js' {
   export function codificarQoi(rgba: Uint8ClampedArray | Uint8Array, ancho: number, alto: number): Uint8Array;
   export function decodificarQoi(b: Uint8Array): { ancho: number; alto: number; rgba: Uint8Array };
+  export function codificarAnimacion(cuadros: { rgba: Uint8ClampedArray | Uint8Array; ms: number }[], ancho: number, alto: number): Uint8Array;
+  export function esAnimacion(b: Uint8Array): boolean;
+  export function cuadrosDe(b: Uint8Array): { qoi: Uint8Array; ms: number }[];
+}
+declare module '$compartido/gif.js' {
+  export function decodificarGif(b: Uint8Array): { ancho: number; alto: number; cuadros: { rgba: Uint8ClampedArray; ms: number }[] };
 }

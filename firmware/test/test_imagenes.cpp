@@ -266,3 +266,76 @@ PRUEBA("imagen: el estado trae el tamaño y la forma de la pantalla") {
   for (int k = 0; k < 4; k++) i += 1 + b[i];
   VERIFICAR(i + 9 < n && b[i] == 240 && b[i + 1] == 0 && b[i + 2] == 240 && b[i + 3] == 0 && b[i + 4] == 1);
 }
+
+// --- Imágenes animadas ("sani") ---
+
+namespace {
+uint32_t azul(int, int) { return 0x1A50F5; }
+uint16_t a565(uint32_t c) {
+  return static_cast<uint16_t>((((c >> 16) & 0xF8) << 8) | (((c >> 8) & 0xFC) << 3) | ((c & 0xFF) >> 3));
+}
+// Arma una animación con estos cuadros (QOI) y duraciones.
+std::vector<uint8_t> sani(int w, int h, const std::vector<std::vector<uint8_t>>& cuadros, const std::vector<uint16_t>& ms) {
+  std::vector<uint8_t> o = {'s', 'a', 'n', 'i', 1, uint8_t(cuadros.size()), uint8_t(w), uint8_t(w >> 8), uint8_t(h), uint8_t(h >> 8)};
+  uint32_t off = static_cast<uint32_t>(10 + 10 * cuadros.size());
+  for (size_t i = 0; i < cuadros.size(); i++) {
+    o.push_back(uint8_t(ms[i])), o.push_back(uint8_t(ms[i] >> 8));
+    for (uint8_t x : u32(off)) o.push_back(x);
+    for (uint8_t x : u32(static_cast<uint32_t>(cuadros[i].size()))) o.push_back(x);
+    off += static_cast<uint32_t>(cuadros[i].size());
+  }
+  for (const auto& c : cuadros) o.insert(o.end(), c.begin(), c.end());
+  return o;
+}
+}  // namespace
+
+PRUEBA("imagen animada: pasa de cuadro con la duración de cada uno, y vuelve a empezar") {
+  arrancar();
+  auto anim = sani(240, 240, {qoi(240, 240, naranja), qoi(240, 240, azul)}, {100, 300});
+  VERIFICAR(subir(2, anim, crc32(anim.data(), anim.size())) == Ok);
+  VERIFICAR(g_s.largoImagen(2) == anim.size());
+  const char* cfg = R"({"version":1,"lista":["imagen:2"]})";
+  g_mem["config"].assign(cfg, cfg + std::strlen(cfg));
+  arrancar(false);
+  correr(40);
+  VERIFICAR(g_s.imagenVisible() == 2);
+  VERIFICAR(g_pantalla[120 * 240 + 120] == a565(0xF5501A));
+  correr(100);  // pasaron los 100 ms del primero
+  VERIFICAR(g_pantalla[120 * 240 + 120] == a565(0x1A50F5));
+  correr(200);  // el segundo dura 300: sigue
+  VERIFICAR(g_pantalla[120 * 240 + 120] == a565(0x1A50F5));
+  correr(120);  // y vuelve al primero
+  VERIFICAR(g_pantalla[120 * 240 + 120] == a565(0xF5501A));
+}
+
+PRUEBA("imagen animada: una sola vez por cuadro (no redibuja de más)") {
+  arrancar();
+  auto anim = sani(240, 240, {qoi(240, 240, naranja), qoi(240, 240, azul)}, {500, 500});
+  VERIFICAR(subir(0, anim, crc32(anim.data(), anim.size())) == Ok);
+  const char* cfg = R"({"version":1,"lista":["imagen:0"]})";
+  g_mem["config"].assign(cfg, cfg + std::strlen(cfg));
+  arrancar(false);
+  correr(40);
+  g_presentadas = 0;
+  correr(2000);  // 4 cuadros nuevos, de 6 franjas cada uno
+  VERIFICAR(g_presentadas == 4 * 6);
+}
+
+PRUEBA("imagen animada: se rechaza si está mal armada") {
+  arrancar();
+  auto bien = qoi(240, 240, naranja);
+  auto chica = qoi(100, 100, naranja);
+  auto rechaza = [](const std::vector<uint8_t>& a) { return subir(1, a, crc32(a.data(), a.size())) == ImagenInvalida; };
+  VERIFICAR(rechaza(sani(240, 240, {bien, chica}, {100, 100})));  // un cuadro de otro tamaño
+  VERIFICAR(rechaza(sani(100, 100, {chica}, {100})));             // otro tamaño de pantalla
+  VERIFICAR(rechaza(sani(240, 240, {bien}, {5})));                 // menos de 20 ms
+  auto corrida = sani(240, 240, {bien, bien}, {100, 100});
+  corrida[10 + 10 + 2] += 50;  // el segundo cuadro apunta afuera del archivo
+  VERIFICAR(rechaza(corrida));
+  auto version = sani(240, 240, {bien}, {100});
+  version[4] = 2;
+  VERIFICAR(rechaza(version));
+  auto ninguno = sani(240, 240, {}, {});  // ni llega a empezar: es más chica que cualquier imagen
+  VERIFICAR(subir(1, ninguno, crc32(ninguno.data(), ninguno.size())) != Ok);
+  VERIFICAR(g_s.largoImagen(1) == 0 && g_archivos.find("img1") == g_archivos.end());
+}

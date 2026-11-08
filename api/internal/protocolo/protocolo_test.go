@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -241,5 +242,51 @@ func TestVida(t *testing.T) {
 	}
 	if _, err := LeerVida(b[:12]); err == nil {
 		t.Error("tendría que rechazar una corta")
+	}
+}
+
+func qoiPrueba(w, h uint32) []byte {
+	b := []byte("qoif")
+	b = binary.BigEndian.AppendUint32(b, w)
+	b = binary.BigEndian.AppendUint32(b, h)
+	b = append(b, 3, 0, 0xC0|61)
+	return append(b, 0, 0, 0, 0, 0, 0, 0, 1)
+}
+
+func saniPrueba(w, h int, cuadros [][]byte, ms []uint16) []byte {
+	b := []byte{'s', 'a', 'n', 'i', 1, byte(len(cuadros)), byte(w), byte(w >> 8), byte(h), byte(h >> 8)}
+	off := 10 + 10*len(cuadros)
+	for i, c := range cuadros {
+		b = binary.LittleEndian.AppendUint16(b, ms[i])
+		b = binary.LittleEndian.AppendUint32(b, uint32(off))
+		b = binary.LittleEndian.AppendUint32(b, uint32(len(c)))
+		off += len(c)
+	}
+	for _, c := range cuadros {
+		b = append(b, c...)
+	}
+	return b
+}
+
+func TestTamanoImagen(t *testing.T) {
+	q := qoiPrueba(240, 240)
+	if w, h, ok := TamanoImagen(q); !ok || w != 240 || h != 240 {
+		t.Fatalf("qoi: %d %d %v", w, h, ok)
+	}
+	a := saniPrueba(240, 240, [][]byte{q, q}, []uint16{100, 100})
+	if w, h, ok := TamanoImagen(a); !ok || w != 240 || h != 240 {
+		t.Fatalf("animación: %d %d %v", w, h, ok)
+	}
+	malas := map[string][]byte{
+		"basura":         []byte("nada que ver acá, ni qoi ni sani"),
+		"cuadro de otro": saniPrueba(240, 240, [][]byte{q, qoiPrueba(100, 100)}, []uint16{100, 100}),
+		"muy rápido":     saniPrueba(240, 240, [][]byte{q}, []uint16{5}),
+		"sin cuadros":    saniPrueba(240, 240, nil, nil),
+		"cortada":        a[:len(a)-3],
+	}
+	for nombre, b := range malas {
+		if _, _, ok := TamanoImagen(b); ok {
+			t.Errorf("%s: la aceptó", nombre)
+		}
 	}
 }
