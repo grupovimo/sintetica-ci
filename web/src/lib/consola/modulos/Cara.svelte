@@ -64,7 +64,7 @@
       <span class="grabado">Ponele una cara ya</span>
       <button class="tecla negra chica" disabled={!conectado || !fija} onclick={() => fijar('')}>{fija ? 'Soltar (vuelve a ser él)' : 'Se maneja solo'}</button>
     </div>
-    {#if !conectado}<p class="texto">Para esto tiene que estar en línea.</p>{/if}
+    {#if !conectado}<p class="texto">Necesita estar en línea.</p>{/if}
     <div class="rapidas">
       {#each RAPIDAS as [n, t]}
         <button class="tecla chica" aria-pressed={fija && visible === n} disabled={!conectado} onclick={() => fijar(n)}>{t}</button>

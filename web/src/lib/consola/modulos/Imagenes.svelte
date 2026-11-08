@@ -95,7 +95,7 @@
     <div class="que">
       <span class="grabado">Protector de pantalla</span>
       <b>{protector ? `Bahía ${String(protector.imagen + 1).padStart(2, '0')}` : 'Apagado'}</b>
-      <p class="texto">{protector ? `Si no pasa nada durante ${textoEspera(espera)}, se ve esa imagen. La tocás o se mueve y vuelve su cara.` : 'Elegí una imagen, un GIF o un video de abajo para que se vea siempre que no pase nada: ideal para la joyería.'}</p>
+      <p class="texto">{protector ? 'Lo tocás y vuelve su cara.' : 'Tocá «Protector» en una bahía.'}</p>
     </div>
     {#if protector}
       <div class="visor espera">
@@ -109,7 +109,6 @@
       <button class="tecla negra chica" onclick={() => ponerProtector(null)}>Apagar</button>
     {/if}
   </div>
-  <p class="texto">Fotos, GIFs o videos cortos (hasta 6 s) para su pantalla. Se recortan solos a {pantalla.ancho} × {pantalla.alto}{modelo.redonda ? ', redonda' : ''}. Las que estén <b>en la lista</b> se van turnando con su cara: un toque en el robot pasa a la siguiente.</p>
   {#if error}<p class="aviso error"><span class="led"></span>{error}</p>{/if}
   <div class="bahias">
     {#each Array.from({ length: 8 }, (_, i) => i) as e}

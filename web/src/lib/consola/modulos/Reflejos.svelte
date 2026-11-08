@@ -45,7 +45,7 @@
 </script>
 
 <div class="reflejos">
-  <p class="texto">{elegida ? `Elegí cómo reacciona cuando: ${NOMBRES_EVENTO[elegida].toLowerCase()}.` : 'Tocá algo de la izquierda y después cómo querés que reaccione. Tocá el mismo par otra vez para desenchufarlo.'}</p>
+  <span class="grabado">{elegida ? `${NOMBRES_EVENTO[elegida]} → ¿qué hace?` : 'Uní un punto con otro'}</span>
   <div class="bahia">
     <div class="columna" role="listbox" aria-label="Cuando…">
       {#each ENTRADAS as e}
@@ -73,7 +73,7 @@
       {/each}
     </div>
   </div>
-  {#if sinMovimiento}<p class="texto">Este modelo no siente el movimiento: lo de levantarlo o sacudirlo no le llega.</p>{/if}
+  {#if sinMovimiento}<p class="texto">Este modelo no siente el movimiento.</p>{/if}
 </div>
 
 <style>

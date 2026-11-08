@@ -134,7 +134,7 @@
       <div class="base">
         <span class="grabado">Bahía libre</span>
         <b class="nombre chico">Sumar un robot</b>
-        <span class="detalle apagado">Escaneá el QR de su pantalla con la app.</span>
+        <span class="detalle apagado">Escaneá su QR con la app.</span>
       </div>
     </button>
   </div>
@@ -146,11 +146,10 @@
       <span class="grabado" style="color: var(--brasa)">Bahía libre</span>
       <h2 id="t-sumar" class="titular" style="font-size: 44px">Sumar un robot</h2>
       <ol class="pasos">
-        <li><span class="num">1</span><span>Prendelo: muestra un QR. Si no, mantené el botón 5 segundos (en el broche, 8).</span></li>
-        <li><span class="num">2</span><span>En la app, con esta misma cuenta, escaneá el QR.</span></li>
-        <li><span class="num">3</span><span>En su pantalla, tocá <b>Sumar a mi cuenta</b> y pasale tu WiFi.</span></li>
+        <li><span class="num">1</span><span>Prendelo: muestra un QR.</span></li>
+        <li><span class="num">2</span><span>Escanealo con la app.</span></li>
+        <li><span class="num">3</span><span>Tocá <b>Sumar</b> en su pantalla.</span></li>
       </ol>
-      <p class="texto" style="font-size: 14px">Queda en tu cuenta cuando se conecta con la clave que le da la app: nadie puede sumar un robot que no tiene en la mano.</p>
       {#if data.desarrollo}
         <div class="virtuales">
           <span class="grabado">Robots virtuales (solo en local)</span>
@@ -161,7 +160,7 @@
               {:else}<button class="tecla chica" disabled={!!sumandoVirtual} onclick={() => sumarVirtual(v.id)}>{sumandoVirtual === v.id ? 'Sumando…' : 'Sumar'}</button>{/if}
             </div>
           {:else}
-            <p class="texto" style="font-size: 14px">No encontré robots virtuales. ¿Está andando <code>docker compose</code>?</p>
+            <p class="texto" style="font-size: 14px">No hay robots virtuales.</p>
           {/each}
         </div>
       {/if}

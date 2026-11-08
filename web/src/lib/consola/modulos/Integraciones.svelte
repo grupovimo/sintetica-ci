@@ -3,6 +3,7 @@
   // escribís y te avisa), webhooks a tus APIs, y automatizaciones: cuando pasa
   // algo en el robot, hace cosas.
   import { onMount } from 'svelte';
+  import QRCode from 'qrcode';
   import { api, ErrorApi } from '$lib/api';
   import { usarBicho } from '$lib/bicho.svelte';
   import { escuchar } from '$lib/eventos.svelte';
@@ -37,6 +38,11 @@
   type Telegram = { activo: boolean; bot?: string; vinculado?: boolean; nombre?: string };
   let telegram = $state<Telegram | null>(null);
   let enlace = $state('');
+  let qr = $state('');
+  $effect(() => {
+    if (!enlace) { qr = ''; return; }
+    QRCode.toString(enlace, { type: 'svg', margin: 1, color: { dark: '#1a1714', light: '#f3eee8' } }).then((s) => (qr = s));
+  });
   let autos = $state<Automatizacion[]>([]);
   let historial = $state<Ejecucion[]>([]);
   let otros = $state<Bicho[]>([]);
@@ -75,7 +81,6 @@
     error = '';
     try {
       enlace = (await api<{ enlace: string }>('/v1/telegram/vincular', { metodo: 'POST' })).enlace;
-      window.open(enlace, '_blank', 'noopener');
       // Hasta que vuelva el evento, se fija cada tanto.
       const t = setInterval(async () => {
         telegram = await api<Telegram>('/v1/telegram').catch(() => telegram);
@@ -151,10 +156,11 @@
         {#if !telegram}<b>Buscando…</b>
         {:else if !telegram.activo}<b>Apagado en esta nube</b>
         {:else if telegram.vinculado}<b>Vinculado{telegram.nombre ? ` con ${telegram.nombre}` : ''}</b>
-          <p class="texto">Escribile al bot: <code>/robots</code>, <code>/estado</code>, <code>/cara contento</code>. Y te avisa lo que armes abajo.</p>
+          <p class="texto"><code>/robots</code> <code>/estado</code> <code>/cara</code></p>
         {:else}<b>Que te hable por Telegram</b>
-          <p class="texto">{enlace ? 'Abrí Telegram y tocá Iniciar. Te espero acá…' : 'Le escribís a tu robot y él te avisa cosas.'}</p>{/if}
+          <p class="texto">{enlace ? 'Escaneá y tocá Iniciar.' : 'Te avisa y le escribís.'}</p>{/if}
       </div>
+      {#if enlace && qr && !telegram?.vinculado}<div class="qr" role="img" aria-label="Código QR para vincular Telegram">{@html qr}</div>{/if}
       {#if telegram?.activo}
         {#if telegram.vinculado}<button class="tecla negra chica" onclick={desvincular}>Desvincular</button>
         {:else if enlace}<a class="tecla naranja" href={enlace} target="_blank" rel="noopener">Abrir Telegram</a>
@@ -218,9 +224,9 @@
         </div>
       </div>
     {:else}
-      <div class="vacio bandeja"><p class="texto">Por ejemplo: <b>cuando muestra un recordatorio → te manda un Telegram</b>, o <b>cuando se queda sin batería → llama a tu API</b>.</p></div>
+      <div class="vacio bandeja"><p class="texto">Ej.: recordatorio → Telegram</p></div>
     {/each}
-    <p class="ayuda">En los textos podés usar {PLANTILLAS}.</p>
+    <p class="ayuda">{PLANTILLAS}</p>
 
     <details class="bandeja webhooks">
       <summary class="grabado">Para desarrolladores: cómo verificar los webhooks</summary>
@@ -246,6 +252,8 @@
 <style>
   .integraciones { display: flex; flex-direction: column; gap: 14px; }
   .telegram { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: center; }
+  .qr { grid-column: 1 / -1; justify-self: center; width: 200px; padding: 10px; border-radius: 18px; background: #f3eee8; box-shadow: 0 6px 0 #a39c90; }
+  .qr :global(svg) { display: block; width: 100%; height: auto; }
   .logo { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(180deg, #3aa4e0, #1d7fbf);
     box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 5px 0 #145a87; }
   .que { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
@@ -264,7 +272,6 @@
   .dos select { font-size: 16px; }
   .mas { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 28px; padding-bottom: 4px; }
   .lado { display: flex; flex-direction: column; gap: 8px; }
-  .vacio .texto b { color: #1a1714; }
   .ayuda { margin: 0; font: 700 12px/1.4 var(--marca); color: rgba(26,23,20,.7); }
   .webhooks summary { cursor: pointer; }
   .webhooks[open] { display: flex; flex-direction: column; gap: 12px; }

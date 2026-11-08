@@ -52,7 +52,7 @@
 
 <div class="recordatorios">
   <div class="titulo">
-    <p class="texto">A la hora, lo muestra en su pantalla{conSonido ? ' y suena' : ''} hasta que lo tocás. Hasta {MAX_RECORDATORIOS}.</p>
+    <span class="grabado">{lista.length} de {MAX_RECORDATORIOS}</span>
     <button class="tecla negra" disabled={lista.length >= MAX_RECORDATORIOS} onclick={nuevo}>+ Nuevo</button>
   </div>
 
@@ -86,7 +86,7 @@
   {:else}
     <div class="vacio bandeja">
       <span class="digitos">--:--</span>
-      <p class="texto">Sin recordatorios. Probá con “Tomar la pastilla” a las 08:30, de lunes a viernes.</p>
+      <p class="texto">Ej.: 08:30 · Tomar la pastilla</p>
     </div>
   {/each}
 </div>

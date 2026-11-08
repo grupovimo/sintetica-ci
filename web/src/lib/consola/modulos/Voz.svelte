@@ -23,8 +23,8 @@
   <div class="bloqueado bandeja">
     <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
     <div>
-      <b>Este modelo no tiene micrófono ni parlante</b>
-      <p class="texto">La voz viene en los modelos que escuchan y hablan: le decís su nombre, te contesta, te lee los recordatorios y conversa con vos.</p>
+      <b>Sin micrófono ni parlante</b>
+      <p class="texto">Llega con los modelos que hablan.</p>
     </div>
   </div>
 {:else}
@@ -52,7 +52,7 @@
           <span class="led"></span><span>Conversar<small>Charla con vos usando IA</small></span>
         </button>
       </div>
-      <p class="texto">Para pedirle cosas: “{v.palabra || nombre}, recordame tomar agua a las cinco” o “{v.palabra || nombre}, ¿qué hora es?”.</p>
+      <p class="texto">“{v.palabra || nombre}, ¿qué hora es?”</p>
     {/if}
   </div>
 {/if}

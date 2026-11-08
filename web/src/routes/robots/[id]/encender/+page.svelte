@@ -160,7 +160,7 @@
           <p class="texto">{DICE_PRESET[preset]}</p>
         </div>
       </div>
-      <p class="texto">Después lo ajustás rasgo por rasgo, cuando lo conozcas.</p>
+      
     {:else if paso === 3}
       <h1 class="titular">Su día.</h1>
       <div class="dos">
@@ -174,7 +174,7 @@
           </div>
         {/each}
       </div>
-      <p class="texto">De noche cuenta ovejas y sueña; a la mañana se despierta con vos.</p>
+      
     {:else}
       <h1 class="titular">¿Una foto?</h1>
       <label class="bahia" class:llena={!!vistaFoto}>
@@ -185,7 +185,6 @@
         <input class="solo-lectores" type="file" accept="image/*,.gif,video/*" onchange={(e) => elegirFoto(e.currentTarget.files?.[0])} />
       </label>
       <label class="llave" aria-pressed={protectorFoto}><input class="solo-lectores" type="checkbox" bind:checked={protectorFoto} /><span class="led"></span>Que sea su protector de pantalla</label>
-      <p class="texto">{protectorFoto ? 'Se ve siempre que no pase nada; lo tocás y aparece su cara.' : 'Se va turnando con su cara.'} Es opcional: podés sumar hasta ocho después.</p>
     {/if}
 
     {#if error}<p class="aviso error"><span class="led"></span>{error}</p>{/if}

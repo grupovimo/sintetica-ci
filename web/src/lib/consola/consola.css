@@ -106,7 +106,7 @@
 .consola .llave[aria-pressed='true'] { color: var(--c-papel); }
 .consola .llave[aria-pressed='true'] .led { background: var(--led); box-shadow: 0 0 10px var(--led); }
 
-.consola .texto { font: 600 16px/1.45 var(--marca); color: var(--gris-claro); margin: 0; }
+.consola .texto { font: 600 16px/1.45 var(--marca); color: var(--gris-claro); margin: 0; max-width: 40ch; text-wrap: pretty; }
 .consola .placa-naranja .texto { color: rgba(26,23,20,.8); }
 .consola .aviso { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 12px; background: var(--hundido); color: var(--c-papel);
   font: 700 14px/1.35 var(--marca); }

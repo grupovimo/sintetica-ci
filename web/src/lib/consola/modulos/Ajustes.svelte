@@ -68,7 +68,7 @@
   </div>
 
   <div class="peligro bandeja">
-    <div><b>Sacarlo de tu cuenta</b><p class="texto">Se olvida del WiFi y de la nube. Para volver a sumarlo hace falta la app, cerca.</p></div>
+    <div><b>Sacarlo de tu cuenta</b><p class="texto">Para volver, hace falta la app.</p></div>
     <button class="tecla negra" disabled={quitando} onclick={quitar}>{quitando ? 'Sacando…' : seguro ? '¿Seguro? Tocá otra vez' : 'Sacar'}</button>
   </div>
 </div>

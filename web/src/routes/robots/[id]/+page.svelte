@@ -106,7 +106,7 @@
           {#if b.bicho.estado?.fija}<button class="tecla negra" disabled={!conectado} onclick={() => hacer({ expresion: '' }, 'Vuelve a ser él')}>Soltar la cara</button>{/if}
         </div>
         {#if aviso}<p class="aviso" aria-live="polite"><span class="led on"></span>{aviso}</p>{/if}
-        {#if !conectado}<p class="texto chico">No está en línea: lo que cambies se guarda y le llega cuando vuelva.</p>{/if}
+        {#if !conectado}<p class="texto chico">Le llega cuando vuelva.</p>{/if}
       </div>
     </section>
 

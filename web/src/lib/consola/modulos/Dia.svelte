@@ -64,7 +64,6 @@
       <span class="ahora" style="left: {enAhora * 100}%" title="Ahora"></span>
     </div>
     <div class="horas">{#each [0, 6, 12, 18, 24] as h}<span>{String(h).padStart(2, '0')}</span>{/each}</div>
-    <p class="texto">De noche cuenta ovejas y sueña; a la mañana se despierta con vos. Si lo despertás antes, se queja un poco.</p>
   </div>
 
   <div class="cumples">

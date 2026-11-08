@@ -53,9 +53,7 @@
         </div>
       {/each}
     </div>
-    <p class="texto">Tocalo para arrancar. Al terminar cada tanda te avisa con una cara{modelo.capacidades.has('parlante') ? ' y un sonido' : ''} y pasa a la siguiente.</p>
-  {:else if modo === 'reloj'}
-    <p class="texto">Muestra la hora grande. Si lo tocás, vuelve a ser él un rato y regresa al reloj.</p>
+    <p class="texto">Un toque arranca o pausa.</p>
   {/if}
 </div>
 
