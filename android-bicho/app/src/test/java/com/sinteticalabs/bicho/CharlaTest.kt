@@ -37,4 +37,10 @@ class CharlaTest {
         val j = org.json.JSONObject("""{"intenciones":{"clima":{"patrones":["como esta el clima|dia","pone* alarma?"],"respuestas":{"todos":["Hace frío"]}}}}""")
         assertEquals(sortedSetOf("alarma", "clima", "como", "dia", "el", "esta", "pone"), Charla.palabrasDe(j))
     }
+
+    @Test fun laConfianzaDeLaPalabra() {
+        val j = """{"result":[{"conf":0.55,"word":"[unk]"},{"conf":0.92,"word":"coco"}],"text":"coco"}"""
+        assertEquals(0.92f, Charla.confianzaDe(j, "coco"), 0.001f)
+        assertEquals(-1f, Charla.confianzaDe("""{"text":""}""", "coco"), 0.001f)
+    }
 }

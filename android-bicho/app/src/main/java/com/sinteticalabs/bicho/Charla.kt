@@ -122,11 +122,15 @@ class Charla(
                     palabra = p
                     // Las dos formas ("ramón" y "ramon"): Vosk ignora la que no está en su vocabulario.
                     espera = Recognizer(model, TASA, JSONArray(listOf(p, escrita, "[unk]").distinct()).toString())
+                        .apply { setWords(true) }
                     Log.i("Bicho", "charla: espera \"$p\"")
                 }
-                val listo = espera.acceptWaveForm(tramo, tramo.size)
-                val oido = texto(if (listo) espera.result else espera.partialResult, if (listo) "text" else "partial")
-                if (!contienePalabra(oido, palabra)) continue
+                // Solo con un resultado final y la palabra con buena confianza: con una
+                // gramática de una sola palabra, los parciales la ven en cualquier ruido.
+                if (!espera.acceptWaveForm(tramo, tramo.size)) continue
+                val confianza = confianzaDe(espera.result, palabra)
+                if (transcribir && confianza >= 0) Log.i("Bicho", "charla: palabra con confianza ${(confianza * 100).toInt()} %")
+                if (confianza < UMBRAL_PALABRA) continue
                 espera.reset()
                 val antes = previo.toList()
                 previo.clear()
@@ -312,7 +316,16 @@ class Charla(
         const val TASA = 16000f
         const val MAXIMO_MS = 8000
         const val MOSTRAR_MS = 2000
-        const val PREVIO = 20  // tramos de 50 ms
+        const val PREVIO = 60  // tramos de 50 ms: 3 s, lo dicho junto con la palabra
+        const val UMBRAL_PALABRA = 0.7f
+
+        /** La confianza de la palabra en un resultado de Vosk con "result" (setWords), o -1 si no está. */
+        fun confianzaDe(json: String, palabra: String): Float = runCatching {
+            val r = JSONObject(json).optJSONArray("result") ?: return -1f
+            (0 until r.length()).map { r.getJSONObject(it) }
+                .filter { normalizar(it.optString("word")) == palabra }
+                .maxOfOrNull { it.optDouble("conf", 0.0).toFloat() } ?: -1f
+        }.getOrDefault(-1f)
         const val GANANCIA = 4  // +12 dB
         private val NUMEROS = ("cero uno una dos tres cuatro cinco seis siete ocho nueve diez once doce trece catorce quince " +
             "veinte treinta cuarenta cincuenta media cuarto y las a en de minutos minuto horas hora mañana hoy si no").split(' ')
