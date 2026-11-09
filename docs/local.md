@@ -68,6 +68,14 @@ ADMIN_EMAILS=@ejemplo.com docker compose up -d --build
 go test -tags e2e -count=1 -v ./api/e2e/
 ```
 
+Ojo: escribe en la base local (cuentas, amigos, la agenda). La de la v1.9
+(`v19_e2e_test.go`: amigos y toques con los dos virtuales, hábitos,
+presencia, avisos entrantes, agenda, charla) sirve el `.ics` desde el host
+(`E2E_HOST`, `host.docker.internal`). Entrar con Telegram usa un Telegram
+falso que levanta el test, solo si la API arrancó con
+`TELEGRAM_TOKEN=1:e2e TELEGRAM_API_URL=http://host.docker.internal:8097` y el
+test con `E2E_TELEGRAM=:8097` (así lo corre el CI; sin eso, se saltea).
+
 ## Con el celu y una placa de verdad
 
 El celu y la placa tienen que llegar a tu Mac por la red de tu casa.

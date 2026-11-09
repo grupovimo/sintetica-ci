@@ -131,6 +131,12 @@ func mailDe(t *testing.T, para string, desde time.Time, contiene string) string 
 
 func entrar(t *testing.T, cli string) *cliente {
 	t.Helper()
+	return entrarComo(t, email, cli)
+}
+
+// entrarComo entra con el link mágico (o el código) de ese email.
+func entrarComo(t *testing.T, email, cli string) *cliente {
+	t.Helper()
 	jar, _ := cookiejar.New(nil)
 	c := &cliente{t: t, http: &http.Client{Jar: jar, Timeout: 60 * time.Second}, web: cli == "web"}
 	desde := time.Now()

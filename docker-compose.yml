@@ -32,6 +32,8 @@ x-api-entorno: &api-entorno
   TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
   TELEGRAM_BOT: ${TELEGRAM_BOT:-sinteticalabs_bot}
   TELEGRAM_CHAT_RESERVAS: ${TELEGRAM_CHAT_RESERVAS:-}
+  # Otra API de Telegram (el e2e del CI levanta una falsa en el host).
+  TELEGRAM_API_URL: ${TELEGRAM_API_URL:-}
   # Spotify y la charla con IA (v1.9; vacías = apagadas).
   SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
   SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
@@ -89,6 +91,9 @@ services:
       mailpit:
         condition: service_started
     environment: *api-entorno
+    # El host (en Linux no viene solo): el e2e sirve ahí un .ics y un Telegram falso.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - claves-api:/claves:ro
     ports:

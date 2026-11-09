@@ -77,8 +77,17 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version: "1.25" }
       - run: cp .env.example .env
-      - run: ADMIN_EMAILS=@ejemplo.com docker compose up -d --build --wait
+      # Con un Telegram falso que sirve el test en el host (:8097).
+      - run: docker compose up -d --build --wait
+        env:
+          ADMIN_EMAILS: "@ejemplo.com"
+          ADMIN_TELEGRAM: "777000111"
+          TELEGRAM_TOKEN: "1:e2e"
+          TELEGRAM_API_URL: http://host.docker.internal:8097
       - run: go test -tags e2e -count=1 -v ./api/e2e/
+        env:
+          E2E_TELEGRAM: ":8097"
+          E2E_TELEGRAM_ADMIN: "777000111"
       - if: failure()
         run: docker compose logs --tail 200
 
