@@ -131,6 +131,14 @@ class Charla(
                 val confianza = confianzaDe(espera.result, palabra)
                 if (transcribir && confianza >= 0) Log.i("Bicho", "charla: palabra con confianza ${(confianza * 100).toInt()} %")
                 if (confianza < UMBRAL_PALABRA) continue
+                // Con una gramática de una sola palabra, la confianza engaña (una tele da 100 %):
+                // se confirma con la lectura libre de los últimos segundos.
+                val libre = Recognizer(model, TASA).use { r -> previo.forEach { r.acceptWaveForm(it, it.size) }; texto(r.finalResult, "text") }
+                if (!pareceLaPalabra(libre, palabra)) {
+                    if (transcribir) Log.i("Bicho", "charla: no era la palabra (\"$libre\")")
+                    espera.reset()
+                    continue
+                }
                 espera.reset()
                 val antes = previo.toList()
                 previo.clear()
@@ -258,7 +266,8 @@ class Charla(
         // Primero el motor de charla del celu: sin red y al toque. Con lo que oyó
         // libre y, si no lo entiende, con la lectura acotada a sus palabras.
         var local = if (enviar.isNotEmpty()) charlar(enviar) else null
-        if (local?.codigo != 1 && enviarAcotada.isNotEmpty() && enviarAcotada != enviar) {
+        // La acotada solo si se parece a lo que se oyó libre (si no, son voces de fondo que la gramática disfraza).
+        if (local?.codigo != 1 && enviarAcotada.isNotEmpty() && enviarAcotada != enviar && parecido(enviarAcotada, enviar) >= 0.6f) {
             charlar(enviarAcotada)?.takeIf { it.codigo == 1 }?.let { local = it }
         }
         val l = local
@@ -318,6 +327,35 @@ class Charla(
         const val MOSTRAR_MS = 2000
         const val PREVIO = 60  // tramos de 50 ms: 3 s, lo dicho junto con la palabra
         const val UMBRAL_PALABRA = 0.7f
+
+        /** Del 0 al 1, qué tan parecidas son dos palabras (por la distancia de edición). */
+        fun similitud(a: String, b: String): Float {
+            if (a.isEmpty() || b.isEmpty()) return 0f
+            var antes = IntArray(b.length + 1) { it }
+            for (i in 1..a.length) {
+                val ahora = IntArray(b.length + 1)
+                ahora[0] = i
+                for (j in 1..b.length) ahora[j] = minOf(antes[j] + 1, ahora[j - 1] + 1, antes[j - 1] + if (a[i - 1] == b[j - 1]) 0 else 1)
+                antes = ahora
+            }
+            return 1f - antes[b.length].toFloat() / maxOf(a.length, b.length)
+        }
+
+        /** Si en lo que se oyó libre hay algo como la palabra ("poco" o "con" por "coco"). */
+        fun pareceLaPalabra(libre: String, palabra: String): Boolean {
+            val p = normalizar(libre).split(' ').filter { it.isNotEmpty() }
+            // Una palabra parecida ("poco") o dos pegadas ("con con"); "con" sola, no.
+            return p.any { similitud(it, palabra) >= 0.75f } ||
+                p.zipWithNext().any { (a, b) -> similitud(a + b, palabra) >= 0.6f }
+        }
+
+        /** Qué parte de las palabras de `acotada` tiene una parecida en `libre`. */
+        fun parecido(acotada: String, libre: String): Float {
+            val a = normalizar(acotada).split(' ').filter { it.isNotEmpty() }
+            val l = normalizar(libre).split(' ').filter { it.isNotEmpty() }
+            if (a.isEmpty()) return 0f
+            return a.count { x -> l.any { similitud(x, it) >= 0.5f } }.toFloat() / a.size
+        }
 
         /** La confianza de la palabra en un resultado de Vosk con "result" (setWords), o -1 si no está. */
         fun confianzaDe(json: String, palabra: String): Float = runCatching {

@@ -43,4 +43,12 @@ class CharlaTest {
         assertEquals(0.92f, Charla.confianzaDe(j, "coco"), 0.001f)
         assertEquals(-1f, Charla.confianzaDe("""{"text":""}""", "coco"), 0.001f)
     }
+
+    @Test fun lasVocesDeFondoNoPasan() {
+        assertTrue(Charla.pareceLaPalabra("poco qué hora es", "coco"))
+        assertTrue(Charla.pareceLaPalabra("con con crema", "coco"))
+        assertFalse(Charla.pareceLaPalabra("el y gratis ropas con estas gentes logias", "coco"))
+        assertTrue(Charla.parecido("como esta el clima", "con como esta el crema") >= 0.6f)
+        assertTrue(Charla.parecido("ni agradezco estas agenda diez abraza", "el y gratis ropas con estas gentes logias y es avanza") < 0.6f)
+    }
 }

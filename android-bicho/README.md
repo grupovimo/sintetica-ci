@@ -65,6 +65,12 @@ Por wifi (para dejarlo en el cargador de pared): con el cable puesto,
    La palabra (`voz.palabra`, o su nombre) tiene que estar en el vocabulario
    del modelo; "lucho", "ramón", "bichito" y "coco" están.
 
+9. Sumarlo a una cuenta (producción por defecto): el Moto no tiene BLE para
+   la app, así que la Mac hace de app. Con el celu prendido y en el mismo wifi:
+   `python3 herramientas/sumar.py` (abre la entrada con Telegram, reclama el
+   robot y le pasa las credenciales por la puerta :8090). Para la nube local:
+   `--api http://localhost:8080 --token <sesión>`; otra IP: `--celu 192.168.x.y`.
+
 Con el celu enchufado las 24 h, conviene un enchufe con horario (que cargue
 unas horas y descanse otras): sin root no se puede limitar la carga, y una
 batería vieja siempre al 100 % se gasta y se puede hinchar.

@@ -233,7 +233,9 @@ class Red(private val raiz: File) {
     private fun broker(url: String): String {
         val u = URI(url.replace("mqtts://", "ssl://").replace("mqtt://", "tcp://"))
         val host = u.host ?: return url
-        val alcanzable = runCatching { InetAddress.getByName(host); true }.getOrDefault(false)
+        // "localhost" es la Mac de la nube local (quien lo sumó), no el celu.
+        val alcanzable = host != "localhost" && host != "127.0.0.1" &&
+            runCatching { InetAddress.getByName(host); true }.getOrDefault(false)
         val reclamante = File(raiz, "reclamante").takeIf { it.exists() }?.readText()?.trim()
         val h = if (!alcanzable && !reclamante.isNullOrEmpty()) reclamante else host
         return "${u.scheme}://$h:${if (u.port > 0) u.port else 1883}"
