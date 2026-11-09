@@ -29,6 +29,8 @@ concurrency:
 
 jobs:
   imagen:
+    # Solo en el repo original (sube a ghcr.io/nawesan12); el espejo de CI no.
+    if: github.repository == 'nawesan12/sintetica'
     runs-on: ubuntu-latest
     strategy:
       matrix:
