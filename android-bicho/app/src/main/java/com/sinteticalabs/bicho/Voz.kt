@@ -36,17 +36,19 @@ class Voz(private val contexto: Context) {
     val nube = VozNube().also { n -> n.alLlegar = { a -> colaHabla.post { audioDeLaNube(a) } } }
 
     /**
-     * La voz propia del núcleo (el balbuceo, firmware/nucleo/voz_propia): si
-     * está prendida, reemplaza al TTS del celu como última opción; un mp3 del
-     * paquete o de la nube la corta. Se elige por adb (tipo voz-propia).
+     * La voz propia del núcleo (el balbuceo, firmware/nucleo/voz_propia), por
+     * modo: 2 (por defecto) solo lo que no tiene texto (murmullos, sorpresas,
+     * el "mm", los toques) y los globos van con el TTS; 1 también lee los
+     * globos (reemplaza al TTS); 0 apagada. Un mp3 del paquete o de la nube la
+     * corta. Se elige por adb (tipo voz-propia --ei modo N).
      */
-    @Volatile var conPropia = false
+    @Volatile var modoPropia = 0
     private var pistaPropia: AudioTrack? = null
     @Volatile private var mp3Hasta = 0L
 
     /** Lo llama el núcleo (hilo de GL) con cada bloque de la voz propia. */
     fun propia(m: ShortArray) {
-        if (!conPropia || callada || config[0] <= 0 || SystemClock.elapsedRealtime() < mp3Hasta) return
+        if (modoPropia == 0 || callada || config[0] <= 0 || SystemClock.elapsedRealtime() < mp3Hasta) return
         val p = pistaPropia ?: AudioTrack.Builder()
             .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
@@ -177,7 +179,7 @@ class Voz(private val contexto: Context) {
     private fun decirLocal() {
         if (globoDicho) return
         globoDicho = true
-        if (conPropia) return  // lo dice la voz propia del núcleo
+        if (modoPropia == 1) return  // lo dice la voz propia del núcleo
         val limpio = globoLimpio
         val h = habla ?: return
         if (limpio.isEmpty() || !hablaLista || config[0] <= 0) return
@@ -271,10 +273,10 @@ class Voz(private val contexto: Context) {
         }
 
         /** Si la voz propia del núcleo reemplaza al TTS del celu (por adb; queda guardado). */
-        fun propiaPrendida(contexto: Context) = contexto.getSharedPreferences("voz", 0).getBoolean("propia", false)
+        fun modoPropia(contexto: Context) = contexto.getSharedPreferences("voz", 0).getInt("propia_modo", 2)
 
-        fun ponerPropia(contexto: Context, si: Boolean) =
-            contexto.getSharedPreferences("voz", 0).edit().putBoolean("propia", si).apply()
+        fun ponerModoPropia(contexto: Context, modo: Int) =
+            contexto.getSharedPreferences("voz", 0).edit().putInt("propia_modo", modo.coerceIn(0, 2)).apply()
 
         /** Silencia (o no) la voz del bicho; queda guardado. */
         fun silenciar(contexto: Context, si: Boolean) {

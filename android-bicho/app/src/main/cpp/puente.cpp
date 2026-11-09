@@ -378,8 +378,9 @@ jint JNI(decir)(JNIEnv* env, jobject, jbyteArray texto) {
   env->GetByteArrayRegion(texto, 0, n, reinterpret_cast<jbyte*>(&t[0]));
   return sintetica_decir(t.c_str(), nullptr);
 }
-void JNI(vozPropia)(JNIEnv*, jobject, jboolean si) {
-  if (g_listo) sintetica_voz_propia(si ? 1 : 0);
+// 0 apagada, 1 todo (también lee los globos), 2 solo sin texto (murmullos, sorpresas, "mm", toques).
+void JNI(vozPropia)(JNIEnv*, jobject, jint modo) {
+  if (g_listo) sintetica_voz_propia(modo);
 }
 void JNI(mostrarQr)(JNIEnv*, jobject) {
   if (g_listo) sintetica_mostrar_qr();

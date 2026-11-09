@@ -77,8 +77,8 @@ object Nucleo {
     external fun charlar(texto: ByteArray): ByteArray
     /** Un globo propio, sin expresión (0 ok). */
     external fun decir(texto: ByteArray): Int
-    /** La voz propia del núcleo (balbuceo) prendida o apagada. */
-    external fun vozPropia(si: Boolean)
+    /** La voz propia del núcleo: 0 apagada, 1 todo (lee los globos), 2 solo sin texto (el balbuceo). */
+    external fun vozPropia(modo: Int)
     external fun mostrarQr()
     /** Algo que mirar (la cara que ve), de -1 a 1; y hacia arriba. */
     external fun seguir(x: Float, y: Float)

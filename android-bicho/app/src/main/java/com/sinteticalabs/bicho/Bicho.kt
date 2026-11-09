@@ -82,9 +82,9 @@ class Bicho : Activity() {
             datos.leerNucleo()
             if (cuadro % 30 == 0) {
                 voz.config = Nucleo.voz()
-                val propia = Voz.propiaPrendida(this)
-                if (cuadro == 0 || propia != voz.conPropia) {
-                    voz.conPropia = propia
+                val propia = Voz.modoPropia(this)
+                if (cuadro == 0 || propia != voz.modoPropia) {
+                    voz.modoPropia = propia
                     Nucleo.vozPropia(propia)
                 }
             }

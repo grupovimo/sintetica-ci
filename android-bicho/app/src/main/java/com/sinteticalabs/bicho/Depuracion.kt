@@ -16,7 +16,7 @@ import android.util.Log
  *   adb shell am broadcast -a sintetica.EVENT --es tipo silencio --ez si true  (calla la voz; el despertador suena igual)
  *   adb shell am broadcast -a sintetica.EVENT --es tipo charlar --es texto "qué hora es"  (la charla sin IA, sin hablarle)
  *   adb shell am broadcast -a sintetica.EVENT --es tipo transcribir --ez si true  (anota lo que oye; solo para diagnosticar)
- *   adb shell am broadcast -a sintetica.EVENT --es tipo voz-propia --ez si true  (el balbuceo del núcleo en vez del TTS)
+ *   adb shell am broadcast -a sintetica.EVENT --es tipo voz-propia --ei modo 2  (0 sin, 1 todo, 2 solo sin texto)
  *   adb shell am broadcast -a sintetica.EVENT --es tipo duenio --es wifi aa:bb:.. --es bt 11:22:..  (el celu del dueño)
  */
 class Depuracion(
@@ -33,7 +33,7 @@ class Depuracion(
         if (tipo == "depuracion") return alternar()
         if (tipo == "silencio") return Voz.silenciar(contexto, intent.getBooleanExtra("si", true))
         if (tipo == "transcribir") return run { charla()?.transcribir = intent.getBooleanExtra("si", false) }
-        if (tipo == "voz-propia") return Voz.ponerPropia(contexto, intent.getBooleanExtra("si", true))
+        if (tipo == "voz-propia") return Voz.ponerModoPropia(contexto, intent.getIntExtra("modo", 2))
         if (tipo == "duenio") return presencia.configurar(intent.getStringExtra("wifi"), intent.getStringExtra("bt"))
         vista.queueEvent {
             val ok = when (tipo) {
