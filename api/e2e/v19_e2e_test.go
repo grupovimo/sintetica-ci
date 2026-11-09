@@ -57,7 +57,14 @@ type evento struct {
 	Datos map[string]any
 }
 
-type escucha struct{ c chan evento }
+// escucha junta todos los eventos (sin perder ninguno) y los lee en orden.
+type escucha struct {
+	mu      sync.Mutex
+	l       []evento
+	k       int // el próximo que se lee
+	cerrado bool
+	nuevo   chan struct{}
+}
 
 func escuchar(t *testing.T, c *cliente) *escucha {
 	t.Helper()
@@ -71,22 +78,31 @@ func escuchar(t *testing.T, c *cliente) *escucha {
 		cancelar()
 		t.Fatalf("SSE: %v", err)
 	}
-	e := &escucha{c: make(chan evento, 512)}
+	e := &escucha{nuevo: make(chan struct{}, 1)}
+	avisar := func() {
+		select {
+		case e.nuevo <- struct{}{}:
+		default:
+		}
+	}
 	go func() {
-		defer close(e.c)
 		sc := bufio.NewScanner(resp.Body)
 		sc.Buffer(make([]byte, 1<<20), 1<<20)
 		for sc.Scan() {
 			if l := sc.Text(); strings.HasPrefix(l, "data: ") {
 				var ev evento
 				if json.Unmarshal([]byte(l[6:]), &ev) == nil {
-					select {
-					case e.c <- ev:
-					default:
-					}
+					e.mu.Lock()
+					e.l = append(e.l, ev)
+					e.mu.Unlock()
+					avisar()
 				}
 			}
 		}
+		e.mu.Lock()
+		e.cerrado = true
+		e.mu.Unlock()
+		avisar()
 	}()
 	t.Cleanup(func() { cancelar(); resp.Body.Close() })
 	return e
@@ -96,14 +112,22 @@ func escuchar(t *testing.T, c *cliente) *escucha {
 func (e *escucha) intentar(plazo time.Duration, ok func(evento) bool) (evento, bool) {
 	fin := time.After(plazo)
 	for {
-		select {
-		case ev, abierto := <-e.c:
-			if !abierto {
-				return evento{}, false
-			}
+		e.mu.Lock()
+		for e.k < len(e.l) {
+			ev := e.l[e.k]
+			e.k++
 			if ok(ev) {
+				e.mu.Unlock()
 				return ev, true
 			}
+		}
+		cerrado := e.cerrado
+		e.mu.Unlock()
+		if cerrado {
+			return evento{}, false
+		}
+		select {
+		case <-e.nuevo:
 		case <-fin:
 			return evento{}, false
 		}
