@@ -51,12 +51,12 @@ class CompuertaTest {
 
     @Test fun alHablarPasaConElSegundoDeAntes() {
         val c = Compuerta(antes = 20, despues = 30)
-        repeat(100) { c.tramo(t, -70f) }
+        repeat(100) { c.tramo(t, -80f) }
         org.junit.Assert.assertTrue(c.tramo(t, -30f).isEmpty())  // un golpecito solo no abre
         org.junit.Assert.assertEquals(21, c.tramo(t, -30f).size)
         org.junit.Assert.assertEquals(1, c.tramo(t, -30f).size)
-        repeat(30) { org.junit.Assert.assertEquals(1, c.tramo(t, -70f).size) }  // la cola de 1,5 s
-        org.junit.Assert.assertTrue(c.tramo(t, -70f).isEmpty())
+        repeat(30) { org.junit.Assert.assertEquals(1, c.tramo(t, -80f).size) }  // la cola de 1,5 s
+        org.junit.Assert.assertTrue(c.tramo(t, -80f).isEmpty())
     }
 
     @Test fun losClicsSueltosNoAbren() {

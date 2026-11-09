@@ -61,7 +61,7 @@ class Bicho : Activity() {
             red.publicar("presencia", "{\"llegaste\":$llegaste}")
         }
         presencia.prender()
-        depuracion = Depuracion(vista, presencia) { datos.alternar() }
+        depuracion = Depuracion(vista, presencia, { if (::charla.isInitialized) charla else null }) { datos.alternar() }
         registerReceiver(depuracion, IntentFilter(Depuracion.ACCION))
         sentidos = Sentidos(this, vista, lienzo)
         charla = Charla(this, voz, { c -> vista.queueEvent { Nucleo.nubeEscribir(2, c) } }, red::publicar, { red.enLinea }) { texto ->

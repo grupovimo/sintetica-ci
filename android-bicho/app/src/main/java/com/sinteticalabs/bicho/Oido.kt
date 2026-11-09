@@ -94,7 +94,7 @@ class Compuerta(
     private val despues: Int = 30,
     private val sobrePiso: Float = 12f,
     /** Nunca abre por debajo de esto (en una pieza muy callada, un clic suelto no es voz). */
-    private val minimo: Float = -60f,
+    private val minimo: Float = -68f,
     /** Tramos seguidos con sonido para abrir: una sílaba dura más que un golpecito. */
     private val seguidos: Int = 2,
 ) {

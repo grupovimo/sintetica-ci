@@ -6,6 +6,8 @@ plugins {
 // El bicho en un celu viejo: pantalla completa, el núcleo de SintéticaOS por NDK
 // y los sensores del celu como sentidos.
 android {
+    // Las intenciones de la charla sin IA: sus palabras arman la gramática de Vosk (Charla).
+    sourceSets["main"].assets.srcDir("../../shared/formato/charla")
     namespace = "com.sinteticalabs.bicho"
     compileSdk = 35
     ndkVersion = "27.2.12479018"
@@ -47,4 +49,5 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.13.0@aar")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

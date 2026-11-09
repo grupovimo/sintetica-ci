@@ -55,10 +55,11 @@ class Charla(
     /** Lo llama el hilo del oído con cada tramo (se copia: el original se borra). */
     fun oir(tramo: ShortArray, n: Int) {
         if (voz.config[3] != 1) return
-        val t = tramo.copyOf(n)
+        // El micrófono del Moto llega muy bajo (la voz a un metro, -55 dB): se sube para Vosk.
+        val t = ShortArray(n) { (tramo[it] * GANANCIA).coerceIn(-32768, 32767).toShort() }
         // Esperando la palabra, solo cuando hay sonido; escuchando una frase o conversando, todo.
         if (atento) return run { cola.offer(t) }
-        val db = Oido.dbfs(t, n)
+        val db = Oido.dbfs(tramo, n)
         val pasan = compuerta.tramo(t, db)
         niveles[tramos % niveles.size] = db
         pasan.forEach { cola.offer(it) }
@@ -79,6 +80,9 @@ class Charla(
     private var abiertos = 0
 
     private val compuerta = Compuerta()
+
+    /** Para diagnosticar: anota en el registro (solo en el celu) lo que transcribió. Apagado por defecto. */
+    @Volatile var transcribir = false
     @Volatile private var atento = false
 
     /** Lo que llega por bicho/{id}/conversacion/url. */
@@ -137,6 +141,9 @@ class Charla(
                         esperarQueTermineDeHablar()
                         pregunto = frase(model, palabra, emptyList(), conPalabra = false)
                     }
+                    // Que su respuesta no lo vuelva a despertar.
+                    esperarQueTermineDeHablar()
+                    espera.reset()
                 } finally {
                     atento = false
                 }
@@ -192,7 +199,7 @@ class Charla(
     /** Hasta que el bicho termina de decir la pregunta (como mucho 10 s); lo que se oyó mientras, se tira. */
     private fun esperarQueTermineDeHablar() {
         val hasta = System.currentTimeMillis() + 10_000
-        Thread.sleep(300)
+        Thread.sleep(800)  // lo que tarda en empezar a hablar (el globo, el TTS)
         while (voz.ocupada() && System.currentTimeMillis() < hasta) Thread.sleep(100)
         cola.clear()
     }
@@ -202,8 +209,14 @@ class Charla(
         Log.i("Bicho", "charla: escuchando")
         voz.sonar("escuchando")
         val r = Recognizer(model, TASA)
+        // La misma frase, acotada a las palabras que conoce el motor ("clima" le gana a "simple").
+        val g = Recognizer(model, TASA, gramatica(palabra))
         val partes = mutableListOf<String>()
-        for (t in previo) if (r.acceptWaveForm(t, t.size)) partes += texto(r.result, "text")
+        val acotada = mutableListOf<String>()
+        for (t in previo) {
+            if (r.acceptWaveForm(t, t.size)) partes += texto(r.result, "text")
+            if (g.acceptWaveForm(t, t.size)) acotada += texto(g.result, "text")
+        }
         var ms = 0
         var mostrado = -MOSTRAR_MS
         try {
@@ -215,6 +228,7 @@ class Charla(
                 }
                 val tramo = cola.poll(1, TimeUnit.SECONDS) ?: break
                 ms += tramo.size * 1000 / TASA.toInt()
+                if (g.acceptWaveForm(tramo, tramo.size)) acotada += texto(g.result, "text")
                 // Termina con la primera pausa después de algo más que la palabra.
                 if (r.acceptWaveForm(tramo, tramo.size)) {
                     partes += texto(r.result, "text")
@@ -222,27 +236,39 @@ class Charla(
                 }
             }
             if (sinPalabra(partes.joinToString(" "), palabra).isEmpty()) partes += texto(r.finalResult, "text")
+            acotada += texto(g.finalResult, "text")
         } finally {
             r.close()
+            g.close()
         }
         val dicho = partes.joinToString(" ")
-        val enviar = if (conPalabra) sinPalabra(dicho, palabra) else String(Avisos.recortar(dicho.trim(), 200), Charsets.UTF_8)
-        if (enviar.isEmpty()) {
+        val dichoAcotado = acotada.joinToString(" ").replace("[unk]", " ").replace(Regex("\\s+"), " ").trim()
+        if (transcribir) Log.i("Bicho", "charla: oí \"$dicho\" (acotada: \"$dichoAcotado\")")
+        val limpiar = { d: String -> if (conPalabra) sinPalabra(d, palabra) else String(Avisos.recortar(d.trim(), 200), Charsets.UTF_8) }
+        val enviar = limpiar(dicho)
+        val enviarAcotada = limpiar(dichoAcotado)
+        if (enviar.isEmpty() && enviarAcotada.isEmpty()) {
             Log.i("Bicho", "charla: no entendí nada")
             return false
         }
-        // Primero el motor de charla del celu: sin red y al toque.
-        val local = charlar(enviar)
-        if (local?.codigo == 1) {
-            Log.i("Bicho", "charla: la entendí sin IA (${local.intencion}${if (local.accion.isNotEmpty()) ", " + local.accion else ""}${if (local.pregunta) ", pregunta" else ""})")
-            return local.pregunta
+        // Primero el motor de charla del celu: sin red y al toque. Con lo que oyó
+        // libre y, si no lo entiende, con la lectura acotada a sus palabras.
+        var local = if (enviar.isNotEmpty()) charlar(enviar) else null
+        if (local?.codigo != 1 && enviarAcotada.isNotEmpty() && enviarAcotada != enviar) {
+            charlar(enviarAcotada)?.takeIf { it.codigo == 1 }?.let { local = it }
         }
-        if (local?.codigo == 0 && !enLinea()) {
+        val l = local
+        if (l?.codigo == 1) {
+            Log.i("Bicho", "charla: la entendí sin IA (${l.intencion}${if (l.accion.isNotEmpty()) ", " + l.accion else ""}${if (l.pregunta) ", pregunta" else ""})")
+            return l.pregunta
+        }
+        if (l?.codigo == 0 && !enLinea()) {
             // Sin nube no hay a quién preguntarle: el "no entendí" del motor.
             Log.i("Bicho", "charla: no la entendí y no hay nube")
-            if (local.frase.isNotEmpty()) alNucleo(byteArrayOf(0x40, 0) + local.frase.toByteArray())
+            if (l.frase.isNotEmpty()) alNucleo(byteArrayOf(0x40, 0) + l.frase.toByteArray())
             return false
         }
+        if (enviar.isEmpty()) return false
         Log.i("Bicho", "charla: frase de ${enviar.length} letras a la nube")
         val mandada = android.os.SystemClock.elapsedRealtime()
         alPublicar("charla", JSONObject().put("texto", enviar).toString())
@@ -254,6 +280,21 @@ class Charla(
         Log.i("Bicho", "charla: nadie contestó")
         alNucleo(byteArrayOf(0x1F) + "dudar".toByteArray())
         return false
+    }
+
+    private var gramaticaHecha: String? = null
+
+    /** Las palabras de las intenciones (assets/intenciones.json), los números y la palabra, para Vosk. */
+    private fun gramatica(palabra: String): String {
+        gramaticaHecha?.let { return it }
+        val palabras = sortedSetOf<String>()
+        runCatching {
+            val json = contexto.assets.open("intenciones.json").bufferedReader().readText()
+            palabras += palabrasDe(JSONObject(json))
+        }.onFailure { Log.w("Bicho", "charla: sin las intenciones para la gramática", it) }
+        palabras += NUMEROS
+        if (palabra.isNotEmpty()) palabras += palabra
+        return JSONArray(palabras.toList() + "[unk]").toString().also { gramaticaHecha = it }
     }
 
     private fun cargar(): Model? {
@@ -272,6 +313,19 @@ class Charla(
         const val MAXIMO_MS = 8000
         const val MOSTRAR_MS = 2000
         const val PREVIO = 20  // tramos de 50 ms
+        const val GANANCIA = 4  // +12 dB
+        private val NUMEROS = ("cero uno una dos tres cuatro cinco seis siete ocho nueve diez once doce trece catorce quince " +
+            "veinte treinta cuarenta cincuenta media cuarto y las a en de minutos minuto horas hora mañana hoy si no").split(' ')
+
+        /** Todas las palabras de los "patrones" (sin la sintaxis: | * ? { }). */
+        fun palabrasDe(o: Any?, dentro: Boolean = false, salida: MutableSet<String> = sortedSetOf()): Set<String> {
+            when (o) {
+                is JSONObject -> o.keys().forEach { k -> palabrasDe(o.get(k), dentro || k == "patrones", salida) }
+                is JSONArray -> for (i in 0 until o.length()) palabrasDe(o.get(i), dentro, salida)
+                is String -> if (dentro) o.replace(Regex("[*?{}]"), "").split(Regex("[ |]+")).filter { it.isNotEmpty() }.forEach { salida += normalizar(it) }
+            }
+            return salida
+        }
         const val ESPERA_URL_MS = 3000L
         const val SIN_RESPUESTA_MS = 6000L
 

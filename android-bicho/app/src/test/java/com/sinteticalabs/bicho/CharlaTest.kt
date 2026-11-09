@@ -32,4 +32,9 @@ class CharlaTest {
         assertEquals(null, Charla.Respuesta.leer("basura".toByteArray()))
         assertEquals(true, Charla.Respuesta.leer("1\talarma\t\t¿Te pongo una alarma a las 6?\t1".toByteArray())!!.pregunta)
     }
+
+    @Test fun lasPalabrasDeLosPatrones() {
+        val j = org.json.JSONObject("""{"intenciones":{"clima":{"patrones":["como esta el clima|dia","pone* alarma?"],"respuestas":{"todos":["Hace frío"]}}}}""")
+        assertEquals(sortedSetOf("alarma", "clima", "como", "dia", "el", "esta", "pone"), Charla.palabrasDe(j))
+    }
 }
