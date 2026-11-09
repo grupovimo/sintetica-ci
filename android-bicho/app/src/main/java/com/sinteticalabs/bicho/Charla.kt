@@ -133,7 +133,11 @@ class Charla(
                 if (confianza < UMBRAL_PALABRA) continue
                 // Con una gramática de una sola palabra, la confianza engaña (una tele da 100 %):
                 // se confirma con la lectura libre de los últimos segundos.
-                val libre = Recognizer(model, TASA).use { r -> previo.forEach { r.acceptWaveForm(it, it.size) }; texto(r.finalResult, "text") }
+                // Solo el último segundo y medio (la palabra está ahí): así confirma rápido.
+                val libre = Recognizer(model, TASA).use { r ->
+                    previo.takeLast(CONFIRMAR).forEach { r.acceptWaveForm(it, it.size) }
+                    texto(r.finalResult, "text")
+                }
                 if (!pareceLaPalabra(libre, palabra)) {
                     if (transcribir) Log.i("Bicho", "charla: no era la palabra (\"$libre\")")
                     espera.reset()
@@ -231,8 +235,11 @@ class Charla(
         }
         var ms = 0
         var mostrado = -MOSTRAR_MS
+        // Si la frase vino pegada a la palabra ("coco qué hora es"), ya está casi toda: poca espera más.
+        val yaDicho = sinPalabra((partes + texto(r.partialResult, "partial")).joinToString(" "), palabra).isNotEmpty()
+        val tope = if (yaDicho) COLA_MS else MAXIMO_MS
         try {
-            while (andando && ms < MAXIMO_MS) {
+            while (andando && ms < tope) {
                 // La cara de escuchar se renueva mientras escucha (el comportamiento dura 2,5 s).
                 if (ms - mostrado >= MOSTRAR_MS) {
                     mostrado = ms
@@ -291,7 +298,9 @@ class Charla(
             Thread.sleep(200)
         }
         Log.i("Bicho", "charla: nadie contestó")
-        alNucleo(byteArrayOf(0x1F) + "dudar".toByteArray())
+        // El "no entendí" del motor ("¿me lo repetís?"); si no hay, la cara de duda.
+        if (l?.frase?.isNotEmpty() == true) alNucleo(byteArrayOf(0x40, 0) + l.frase.toByteArray())
+        else alNucleo(byteArrayOf(0x1F) + "dudar".toByteArray())
         return false
     }
 
@@ -324,6 +333,8 @@ class Charla(
     companion object {
         const val TASA = 16000f
         const val MAXIMO_MS = 8000
+        const val COLA_MS = 1500  // después de una frase pegada a la palabra
+        const val CONFIRMAR = 30  // tramos (1,5 s) para confirmar la palabra
         const val MOSTRAR_MS = 2000
         const val PREVIO = 60  // tramos de 50 ms: 3 s, lo dicho junto con la palabra
         const val UMBRAL_PALABRA = 0.7f
@@ -378,7 +389,7 @@ class Charla(
             return salida
         }
         const val ESPERA_URL_MS = 3000L
-        const val SIN_RESPUESTA_MS = 6000L
+        const val SIN_RESPUESTA_MS = 4000L
 
         /** En minúsculas y sin tildes (Vosk escribe así; la palabra puede venir con mayúsculas). */
         fun normalizar(s: String): String =
