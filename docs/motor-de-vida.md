@@ -215,6 +215,13 @@ Una config v1 sigue siendo válida (su `personalidad.sueno` pasa al horario).
 - `cara.expresion`: la **cara de siempre** (en vez de la neutral): una
   paramétrica o de imagen que exista. No es una cara fija: sigue durmiéndose
   solo, eligiendo comportamientos y reaccionando (encima de ella).
+- `cara.tamano` (0,5 a 1,5): multiplica la unidad del rostro (la SDF, el
+  panel y los sprites de las caras de imagen, que se recargan a esa escala).
+  Llega con un fundido (~150 ms, por el tiempo y no por los cuadros: nunca un
+  salto) y se limita a lo que entra en la pantalla: medio ancho ~0,5 y medio
+  alto ~0,55 unidades (en la redonda, ~0,52 de radio), con lo que salta y las
+  chispas. En la 1.47B (baja) eso es 1; en la redonda y en un celu parado, 1,4
+  entra entero (`Sistema::tamanoObjetivo`, tests "tamaño:").
 - `comportamientos`: `tipo`, `cuando`, `necesidad`, `base`, `probabilidad`,
   `enfriamiento`, `interrumpible`, `afinidad` y hasta 6 `pasos` (`cara`, `dura`,
   `veces`, `mirada`, `parpadeo`, `particula`, `cuantas`, `peso`, `sonido`, `estado`,

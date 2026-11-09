@@ -159,6 +159,7 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
   proximaVueltaCara_ = vueltaCaraHasta_ = 0;
   ultimaRotacion_ = ahora;
   ultimaActividad_ = ahora;
+  tamanoVisto_ = tamanoObjetivo();  // al prender, ya del tamaño de la config (sin fundido)
   aplicarLista(ahora);
   log("SintéticaOS listo");
 }
@@ -345,6 +346,16 @@ int Sistema::fpsSugerido() const {
 }
 
 // Convierte lo que pasa alrededor (batería, cargador, WiFi) en eventos.
+float Sistema::tamanoObjetivo() const {
+  // Lo más grande que entra: los ojos más abiertos y separados de la marca
+  // (medio ancho ~0,5 y medio alto ~0,55 unidades, con lo que salta y las chispas)
+  // dentro de la pantalla, o del círculo en la redonda.
+  const float W = static_cast<float>(perfil_.ancho), H = static_cast<float>(perfil_.alto), u = vistaRostro_.unidad;
+  float maximo = perfil_.redonda ? (minf(W, H) / 2) / (0.52f * u) : minf((W / 2) / (0.5f * u), (H / 2) / (0.55f * u));
+  maximo = limitar(maximo, 1.0f, 1.5f);
+  return limitar(config_.tamano, 0.5f, maximo);
+}
+
 void Sistema::vigilar(uint32_t ahora) {
   const Contexto c = contexto();
   if (c.bateria >= 0 && ultimaBateria_ >= 0) {
@@ -458,6 +469,9 @@ uint32_t Sistema::firmaSprites(int cara) const {
   b[n++] = static_cast<uint8_t>(c.tamano), b[n++] = static_cast<uint8_t>(c.tamano >> 8);
   b[n++] = static_cast<uint8_t>(c.bocaTamano), b[n++] = static_cast<uint8_t>(c.bocaTamano >> 8);
   b[n++] = static_cast<uint8_t>(c.bocaY), b[n++] = static_cast<uint8_t>(c.bocaY >> 8);
+  // El tamaño de la cara (cara.tamano): con otro, se vuelven a cargar a esa escala.
+  const uint16_t t = static_cast<uint16_t>(tamanoObjetivo() * 1000 + 0.5f);
+  b[n++] = static_cast<uint8_t>(t), b[n++] = static_cast<uint8_t>(t >> 8);
   b[n++] = 0x5A;
   return protocolo::crc32(b, n) | 1u;
 }
@@ -475,7 +489,7 @@ void Sistema::avanzarSprites(uint32_t dt) {
       cache_.vaciar();
       if (objetivo) {
         const CaraImagen& c = config_.vida.imagenes[config_.vida.caras[cara].imagen];
-        if (cache_.cargar(c, vistaRostro_.unidad, leerSprite, this)) {
+        if (cache_.cargar(c, vistaRostro_.unidad * tamanoObjetivo(), leerSprite, this)) {
           firmaCache_ = objetivo;
         } else {
           log("no pude leer los sprites de la cara; uso la de siempre");
@@ -947,7 +961,7 @@ void Sistema::dibujarPantalla(uint32_t ahora) {
   if (dibujo >= 0 && op >= 0.999f) {
     lienzo_.limpiar(paleta::PANTALLA);
   } else {
-    dibujarRostro(lienzo_, vistaRostro_, motor_.cuadro(), &cache_, opSprites_, ocultarOjos_);
+    dibujarRostro(lienzo_, vistaCara(), motor_.cuadro(), &cache_, opSprites_, ocultarOjos_);
   }
   if (dibujo >= 0 && op > 0.001f) {
     lienzo_.opacidad(op);
@@ -1016,6 +1030,12 @@ void Sistema::tick() {
     responderAnimo(2);
   }
   avanzarPomodoro(ahora, dtCuadro);
+  // El tamaño de la cara (cara.tamano): hacia el de la config con un fundido
+  // de ~150 ms que no depende de los cuadros por segundo (nunca de golpe).
+  if (dtCuadro > 0) {
+    const float k = 1.0f - exponencial(-static_cast<float>(dtCuadro < 2000 ? dtCuadro : 2000) / 150.0f);
+    tamanoVisto_ += (tamanoObjetivo() - tamanoVisto_) * k;
+  }
   // v3: si llueve, más tranquilo.
   motor_.clima(climaVigente() && situacionClima(clima_) == Situacion::ClimaLluvia);
   motor_.tick(ahora, contexto());
@@ -1583,7 +1603,7 @@ void Sistema::dibujarPanel() {
   const float W = static_cast<float>(lienzo_.ancho()), H = static_cast<float>(lienzo_.alto());
   const bool redonda = perfil_.redonda;
   // La cara se achica y sube; abajo aparece el texto.
-  VistaRostro v = vistaRostro_;
+  VistaRostro v = vistaCara();
   v.unidad = mezclar(v.unidad, v.unidad * 0.45f, f);
   v.origenY = mezclar(v.origenY, H * 0.27f, f);
   dibujarRostro(lienzo_, v, motor_.cuadro(), &cache_, opSprites_, ocultarOjos_);

@@ -212,6 +212,10 @@ class Sistema {
   // El clima que mandó la nube (vale 3 h).
   const DatosClima& clima() const { return clima_; }
   bool climaVigente() const { return clima_.hay && hal_.ahoraMs() - clima_.recibido < CLIMA_VALE_MS; }
+  // El tamaño de la cara que se ve (config "cara.tamano", limitado para que
+  // entre en la pantalla): llega con un fundido, nunca de golpe.
+  float tamanoVisto() const { return tamanoVisto_; }
+  float tamanoObjetivo() const;
   // El protector de pantalla: 0 = la cara, 1 = la imagen entera.
   float faseProtector() const { return faseProtector_; }
 
@@ -507,6 +511,12 @@ class Sistema {
   char recCharla_[LARGO_TEXTO_CHARLA] = {};
   bool dormirTrasGlobo_ = false;
   VozPropia voz_;
+  float tamanoVisto_ = 1;  // cara.tamano, con su fundido
+  VistaRostro vistaCara() const {
+    VistaRostro v = vistaRostro_;
+    v.unidad *= tamanoVisto_;
+    return v;
+  }
   uint8_t vozModo_ = 1;
   bool vozSuelta_ = false;  // una vocalización (sin globo)
   uint32_t vozDesde_ = 0, vozEnviadas_ = 0;
