@@ -119,4 +119,10 @@ const charla = path.join(formato, 'charla');
 const validarCharla = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true })
   .compile(JSON.parse(fs.readFileSync(path.join(charla, 'intenciones.schema.json'), 'utf8')));
 revisar('charla/intenciones.json', validarCharla, JSON.parse(fs.readFileSync(path.join(charla, 'intenciones.json'), 'utf8')));
+
+// El carácter del motor de vida v3 (vida/caracter.json) contra su schema (los
+// comportamientos, las caras y los parámetros los revisa embeber_caras.py).
+const validarCaracter = new Ajv2020({ allErrors: true, strict: true, allowUnionTypes: true })
+  .compile(JSON.parse(fs.readFileSync(path.join(formato, 'vida', 'caracter.schema.json'), 'utf8')));
+revisar('vida/caracter.json', validarCaracter, vida('caracter.json'));
 process.exit(errores ? 1 : 0);

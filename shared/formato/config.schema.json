@@ -148,7 +148,7 @@
         "properties": {
           "si": {
             "type": "string",
-            "description": "Un evento (tacto, toque, doble-toque, levantado, sacudida, boca-abajo, vinculado, app-abierta, despertado, caricia, muchos-toques, sacudida-suave, sacudida-fuerte, inclinado, caida, voz, nombre, ruido, musica, silencio, notificacion, llamada, bateria-baja, bateria-critica, enchufado, desenchufado, cargado, sin-wifi, cambio-de-cara, bicho-cerca, volvio, hito, recordatorio, pomodoro, despertador, juego, animo, cara-detectada, oscuridad, mano-cerca, toque-recibido, devolver-toque, agenda, llegaste, te-fuiste, habito; también con _ o . en vez de -, como \"sacudida.fuerte\") o una condición de estado (bateria<15, humor>0.5).",
+            "description": "Un evento (tacto, toque, doble-toque, levantado, sacudida, boca-abajo, vinculado, app-abierta, despertado, caricia, muchos-toques, sacudida-suave, sacudida-fuerte, inclinado, caida, voz, nombre, ruido, musica, silencio, notificacion, llamada, bateria-baja, bateria-critica, enchufado, desenchufado, cargado, sin-wifi, cambio-de-cara, bicho-cerca, volvio, hito, recordatorio, pomodoro, despertador, juego, animo, cara-detectada, oscuridad, mano-cerca, toque-recibido, devolver-toque, agenda, llegaste, te-fuiste, habito, crecio; también con _ o . en vez de -, como \"sacudida.fuerte\") o una condición de estado (bateria<15, humor>0.5).",
             "pattern": "^([a-z][a-z._-]*|(bateria|humor)[<>]-?[0-9]+(\\.[0-9]+)?)$"
           },
           "entonces": {
@@ -894,6 +894,86 @@
                 "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
               },
               "maxItems": 12
+            },
+            "recuerdo": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "propuesta": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "crecio": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "mes-juntos": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "feriado": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "fecha-tuya": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "fecha-manana": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
+            },
+            "mimos": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60,
+                "description": "De 1 a 60 bytes UTF-8 ({dueno} y {robot} se reemplazan)."
+              },
+              "maxItems": 12
             }
           }
         }
@@ -1140,6 +1220,32 @@
           "type": "string",
           "maxLength": 40,
           "description": "Lo que dice (de 0 a 40 bytes); vacío: las frases de te-vas (\"¿Llevás las llaves?\")."
+        }
+      }
+    },
+    "fechas": {
+      "type": "array",
+      "maxItems": 6,
+      "description": "Las fechas que te importan (v3): el día antes te avisa (fecha-manana) y ese día te lo recuerda (fecha-tuya).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fecha",
+          "texto"
+        ],
+        "properties": {
+          "fecha": {
+            "type": "string",
+            "pattern": "^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
+            "description": "MM-DD"
+          },
+          "texto": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "De 1 a 40 bytes UTF-8 (\"el cumple de mamá\"): va en {titulo}."
+          }
         }
       }
     }
@@ -1855,7 +1961,8 @@
             "burbuja",
             "oveja",
             "ninguna",
-            "reloj"
+            "reloj",
+            "garabato"
           ]
         },
         "parpadeo": {
@@ -2295,7 +2402,9 @@
             "reojo",
             "estimulo",
             "rem",
-            "ovejas"
+            "ovejas",
+            "particula",
+            "puerta"
           ]
         },
         "parpadeo": {
@@ -2322,7 +2431,8 @@
             "estrella",
             "burbuja",
             "oveja",
-            "reloj"
+            "reloj",
+            "garabato"
           ]
         },
         "cuantas": {
@@ -2398,7 +2508,15 @@
             "mail",
             "github",
             "pedido",
-            "aviso"
+            "aviso",
+            "recuerdo",
+            "propuesta",
+            "crecio",
+            "mes-juntos",
+            "feriado",
+            "fecha-tuya",
+            "fecha-manana",
+            "mimos"
           ],
           "description": "Al empezar el paso, pide una frase de esa situación (frases.json): el bicho decide si la dice."
         },
@@ -2415,7 +2533,8 @@
             "nota",
             "estrella",
             "oveja",
-            "reloj"
+            "reloj",
+            "garabato"
           ],
           "description": "Con \"particula\": \"burbuja\": lo que va adentro (lo que sueña). sueno = al azar entre corazón, estrella, nota y oveja."
         }

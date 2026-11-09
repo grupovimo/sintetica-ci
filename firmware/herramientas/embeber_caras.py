@@ -77,6 +77,162 @@ def tabla_frases(frases) -> list:
     return partes
 
 
+# ---------------------------------------------------------------- el carácter (v3)
+
+# El orden es el de TipoEpisodio (firmware/nucleo/motor_vida.h); un test lo verifica.
+EPISODIOS = ["gane", "perdi", "empate", "toque", "animo-bien", "animo-medio", "animo-mal", "tarde", "posponer",
+             "habito", "caricias", "sacudida", "musica", "volviste", "solo", "crecio"]
+RASGOS = ["energia", "sociabilidad", "picardia", "timidez", "curiosidad", "malGenio"]
+PLANTILLAS_CARACTER = {"dueno", "robot", "juego", "toque", "cantidad", "habito"}
+
+
+def f(x) -> str:
+    return f"{float(x):.4f}f"
+
+
+def tabla_caracter(c, comportamientos, expresiones) -> list:
+    import re
+
+    def mal(que):
+        sys.exit(f"caracter.json: {que}")
+
+    textos = []
+
+    def sumar(lista, donde):
+        primero = len(textos)
+        for t in lista:
+            n = len(t.encode("utf-8"))
+            if not 1 <= n <= LARGO_FRASE:
+                mal(f"{donde}: {t!r} tiene {n} bytes (de 1 a {LARGO_FRASE})")
+            for clave in re.findall(r"\{([^}]*)\}", t):
+                if clave not in PLANTILLAS_CARACTER:
+                    mal(f"{donde}: plantilla desconocida {{{clave}}}")
+            textos.append(f"    {c_texto(t)},")
+        return primero, len(textos) - primero
+
+    t = c["tics"]
+    for n in t["favoritos"]:
+        if n not in comportamientos:
+            mal(f"tics.favoritos: el comportamiento {n!r} no existe")
+    for n in t["caras_pensar"]:
+        if n not in expresiones and n not in comportamientos:
+            mal(f"tics.caras_pensar: {n!r} no existe")
+    if set(c["episodios"]) != set(EPISODIOS):
+        mal(f"episodios: tienen que ser {', '.join(EPISODIOS)}")
+    partes = [
+        "// ---------------------------------------------------------------- el carácter (v3, vida/caracter.json)",
+        "",
+        "struct MicrogestoBase {",
+        "  const char* nombre;",
+        "  const char* param;  // \"der.lt\", \"ftilt\"…",
+        "  float valor, dura, cadaMin, cadaMax;",
+        "};",
+        "struct EtapaBase {",
+        "  const char* nombre;",
+        "  int dias;",
+        "  float afecto;",
+        "  float rasgos[6];  // energia, sociabilidad, picardia, timidez, curiosidad, malGenio",
+        "};",
+        "struct EpisodioBase {",
+        "  const char* nombre;",
+        "  int importancia;",
+        "  const char* sueno;  // la partícula de lo que sueña",
+        "  int recuerdo, nRecuerdo, diario, nDiario;  // en TEXTOS_CARACTER",
+        "};",
+        "struct FeriadoBase {",
+        "  int fecha;     // mes·100 + día (0 = depende de la pascua)",
+        "  int pascua;    // días desde el domingo de pascua",
+        "  const char* titulo;",
+        "  bool festejo;",
+        "};",
+        "struct VozBase {",
+        "  const char* clave;",
+        "  const char* texto;",
+        "};",
+        "struct EstacionBase {",
+        "  uint16_t meses;  // bit m = el mes m (1-12)",
+        "  float energia, curiosidad;",
+        "};",
+        "",
+        "namespace caracter {",
+        f"constexpr float PARPADEO_MIN = {f(t['parpadeo'][0])}, PARPADEO_MAX = {f(t['parpadeo'][1])};",
+        f"constexpr float DOBLES_MIN = {f(t['dobles'][0])}, DOBLES_MAX = {f(t['dobles'][1])};",
+        f"constexpr float VELOCIDAD_MIN = {f(t['velocidad'][0])}, VELOCIDAD_MAX = {f(t['velocidad'][1])};",
+        f"constexpr float FAVORITO = {f(t['favorito'])};",
+        f"constexpr int N_PENSAR = {len(t['pensar'])};",
+        "inline const float PENSAR[N_PENSAR][2] = {" + ", ".join(f"{{{f(a)}, {f(b)}}}" for a, b in t["pensar"]) + "};",
+        f"constexpr int N_CARAS_PENSAR = {len(t['caras_pensar'])};",
+        "inline const char* const CARAS_PENSAR[N_CARAS_PENSAR] = {" + ", ".join(c_texto(x) for x in t["caras_pensar"]) + "};",
+        f"constexpr int N_FAVORITOS = {len(t['favoritos'])};",
+        "inline const char* const FAVORITOS[N_FAVORITOS] = {" + ", ".join(c_texto(x) for x in t["favoritos"]) + "};",
+        f"constexpr int N_MICROGESTOS = {len(t['microgestos'])};",
+        "inline const MicrogestoBase MICROGESTOS[N_MICROGESTOS] = {",
+        *[f"    {{{c_texto(m['nombre'])}, {c_texto(m['param'])}, {f(m['valor'])}, {f(m['dura'])}, {f(m['cada'][0])}, {f(m['cada'][1])}}},"
+          for m in t["microgestos"]],
+        "};",
+        f"constexpr int N_ETAPAS = {len(c['etapas'])};",
+        "inline const EtapaBase ETAPAS[N_ETAPAS] = {",
+        *[f"    {{{c_texto(e['nombre'])}, {int(e['dias'])}, {f(e['afecto'])}, "
+          f"{{{', '.join(f(e['rasgos'].get(r, 0)) for r in RASGOS)}}}}},"
+          for e in c["etapas"]],
+        "};",
+        f"constexpr int MESES_JUNTOS = {int(c['meses_juntos'])};",
+    ]
+    filas = []
+    for n in EPISODIOS:
+        e = c["episodios"][n]
+        r = sumar(e["recuerdo"], f"episodios.{n}.recuerdo")
+        d = sumar(e["diario"], f"episodios.{n}.diario")
+        filas.append(f"    {{{c_texto(n)}, {int(e['importancia'])}, {c_texto(e['sueno'])}, {r[0]}, {r[1]}, {d[0]}, {d[1]}}},")
+    tr = sumar(c["diario_tranquilo"], "diario_tranquilo")
+    partes += [f"constexpr int N_EPISODIOS = {len(filas)};", "inline const EpisodioBase EPISODIOS[N_EPISODIOS] = {", *filas, "};",
+               f"constexpr int TRANQUILO = {tr[0]}, N_TRANQUILO = {tr[1]};",
+               f"constexpr int DIARIO_LINEAS = {int(c['diario_lineas'])};",
+               "inline const char* const JUEGOS[5] = {" + ", ".join(c_texto(x) for x in c["juegos"]) + "};",
+               "inline const char* const TOQUES[4] = {" + ", ".join(c_texto(x) for x in c["toques"]) + "};",
+               f"constexpr int CARICIAS_DIA = {int(c['caricias_dia'])};"]
+    em = c["empatia"]
+    partes += [f"constexpr int EMPATIA_DIAS = {int(em['dias'])}, EMPATIA_MINIMO = {int(em['minimo'])};",
+               f"constexpr float EMPATIA_UMBRAL = {f(em['umbral'])}, EMPATIA_RIGIDEZ = {f(em['rigidez'])};",
+               "inline const float EMPATIA_RASGOS[6] = {" + ", ".join(f(em["rasgos"].get(r, 0)) for r in RASGOS) + "};",
+               f"constexpr int OTRA_PREGUNTA_H = {int(em['otra_pregunta_h'])};"]
+    ll = c["clima"]["lluvia"]
+    partes += [f"constexpr float LLUVIA_ENERGIA = {f(ll['energia'])}, LLUVIA_CURIOSIDAD = {f(ll['curiosidad'])}, "
+               f"LLUVIA_RIGIDEZ = {f(ll['rigidez'])};"]
+    est = []
+    for n, e in c["clima"]["estaciones"].items():
+        m = sum(1 << x for x in e["meses"])
+        est.append(f"    {{{m}, {f(e['energia'])}, {f(e['curiosidad'])}}},  // {n}")
+    partes += [f"constexpr int N_ESTACIONES = {len(est)};", "inline const EstacionBase ESTACIONES[N_ESTACIONES] = {", *est, "};"]
+    fer = []
+    for x in c["feriados"]:
+        fecha = 0
+        if "fecha" in x:
+            mm, dd = x["fecha"].split("-")
+            fecha = int(mm) * 100 + int(dd)
+        fer.append(f"    {{{fecha}, {int(x.get('pascua', 0))}, {c_texto(x['titulo'])}, {'true' if x['festejo'] else 'false'}}},")
+    partes += [f"constexpr int N_FERIADOS = {len(fer)};", "inline const FeriadoBase FERIADOS[N_FERIADOS] = {", *fer, "};"]
+    ru = c["rutinas"]
+    partes += [f"constexpr float APRENDER = {f(ru['aprender'])};",
+               f"constexpr int DESPERTAR_ANTES = {int(ru['despertar_antes'])}, ESPERAR_ANTES = {int(ru['esperar_antes'])}, "
+               f"ESPERAR_DESPUES = {int(ru['esperar_despues'])}, DORMIS_ANTES = {int(ru['dormis_antes'])};",
+               f"constexpr float BRILLO_DORMIS = {f(ru['brillo_dormis'])}, SUENO_DORMIS = {f(ru['sueno_dormis'])};",
+               f"constexpr int SOLO_MINUTOS = {int(c['solo_minutos'])};"]
+    for parte in ("sonidos", "caras", "eventos"):
+        d = c["voz"][parte]
+        if parte == "caras":
+            for k in d:
+                if k not in expresiones:
+                    mal(f"voz.caras: la expresión {k!r} no existe")
+        nombre = "VOZ_" + parte.upper()
+        partes += [f"constexpr int N_{nombre} = {len(d)};",
+                   f"inline const VozBase {nombre}[N_{nombre}] = {{",
+                   *[f"    {{{c_texto(k)}, {c_texto(v)}}}," for k, v in d.items()], "};"]
+    partes += [f"constexpr int N_TEXTOS = {len(textos)};", "inline const char* const TEXTOS[N_TEXTOS] = {", *textos, "};",
+               "}  // namespace caracter", ""]
+    return partes
+
+
 def generar_vida() -> str:
     def leer(nombre):
         return json.loads((VIDA / nombre).read_text(encoding="utf-8"))
@@ -87,6 +243,8 @@ def generar_vida() -> str:
         "// GENERADO por firmware/herramientas/embeber_caras.py desde shared/formato/vida.",
         "// No editar a mano.",
         "#pragma once",
+        "",
+        "#include <stdint.h>",
         "",
         "namespace sintetica {",
         "",
@@ -108,7 +266,8 @@ def generar_vida() -> str:
                f'inline const char* const REGLAS_VIDA_BASE = R"json({compacto(leer("reglas.json"))})json";',
                "",
                f'inline const char* const PERSONALIDADES_BASE = R"json({compacto(leer("personalidades.json"))})json";',
-               "", *tabla_frases(leer("frases.json")), "}  // namespace sintetica", ""]
+               "", *tabla_frases(leer("frases.json")),
+               *tabla_caracter(leer("caracter.json"), comportamientos, expresiones), "}  // namespace sintetica", ""]
     return "\n".join(partes)
 
 

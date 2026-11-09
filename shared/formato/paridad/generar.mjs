@@ -26,8 +26,8 @@ const limites = {
   expresionesBase: 16,
   carasVida: 48, // paramétricas en total (38 de base)
   carasVidaBase: 38,
-  comportamientos: 67, // en total (58 de base)
-  comportamientosBase: 58,
+  comportamientos: 75, // en total (66 de base)
+  comportamientosBase: 66,
   carasImagen: 8,
   sprites: 12,
   imagenes: 8,
