@@ -431,7 +431,7 @@ contado, los juegos y el saludo entre robots).
   resuelven). El DNS se resuelve al conectar, se validan **todas** las IPs y la
   conexión va a la IP validada (contra DNS rebinding).
 - **Límite de disparos**: cada automatización corre como mucho una vez cada
-  10 s y 200 veces por día (en memoria; `probar` cuenta). Así no sirve de cañón
+  10 s y 200 veces por día (en la base; `probar` cuenta). Así no sirve de cañón
   ni se arman bucles entre robots.
 - Cada vez que una corre: entradas en el historial (una por acción) y el
   evento `automatizacion` por SSE: `{id, cuando, evento, resultados, en}`.
@@ -643,10 +643,10 @@ email ni los ids de sus robots.
   toques, con `de` = el nombre de mi robot `desde` (tiene que ser mío) o el mío
   ("Un amigo" si no puse). `expresion` solo con `carita` (y obligatoria). Si no
   llegó a ningún robot y vinculó Telegram: "Ana te mandó un abrazo 🤗". Tope:
-  30 por hora por par, en cada sentido (en memoria). Evento SSE `toque`
+  30 por hora por par, en cada sentido (en la base). Evento SSE `toque`
   `{de, tipo, robot}` para el que lo recibe.
 - **Devolver**: cuando un robot avisa `devolver-toque` (evento 40, lo avisa
-  solo), la nube busca el último toque que le llegó (en memoria, 10 min, una
+  solo), la nube busca el último toque que le llegó (en la base, 10 min, una
   sola vez) y se lo manda de vuelta al robot `desde` (si sigue conectado) o a
   los del que tocó que reciben los toques de este dueño, con `de` = el nombre
   del robot que lo devolvió; el evento `toque` lleva `devuelto: true` y, si no
@@ -719,7 +719,8 @@ mostrar (`regenerar: true`).
     `payment.created`; con el access token, la nube lee el pago
     (`GET api.mercadopago.com/v1/payments/{id}`, el id solo números) y avisa
     solo los aprobados con el monto ("$12.000") y el nombre del que pagó. Una
-    vez por pago (48 h, en memoria).
+    vez por pago (30 días, en la base); las entregas de GitHub, una vez
+    por `X-GitHub-Delivery` (72 h; la repetida, 202 `{repetido: true}`).
 - Manda el `0x44` con el tipo nuevo (`app` = el título corto, `contacto` =
   de) a los robots conectados del usuario → `{ok, robots}` (cuántos lo
   recibieron) y el evento SSE `entrante` `{tipo, titulo, de, origen: json|github|mercadopago, robots}`.

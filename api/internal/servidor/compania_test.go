@@ -243,6 +243,15 @@ func TestEntrantesHTTP(t *testing.T) {
 	if d := evento(); d["tipo"] != "github" || d["titulo"] != "PR #12" || d["de"] != "ana" {
 		t.Fatalf("PR: %v", d)
 	}
+	// Una entrega que GitHub reintenta se avisa una vez.
+	entrega := map[string]string{"X-GitHub-Event": "pull_request", "X-Hub-Signature-256": firmarGitHub(tok, pr), "X-GitHub-Delivery": "e2e-" + tok[4:12]}
+	if cod, _ := mandarEntrante(h, ruta, pr, entrega); cod != http.StatusOK {
+		t.Fatalf("entrega: %d", cod)
+	}
+	evento()
+	if cod, v := mandarEntrante(h, ruta, pr, entrega); cod != http.StatusAccepted || v["repetido"] != true {
+		t.Fatalf("la misma entrega: %d %v", cod, v)
+	}
 	ci := `{"action":"completed","workflow_run":{"name":"CI","conclusion":"failure"},"repository":{"name":"sintetica"},"sender":{"login":"bot"}}`
 	if cod, _ := gh("workflow_run", ci, firmarGitHub(tok, ci)); cod != http.StatusOK {
 		t.Fatalf("CI: %d", cod)
@@ -265,6 +274,11 @@ func TestEntrantesHTTP(t *testing.T) {
 	}
 	if cod, _ := mandarEntrante(h, ruta, pago, nil); cod != http.StatusAccepted {
 		t.Fatalf("el mismo pago: %d", cod)
+	}
+	// Tampoco después de reiniciar la API (queda en la base).
+	reiniciada := Nuevo(s.op, s.alm, s.nube, s.integ, s.hub, nil, nil, s.log).Rutas()
+	if cod, _ := mandarEntrante(reiniciada, ruta, pago, nil); cod != http.StatusAccepted {
+		t.Fatalf("el mismo pago después de reiniciar: %d", cod)
 	}
 	if pedidoMP != nil {
 		t.Fatal("sin token no se le pregunta a Mercado Pago")
