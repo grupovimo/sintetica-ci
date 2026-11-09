@@ -15,7 +15,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"sintetica/api/internal/almacen"
@@ -171,7 +170,7 @@ func (i *Integraciones) Amigo(ctx context.Context, usuario string, id int64) (Am
 
 // AceptarAmigo canjea un código. Al que invitó le llega un Telegram.
 func (i *Integraciones) AceptarAmigo(ctx context.Context, usuario, codigo string) (Amigo, error) {
-	if !i.limite.permitir("aceptar:"+usuario, 0, IntentosPorHora, time.Hour) {
+	if !i.tope(ctx, "aceptar:"+usuario, 0, IntentosPorHora, time.Hour) {
 		return Amigo{}, ErrMuchosIntentos
 	}
 	c, ok := NormalizarCodigo(codigo)
@@ -287,35 +286,13 @@ type ResultadoToque struct {
 	Telegram bool `json:"telegram"`
 }
 
-// toqueVisto: el último toque que le llegó a un robot (para devolverlo).
+// toqueVisto: el último toque que le llegó a un robot (para devolverlo). Se
+// guarda en la base (toques_recibidos): sobrevive a un reinicio de la API.
 type toqueVisto struct {
 	deUsuario   string // el que tocó
 	desde       string // su robot, si lo mandó desde uno
 	tipo, expre string
 	en          time.Time
-}
-
-type estadoToques struct {
-	mu      sync.Mutex
-	ultimos map[string]toqueVisto // robot que lo recibió → el toque
-}
-
-func (e *estadoToques) anotar(robot string, t toqueVisto) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if e.ultimos == nil || len(e.ultimos) > 10000 {
-		e.ultimos = map[string]toqueVisto{}
-	}
-	e.ultimos[robot] = t
-}
-
-// tomar: el toque que le llegó a ese robot en los últimos 10 min (una vez).
-func (e *estadoToques) tomar(robot string, ahora time.Time) (toqueVisto, bool) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	t, ok := e.ultimos[robot]
-	delete(e.ultimos, robot)
-	return t, ok && ahora.Sub(t.en) <= VentanaDevolver
 }
 
 var patronExpresionToque = regexp.MustCompile(`^[a-z][a-z0-9-]{0,23}$`)
@@ -375,7 +352,7 @@ func (i *Integraciones) Tocar(ctx context.Context, usuario string, amistad int64
 	if strings.TrimSpace(de) == "" {
 		de = "Un amigo"
 	}
-	if !i.limite.permitir(fmt.Sprintf("toque:%d:%s", am.ID, usuario), 0, ToquesPorHoraPorPar, time.Hour) {
+	if !i.tope(ctx, fmt.Sprintf("toque:%d:%s", am.ID, usuario), 0, ToquesPorHoraPorPar, time.Hour) {
 		return ResultadoToque{}, ErrMuchosToques
 	}
 	return i.entregarToque(ctx, am.UsuarioID, am.SusRobots, toqueVisto{deUsuario: usuario, desde: desdeID, tipo: tipo, expre: expresion, en: time.Now()}, de, false)
@@ -403,7 +380,10 @@ func (i *Integraciones) entregarToque(ctx context.Context, para string, lista []
 		}
 		res.Robots++
 		if !devuelto {
-			i.toques.anotar(r.ID, t)
+			if err := i.alm.AnotarToque(ctx, r.ID, almacen.ToqueRecibido{DeUsuario: t.deUsuario, Desde: t.desde,
+				Tipo: t.tipo, Expresion: t.expre, En: t.en}); err != nil {
+				i.log.Warn("toque: no lo pude anotar para devolverlo", "bicho", r.ID, "error", err)
+			}
 		}
 		datos := map[string]any{"de": de, "tipo": t.tipo, "robot": r.ID}
 		if devuelto {
@@ -427,12 +407,16 @@ func (i *Integraciones) entregarToque(ctx context.Context, para string, lista []
 // toque que le llegó: vuelve al robot desde el que se mandó o, si no, a los
 // del que tocó que reciben los toques de este dueño.
 func (i *Integraciones) devolverToque(bicho string) {
-	t, ok := i.toques.tomar(bicho, time.Now())
+	ctx, cancelar := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancelar()
+	g, ok, err := i.alm.TomarToque(ctx, bicho, VentanaDevolver)
+	if err != nil {
+		i.log.Warn("toque: no pude leer el último", "bicho", bicho, "error", err)
+	}
 	if !ok {
 		return
 	}
-	ctx, cancelar := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancelar()
+	t := toqueVisto{deUsuario: g.DeUsuario, desde: g.Desde, tipo: g.Tipo, expre: g.Expresion, en: g.En}
 	dueno := i.robots.Dueno(bicho)
 	if dueno == "" {
 		return
@@ -441,7 +425,7 @@ func (i *Integraciones) devolverToque(bicho string) {
 	if err != nil {
 		return // ya no son amigos
 	}
-	if !i.limite.permitir(fmt.Sprintf("toque:%d:%s", am.ID, dueno), 0, ToquesPorHoraPorPar, time.Hour) {
+	if !i.tope(ctx, fmt.Sprintf("toque:%d:%s", am.ID, dueno), 0, ToquesPorHoraPorPar, time.Hour) {
 		return
 	}
 	lista := am.SusRobots

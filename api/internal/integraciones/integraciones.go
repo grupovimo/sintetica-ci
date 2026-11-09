@@ -84,11 +84,10 @@ type Integraciones struct {
 
 	cuid estadoCuidado // lo de la v1.7 (cuidado.go)
 
-	toques estadoToques  // los últimos toques, para devolverlos (amigos.go)
-	v19    estadoV19     // lo de la v1.9 (v19.go)
-	voz    estadoVoz     // ElevenLabs (voz.go)
-	ia     estadoIA      // la clave de IA propia de cada usuario (ia.go)
-	paq    estadoPaquete // el paquete de voz sin internet (paquete_voz.go)
+	v19 estadoV19     // lo de la v1.9 (v19.go)
+	voz estadoVoz     // ElevenLabs (voz.go)
+	ia  estadoIA      // la clave de IA propia de cada usuario (ia.go)
+	paq estadoPaquete // el paquete de voz sin internet (paquete_voz.go)
 
 	cm estadoCharlaMotor // la charla sin IA: el hilo de cada robot (charla_motor.go)
 }
@@ -389,14 +388,26 @@ func (i *Integraciones) CrearVinculo(ctx context.Context, usuario string) (enlac
 	return "https://t.me/" + i.op.TelegramBot + "?start=" + url.QueryEscape(codigo), vence, nil
 }
 
-// Vincular canjea un código (lo que hace "/start <código>").
+// Vincular canjea un código (lo que hace "/start <código>"). Devuelve la
+// cuenta que quedó con el chat.
 func (i *Integraciones) Vincular(ctx context.Context, codigo string, chatID int64, nombre string) (string, error) {
-	usuario, err := i.alm.VincularTelegram(ctx, hashCodigo(codigo), chatID, nombre)
+	r, err := i.vincular(ctx, codigo, chatID, nombre)
+	return r.Usuario, err
+}
+
+func (i *Integraciones) vincular(ctx context.Context, codigo string, chatID int64, nombre string) (almacen.VinculoNuevo, error) {
+	r, err := i.alm.VincularTelegram(ctx, hashCodigo(codigo), chatID, nombre)
 	if err != nil {
-		return "", err
+		return r, err
 	}
-	i.hub.Publicar(usuario, eventos.Evento{Tipo: "telegram", Datos: map[string]any{"vinculado": true, "nombre": nombre}})
-	return usuario, nil
+	datos := map[string]any{"vinculado": true, "nombre": nombre}
+	if r.Unida {
+		// La web de la cuenta que se sumó: sus sesiones ya son de la otra.
+		datos["unida"] = true
+		i.hub.Publicar(r.Pidio, eventos.Evento{Tipo: "telegram", Datos: datos})
+	}
+	i.hub.Publicar(r.Usuario, eventos.Evento{Tipo: "telegram", Datos: datos})
+	return r, nil
 }
 
 // Desvincular olvida el chat del usuario.
@@ -408,7 +419,25 @@ func (i *Integraciones) Desvincular(ctx context.Context, usuario string) error {
 	return nil
 }
 
-// --- Límite de disparos (en memoria) ---
+// --- Límites ---
+
+// tope: un límite que importa (toques entre amigos, disparos de las
+// automatizaciones, códigos de amigo): vive en la base, así un reinicio de la
+// API no lo vacía. Si la base falla, se usa el de memoria.
+func (i *Integraciones) tope(ctx context.Context, clave string, cada time.Duration, max int, ventana time.Duration) bool {
+	if i.alm == nil {
+		return i.limite.permitir(clave, cada, max, ventana)
+	}
+	ok, err := i.alm.Tope(ctx, clave, cada, max, ventana)
+	if err != nil {
+		i.log.Warn("tope: la base no contestó (uso el de memoria)", "clave", clave, "error", err)
+		return i.limite.permitir(clave, cada, max, ventana)
+	}
+	return ok
+}
+
+// El límite en memoria: lo que da igual perder al reiniciar (pedidos por
+// minuto, la charla por MQTT, el paquete de voz).
 
 type limitador struct {
 	mu     sync.Mutex

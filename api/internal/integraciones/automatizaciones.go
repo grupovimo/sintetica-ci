@@ -260,7 +260,7 @@ func (i *Integraciones) disparar(ctx context.Context, d disparo) {
 // correr hace las acciones de una automatización (si el límite lo deja),
 // las anota en el historial y avisa a la web.
 func (i *Integraciones) correr(ctx context.Context, usuario, bicho string, a Automatizacion, evento string, datos map[string]any) ([]Resultado, error) {
-	if !i.limite.permitir(bicho+"/"+a.ID, DisparoCada, DisparosPorDia, 24*time.Hour) {
+	if !i.tope(ctx, "auto:"+bicho+"/"+a.ID, DisparoCada, DisparosPorDia, 24*time.Hour) {
 		return nil, ErrLimite
 	}
 	ctx, cancelar := context.WithTimeout(ctx, 30*time.Second)

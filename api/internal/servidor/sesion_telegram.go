@@ -171,6 +171,7 @@ func (s *Servidor) sesionDeEntrada(w http.ResponseWriter, r *http.Request, e alm
 		s.interno(w, err)
 		return
 	}
+	s.adminPorTelegram(r.Context(), &u, e.ChatID)
 	if e.Cliente == "web" {
 		http.SetCookie(w, s.cookieDeEntrada("", -1))
 	}

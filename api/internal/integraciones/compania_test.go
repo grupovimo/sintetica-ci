@@ -170,7 +170,9 @@ func TestAmigosYToques(t *testing.T) {
 		t.Fatal("sin evento toque")
 	}
 
-	// Ana lo acaricia: vuelve a Lola, con el nombre de Pipo (una sola vez).
+	// La API se reinicia (el último toque está en la base) y Ana lo acaricia:
+	// vuelve a Lola, con el nombre de Pipo (una sola vez).
+	i = Nuevo(Opciones{}, a, robots, hub, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	i.Evento(ra, "devolver-toque", map[string]any{})
 	devuelto, _ := protocolo.Toque("abrazo", "Pipo", "")
 	esperar := func(id string, n int) []string {
@@ -222,6 +224,11 @@ func TestAmigosYToques(t *testing.T) {
 	}
 	if _, err := i.Tocar(ctx, beto.ID, deBeto.ID, "toque", "", ""); !errors.Is(err, ErrMuchosToques) {
 		t.Fatalf("tope: %v", err)
+	}
+	// El tope también sobrevive a un reinicio.
+	i = Nuevo(Opciones{}, a, robots, hub, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if _, err := i.Tocar(ctx, beto.ID, deBeto.ID, "toque", "", ""); !errors.Is(err, ErrMuchosToques) {
+		t.Fatalf("tope después de reiniciar: %v", err)
 	}
 	if err := i.BorrarAmigo(ctx, ana.ID, lAna[0].ID); err != nil {
 		t.Fatal(err)

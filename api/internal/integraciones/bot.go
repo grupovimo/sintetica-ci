@@ -274,13 +274,23 @@ func (i *Integraciones) atenderMensaje(ctx context.Context, m *mensaje) {
 		return
 	}
 	if comando == "/start" && resto != "" {
-		if _, err := i.Vincular(ctx, resto, chat, nombreTG(m.From)); err != nil {
+		r, err := i.vincular(ctx, resto, chat, nombreTG(m.From))
+		if err != nil {
 			if errors.Is(err, almacen.ErrCodigoInvalido) {
 				i.responder(ctx, chat, "Ese link ya se usó o venció (valen 15 minutos). Pedí uno nuevo en la web, en Integraciones.", nil)
 				return
 			}
+			if errors.Is(err, almacen.ErrCuentasConDatos) {
+				i.responder(ctx, chat, "Este Telegram ya tiene su propia cuenta de Sintética, con robots o amigos. "+
+					"Entrá con Telegram y sumale el mail desde la consola: así queda una sola.", nil)
+				return
+			}
 			i.log.Warn("telegram: no pude vincular", "error", err)
 			i.responder(ctx, chat, "Algo salió mal de nuestro lado. Probá de nuevo en un rato.", nil)
+			return
+		}
+		if r.Unida {
+			i.responder(ctx, chat, "¡Listo! Tu mail se sumó a la cuenta que ya tenías con este Telegram: ahora es una sola.\n\n"+textoAyuda, nil)
 			return
 		}
 		i.responder(ctx, chat, "¡Listo! Este chat quedó vinculado con tu cuenta de Sintética. Desde acá podés hablarle a tus robots y ellos te van a avisar lo que armes en Automatizaciones.\n\n"+textoAyuda, nil)

@@ -37,7 +37,10 @@ Cómo se conectan los bichos, las apps y la web. Para levantarlo en local, ver
   sitio ajeno no lo puede mandar: CSRF).
 - Límites: 5 links por email por hora, 20 por IP por hora.
 - La cuenta se crea sola la primera vez. `ADMIN_EMAILS` (emails o `@dominio`)
-  marca administradores: pueden subir firmwares.
+  marca administradores: pueden subir firmwares. `ADMIN_TELEGRAM` (ids de
+  Telegram separados por comas, el número del chat privado con el bot) hace
+  lo mismo para quien entra con Telegram (así hay admin en producción sin
+  SMTP). Queda marcado para siempre, como con el mail.
 - **Sin SMTP** (`SMTP_SERVIDOR=ninguno` o vacío a propósito; sin la variable,
   Mailpit en local) no se manda mail: `POST /v1/sesion/enlace` responde 503 y
   la web no ofrece el mail. `GET /v1/sesion/metodos` (público) dice qué hay:
@@ -75,12 +78,67 @@ Código: `servidor/sesion_telegram.go` (las rutas), `integraciones/entrar.go`
   códigos, con el de `canjear` (30 por IP cada 10 min); las esperas, 600 por
   IP cada 10 min.
 
+### Una sola cuenta por persona (sumar mail, vincular Telegram)
+
+Código: `almacen/unir.go`, `servidor/cuenta.go`; migración `019_robustez.sql`
+(`email_pendientes`).
+
+- **Sumar un mail** (la cuenta de Telegram no tiene): `POST /v1/sesion/email
+  {email}` (con sesión) manda al mail un código de 8 caracteres (15 min, 5
+  intentos, uno pendiente por cuenta; 5 pedidos por hora). 503 sin SMTP; 409
+  si la cuenta ya tiene mail. `POST /v1/sesion/email/confirmar {codigo}` →
+  `{usuario, unida}`. Desde ahí, entrar por mail con esa dirección es la
+  misma cuenta.
+- **Vincular Telegram** desde una cuenta de mail (Integraciones, como
+  siempre): si el chat era de otra cuenta **con** mail, pasa a esta (la otra
+  sigue entrando por mail).
+- **Si el mail o el Telegram ya son de otra cuenta**, no se duplican ni se
+  deja a nadie sin poder entrar: la que está **vacía** (sin robots, amigos,
+  biblioteca ni avisos entrantes) se suma a la otra: su mail, su Telegram,
+  su admin, su nombre (si la otra no tiene) y sus **sesiones abiertas** pasan
+  a la que queda, y se borra. `unida: true` (o, en el bot, "Tu mail se sumó a
+  la cuenta que ya tenías con este Telegram") quiere decir que la sesión
+  sigue abierta pero ahora en la otra cuenta: la web tiene que releer
+  `GET /v1/sesion` (por SSE llega `telegram` con `unida: true`).
+- Si **las dos tienen cosas**, no se toca nada: 409 (`ErrCuentasConDatos`; el
+  bot lo explica). Si cada una tiene un Telegram distinto, 409
+  (`ErrOtroTelegram`). Unir dos cuentas con robots queda para más adelante
+  (a mano en la base, si alguien lo pide).
+- **Pendiente en la consola** (no está hecho): el botón "Sumar mail" (pedir el
+  código y tipearlo) en la cuenta, solo si `GET /v1/sesion/metodos` dice
+  `email: true` y la cuenta no tiene mail; y releer la sesión cuando vuelve
+  `unida`. Las apps, lo mismo.
+
 **Para las apps (iOS y Android, todavía no):** pedir con `cliente: "app"`,
 guardar `token` y `secreto`, abrir `enlace` (abre Telegram), y hacer el GET
 de arriba en un bucle (con `X-Sintetica-Secreto`) hasta que vuelva el
 `token` de la sesión (180 días, `Authorization: Bearer`). Si vuelve 410,
 empezar de nuevo. Mostrar también un campo para el código de 6 dígitos.
 Consultar `GET /v1/sesion/metodos` para no ofrecer el mail donde no hay SMTP.
+
+## Lo que sobrevive a un reinicio
+
+La API guarda en la base (`019_robustez.sql`, `almacen/topes.go`) lo que no
+puede perderse al reiniciar; la limpieza de cada hora (`Limpiar`) borra lo
+vencido por índice (barato en el VPS chico):
+
+- `topes` (un renglón por vez que se dejó pasar, con su vencimiento; un
+  candado por clave ordena los pedidos a la vez): los **toques entre amigos**
+  (30 por hora por par y sentido), los **disparos de las automatizaciones**
+  (`DisparoCada` y `DisparosPorDia`), los **códigos de amigo** probados (10
+  por hora) y los pedidos de "sumar mail". Si la base no contesta, se usa el
+  límite en memoria.
+- `vistos` (una vez hasta que vence): los **pagos de Mercado Pago ya
+  avisados** (30 días; Mercado Pago reintenta y manda `created` y `updated`)
+  y las **entregas de GitHub** (`X-GitHub-Delivery`, 72 h).
+- `toques_recibidos`: el **último toque** de cada robot, para devolverlo
+  dentro de los 10 minutos.
+
+Sigue en memoria, a propósito (perderlo da igual): los límites por IP y por
+minuto de las rutas, la charla y el paquete de voz por MQTT, el hilo de la
+charla de cada robot (`EstadoCharla`), los cachés (automatizaciones, robots,
+clima, ElevenLabs, Spotify), lo que espera que el usuario elija un robot en
+Telegram y las partidas del día que vio la nube.
 
 ## Sumar un bicho a una cuenta
 
@@ -1198,6 +1256,7 @@ SVG) y el prompt `inventar_cara`.
 | `CLAVE_FIRMA` | la clave privada de las OTA | `/claves/ota-privada.pem` |
 | `SECRETO` | firma los links de descarga (OTA y paquete de voz) y de él sale la clave con la que se cifran el calendario, Spotify, ElevenLabs y la clave de IA propia | uno local |
 | `ADMIN_EMAILS` | quién sube firmwares | vacío |
+| `ADMIN_TELEGRAM` | ids de Telegram (separados por comas) que también son admin | vacío |
 | `DESARROLLO` | bichos virtuales y los links en el log | `1` |
 | `BICHOS_VIRTUALES` | dónde están los virtuales | los dos del compose |
 | `COOKIE_SEGURA` | cookie solo por HTTPS | `0` |

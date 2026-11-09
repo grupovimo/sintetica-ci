@@ -149,6 +149,9 @@ func (a *Almacen) Limpiar(ctx context.Context) error {
 	if err := a.limpiarV19(ctx); err != nil {
 		return err
 	}
+	if err := a.limpiarTopes(ctx); err != nil {
+		return err
+	}
 	if _, err := a.db.Exec(ctx, `delete from enlaces where vence < now() - interval '1 day'`); err != nil {
 		return err
 	}

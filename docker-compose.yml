@@ -25,6 +25,7 @@ x-api-entorno: &api-entorno
   CLAVE_FIRMA: /claves/ota-privada.pem
   SECRETO: ${SECRETO:-un-secreto-local-de-al-menos-16-bytes}
   ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+  ADMIN_TELEGRAM: ${ADMIN_TELEGRAM:-}
   DESARROLLO: "1"
   BICHOS_VIRTUALES: http://bicho-virtual:8090,http://bicho-broche:8090
   # El bot de Telegram (sin token, las integraciones de Telegram quedan apagadas).

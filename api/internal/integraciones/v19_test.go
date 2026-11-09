@@ -116,7 +116,9 @@ func esperarEnviado(t *testing.T, r *robotsFalsos, s string) {
 func TestAgendaConICSFalso(t *testing.T) {
 	a := abrirBase(t)
 	ctx := context.Background()
-	fijo := time.Now().Truncate(time.Minute).Add(10 * time.Second)
+	// Las 12 de hoy (hora de Argentina): con la hora de verdad, a la noche
+	// "Más tarde" (3 h después) caía mañana y el resumen cambiaba.
+	fijo := inicioDelDia(time.Now().In(nube.Zona())).Add(12*time.Hour + 10*time.Second)
 	z := func(t time.Time) string { return t.UTC().Format("20060102T150405Z") }
 	manana := inicioDelDia(fijo.In(nube.Zona())).AddDate(0, 0, 1).Add(10 * time.Hour)
 	var mu sync.Mutex

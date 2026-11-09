@@ -34,6 +34,7 @@ x-api-entorno: &api-entorno
   CLAVE_FIRMA: /claves/ota-privada.pem
   SECRETO: ${SECRETO:?falta SECRETO}
   ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+  ADMIN_TELEGRAM: ${ADMIN_TELEGRAM:-}
   COOKIE_SEGURA: "1"
   DESARROLLO: "0"
   # El bot de Telegram (sin token, las integraciones de Telegram quedan apagadas).

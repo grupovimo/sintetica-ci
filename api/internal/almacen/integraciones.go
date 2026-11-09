@@ -35,27 +35,78 @@ func (a *Almacen) CodigosTelegramRecientes(ctx context.Context, usuarioID string
 	return n, err
 }
 
+// VinculoNuevo es lo que pasó al vincular un chat.
+type VinculoNuevo struct {
+	Usuario string // la cuenta que quedó con el chat
+	Pidio   string // la que pidió el código (otra si se unieron)
+	Unida   bool   // la que pidió estaba vacía y se sumó a la del chat
+}
+
 // VincularTelegram canjea el código (una sola vez, antes de que venza) y deja
-// ese chat como el del usuario. Si el chat era de otro usuario, pasa a este.
-func (a *Almacen) VincularTelegram(ctx context.Context, codigoHash []byte, chatID int64, nombre string) (string, error) {
-	var usuario string
+// ese chat como el del usuario. Si el chat era de otra cuenta con mail, pasa a
+// esta (la otra sigue entrando por mail). Si era de una cuenta sin mail (la
+// creó Telegram), no se deja a nadie sin poder entrar: la que esté vacía se
+// suma a la otra (unir); si las dos tienen cosas, ErrCuentasConDatos.
+func (a *Almacen) VincularTelegram(ctx context.Context, codigoHash []byte, chatID int64, nombre string) (VinculoNuevo, error) {
+	var r VinculoNuevo
 	err := a.enTx(ctx, func(tx pgx.Tx) error {
 		err := tx.QueryRow(ctx, `update telegram_codigos set usado = now()
-			where codigo_hash = $1 and usado is null and vence > now() returning usuario_id`, codigoHash).Scan(&usuario)
+			where codigo_hash = $1 and usado is null and vence > now() returning usuario_id`, codigoHash).Scan(&r.Pidio)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrCodigoInvalido
 		}
 		if err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `delete from telegram_vinculos where chat_id = $1 and usuario_id <> $2`, chatID, usuario); err != nil {
+		r.Usuario = r.Pidio
+		var otro string
+		var otroMail *string
+		err = tx.QueryRow(ctx, `select v.usuario_id, u.email from telegram_vinculos v join usuarios u on u.id = v.usuario_id
+			where v.chat_id = $1 and v.usuario_id <> $2 for update of v`, chatID, r.Pidio).Scan(&otro, &otroMail)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		if err == nil && otroMail == nil {
+			pidioVacia, err := cuentaVacia(ctx, tx, r.Pidio)
+			if err != nil {
+				return err
+			}
+			otroVacia, err := cuentaVacia(ctx, tx, otro)
+			if err != nil {
+				return err
+			}
+			switch {
+			case pidioVacia:
+				// La que pidió (vacía) se suma a la del chat: se queda con su mail.
+				if _, err := tx.Exec(ctx, `delete from telegram_vinculos where usuario_id = $1`, r.Pidio); err != nil {
+					return err
+				}
+				if err := unir(ctx, tx, r.Pidio, otro); err != nil {
+					return err
+				}
+				r.Usuario, r.Unida = otro, true
+				_, err = tx.Exec(ctx, `update telegram_vinculos set nombre = $2 where chat_id = $1`, chatID, nombre)
+				return err
+			case otroVacia:
+				// La del chat (vacía, sin mail) se suma a esta.
+				if _, err := tx.Exec(ctx, `delete from telegram_vinculos where usuario_id = $1`, otro); err != nil {
+					return err
+				}
+				if err := unir(ctx, tx, otro, r.Pidio); err != nil {
+					return err
+				}
+			default:
+				return ErrCuentasConDatos
+			}
+		}
+		if _, err := tx.Exec(ctx, `delete from telegram_vinculos where chat_id = $1 and usuario_id <> $2`, chatID, r.Pidio); err != nil {
 			return err
 		}
 		_, err = tx.Exec(ctx, `insert into telegram_vinculos (usuario_id, chat_id, nombre) values ($1, $2, $3)
-			on conflict (usuario_id) do update set chat_id = excluded.chat_id, nombre = excluded.nombre, creado = now()`, usuario, chatID, nombre)
+			on conflict (usuario_id) do update set chat_id = excluded.chat_id, nombre = excluded.nombre, creado = now()`, r.Pidio, chatID, nombre)
 		return err
 	})
-	return usuario, err
+	return r, err
 }
 
 // TelegramDe devuelve el vínculo de un usuario.

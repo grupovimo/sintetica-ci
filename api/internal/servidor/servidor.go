@@ -37,7 +37,8 @@ type Opciones struct {
 	MQTTUsuario     string   // el superusuario del broker (para mirar de afuera)
 	MQTTClave       string   // "" = nadie entra como superusuario
 	Secreto         []byte   // firma los links de descarga de las OTA
-	Admins          []string // emails que pueden subir firmwares
+	Admins          []string // emails que pueden subir firmwares (ADMIN_EMAILS)
+	AdminsTelegram  []int64  // los ids de Telegram que también son administradores (ADMIN_TELEGRAM)
 	Desarrollo      bool     // habilita sumar bichos virtuales y muestra los links en el log
 	BichosVirtuales []string // URLs de los bichos virtuales (desarrollo)
 	CookieSegura    bool
@@ -86,6 +87,8 @@ func (s *Servidor) Rutas() http.Handler {
 	m.HandleFunc("GET /v1/sesion", s.conSesion(s.yo))
 	m.HandleFunc("PATCH /v1/sesion", s.conSesion(s.cambiarNombre))
 	m.HandleFunc("DELETE /v1/sesion", s.conSesion(s.salir))
+	m.HandleFunc("POST /v1/sesion/email", s.conSesion(s.pedirSumarEmail))               // sumar un mail (cuenta.go)
+	m.HandleFunc("POST /v1/sesion/email/confirmar", s.conSesion(s.confirmarSumarEmail)) //
 
 	m.HandleFunc("GET /v1/eventos", s.conSesion(s.eventos))
 	m.HandleFunc("GET /v1/bichos", s.conSesion(s.listarBichos))

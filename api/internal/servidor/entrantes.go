@@ -249,6 +249,11 @@ func (s *Servidor) recibirEntrante(w http.ResponseWriter, r *http.Request) {
 			fallar(w, http.StatusBadRequest, "el webhook de GitHub no es JSON válido")
 			return
 		}
+		// Una entrega que GitHub reintenta (o se reenvía a mano) se avisa una vez.
+		if d := r.Header.Get("X-GitHub-Delivery"); a != nil && d != "" && len(d) <= 64 && !s.primeraVez(r.Context(), "gh:"+e.UsuarioID+":"+d, 72*time.Hour) {
+			responder(w, http.StatusAccepted, map[string]any{"ok": true, "ignorado": true, "repetido": true})
+			return
+		}
 	case esMercadoPago(r, cuerpo):
 		a = s.avisoMercadoPago(r.Context(), e, r, cuerpo)
 	default:
@@ -485,8 +490,8 @@ func (s *Servidor) avisoMercadoPago(ctx context.Context, e almacen.Entrante, r *
 			a.de = nombre
 		}
 	}
-	if !s.limites.permitir("mp:"+e.UsuarioID+":"+id, 1, 48*time.Hour) {
-		return nil // ya se avisó ese pago
+	if !s.primeraVez(ctx, "mp:"+e.UsuarioID+":"+id, 30*24*time.Hour) {
+		return nil // ya se avisó ese pago (Mercado Pago reintenta y manda created y updated)
 	}
 	return a
 }
@@ -551,4 +556,16 @@ func monto(v float64, moneda string) string {
 		return "US$ " + s
 	}
 	return moneda + " " + s
+}
+
+// primeraVez: true la primera vez que llega esa clave (queda en la base hasta
+// `dura`, así un reinicio de la API no hace que se avise dos veces). Si la
+// base falla, el límite en memoria.
+func (s *Servidor) primeraVez(ctx context.Context, clave string, dura time.Duration) bool {
+	ok, err := s.alm.PrimeraVez(ctx, clave, dura)
+	if err != nil {
+		s.log.Warn("entrantes: no pude anotar el aviso (uso la memoria)", "error", err)
+		return s.limites.permitir(clave, 1, dura)
+	}
+	return ok
 }

@@ -129,6 +129,7 @@ func correr(log *slog.Logger) error {
 		MQTTClave:       os.Getenv("MQTT_CLAVE"),
 		Secreto:         secreto,
 		Admins:          lista(os.Getenv("ADMIN_EMAILS")),
+		AdminsTelegram:  idsChat(os.Getenv("ADMIN_TELEGRAM")),
 		Desarrollo:      desarrollo,
 		BichosVirtuales: strings.Split(strings.ReplaceAll(os.Getenv("BICHOS_VIRTUALES"), " ", ""), ","),
 		CookieSegura:    env("COOKIE_SEGURA", "0") == "1",
@@ -257,6 +258,17 @@ func correr(log *slog.Logger) error {
 }
 
 // idChat: el id de un chat de Telegram de una variable de entorno (0 si está vacía o mal).
+// idsChat: "123, 456" → los ids (los que no son números, afuera).
+func idsChat(s string) []int64 {
+	var l []int64
+	for _, x := range strings.Split(s, ",") {
+		if n := idChat(x); n != 0 {
+			l = append(l, n)
+		}
+	}
+	return l
+}
+
 func idChat(s string) int64 {
 	n, _ := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
 	return n
