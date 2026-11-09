@@ -120,6 +120,9 @@ export async function crearSimulador(opciones) {
       comportamientos: x.sim_vida_comportamientos_hechos(),
       parpadeos: x.sim_vida_parpadeos(),
     }),
+    // La v3: la etapa, los tics, lo que pasó hoy y el diario (texto), y las pruebas del panel.
+    caracter: () => cadena(x.sim_v3_texto()),
+    accionV3: (a) => x.sim_v3_accion(a),
     caras: () => Array.from({ length: x.sim_cantidad_caras() }, (_, i) => cadena(x.sim_nombre_cara(i))),
     eventos: () => Array.from({ length: x.sim_cantidad_eventos() }, (_, i) => cadena(x.sim_nombre_evento(i))),
     forzarComportamiento: (nombre) => {

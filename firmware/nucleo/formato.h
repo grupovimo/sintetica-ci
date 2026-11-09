@@ -127,6 +127,7 @@ enum class Evento : uint8_t {
   Llegaste,       // presencia: llegaste (v1.9)
   TeFuiste,       // presencia: te fuiste (v1.9)
   Habito,         // se marcó un hábito (v1.9; si fue en el bicho, lo avisa solo)
+  Crecio,         // pasó a otra etapa (v3; lo genera el motor; si no hay regla, la de hito)
   Cantidad
 };
 // El evento "padre" (sacudida-fuerte → sacudida, caricia → tacto): si no hay
@@ -285,6 +286,7 @@ struct Config {
   Avisos avisos;
   Habitos habitos;     // v1.9
   Presencia presencia;  // v1.9
+  FechasTuyas fechas;   // v3
 
   int indiceExpresion(const char* nombre) const;
   int indiceAnimacion(const char* nombre) const;

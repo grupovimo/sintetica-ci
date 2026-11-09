@@ -20,7 +20,7 @@ export const Op = {
   cmdRed: 0x16, cmdNube: 0x17, cmdOlvidarRed: 0x18, cmdReproducir: 0x19,
   cmdHora: 0x1a, cmdVida: 0x1b, cmdMemoria: 0x1c, cmdRestaurar: 0x1d, cmdRegistro: 0x1e, cmdComportamiento: 0x1f,
   cmdDecir: 0x40, cmdClima: 0x41, cmdAlarma: 0x42, cmdJugar: 0x43, cmdAviso: 0x44, cmdAnimo: 0x45, cmdMirar: 0x46,
-  cmdToque: 0x47, cmdAgenda: 0x48, cmdPresencia: 0x49, cmdHabito: 0x4a, cmdMusica: 0x4b, cmdCharlar: 0x4c,
+  cmdToque: 0x47, cmdAgenda: 0x48, cmdPresencia: 0x49, cmdHabito: 0x4a, cmdMusica: 0x4b, cmdCharlar: 0x4c, cmdDiario: 0x4d,
   imgInicio: 0x20, imgBloque: 0x21, imgFin: 0x22, imgBorrar: 0x23, imgListar: 0x24, imgPedir: 0x25, imgListarSprites: 0x26,
   otaInicio: 0x30, otaBloque: 0x31, otaFin: 0x32, otaDescargar: 0x33, otaProgreso: 0x34, otaCancelar: 0x35,
   respuesta: 0x80, configTrozo: 0x84, configCierre: 0x85, imgTrozo: 0xa7, imgCierre: 0xa8,
@@ -42,12 +42,13 @@ export const Eventos = [
   'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito',
   'recordatorio', 'pomodoro', 'despertador', 'juego', 'animo', 'cara-detectada', 'oscuridad', 'mano-cerca',
   'toque-recibido', 'devolver-toque', 'agenda', 'llegaste', 'te-fuiste', 'habito', // v1.9
+  'crecio', // v3
 ];
 // Los tipos del comando Toque y del comando Aviso (v1.9), en orden.
 export const TiposToque = ['toque', 'abrazo', 'beso', 'carita'];
 export const TiposAviso = ['notificacion', 'llamada', 'pago', 'mail', 'github', 'pedido', 'otro'];
 // Los tipos de las entradas del registro, en orden.
-export const TiposRegistro = ['evento', 'comportamiento', 'sueño', 'hito', 'recordatorio', 'juego', 'animo', 'toque', 'habito'];
+export const TiposRegistro = ['evento', 'comportamiento', 'sueño', 'hito', 'recordatorio', 'juego', 'animo', 'toque', 'habito', 'diario'];
 // Los juegos del comando Jugar (v1.7), en orden, y los ánimos del comando Ánimo.
 export const Juegos = ['ppt', 'reflejos', 'mirada', 'dado', 'moneda'];
 export const Animos = ['bien', 'medio', 'mal'];
@@ -63,6 +64,8 @@ export const Situaciones = [
   // v1.9
   'toque-recibido', 'toque-devuelto', 'agenda', 'agenda-manana', 'te-vas', 'habito-hecho', 'habito-racha',
   'habito-cortado', 'musica', 'pago', 'mail', 'github', 'pedido', 'aviso',
+  // v3
+  'recuerdo', 'propuesta', 'crecio', 'mes-juntos', 'feriado', 'fecha-tuya', 'fecha-manana', 'mimos',
 ];
 // El estado interno y los rasgos, en el orden del protocolo (comando Vida).
 export const VariablesEstado = ['energia', 'animo', 'afecto', 'aburrimiento', 'curiosidad', 'sueno', 'estres'];
@@ -224,6 +227,8 @@ export const comando = {
     if (b.length < 1 || b.length > 200) throw new Error('el texto es de 1 a 200 bytes');
     return Uint8Array.from([Op.cmdCharlar, b.length, ...b]);
   },
+  // El diario que escribe el robot (v3): responde una línea por notificación (0xCD).
+  diario: () => Uint8Array.from([Op.cmdDiario]),
   // La respuesta al "¿cómo estás?" (v1.7): 'bien', 'medio' o 'mal'.
   animo: (a) => {
     const i = Animos.indexOf(a);
@@ -380,6 +385,22 @@ export function leerCharla(b) {
   const dia = (b[i++] << 24) >> 24, dias = b[i++];
   const textoAccion = corto(), frase = corto();
   return { noEntendi: (b[2] & 1) !== 0, falta: (b[2] & 2) !== 0, hizo: (b[2] & 4) !== 0, confianza: b[3], intencion, accion, dato, minuto, enMinutos, dia, dias, texto: textoAccion, frase };
+}
+
+// Una línea del diario (v3, la respuesta a diario() o el aviso cuando escribe una):
+// [0xCD][0][u16 día][u8 i][u8 n][u8 tipo][u8 dato][u8 etapa][texto]. día = (epoch local − 4 h) / 86400.
+// n = 0: el diario está vacío. tipo: un TiposEpisodio o 255 (un día tranquilo).
+export const TiposEpisodio = ['gane', 'perdi', 'empate', 'toque', 'animo-bien', 'animo-medio', 'animo-mal', 'tarde',
+  'posponer', 'habito', 'caricias', 'sacudida', 'musica', 'volviste', 'solo', 'crecio'];
+export const Etapas = ['recien-llegado', 'conociendonos', 'confiado', 'companero'];
+export function leerDiario(b) {
+  if (b[0] !== (Op.cmdDiario | 0x80) || b[1] !== 0 || b.length < 9) return null;
+  const tipo = b[6];
+  return {
+    dia: b[2] | (b[3] << 8), indice: b[4], total: b[5],
+    tipo: tipo === 255 ? 'tranquilo' : (TiposEpisodio[tipo] ?? `tipo ${tipo}`), dato: b[7],
+    etapa: Etapas[b[8]] ?? `etapa ${b[8]}`, texto: lector.decode(b.subarray(9)),
+  };
 }
 
 export function leerRespuesta(b) {

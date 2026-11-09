@@ -66,7 +66,7 @@ func TestCompaniaLimites(t *testing.T) {
 	if _, err := Aviso("fax", "", ""); err == nil {
 		t.Error("un aviso desconocido no vale")
 	}
-	if len(Eventos) != 45 || Eventos[39] != "toque-recibido" || Eventos[44] != "habito" {
+	if len(Eventos) != 46 || Eventos[39] != "toque-recibido" || Eventos[44] != "habito" {
 		t.Errorf("los eventos de la v1.9 van del 39 al 44: %d", len(Eventos))
 	}
 	if TiposRegistro[RegistroToque] != "toque" || TiposRegistro[RegistroHabito] != "habito" {

@@ -26,7 +26,7 @@ const (
 )
 
 // TiposRegistro: el nombre de cada tipo de entrada del registro, en orden.
-var TiposRegistro = []string{"evento", "comportamiento", "dormir", "hito", "recordatorio", "juego", "animo", "toque", "habito"}
+var TiposRegistro = []string{"evento", "comportamiento", "dormir", "hito", "recordatorio", "juego", "animo", "toque", "habito", "diario"}
 
 // TiposToque, en el orden del protocolo.
 var TiposToque = []string{"toque", "abrazo", "beso", "carita"}

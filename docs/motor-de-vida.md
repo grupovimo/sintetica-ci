@@ -1,5 +1,9 @@
 # El motor de vida (cómo está hecho)
 
+> v3 (8/11/2026): tics propios por semilla, etapas, memoria episódica y
+> diario, jugar solo, empatía que dura, clima, feriados y rutinas que aprende:
+> ver "v3" más abajo.
+
 La especificación está en [motor-de-vida-especificacion.md](motor-de-vida-especificacion.md)
 (exportada de la pestaña "Motor de vida" del doc). Acá está **cómo** se
 implementó, dónde vive cada cosa y qué decisiones se tomaron donde la
@@ -696,8 +700,201 @@ La IA (si el dueño la conectó) es el último recurso: solo cuando el motor dic
   función, pura, en paralelo) y el simulador (panel "Charla", con la voz por
   WebAudio).
 
+### La voz sin texto (`sintetica_voz_propia(2)`)
+
+`Sistema::vozPropia(modo)` (la API C: `sintetica_voz_propia`; el simulador:
+`sim_voz_propia`) tiene tres modos, y solo hacen algo si hay parlante
+(`Hal::audio`); sin él, todo sale por `Hal::sonido` como siempre:
+
+| Modo | Lee los globos | Balbucea (vocalizaciones) | Los sonidos de `voz.sonidos` |
+| --- | --- | --- | --- |
+| 0 apagada | no | no | por `Hal::sonido` |
+| 1 todo (por defecto) | sí | sí | por la voz, **no** por `Hal::sonido` |
+| 2 solo sin texto | **nunca** (los dice otro: el paquete, el mp3 de la nube, un TTS) | sí | por la voz, **no** por `Hal::sonido` |
+
+Lo que balbucea son datos (`shared/formato/vida/caracter.json`, `voz`):
+
+- `voz.sonidos`: los sonidos que **pasan a la voz** y dejan de salir por
+  `Hal::sonido` (para que el celu no los duplique): `murmullo` (hablar
+  dormido), `risa`, `tarareo`, `hip`, `achis`, `ayuda`, `llamar`, `festejo` y
+  `ronroneo`. **Todos los demás siguen por `Hal::sonido`**: `ronquido`,
+  `despertador:1` a `:5`, `recordatorio`, `pomodoro`, `dado`, `notificacion`,
+  `llamada`, `toque`, `abrazo`, `beso`, `agenda`, `pago`, `habito` y los de los
+  pasos que no estén en la tabla.
+- `voz.caras`: al llegar a esa cara (con peso ≥ 0,5, despierto) dice algo
+  corto: `sorpresa` "¡oh!", `pensando` "mmm...", `confundido` "¿eh?", `miedo`
+  "¡ay!".
+- `voz.eventos`: la reacción a un toque: `tacto` "¡ji!", `doble-toque` "¡ji ji!".
+
+El motor las pide como el sonido `voz:<cara o evento>` (`MotorVida::vocalizar`);
+ese nombre **nunca** llega a `Hal::sonido` (sin voz, no suena nada). Una
+vocalización no pisa a la voz que ya está hablando, y un globo (modo 1) sí la
+pisa a ella. Test: `v3: voz propia 2 (sin texto)…`, `v3: la tabla de la voz sin texto…`.
+
 RAM: `EstadoCharla` 72 B, `VozPropia` ~56 B, el recordatorio de una vez 41 B y
 unos timers en `Sistema`; en la pila, ~1,5 KB mientras charla.
+
+## v3: único, que crece, que recuerda, que juega solo y que te acompaña
+
+Todo lo que son tablas, frases y umbrales está en
+`shared/formato/vida/caracter.json` (con su schema, `caracter.schema.json`,
+que valida `npm run test:formato`); `npm run caras` lo pasa a tablas `const`
+(`vida_base.h`, `namespace caracter`: flash, 0 de RAM). Los comportamientos
+nuevos están en `comportamientos.json` y las frases en `frases.json`, como
+siempre. El código: `nucleo/caracter.cpp` (el motor) y `nucleo/diario.cpp` (el
+sistema). El motor **sin identidad** (los tests de la v2, que lo usan suelto)
+es el de la v2: lo de la v3 cambia la forma de ser solo en un robot con su
+semilla (el `Sistema` siempre se la da).
+
+### Único: los tics de su semilla
+
+`MotorVida::identidad(crc32(identificador))` (la MAC): un `Azar` propio da sus
+tics, **los mismos para siempre** (test "cada robot tiene sus tics"):
+
+| Tic | De dónde | Qué cambia |
+| --- | --- | --- |
+| Cómo parpadea | `tics.parpadeo` (×1 a ×1,25) y `tics.dobles` (11 a 19 %) | el intervalo y los dobles (siempre de 10 a 20 por minuto) |
+| Su velocidad | `tics.velocidad` (×0,92 a ×1,1) | la rigidez de todos los resortes |
+| Hacia dónde mira cuando piensa | `tics.pensar` (5 lados) | la mirada `perdida` (soñar despierto) y la cara `pensando` (sus `gx`/`gy` hacia su lado) |
+| Su gesto favorito | `tics.favoritos` | ese comportamiento, con afinidad ×1,6 |
+| Su microgesto | `tics.microgestos` (un ojo que se entrecierra, ladear, la trompita, achinar, un saltito, agrandar los ojos, una cejita) | cada 25 a 90 s un empujoncito suave (medio seno) a su parámetro, que los resortes redondean: nunca un corte |
+| De qué lado está "la puerta" | ±1 | adónde mira cuando te espera |
+
+### Crece: las etapas
+
+`etapas` (días juntos **y** afecto): recién llegado (0 días: timidez +0,2,
+curiosidad +0,15, picardía −0,1), conociéndonos (3 días y afecto 0,32),
+confiado (14 y 0,42) y compañero (60 y 0,55: un poco más sociable y pícaro).
+Los deltas se suman a los rasgos (`rasgos()`), así cambian las afinidades, las
+variantes de las reglas y el preset de las frases. **Nunca baja**
+(`Recuerdos::etapa`): lo que destrabó queda. Al pasar de etapa: el episodio
+`crecio`, el evento `45 crecio` (sin regla, la de `hito`: festeja) y la frase
+de `crecio`. Destraba comportamientos con `"cuando": "etapa>0.5"` (el
+`dibujito`) y se puede usar en las reglas (`"y": "etapa>1.5"`). Variables
+nuevas para las condiciones: `etapa`, `dias`, `solo`, `bajon`, `lluvia`,
+`esperando`.
+
+**Fechas propias** (en los hitos): "¡Hoy hace un mes que nos conocimos!" el
+mismo día del mes que el primer encuentro (de 1 a `meses_juntos` = 11 meses;
+el año es el aniversario de la v1.7), situación `mes-juntos` con `{cantidad}`
+("un mes", "3 meses").
+
+### Recuerda: la memoria episódica, los sueños y el diario
+
+`Recuerdos` (160 B en RAM; en la flash, la clave **`recuerdos`**, 168 B con
+versión y CRC, aparte de la memoria de 112 B que no tiene lugar; sin la clave,
+todo en cero: un robot de antes sigue andando). Guarda los últimos 16
+**episodios** (`{día, tipo, dato}`, uno por tipo y por día): ganaste o perdiste
+un juego (cuál), un toque de un amigo (cuál), tu ánimo, llegaste tarde,
+pospusiste la alarma (cuántas veces), un hábito, muchas caricias (10 en el
+día), una sacudida fuerte, música, volviste después de días, jugó solo, creció.
+El "día" es el de vida: cambia a las 4 de la mañana.
+
+- **Para hablar** (`recuerdo`): un rato (20 min) después del primer encuentro
+  del día, el episodio más importante de ayer (`importancia`) con su frase de
+  `episodios.<tipo>.recuerdo`: "Ayer me ganaste a los dados. Hoy me desquito.",
+  "Ayer estabas bajoneado. ¿Cómo amaneciste?". El de posponer lo dice el
+  despertador: si ayer pospusiste 3 veces o más, "¿Hoy también vas a posponer?".
+- **Para soñar**: la burbuja del sueño (`"dentro": "sueno"`) lleva la partícula
+  de un episodio de hoy (o de ayer, de madrugada): un juego, estrellas; un
+  abrazo o tu ánimo, corazones; música, notas; nada, ovejas. Si hoy lo
+  sacudieron fuerte, más pesadillas (60 %).
+- **El diario**: al dormirse de noche (o a la mañana, si ayer no durmió),
+  escribe hasta 3 líneas del día (los más importantes, sin repetir el tipo) con
+  las frases de `episodios.<tipo>.diario` ("Nahuel me ganó a los dados. La
+  próxima es mía.", "Día difícil para Nahuel. Le di mimos."); sin nada, una de
+  `diario_tranquilo`. Guarda las últimas 14 (en `Recuerdos`, como códigos: el
+  texto se arma al mandarlo, determinista). Contrato: comando **`0x4D` Diario**
+  y su aviso `0xCD` (protocolo-ble.md), registro tipo 9.
+
+### Juega solo y es curioso
+
+`solo` = te fuiste (`0x49`) o hace `solo_minutos` (10) que nadie lo toca. Los
+comportamientos con `solo` en sus condiciones: `perseguir-estrella` (la mirada
+nueva `particula` sigue a la última partícula: una estrella que da vueltas),
+`tararear-solo` (notas y el sonido `tarareo`), `ordenar-cosas` (mira a un lado,
+abajo, al otro, concentrado, y queda orgulloso), `dibujito` (la partícula
+nueva `garabato`, una espiral que se va dibujando abajo de los ojos; desde la
+etapa 1), `mirar-la-hora` (el relojito, mirándolo) y los de siempre (mirar
+alrededor, soñar despierto). Cuando volvés, **te propone algo**
+(`propuesta`): "¿Jugamos a los dados?" (el juego que más jugaron,
+`Recuerdos::juegos`) o "¿Me contás algo sobre el mate?" (uno de tus gustos de la
+charla); sin ninguno, "¿Hacemos algo juntos?".
+
+### Empatía que dura, el clima, la estación y las fechas
+
+- **El bajón** (`empatia`): el peor ánimo de cada día (el "¿cómo estás?", la
+  charla) en los últimos 7 días (`Recuerdos::animos`). Con 2 días respondidos o
+  más en los últimos 4 y un promedio ≥ 0,5 (mal = 1, más o menos = 0,5),
+  cambia su forma de ser esos días: picardía −0,25 (menos chistes y travesuras),
+  sociabilidad +0,15 (más cariñoso: el preset de las frases se corre a
+  cariñoso), energía −0,1 y resortes un 10 % más blandos (más suave); el
+  comportamiento `mimos` (cara enamorada a medias, mirando al frente y la frase
+  de `mimos`) y te pregunta "¿cómo estás?" otra vez a las 5 horas.
+- **La lluvia** (el clima de la nube, `0x41`): energía −0,08, curiosidad −0,05
+  y resortes ×0,94; `mirar-la-lluvia` (mira para arriba, gotas).
+- **La estación** (hemisferio sur, por la fecha): primavera energía +0,06 y
+  curiosidad +0,05; verano +0,03; otoño −0,02; invierno −0,05.
+- **Los feriados argentinos** (`feriados`, una vez por año cada uno, como
+  hito): los de fecha fija y los de la pascua (Carnaval, Viernes Santo:
+  algoritmo de la pascua gregoriana). Los serios (el Día de la Memoria,
+  Malvinas, Viernes Santo, Güemes, San Martín) **no se festejan**: solo "Hoy es
+  el Día de la Memoria." (`feriado`, `{titulo}`).
+- **Las fechas tuyas** (config **`fechas`**, hasta 6: `{"fecha": "MM-DD",
+  "texto": "el cumple de mamá"}`, texto de 1 a 40 bytes): el día antes,
+  "Mañana es el cumple de mamá." (`fecha-manana`); ese día, "¡Acordate: hoy es
+  el cumple de mamá!" (`fecha-tuya`). Sin festejo.
+
+### Rutinas que aprende
+
+`Recuerdos::minLlegada` y `minDormis` (promedio móvil, `aprender` = 0,25 por
+vez): llegás = la primera interacción después de 3 h (de día) o el `0x49`
+"llegaste"; te dormís = la última interacción antes de que se duerma de noche
+o el `0x49` "te fuiste" después de las 20.
+
+- **Se despierta antes**: dormido (siesta o de noche), `despertar_antes` (10)
+  minutos antes de que llegues, se despierta solo (una vez por día).
+- **Te espera mirando la puerta**: de `esperar_antes` (15) min antes a
+  `esperar_despues` (30) después, si no te vio hace media hora, mira hacia su
+  "puerta" (y de vez en cuando al frente); `esperar-en-la-puerta`
+  (`esperando`).
+- **A la hora en que te dormís**: en los `dormis_antes` (30) min antes, el
+  brillo baja hasta un 25 % y el sueño sube hasta 0,3 (así bosteza y cabecea
+  solo), y bosteza una vez al empezar.
+
+### Los números
+
+RAM: `Recuerdos` 160 B, `Caracter` 32 B y ~60 B de estado en el motor;
+`FechasTuyas` 266 B en `Config`; 8 comportamientos de base más
+(`MAX_COMPORTAMIENTOS` 75, 66 de base: el usuario sigue con 9 propios; 232 B
+cada uno, ~1,9 KB). Flash: las tablas de `caracter.json` (~6 KB).
+
+Tests (`firmware/test/test_vida3.cpp`, `./build/nucleo/pruebas "v3:"`): los
+tics por id, el microgesto, las etapas (y que no bajan), el mes juntos, el
+recuerdo de ayer, el diario (0x4D, el aviso, la flash), de noche lo escribe
+solo, los sueños del día, jugar solo y la propuesta, la mirada que sigue a la
+partícula, el bajón, la lluvia y la estación, los feriados (sin festejo; el
+Carnaval), las fechas tuyas, las rutinas (llegás, la puerta, despertarse antes,
+la hora en que te dormís) y la voz sin texto.
+
+**Simulador** (`npm run sim`): en "Motor de vida", **Carácter (v3)** muestra
+la etapa, los tics, lo que pasó hoy, el bajón, si te espera, a qué hora llegás
+y las últimas líneas del diario, con botones para irte, llegar, un bajón de 3
+días, que llueva (el `0x41` de verdad), sumar 20 días juntos (crece) y escribir
+el diario ya.
+
+### Lo que tiene que hacer la nube y la consola (después)
+
+- **Nube**: guardar cada `0xCD` que llega solo (el diario, por robot y día;
+  `api/internal/protocolo`: `LeerDiario`) y, al conectar, pedir `0x4D` para
+  completar; mostrarlo en "su día contado" y por Telegram si se quiere. Mandar
+  el `0x49` (presencia) y el clima como hasta ahora: ahora además enseñan las
+  rutinas. El evento `45 crecio` puede avisar "{robot} ya confía en vos".
+- **Consola**: un módulo **Diario** (las líneas por día, con su ícono por tipo),
+  la **etapa** (recién llegado → compañero) y los días juntos; las **fechas
+  tuyas** (config `fechas`, hasta 6) en "Su día"; y en el Laboratorio, los
+  comportamientos nuevos, las miradas `particula` y `puerta`, la partícula
+  `garabato` y las variables nuevas para las condiciones.
 
 ## Protocolo v1.4
 

@@ -145,6 +145,8 @@ const vectores = {
     { nombre: 'aviso github', tipo: 'github', app: 'PR #12', contacto: 'octocat', hex: hex(comando.aviso({ tipo: 'github', app: 'PR #12', contacto: 'octocat' })) },
     // v1.10: la charla sin IA.
     { nombre: 'charlar hola', texto: '¡Hola, Toto!', hex: hex(comando.charlar('¡Hola, Toto!')) },
+    // v3: el diario.
+    { nombre: 'diario', hex: hex(comando.diario()) },
     { nombre: 'ota cancelar', hex: hex(ota.cancelar()) },
   ],
   ota: {

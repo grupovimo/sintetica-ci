@@ -19,7 +19,8 @@ ResultadoConfig falla(const char* detalle, ErrorConfig e = ErrorConfig::Campo) {
 const char* const NOMBRES_VAR[static_cast<int>(VarVida::Cantidad)] = {
     "energia", "animo", "afecto", "aburrimiento", "curiosidad", "sueno", "estres",
     "rasgo.energia", "rasgo.sociabilidad", "rasgo.picardia", "rasgo.timidez", "rasgo.curiosidad", "rasgo.malGenio",
-    "bateria", "hora", "humor", "ignorado", "ausencia", "rencor", "dormido", "noche", "cargando"};
+    "bateria", "hora", "humor", "ignorado", "ausencia", "rencor", "dormido", "noche", "cargando",
+    "etapa", "dias", "solo", "bajon", "lluvia", "esperando"};
 
 const char* const NOMBRES_RASGO[N_RASGOS] = {"energia", "sociabilidad", "picardia", "timidez", "curiosidad", "malGenio"};
 
@@ -35,7 +36,7 @@ const char* const NOMBRES_PARTES[N_PARTES_SPRITE] = {"ojo", "ojo_cerrado", "ojo_
 
 const char* const NOMBRES_MIRADA[static_cast<int>(Mirada::Cantidad)] = {
     "libre", "frente", "arriba", "abajo", "izquierda", "derecha", "lado", "alrededor", "perdida", "reojo", "estimulo",
-    "rem", "ovejas"};
+    "rem", "ovejas", "particula", "puerta"};
 
 template <int N>
 int buscarNombre(const char* const (&tabla)[N], const char* n) {

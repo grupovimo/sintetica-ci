@@ -15,7 +15,7 @@ const char* const NOMBRES_EVENTO[] = {
     "ruido", "musica", "silencio", "notificacion", "llamada", "bateria-baja", "bateria-critica", "enchufado",
     "desenchufado", "cargado", "sin-wifi", "cambio-de-cara", "bicho-cerca", "volvio", "hito",
     "recordatorio", "pomodoro", "despertador", "juego", "animo", "cara-detectada", "oscuridad", "mano-cerca",
-    "toque-recibido", "devolver-toque", "agenda", "llegaste", "te-fuiste", "habito"};
+    "toque-recibido", "devolver-toque", "agenda", "llegaste", "te-fuiste", "habito", "crecio"};
 static_assert(sizeof NOMBRES_EVENTO / sizeof NOMBRES_EVENTO[0] == static_cast<int>(Evento::Cantidad), "eventos");
 
 // Memoria de trabajo compartida (no reentrante: el núcleo corre en un solo hilo).
@@ -431,6 +431,8 @@ Evento eventoPadre(Evento e) {
       return Evento::Levantado;
     case Evento::Nombre:
       return Evento::Voz;
+    case Evento::Crecio:
+      return Evento::Hito;
     default:
       return Evento::Cantidad;
   }
@@ -771,6 +773,7 @@ ResultadoConfig aplicarSobre(Config& c, const char* texto, size_t n) {
   if (const char* m = leerAvisos(j, 0, c, &c.avisos)) return error(ErrorConfig::Campo, m);
   if (const char* m = leerHabitos(j, 0, &c.habitos)) return error(ErrorConfig::Campo, m);
   if (const char* m = leerPresencia(j, 0, &c.presencia)) return error(ErrorConfig::Campo, m);
+  if (const char* m = leerFechas(j, 0, &c.fechas)) return error(ErrorConfig::Campo, m);
 
   int modo = j.buscar(0, "modo");
   if (modo >= 0) {

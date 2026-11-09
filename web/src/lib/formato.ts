@@ -13,6 +13,7 @@ export const EVENTOS = [
   'desenchufado', 'cargado', 'sin-wifi', 'cambio-de-cara', 'bicho-cerca', 'volvio', 'hito', 'recordatorio', 'pomodoro', 'despertador',
   'juego', 'animo', 'cara-detectada', 'oscuridad', 'mano-cerca',
   'toque-recibido', 'devolver-toque', 'agenda', 'llegaste', 'te-fuiste', 'habito',
+  'crecio',
 ] as const;
 export const NOMBRES_EVENTO: Record<string, string> = {
   tacto: 'Lo tocan', 'doble-toque': 'Doble toque', levantado: 'Lo levantan', sacudida: 'Lo sacuden (cualquiera)',
@@ -28,6 +29,7 @@ export const NOMBRES_EVENTO: Record<string, string> = {
   'mano-cerca': 'Una mano cerca',
   'toque-recibido': 'Le llega un toque', 'devolver-toque': 'Devolvés un toque', agenda: 'Se viene un evento',
   llegaste: 'Llegás', 'te-fuiste': 'Te vas', habito: 'Marcás un hábito',
+  crecio: 'Crece (otra etapa)',
 };
 
 // El robot cuenta los textos en bytes UTF-8 (una tilde ocupa 2): se corta sin partir una letra.
@@ -68,10 +70,10 @@ export const MOVIMIENTOS = ['ninguno', 'rebote', 'saltitos', 'risa', 'mirada-lad
 export const PARTICULAS: readonly string[] = __PARTICULAS__;
 // Cómo se ve cada una en una tecla.
 export const GLIFO_PARTICULA: Record<string, string> = {
-  zzz: 'z', corazon: '♥', lagrima: '💧', gota: '·', chispa: '✦', pregunta: '?', exclamacion: '!', nota: '♪', estrella: '★', burbuja: '○', oveja: '🐑', reloj: '⏱',
+  zzz: 'z', corazon: '♥', lagrima: '💧', gota: '·', chispa: '✦', pregunta: '?', exclamacion: '!', nota: '♪', estrella: '★', burbuja: '○', oveja: '🐑', reloj: '⏱', garabato: '✎',
 };
 export const PARPADEOS = ['normal', 'menos', 'mas', 'no', 'lento', 'rapido', 'doble'] as const;
-export const MIRADAS = ['libre', 'frente', 'arriba', 'abajo', 'izquierda', 'derecha', 'lado', 'alrededor', 'perdida', 'reojo', 'estimulo', 'rem', 'ovejas'] as const;
+export const MIRADAS = ['libre', 'frente', 'arriba', 'abajo', 'izquierda', 'derecha', 'lado', 'alrededor', 'perdida', 'reojo', 'estimulo', 'rem', 'ovejas', 'particula', 'puerta'] as const;
 // Los parámetros del ojo y los globales, con sus límites (los de la marca: config.schema.json).
 export const PARAMS_OJO: [string, number, number, string][] = [
   ['w', 0.03, 0.2, 'Ancho'], ['h', 0.03, 0.32, 'Alto'], ['r', 0, 1, 'Redondez'], ['tilt', -0.6, 0.6, 'Inclinación'],
@@ -241,6 +243,7 @@ export const SITUACIONES = [
   'buen-dia', 'comiste', 'a-dormir', 'tardaste', 'agua', 'pausa', 'como-estas', 'animo-bien', 'animo-medio', 'animo-mal', 'jugar', 'gane', 'perdi', 'empate', 'anio-nuevo', 'navidad', 'dia-del-amigo', 'dia-del-nino', 'aniversario',
   'toque-recibido', 'toque-devuelto', 'agenda', 'agenda-manana', 'te-vas', 'habito-hecho', 'habito-racha', 'habito-cortado',
   'musica', 'pago', 'mail', 'github', 'pedido', 'aviso',
+  'recuerdo', 'propuesta', 'crecio', 'mes-juntos', 'feriado', 'fecha-tuya', 'fecha-manana', 'mimos',
 ] as const;
 export type Situacion = (typeof SITUACIONES)[number];
 export const NOMBRES_SITUACION: Record<Situacion, string> = {
@@ -252,6 +255,8 @@ export const NOMBRES_SITUACION: Record<Situacion, string> = {
   'toque-recibido': 'Le llega un toque', 'toque-devuelto': 'Devolvés el toque', agenda: 'Se viene un evento', 'agenda-manana': 'Mañana',
   'te-vas': 'Te vas', 'habito-hecho': 'Hábito hecho', 'habito-racha': 'Racha', 'habito-cortado': 'Se cortó la racha',
   musica: 'Música', pago: 'Te pagaron', mail: 'Un mail', github: 'GitHub', pedido: 'Un pedido', aviso: 'Un aviso',
+  recuerdo: 'Se acuerda de ayer', propuesta: 'Te propone algo', crecio: 'Crece', 'mes-juntos': 'Meses juntos',
+  feriado: 'Feriado', 'fecha-tuya': 'Tu fecha', 'fecha-manana': 'Tu fecha, mañana', mimos: 'Mimos',
 };
 export const MAX_FRASES = 12;
 export const MAX_TEXTO = 60;

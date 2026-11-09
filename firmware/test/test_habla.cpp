@@ -29,7 +29,8 @@ std::string completar(const char* p, const char* dueno, const char* robot = "Luc
 // Las plantillas de la v1.9, en lo más largo que pueden venir.
 const Plantilla LARGAS[] = {{"de", "Maximiliano Bartolomeo X"}, {"titulo", "Reunión de directorio con todo el equipo"},
                             {"minutos", "15"}, {"cantidad", "12"}, {"racha", "255"}, {"habito", "Meditar diez min"},
-                            {"artista", "Los Fabulosos Cadillacs"}};
+                            {"artista", "Los Fabulosos Cadillacs"}, {"juego", "piedra, papel o tijera"},
+                            {"gusto", "las empanadas de carne cortadas a cuchillo"}};
 }  // namespace
 
 PRUEBA("habla: las situaciones del núcleo y las de frases.json son las mismas") {

@@ -2,6 +2,7 @@
 // El navegador (sim/web/sim.js) da el reloj, la pantalla (un canvas), el
 // almacenamiento (localStorage) y recibe las notificaciones BLE.
 #include "sistema.h"
+#include "vida_base.h"
 
 using namespace sintetica;
 
@@ -102,7 +103,7 @@ __attribute__((export_name("sim_charlar"))) int sim_charlar(int n) {
   RespuestaCharla r;
   return g_sistema.charlar(reinterpret_cast<const char*>(g_intercambio), static_cast<size_t>(n), &r) ? 1 : 0;
 }
-__attribute__((export_name("sim_voz_propia"))) void sim_voz_propia(int si) { g_sistema.vozPropia(si != 0); }
+__attribute__((export_name("sim_voz_propia"))) void sim_voz_propia(int si) { g_sistema.vozPropia(si); }
 __attribute__((export_name("sim_tacto"))) void sim_tacto(int apretado) { g_sistema.tacto(apretado != 0); }
 __attribute__((export_name("sim_imu"))) void sim_imu(float ax, float ay, float az) { g_sistema.imu(ax, ay, az); }
 __attribute__((export_name("sim_evento"))) void sim_evento(int e) {
@@ -318,6 +319,76 @@ __attribute__((export_name("sim_vida_comportamientos_hechos"))) int sim_vida_com
   return static_cast<int>(g_sistema.motor().comportamientosEmpezados());
 }
 __attribute__((export_name("sim_vida_parpadeos"))) int sim_vida_parpadeos() { return static_cast<int>(g_sistema.motor().parpadeos()); }
+// La v3 (el panel "Carácter"): la etapa, los tics, lo que pasó hoy, el diario.
+namespace {
+char g_v3[720];
+size_t g_v3n = 0;
+void v3(const char* s) { g_v3n += copiarTexto(g_v3 + g_v3n, sizeof g_v3 - g_v3n, s); }
+void v3n(int v) {
+  char d[12];
+  int n = 0;
+  bool neg = v < 0;
+  unsigned u = static_cast<unsigned>(neg ? -v : v);
+  do d[n++] = static_cast<char>('0' + u % 10), u /= 10;
+  while (u && n < 11);
+  if (neg) d[n++] = '-';
+  char t[12];
+  for (int i = 0; i < n; i++) t[i] = d[n - 1 - i];
+  t[n] = 0;
+  v3(t);
+}
+}  // namespace
+__attribute__((export_name("sim_v3_texto"))) const char* sim_v3_texto() {
+  const MotorVida& m = g_sistema.motor();
+  const Caracter& c = m.caracter();
+  const Recuerdos& r = m.recuerdos();
+  g_v3n = 0;
+  g_v3[0] = 0;
+  v3("etapa: "), v3(m.nombreEtapa()), v3(" · días: "), v3n(m.memoria().dias);
+  v3("\ntics: parpadeo ×"), v3n(static_cast<int>(c.parpadeo * 100)), v3("% · velocidad ×"), v3n(static_cast<int>(c.velocidad * 100));
+  v3("% · favorito: "), v3(c.favorito >= 0 ? caracter::FAVORITOS[c.favorito] : "-");
+  v3(" · microgesto: "), v3(c.microgesto >= 0 ? caracter::MICROGESTOS[c.microgesto].nombre : "-");
+  v3("\nhoy: ");
+  const uint16_t hoy = m.diaVida();
+  int k = 0;
+  for (int i = 0; i < r.nEpisodios; i++) {
+    const Episodio& e = r.episodios[(r.iniEpisodios + i) % MAX_EPISODIOS];
+    if (e.dia != hoy || e.tipo >= caracter::N_EPISODIOS) continue;
+    if (k++) v3(", ");
+    v3(caracter::EPISODIOS[e.tipo].nombre);
+  }
+  if (!k) v3("nada todavía");
+  const float b = m.bajon();
+  v3("\nbajón: "), v3(b < 0 ? "no sabe" : m.empatico() ? "sí" : "no");
+  v3(" · espera: "), v3(m.esperando() ? "sí" : "no");
+  v3(" · llegás: ");
+  if (r.minLlegada < 1440) v3n(r.minLlegada / 60), v3(":"), v3(r.minLlegada % 60 < 10 ? "0" : ""), v3n(r.minLlegada % 60);
+  else v3("-");
+  for (int i = r.nDiario > 3 ? r.nDiario - 3 : 0; i < r.nDiario; i++) {
+    char t[LARGO_FRASE];
+    if (g_sistema.textoEpisodio(r.diario[(r.iniDiario + i) % MAX_DIARIO], true, t, sizeof t)) v3("\ndiario: "), v3(t);
+  }
+  return g_v3;
+}
+// 0: escribir el diario de hoy ya; 1: estuviste bajoneado (tres días); 2: te fuiste; 3: llegaste;
+// 4: pasaron 20 días juntos (crece).
+__attribute__((export_name("sim_v3_accion"))) void sim_v3_accion(int a) {
+  MotorVida& m = g_sistema.motor();
+  if (a == 0) m.escribirDiario(m.diaVida());
+  if (a == 1) {
+    Recuerdos r = m.recuerdos();
+    r.diaAnimos = m.diaVida(), r.animos[0] = r.animos[1] = r.animos[2] = 3;
+    m.restaurarRecuerdos(r);
+  }
+  if (a == 2 || a == 3) g_sistema.presencia(a == 3);
+  if (a == 4) {
+    Memoria x = m.memoria();
+    if (!x.nacimiento) x.nacimiento = g_sistema.epoch() ? g_sistema.epoch() - 20 * 86400 : 1;
+    x.dias = static_cast<uint16_t>(x.dias + 20);
+    x.estado[2] = 160, x.epochEstado = g_sistema.epoch();
+    m.restaurarMemoria(x);
+  }
+}
 // Las expresiones paramétricas de la config del bicho.
 __attribute__((export_name("sim_cantidad_caras"))) int sim_cantidad_caras() { return g_sistema.config().vida.nCaras; }
 __attribute__((export_name("sim_nombre_cara"))) const char* sim_nombre_cara(int i) {

@@ -328,6 +328,7 @@ function cuadro(t) {
       $('v-comportamiento').textContent = v.dormido ? (v.sonando ? 'soñando' : 'durmiendo') : (v.comportamiento || 'nada en especial');
       $('v-candidatos').textContent = v.candidatos.length
         ? '· el último sorteo: ' + v.candidatos.map((c) => `${c.nombre} ${c.puntaje.toFixed(2)}`).join(', ') : '';
+      if ($('v-caracter').closest('details').open) $('v-caracter').textContent = sim.caracter();
       const { minuto } = sim.hora();
       $('v-hora').textContent = `${String(Math.floor(minuto / 60)).padStart(2, '0')}:${String(minuto % 60).padStart(2, '0')}` +
         (sim.velocidad() !== 1 ? ` · × ${sim.velocidad()}` : '');
@@ -372,6 +373,12 @@ function enlazar() {
     e.currentTarget.setAttribute('aria-pressed', String(si));
     escribir(Car.comando, comando.vida(si));
   });
+  // La v3: irse, llegar, un bajón, lluvia (el 0x41 de verdad), crecer y el diario.
+  document.querySelectorAll('[data-v3]').forEach((b) => b.addEventListener('click', () => {
+    const a = b.dataset.v3;
+    if (a === 'lluvia') escribir(Car.comando, comando.clima({ temp: 13, codigo: 63, max: 15, min: 9, ciudad: 'Rosario' }), '(llueve)');
+    else sim.accionV3(Number(a));
+  }));
   $('b-comportamiento').addEventListener('click', () => {
     const n = $('s-comportamiento').value;
     if (n && !sim.forzarComportamiento(n)) anotar(`· no pude empezar ${n}`, 'mal');

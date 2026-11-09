@@ -4,6 +4,7 @@
 #include "globo.h"
 #include "fuentes.h"
 #include "texto.h"
+#include "vida_base.h"
 
 namespace sintetica {
 
@@ -137,8 +138,13 @@ void Sistema::iniciar(const Hal& hal, uint16_t* pixeles, const Perfil& perfil) {
     auto* s = static_cast<Sistema*>(c);
     if (s->hal_.guardar) s->hal_.guardar(CLAVE_VIDA, d, n);
   };
+  sv.guardarRecuerdos = [](void* c, const uint8_t* d, size_t n) { static_cast<Sistema*>(c)->guardarRecuerdos(d, n); };
+  sv.diario = [](void* c, uint16_t dia, uint8_t tipo, uint8_t dato) { static_cast<Sistema*>(c)->lineaDiarioNueva(dia, tipo, dato); };
   motor_.salidas(sv);
   leerMemoria();
+  leerRecuerdos();
+  // v3: sus tics salen del identificador (la MAC): los mismos para siempre.
+  motor_.identidad(protocolo::crc32(reinterpret_cast<const uint8_t*>(id_), largo(id_)));
   leerAjustes();
   leerImagenes();
   leerSprites();
@@ -1010,6 +1016,8 @@ void Sistema::tick() {
     responderAnimo(2);
   }
   avanzarPomodoro(ahora, dtCuadro);
+  // v3: si llueve, más tranquilo.
+  motor_.clima(climaVigente() && situacionClima(clima_) == Situacion::ClimaLluvia);
   motor_.tick(ahora, contexto());
   avanzarVoz(ahora);
   avanzarSprites(dtCuadro);
@@ -1156,9 +1164,39 @@ void aMayusculas(char* s) {
 int minutosEntre(int desde, int hasta) { return ((hasta - desde) % 1440 + 1440) % 1440; }
 }  // namespace
 
+const char* Sistema::vocalizacion(const char* sonido) const {
+  if (!vozModo_ || !hal_.audio || !sonido) return nullptr;
+  if (iguales(sonido, "voz:", 4)) {
+    const char* k = sonido + 4;
+    for (const VozBase& v : caracter::VOZ_CARAS)
+      if (iguales(v.clave, k)) return v.texto;
+    for (const VozBase& v : caracter::VOZ_EVENTOS)
+      if (iguales(v.clave, k)) return v.texto;
+    return nullptr;
+  }
+  for (const VozBase& v : caracter::VOZ_SONIDOS)
+    if (iguales(v.clave, sonido)) return v.texto;
+  return nullptr;
+}
+
 void Sistema::sonar(const char* nombre) {
   // "voz": volumen 0 silencia todo.
-  if (hal_.sonido && config_.voz.volumen > 0) hal_.sonido(nombre);
+  if (config_.voz.volumen == 0) return;
+  // Con la voz propia, los de "voz.sonidos" (y las vocalizaciones "voz:…")
+  // los balbucea ella y no salen por Hal::sonido: el que tiene parlante no
+  // los duplica. Si ya está diciendo algo, no lo pisa (y tampoco suena).
+  const char* v = vocalizacion(nombre);
+  if (v) {
+    if (voz_.hablando()) return;
+    const float* est = motor_.estadoInterno();
+    voz_.empezar(v, paramsVoz(static_cast<int>(config_.voz.tipo), config_.voz.volumen, motor_.rasgos(), est[0], est[1]));
+    vozSuelta_ = true;
+    vozDesde_ = hal_.ahoraMs();
+    vozEnviadas_ = 0;
+    return;
+  }
+  if (iguales(nombre, "voz:", 4)) return;  // una vocalización sin voz propia: nada
+  if (hal_.sonido) hal_.sonido(nombre);
 }
 
 // Un evento que genera el sistema (recordatorio, pomodoro): además del
@@ -1236,7 +1274,8 @@ void Sistema::mostrarGlobo(uint32_t ahora) {
   globoHasta_ = ahora + dura + tiemposPanel::FUNDIDO_MS;
   if (motor_.dormido()) motor_.despertar(ahora, false);
   // Con parlante, lo dice con su voz (el balbuceo sigue el texto del globo).
-  if (vozPropia_ && hal_.audio && config_.voz.volumen > 0) {
+  if (vozModo_ == 1 && hal_.audio && config_.voz.volumen > 0) {
+    vozSuelta_ = false;
     const float* est = motor_.estadoInterno();
     voz_.empezar(globoTexto_, paramsVoz(static_cast<int>(config_.voz.tipo), config_.voz.volumen, motor_.rasgos(), est[0], est[1]));
     vozDesde_ = ahora;
@@ -1253,6 +1292,7 @@ void Sistema::mostrarGlobo(uint32_t ahora) {
 
 void Sistema::hablar(Situacion s, Plantillas extra) {
   if (apagado_ || emparejando_) return;
+  if (!extra.n && hablarV3(s)) return;  // las de la v3 llevan sus plantillas
   const bool siempre = situacionSiempre(s);
   // "Callate": una hora sin frases espontáneas.
   if (!siempre && calladoHasta_ && static_cast<int32_t>(hal_.ahoraMs() - calladoHasta_) < 0) return;
@@ -1317,7 +1357,16 @@ void Sistema::sonarAlarma(bool porHora) {
     if (i >= 0) motor_.comportamiento(i, ahora);
   }
   char t[LARGO_FRASE];
-  if (config_.despertador.texto[0]) completarFrase(config_.despertador.texto, config_.vida.dueno, nombre(), t, sizeof t);
+  // v3: si ayer la pospusiste 3 veces o más, "¿Hoy también vas a posponer?".
+  uint8_t veces = 0;
+  const uint16_t hoy = motor_.diaVida();
+  Episodio ayer;
+  ayer.dia = static_cast<uint16_t>(hoy - 1), ayer.tipo = static_cast<uint8_t>(TipoEpisodio::Posponer);
+  const bool pospusoAyer = porHora && hoy && motor_.ocurrio(ayer.dia, TipoEpisodio::Posponer, &veces) && veces >= 3;
+  ayer.dato = veces;
+  if (pospusoAyer && textoEpisodio(ayer, false, t, sizeof t)) {
+    // (ya está en t)
+  } else if (config_.despertador.texto[0]) completarFrase(config_.despertador.texto, config_.vida.dueno, nombre(), t, sizeof t);
   else if (!elegirFrase(config_.habla, Situacion::Despertador, presetCercano(motor_.rasgos()), config_.vida.dueno, nombre(),
                         azar_, t, sizeof t))
     copiarTexto(t, sizeof t, "\xC2\xA1" "Buen d\xC3\xAD" "a!");
@@ -1367,6 +1416,7 @@ void Sistema::posponerAlarma() {
   const uint32_t ahora = hal_.ahoraMs();
   alarma_ = false;
   pospuestaHasta_ = ahora + config_.despertador.posponer * 60000u;
+  motor_.recordar(TipoEpisodio::Posponer, 0, true);  // v3: cuántas veces hoy
   motor_.interaccion(ahora);
   hablar(Situacion::Posponer);
 }
@@ -2412,6 +2462,9 @@ void Sistema::procesar(uint8_t car, const uint8_t* d, size_t n) {
         if (n != 4 || d[1] >= MAX_HABITOS || d[2] > 1) return responder(car, op, Malformado, "[u8 índice 0-3][u8 0 hecho, 1 deshacer][u8 racha]");
         return responder(car, op, habito(d[1], d[2] == 0, d[3]) ? Ok : NoExiste);
       }
+      case CmdDiario:
+        if (n != 1) return responder(car, op, Malformado, "sin datos");
+        return enviarDiario();
       case CmdCharlar: {
         // [n][texto]
         if (n < 3 || d[1] == 0 || 2u + d[1] != n || d[1] > MAX_ENTRADA_CHARLA ||

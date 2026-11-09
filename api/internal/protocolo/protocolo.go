@@ -116,6 +116,7 @@ var Eventos = []string{
 	// v1.9: llegó un toque de un amigo, lo devolvió (lo avisa solo), llegó la
 	// agenda (0 a 15 min), presencia y se marcó un hábito (lo avisa solo).
 	"toque-recibido", "devolver-toque", "agenda", "llegaste", "te-fuiste", "habito",
+	"crecio", // v3: pasó a otra etapa (lo genera el motor)
 }
 
 // VariablesEstado y Rasgos: el estado interno y la personalidad, en el orden del protocolo.
