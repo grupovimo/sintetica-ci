@@ -45,10 +45,13 @@ class Voz(private val contexto: Context) {
     @Volatile var modoPropia = 0
     private var pistaPropia: AudioTrack? = null
     @Volatile private var mp3Hasta = 0L
+    private var ultimoLogPropia = 0L
 
     /** Lo llama el núcleo (hilo de GL) con cada bloque de la voz propia. */
     fun propia(m: ShortArray) {
         if (modoPropia == 0 || callada || config[0] <= 0 || SystemClock.elapsedRealtime() < mp3Hasta) return
+        // El núcleo también manda silencio: eso no cuenta como hablar (si no, el oído queda sordo).
+        if (Oido.dbfs(m, m.size) < -70f) return
         val p = pistaPropia ?: AudioTrack.Builder()
             .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
@@ -58,7 +61,11 @@ class Voz(private val contexto: Context) {
             .setBufferSizeInBytes(16000 * 2)
             .build().also { it.play(); pistaPropia = it }
         p.setVolume(config[0] / 100f)
-        p.write(m, 0, m.size, AudioTrack.WRITE_NON_BLOCKING)
+        val escritas = p.write(m, 0, m.size, AudioTrack.WRITE_NON_BLOCKING)
+        if (SystemClock.elapsedRealtime() - ultimoLogPropia > 2000) {
+            ultimoLogPropia = SystemClock.elapsedRealtime()
+            Log.i("Bicho", "voz propia: ${m.size} muestras a ${Oido.dbfs(m, m.size).toInt()} dB (escribió $escritas)")
+        }
         ocupar(m.size * 1000L / 16000)
     }
 

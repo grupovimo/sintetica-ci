@@ -32,6 +32,7 @@ class Bicho : Activity() {
 
     override fun onCreate(estado: Bundle?) {
         super.onCreate(estado)
+        cerrarOtrasCopias()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val red = Red(filesDir)
         val archivos = java.io.File(filesDir, "archivos").apply { mkdirs() }.path
@@ -98,6 +99,20 @@ class Bicho : Activity() {
             cuadro++
         }
         Avisos.alAviso = { comando -> vista.queueEvent { Nucleo.nubeEscribir(2, comando) } }
+    }
+
+    /**
+     * Una sola copia: después de reinstalar, el proceso viejo puede quedar vivo
+     * (en kiosco ni force-stop lo cierra) y las dos se pelean la nube (el mismo
+     * id en MQTT) y el micrófono.
+     */
+    private fun cerrarOtrasCopias() {
+        val am = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
+        val yo = android.os.Process.myPid()
+        am.runningAppProcesses?.filter { it.processName == packageName && it.pid != yo }?.forEach {
+            Log.w("Bicho", "había otra copia (pid ${it.pid}): la cierro")
+            android.os.Process.killProcess(it.pid)
+        }
     }
 
     override fun onDestroy() {
