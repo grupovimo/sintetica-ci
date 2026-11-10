@@ -90,9 +90,35 @@ adb shell am broadcast -a sintetica.EVENT --es tipo sacudida-fuerte  # cualquier
 adb shell am broadcast -a sintetica.EVENT --es tipo depuracion        # datos en pantalla
 adb shell am broadcast -a sintetica.EVENT --es tipo tiempo --ei x 720 # un día en 2 minutos (x 1 = normal)
 adb shell am broadcast -a sintetica.EVENT --es tipo comando --es hex 4202  # un comando (acá, sonar el despertador; 4200 lo apaga, 4303 el dado)
+adb shell am broadcast -a sintetica.EVENT --es tipo charlar --es texto "qué hora es"  # la charla sin IA, sin hablarle
+adb shell am broadcast -a sintetica.EVENT --es tipo transcribir --ez si true         # anota lo que oye (solo diagnosticar; se apaga al reiniciar)
+adb shell am broadcast -a sintetica.EVENT --es tipo silencio --ez si false           # la voz del bicho (el despertador suena igual)
+adb shell am broadcast -a sintetica.EVENT --es tipo voz-propia --ei modo 2           # 0 sin, 1 todo, 2 solo sin texto (por defecto)
+adb shell am broadcast -a sintetica.EVENT --es tipo duenio --es wifi <MAC> --es bt <MAC>  # el celu del dueño (presencia)
 adb logcat -s Bicho SinteticaOS
 adb exec-out screencap -p > captura.png
+adb shell ps | grep sintetica   # una sola copia (tras reinstalar, la vieja puede quedar viva; al arrancar la cierra)
 ```
+
+En el registro: `comportamiento:` (cada uno nuevo), `charla:` (la palabra, lo que
+entendió, la compuerta por minuto), `voz:` / `voz propia:`, `presencia:` y
+`paquete de voz:`.
+
+## Cómo habla y escucha
+
+- **Oído**: Vosk (modelo chico en español, en el celu) espera la palabra con
+  una gramática de una sola palabra y la confirma con la lectura libre del
+  último 1,5 s. Después transcribe la frase dos veces, una libre y otra acotada
+  a las palabras de `shared/formato/charla/intenciones.json`.
+- **Charla**: primero el motor del núcleo (`sintetica_charlar`, sin red). Lo
+  que no entiende va a la nube (`bicho/{id}/charla`); si nadie contesta en
+  4 s, dice el "no entendí" del motor. Con ElevenLabs conectado, la palabra
+  abre una conversación en tiempo real.
+- **Voz de los globos**: el paquete de voz del celu, después el mp3 de la nube
+  (Edge o ElevenLabs) y al final el TTS de Google. El balbuceo del núcleo
+  (voz propia, modo 2) es solo para lo que no tiene texto.
+- **Pendiente**: con el micrófono lejos, Vosk entiende mal las frases. Lo
+  próximo es probar `AudioSource.VOICE_RECOGNITION`.
 
 ## Privacidad
 
