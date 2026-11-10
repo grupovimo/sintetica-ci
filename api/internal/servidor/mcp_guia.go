@@ -261,7 +261,8 @@ Otras ideas: ojos de gato (una almendra verde con la pupila vertical), un visor 
 
 Lo que se aprende probando en la placa:
 
-- Los trazos finos desaparecen: el ojo se achica a 128 px. Pestañas y contornos de **7 a 11** (en un viewBox de 100), brillos de radio 4 o más.
+- Los trazos finos desaparecen: el ojo se achica a 128 px, y los ` + "`stroke`" + ` hoy salen bastante más finos que lo pedido. Lo que tiene que verse grueso (el delineado de arriba, una ceja) dibujalo como **forma rellena** (una medialuna con ` + "`fill`" + `), no como línea; los trazos, solo para detalles finos. Brillos de radio 4 o más.
+- **Negro no**: el delineado negro del anime se pierde en la pantalla. Hacelo de un color oscuro pero visible (rosa oscuro, borravino, violeta) que contraste con el blanco del ojo.
 - Las pestañas **pegadas al borde del iris**: separadas, parecen cejas flotando.
 - ` + "`blush`" + ` hasta 0,4: más fuerte se ve marrón sobre el negro. Un rubor rosa queda mejor dibujado adentro del ojo (un arco abajo).
 - Mirá siempre las dos imágenes de ` + "`solo_ver`" + ` antes de guardar, y ajustá una vez.

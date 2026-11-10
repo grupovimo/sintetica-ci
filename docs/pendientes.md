@@ -48,6 +48,18 @@ Lo que quedó abierto al cerrar la etapa 6. Ordenado por lo que más destraba.
      después del primer DELETE. Desde `abb1fd4` la nube anota qué llegó
      mientras esperaba ("sin respuesta" en el log de la API): enchufar la placa,
      borrar una imagen y mirar `docker compose logs api | grep "sin respuesta"`.
+   - **Subir sprites nuevos falla de a uno**: al reemplazar los 3 sprites de
+     una cara, la placa rechaza el ImgInicio con "muy grande" (sin detalle, así
+     que no es el chequeo de espacio) y acepta uno por vuelta de la
+     sincronización. Mirar `imagen guardada`/`sprite guardado` en el serie y qué
+     devuelve `hal_.espacioLibre()` con LittleFS casi vacío.
+   - **El rasterizador de SVG de la nube afina los `stroke`**: un trazo de 15
+     (viewBox 100) sale de ~3 px en el sprite de 128. La guía del MCP dice que
+     lo grueso vaya como forma rellena; arreglarlo en `api/internal/imagenes`.
+   - La placa quedó **de fábrica** al cerrar (10/11, 22:20): sin vínculo, WiFi,
+     config ni archivos (NVS y LittleFS borrados con esptool). En la nube sigue
+     en la cuenta de Nahuel con la config v11 (ojos de fábrica, modo galería):
+     al volver a vincularla y pasarle el WiFi, la nube le devuelve esa config.
    - **El WiFi está escondido en la app** (Ajustes → Cerca): que el encendido
      lo pida solo la primera vez.
    - **El LED RGB** (GPIO 38): probarlo y decidir si sigue al ánimo (como datos
