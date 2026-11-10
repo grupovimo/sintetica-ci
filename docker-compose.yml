@@ -32,6 +32,7 @@ x-api-entorno: &api-entorno
   TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
   TELEGRAM_BOT: ${TELEGRAM_BOT:-sinteticalabs_bot}
   TELEGRAM_CHAT_RESERVAS: ${TELEGRAM_CHAT_RESERVAS:-}
+  MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
   # Otra API de Telegram (el e2e del CI levanta una falsa en el host).
   TELEGRAM_API_URL: ${TELEGRAM_API_URL:-}
   # Spotify y la charla con IA (v1.9; vacías = apagadas).

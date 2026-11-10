@@ -134,6 +134,7 @@ func correr(log *slog.Logger) error {
 		BichosVirtuales: strings.Split(strings.ReplaceAll(os.Getenv("BICHOS_VIRTUALES"), " ", ""), ","),
 		CookieSegura:    env("COOKIE_SEGURA", "0") == "1",
 		URLPublica:      env("API_URL_PUBLICA", "http://localhost:8080"),
+		MPToken:         strings.TrimSpace(os.Getenv("MP_ACCESS_TOKEN")), // la preventa del cubito (vacío, apagada)
 	}
 	if len(op.BichosVirtuales) == 1 && op.BichosVirtuales[0] == "" {
 		op.BichosVirtuales = nil

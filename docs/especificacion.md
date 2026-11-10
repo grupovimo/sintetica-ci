@@ -247,6 +247,24 @@ se sube nada al VPS (ver [local.md](local.md) y [nube.md](nube.md)).
   web, con copia segura: si se pierde, los robots vendidos no se actualizan más.
   Las placas de desarrollo quedan abiertas.
 
+### El control del dueño y la preventa (10/11/2026)
+
+- **/admin** en la web (solo administradores, `conAdmin` en la API): resumen,
+  unidades, componentes, compras, ventas y preventa, con la estética de la
+  consola. Las tablas están en `api/internal/almacen/migraciones/020_control.sql`.
+  Qué placas y componentes se usan vive solo en la base, nunca en el repo.
+- **Plata**: cada costo y precio en su moneda (USD o ARS); las cuentas usan el
+  dólar oficial de DolarApi (venta), que se pide desde la API y se guarda una
+  hora. El costo de una unidad se congela al armarla (lista de materiales ×
+  dólar de ese día), y armarla descuenta el stock; una compra que llega lo suma.
+- **Unidades atadas a los robots** por la MAC (una unidad, un robot); el
+  historial anota cada cambio ("Estado: X → Y").
+- **Preventa de la Unidad**: seña en pesos con Mercado Pago Checkout Pro
+  (`MP_ACCESS_TOKEN`, la cuenta de Sintética). Sin token la landing sigue con la
+  reserva gratis. Al aviso de Mercado Pago la API vuelve a pedir el pago con el
+  token (no le cree al cuerpo), chequea monto y moneda, y avisa por Telegram al
+  chat de las reservas. Una seña pendiente guarda el cupo 30 minutos.
+
 ### Diferencias con el ejemplo del doc
 
 - Las formas de una expresión van en `"formas"` (el ejemplo decía `"ojos"`),

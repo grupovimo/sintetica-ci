@@ -40,7 +40,7 @@
             <a href="/robots">Mis robots</a>
             <a href="/caras">Biblioteca de caras</a>
             <a href="/animaciones">Biblioteca de animaciones</a>
-            {#if usuario.admin}<a href="/firmwares">Firmwares</a><a href="/reservas">Reservas</a>{/if}
+            {#if usuario.admin}<a href="/admin">Control</a><a href="/firmwares">Firmwares</a><a href="/reservas">Reservas</a>{/if}
             <button onclick={salir}>Salir</button>
           </div>
         {/if}

@@ -4,6 +4,16 @@ Lo que quedó abierto al cerrar la etapa 6. Ordenado por lo que más destraba.
 
 ## Para Nahuel
 
+- **La preventa del cubito** (10/11): pasar el access token de producción de
+  Mercado Pago (`APP_USR-…`) para ponerlo como `MP_ACCESS_TOKEN` en
+  `/opt/sintetica/.env` (y `docker compose up -d api`). Después, en
+  https://sintetica.grupovimo.com.ar/admin/preventa: precio, precio final, seña,
+  cupos y entrega, y prenderla. El aviso de pago llega solo (cada preferencia
+  manda su `notification_url`); no hace falta configurar webhooks en el panel de
+  Mercado Pago. Probar una seña real chica antes de anunciarla.
+- **Cargar el negocio** en /admin: componentes con costo, proveedor y link, la
+  lista de materiales de la Unidad y el Broche, y las unidades que ya existen.
+
 - **El CI**: arreglar el pago o el límite de Actions de `nawesan12`, o hacer
   público el espejo y empujar la rama:
   ```sh

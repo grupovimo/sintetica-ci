@@ -1,6 +1,8 @@
 <script lang="ts">
   // La página de una pieza: la foto grande, qué es y reservarla.
+  import { onMount } from 'svelte';
   import { page } from '$app/state';
+  import { api } from '$lib/api';
   import Cabecera from '$lib/landing/Cabecera.svelte';
   import Foto from '$lib/landing/Foto.svelte';
   import Pie from '$lib/landing/Pie.svelte';
@@ -10,6 +12,13 @@
   let { data } = $props();
   const p = $derived(pieza(page.params.clave ?? ''));
   const otras = $derived(PIEZAS.filter((x) => x.clave !== p?.clave));
+  // La preventa de la Unidad (la arma el dueño en /admin/preventa).
+  let preventa = $state<{ activa: boolean; precio?: number; precioFinal?: number; quedan?: number }>({ activa: false });
+  const pesos = (v = 0) => '$' + new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(v);
+  const enPreventa = $derived(preventa.activa && p?.clave === 'unidad');
+  onMount(() => {
+    api<typeof preventa>('/v1/preventa').then((x) => (preventa = x)).catch(() => {});
+  });
 </script>
 
 <svelte:head>
@@ -38,7 +47,15 @@
             {#each p.fichas as f}<span class="ficha">{f}</span>{/each}
           </div>
           <div class="entre">
-            <a class="inflado" href="/?pieza={p.clave}#reservar">Reservar</a>
+            {#if enPreventa}
+              <span class="precio"><b>{pesos(preventa.precio)}</b>{#if (preventa.precioFinal ?? 0) > (preventa.precio ?? 0)}<s>{pesos(preventa.precioFinal)}</s>{/if}</span>
+              <div class="fila chica">
+                <span class="ficha preventa">Preventa · quedan {preventa.quedan}</span>
+                <a class="inflado naranja" href="/?pieza=unidad#reservar">Señar</a>
+              </div>
+            {:else}
+              <a class="inflado" href="/?pieza={p.clave}#reservar">Reservar</a>
+            {/if}
           </div>
         </div>
       </div>
@@ -68,6 +85,10 @@
 </div>
 
 <style>
+  .precio { display: flex; align-items: baseline; gap: 12px; font: 900 40px/1 'Archivo', sans-serif; font-stretch: 115%; letter-spacing: -0.02em; }
+  .precio s { font-size: 22px; color: #8a857d; }
+  .ficha.preventa { color: #fff; background: radial-gradient(130% 150% at 30% 0%, #ffb08a 0%, #ff5a1f 45%, #c2410c 100%);
+    box-shadow: inset 0 2px 1px rgba(255, 255, 255, 0.5), inset 0 -6px 10px rgba(110, 30, 0, 0.4), 0 8px 16px -10px rgba(0, 0, 0, 0.5); }
   .cabeza { position: relative; overflow: hidden; padding-bottom: 96px; }
   .detalle { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 48px; align-items: center; padding-top: 32px; }
   .foto-grande :global(.foto) { box-shadow: 0 32px 48px -32px rgba(0, 0, 0, 0.6); }

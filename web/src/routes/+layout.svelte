@@ -14,7 +14,7 @@
   const activa = (ruta: string) => page.url.pathname.startsWith(ruta);
   // La landing (/) y la consola de los robots (/robots) tienen su propia barra y su propio diseño.
   const landing = $derived(page.url.pathname === '/' || page.url.pathname.startsWith('/piezas') || page.url.pathname.startsWith('/robots') || page.url.pathname === '/entrar' ||
-    ['/caras', '/animaciones', '/firmwares', '/reservas'].some((r) => page.url.pathname.startsWith(r)));
+    ['/caras', '/animaciones', '/firmwares', '/reservas', '/admin'].some((r) => page.url.pathname.startsWith(r)));
 
   async function salir() {
     await api('/v1/sesion', { metodo: 'DELETE' }).catch(() => {});
@@ -40,6 +40,7 @@
           <a href={s.ruta} aria-current={activa(s.ruta) ? 'page' : undefined}>{s.nombre}</a>
         {/each}
         {#if data.usuario.admin}
+          <a href="/admin" aria-current={activa('/admin') ? 'page' : undefined}>Control</a>
           <a href="/firmwares" aria-current={activa('/firmwares') ? 'page' : undefined}>Firmwares</a>
           <a href="/reservas" aria-current={activa('/reservas') ? 'page' : undefined}>Reservas</a>
         {/if}

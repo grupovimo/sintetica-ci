@@ -66,11 +66,24 @@
   let reservado = $state(false);
   let errorReserva = $state('');
 
+  // La preventa del cubito (la Unidad): la seña va por Mercado Pago. Si no
+  // está abierta, la reserva gratis de siempre.
+  type Preventa = { activa: boolean; precio?: number; precioFinal?: number; sena?: number; cupos?: number; quedan?: number; entrega?: string };
+  let preventa = $state<Preventa>({ activa: false });
+  let volvioDePagar = $state<'' | 'ok' | 'pendiente'>('');
+  const pesos = (v = 0) => '$' + new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(v);
+  const senando = $derived(preventa.activa && pieza === 'unidad' && (preventa.quedan ?? 0) > 0);
+
   async function reservar(e: Event) {
     e.preventDefault();
     enviando = true;
     errorReserva = '';
     try {
+      if (senando) {
+        const r = await api<{ url: string }>('/v1/preventa/senas', { cuerpo: { nombre, contacto, color, sitio } });
+        location.href = r.url;
+        return;
+      }
       await api('/v1/reservas', { cuerpo: { nombre, pieza, contacto, color, mensaje: '', sitio } });
       reservado = true;
     } catch (err) {
@@ -93,8 +106,16 @@
 
   onMount(() => {
     // Desde la página de una pieza: la reserva ya la trae elegida.
-    const pedida = new URLSearchParams(location.search).get('pieza');
+    const busqueda = new URLSearchParams(location.search);
+    const pedida = busqueda.get('pieza');
     if (pedida && datosPieza(pedida)) pieza = pedida;
+    // De vuelta de Mercado Pago.
+    const sena = busqueda.get('sena');
+    if (sena === 'ok' || sena === 'pendiente') volvioDePagar = sena;
+    else if (sena === 'error') errorReserva = 'El pago no salió. Probá de nuevo.';
+    api<Preventa>('/v1/preventa')
+      .then((p) => (preventa = p))
+      .catch(() => {});
     fotos(['contento', 'enamorado', 'mareado', 'sospecha'])
       .then((f) => (caras = f))
       .catch(() => {});
@@ -174,9 +195,16 @@
         <div class="tarjeta-negra aparece">
           <p class="t-lead">Robots y joyería electrónica.<br /><span class="naranja">Ya es normal tener uno.</span></p>
           <div class="pila">
-            <div class="fila"><span class="ficha">Lote 01</span><span class="ficha">Hecho a mano</span><span class="ficha">Nº grabado</span></div>
             <div class="fila">
-              <a class="inflado naranja" href="#reservar">Reservar el tuyo</a>
+              {#if preventa.activa}<a class="ficha preventa" href="#reservar" onclick={() => elegirPieza('unidad')}><span class="punto"></span>Preventa · quedan {preventa.quedan}</a>{/if}
+              <span class="ficha">Lote 01</span><span class="ficha">Hecho a mano</span><span class="ficha">Nº grabado</span>
+            </div>
+            <div class="fila">
+              {#if preventa.activa}
+                <a class="inflado naranja" href="#reservar" onclick={() => elegirPieza('unidad')}>Señá tu Unidad</a>
+              {:else}
+                <a class="inflado naranja" href="#reservar">Reservar el tuyo</a>
+              {/if}
               <a class="inflado contorno" href="#facil">Cómo funciona</a>
             </div>
           </div>
@@ -211,10 +239,22 @@
   <section id="piezas" class="hueso seccion sin-arriba">
     <div class="contenedor angosto grilla-2">
       <article class="pieza aparece">
-        <Foto src="/landing/unidad.jpg" alt="La Unidad, un cubo naranja con dos ojos, sobre el escritorio" />
+        <div class="con-sello">
+          <Foto src="/landing/unidad.jpg" alt="La Unidad, un cubo naranja con dos ojos, sobre el escritorio" />
+          {#if preventa.activa}
+            <div class="sello" aria-hidden="true"><b>Pre</b><b>venta</b><span>{preventa.quedan} cupos</span></div>
+          {/if}
+        </div>
         <div class="pie-pieza">
-          <div><h3 class="t-h3"><a href="/piezas/unidad">Unidad</a></h3><span class="detalle">Robot de escritorio</span></div>
-          <a class="inflado" href="#reservar" onclick={() => elegirPieza('unidad')}>Reservar</a>
+          <div>
+            <h3 class="t-h3"><a href="/piezas/unidad">Unidad</a></h3>
+            {#if preventa.activa}
+              <span class="precio"><b>{pesos(preventa.precio)}</b>{#if (preventa.precioFinal ?? 0) > (preventa.precio ?? 0)}<s>{pesos(preventa.precioFinal)}</s>{/if}</span>
+            {:else}
+              <span class="detalle">Robot de escritorio</span>
+            {/if}
+          </div>
+          <a class={preventa.activa ? 'inflado naranja' : 'inflado'} href="#reservar" onclick={() => elegirPieza('unidad')}>{preventa.activa ? 'Señar' : 'Reservar'}</a>
         </div>
       </article>
       <article class="pieza aparece" style:transition-delay="80ms">
@@ -395,9 +435,23 @@
     <div class="contenedor angosto pila-48">
       <div class="entre abajo">
         <h2 class="t-display aparece">Reservá<br />el tuyo.</h2>
-        <div class="fila chica"><span class="ficha">Lote 01</span><span class="ficha">Sin pago ahora</span></div>
+        <div class="fila chica">
+          <span class="ficha">Lote 01</span>
+          {#if senando}
+            <span class="ficha preventa"><span class="punto"></span>Preventa · {pesos(preventa.precio)}</span>
+            <span class="ficha">Seña {pesos(preventa.sena)}</span>
+            {#if preventa.entrega}<span class="ficha">Entrega {preventa.entrega}</span>{/if}
+          {:else}
+            <span class="ficha">Sin pago ahora</span>
+          {/if}
+        </div>
       </div>
-      {#if reservado}
+      {#if volvioDePagar}
+        <div class="formulario listo">
+          <p class="t-lead">{volvioDePagar === 'ok' ? '¡Tu Unidad es tuya!' : 'Tu pago está en camino.'}</p>
+          <p class="detalle-claro">{volvioDePagar === 'ok' ? 'Recibimos la seña. Te escribimos para coordinar.' : 'Cuando Mercado Pago lo confirme, te escribimos.'}</p>
+        </div>
+      {:else if reservado}
         <div class="formulario listo">
           <p class="t-lead">¡Listo, {nombre.split(' ')[0]}!</p>
           <p class="detalle-claro">Te escribimos a <b>{contacto}</b> para coordinar tu {datosPieza(pieza)?.nombre ?? 'pieza'}.</p>
@@ -421,7 +475,7 @@
             </div>
           </fieldset>
           <label class="trampa" aria-hidden="true">Sitio<input bind:value={sitio} tabindex="-1" autocomplete="off" /></label>
-          <button class="inflado naranja enviar" disabled={enviando}>{enviando ? 'Mandando…' : 'Reservar'}</button>
+          <button class="inflado naranja enviar" disabled={enviando}>{enviando ? (senando ? 'Yendo a pagar…' : 'Mandando…') : senando ? `Señar ${pesos(preventa.sena)}` : 'Reservar'}</button>
           {#if errorReserva}<p class="error" role="alert">{errorReserva}</p>{/if}
         </form>
       {/if}
@@ -481,6 +535,21 @@
   .numero { width: 64px; min-height: 64px; padding: 0; font-size: 24px; }
   .pieza { display: flex; flex-direction: column; gap: 24px; }
   .pie-pieza { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .con-sello { position: relative; }
+  .sello { position: absolute; top: 20px; right: 20px; width: 132px; aspect-ratio: 1; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    rotate: 12deg; color: #111; background: radial-gradient(130% 150% at 30% 0%, #fff 0%, #f4f2ee 60%, #dcd8d0 100%);
+    box-shadow: inset 0 2px 1px #fff, inset 0 -10px 16px rgba(0, 0, 0, 0.14), 0 18px 28px -14px rgba(0, 0, 0, 0.6); }
+  .sello b { font: 900 26px/0.86 'Archivo', sans-serif; font-stretch: 125%; letter-spacing: -0.04em; text-transform: uppercase; }
+  .sello b + b { color: #ff5a1f; }
+  .sello span { margin-top: 8px; font: 800 12px/1 'Archivo', sans-serif; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.65; }
+  .precio { display: flex; align-items: baseline; gap: 12px; margin-top: 8px; font: 900 32px/1 'Archivo', sans-serif; font-stretch: 115%; letter-spacing: -0.02em; }
+  .precio s { font-size: 20px; color: #8a857d; }
+  .ficha.preventa { color: #fff; background: radial-gradient(130% 150% at 30% 0%, #ffb08a 0%, #ff5a1f 45%, #c2410c 100%);
+    box-shadow: inset 0 2px 1px rgba(255, 255, 255, 0.5), inset 0 -6px 10px rgba(110, 30, 0, 0.4), 0 8px 16px -10px rgba(0, 0, 0, 0.5); }
+  .reserva .ficha.preventa { background: radial-gradient(130% 150% at 30% 0%, #4a4a4a 0%, #161616 45%, #000 100%); box-shadow: inset 0 2px 1px rgba(255, 255, 255, 0.3), 0 8px 16px -10px rgba(0, 0, 0, 0.6); }
+  .reserva .ficha .punto { background: #ff5a1f; box-shadow: 0 0 8px #ff5a1f; }
+  .ficha .punto { width: 8px; height: 8px; border-radius: 50%; background: #fff; box-shadow: 0 0 8px #fff; animation: latido 1.6s ease-in-out infinite; }
+  @keyframes latido { 50% { opacity: 0.35; } }
   .detalle { display: block; margin-top: 8px; font: 700 18px/1.2 'Archivo', sans-serif; color: #4a4741; }
 
   /* 4 y 5 */

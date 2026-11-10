@@ -1,0 +1,74 @@
+/* El centro de control (/admin): las piezas de la consola (consola.css)
+   armadas como tablero del dueño. Todo bajo .control. */
+
+/* El teclado de módulos, en la placa naranja (como el de cada robot). */
+.control .teclado { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.control .modulo { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; gap: 14px; min-height: 76px; padding: 11px 12px;
+  border-radius: 16px; text-decoration: none; color: #1a1714; font-family: var(--marca);
+  background: linear-gradient(180deg, #fbf9f5 0%, #e6e0d6 100%);
+  box-shadow: inset 0 1px 0 #fff, inset 0 -3px 0 rgba(0,0,0,.1), 0 6px 0 #8f887c, 0 10px 16px -6px rgba(80,20,0,.55); transition: transform .08s, box-shadow .08s; }
+.control .modulo:active { transform: translateY(5px); box-shadow: inset 0 1px 0 #fff, 0 1px 0 #8f887c; }
+.control .modulo[aria-current='page'] { transform: translateY(5px); color: var(--c-papel); background: linear-gradient(180deg, #2a2622 0%, #151310 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 1px 0 #000; }
+.control .modulo .arriba { display: flex; width: 100%; justify-content: space-between; align-items: center; }
+.control .modulo .n { font: 900 11px/1 var(--marca); opacity: .55; font-variant-numeric: tabular-nums; }
+.control .modulo b { font: 900 12px/1.1 var(--marca); font-stretch: 105%; text-transform: uppercase; }
+.control .modulo .led { background: #b9b1a6; }
+.control .modulo[aria-current='page'] .led { background: var(--led); box-shadow: 0 0 10px var(--led); }
+
+/* Selector segmentado */
+.control .modo { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 3px; border-radius: 10px; background: #1c1a17; box-shadow: inset 0 1px 3px rgba(0,0,0,.8); }
+.control .modo button { padding: 8px 11px; border-radius: 7px; cursor: pointer; font: 800 11px/1 var(--marca); letter-spacing: .12em; text-transform: uppercase; color: var(--gris); }
+.control .modo button[aria-checked='true'] { color: #1a1714; background: linear-gradient(180deg, #ff8a5c, #f2541a); box-shadow: 0 2px 0 #9a3209; }
+
+/* Secciones y grillas */
+.control .seccion { display: flex; flex-direction: column; gap: 16px; }
+.control .cabeza { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.control .visores { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.control .campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 140px), 1fr)); gap: 10px; }
+.control .campos .ancho { grid-column: 1 / -1; }
+.control .visor.dato { gap: 8px; }
+.control .visor small { font: 700 12px/1.2 var(--marca); color: var(--gris); }
+.control .visor .campo { font-size: 20px; }
+.control .visor input.campo[type='number'] { font-variant-numeric: tabular-nums; }
+.control .bloque { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+/* Listas: una fila por cosa, en chapa */
+.control .lista { display: flex; flex-direction: column; gap: 10px; }
+.control .fila { display: grid; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 18px; min-width: 0; color: var(--c-papel);
+  background: linear-gradient(180deg, #2c2925 0%, #1c1a17 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 14px 24px -18px rgba(0,0,0,.9); }
+.control .fila.boton { cursor: pointer; text-align: left; width: 100%; }
+.control .fila.boton:hover { filter: brightness(1.08); }
+.control .fila.apagada { opacity: .5; }
+.control .fila .titulo { font: 900 17px/1.1 var(--marca); font-stretch: 110%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.control .fila .sub { font: 700 12px/1.2 var(--marca); color: var(--gris); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.control .fila .num { font: 900 17px/1 var(--marca); font-variant-numeric: tabular-nums; color: var(--brasa); text-align: right; white-space: nowrap; }
+.control .estado { display: inline-flex; align-items: center; gap: 8px; font: 800 11px/1 var(--marca); letter-spacing: .1em; text-transform: uppercase; color: #d9d2c6; white-space: nowrap; }
+.control .marbete { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px; border-radius: 9px; background: var(--chapa);
+  font: 800 11px/1 var(--marca); letter-spacing: .1em; text-transform: uppercase; color: #d9d2c6; white-space: nowrap; }
+.control .vacio { display: flex; align-items: center; gap: 10px; padding: 28px; border-radius: 18px; background: var(--hundido); color: var(--gris);
+  font: 800 12px/1 var(--marca); letter-spacing: .12em; text-transform: uppercase; box-shadow: inset 0 3px 10px rgba(0,0,0,.8); }
+.control .acciones { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.control .enlace { color: var(--brasa); font: 800 12px/1 var(--marca); letter-spacing: .06em; text-decoration: none; }
+.control .enlace:hover { text-decoration: underline; }
+.control .tachado { text-decoration: line-through; opacity: .6; }
+
+/* Historial */
+.control .historial { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.control .historial li { display: flex; gap: 12px; font: 700 13px/1.3 var(--marca); color: var(--gris-claro); }
+.control .historial time { color: var(--gris); flex: none; min-width: 84px; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1000px) {
+  .control .teclado { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+}
+@media (max-width: 560px) {
+  .control .teclado { display: flex; overflow-x: auto; gap: 8px; margin: -6px -16px 0; padding: 6px 16px 12px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .control .teclado::-webkit-scrollbar { display: none; }
+  .control .modulo { flex: none; min-width: 112px; scroll-snap-align: start; }
+  .control .fila { padding: 12px 14px; gap: 10px; }
+  .control .placa-naranja { border-radius: 28px; padding: 16px; }
+}
+
+/* En la placa naranja, el LED apagado se ve oscuro. */
+.control .placa-naranja .estado .led:not(.on) { background: rgba(26,23,20,.45); }
+.control .visor input.campo[type='date'] { font-size: 16px; color-scheme: dark; }

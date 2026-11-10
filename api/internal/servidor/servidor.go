@@ -44,6 +44,8 @@ type Opciones struct {
 	CookieSegura    bool
 	URLPublica      string // la base pública de la API (API_URL_PUBLICA): el issuer y el recurso del MCP
 	MercadoPagoURL  string // la API de Mercado Pago (vacía, la de siempre; los tests ponen un servidor falso)
+	MPToken         string // el access token de la cuenta de Sintética (MP_ACCESS_TOKEN): cobra las señas de la preventa
+	DolarURL        string // DolarApi (vacía, el oficial de siempre; los tests ponen un servidor falso)
 }
 
 // Servidor tiene todo lo que usan los handlers.
@@ -59,12 +61,14 @@ type Servidor struct {
 	limites  *limitador
 	integ    *integraciones.Integraciones
 	mcp      *estadoMCP
+
+	cotizacion *cotizacion // el dólar del control (dolar.go)
 }
 
 // Nuevo arma el servidor.
 func Nuevo(op Opciones, alm *almacen.Almacen, n *nube.Nube, i *integraciones.Integraciones, hub *eventos.Hub, c *correo.Correo, f *firma.Firmador, log *slog.Logger) *Servidor {
 	s := &Servidor{op: op, alm: alm, nube: n, relevo: nube.NuevoRelevo(n), hub: hub, correo: c, firmador: f, log: log, limites: nuevoLimitador(), integ: i,
-		mcp: &estadoMCP{}}
+		mcp: &estadoMCP{}, cotizacion: &cotizacion{}}
 	if i != nil {
 		// La acción "modo" de las automatizaciones guarda la config por acá.
 		i.UsarConfig(s.cambiarClaves)
@@ -145,6 +149,11 @@ func (s *Servidor) Rutas() http.Handler {
 	m.HandleFunc("POST /v1/reservas", s.reservar)
 	m.HandleFunc("GET /v1/reservas", s.conSesion(s.listarReservas))
 	m.HandleFunc("PATCH /v1/reservas/{id}", s.conSesion(s.marcarReserva))
+
+	m.HandleFunc("GET /v1/preventa", s.verPreventaPublica) // la preventa del cubito (preventa.go)
+	m.HandleFunc("POST /v1/preventa/senas", s.senar)
+	m.HandleFunc("POST /v1/preventa/mp", s.avisoMP)
+	s.rutasControl(m) // el centro de control del dueño, /v1/admin/... (control.go)
 
 	m.HandleFunc("GET /v1/firmwares", s.conSesion(s.listarFirmwares))
 	m.HandleFunc("POST /v1/firmwares", s.conSesion(s.subirFirmware))
