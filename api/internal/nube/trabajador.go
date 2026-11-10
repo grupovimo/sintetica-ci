@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -302,15 +303,26 @@ func (t *trabajador) manejar(e entrada) {
 func (t *trabajador) esperar(es func(car byte, d []byte) bool, plazo time.Duration) ([]byte, error) {
 	limite := time.NewTimer(plazo)
 	defer limite.Stop()
+	// Lo que llegó mientras tanto (para entender un "no respondió": ¿nada, o
+	// respuestas que no eran?).
+	var vistas []string
+	estados := 0
 	for {
 		select {
 		case <-t.n.ctx.Done():
 			return nil, t.n.ctx.Err()
 		case <-limite.C:
+			t.n.log.Warn("sin respuesta", "bicho", t.id, "plazo", plazo, "estados", estados, "respuestas", strings.Join(vistas, " "))
 			return nil, errTiempo
 		case e := <-t.entrada:
 			if e.tipo == entRespuesta && es(e.car, e.datos) {
 				return e.datos, nil
+			}
+			switch {
+			case e.tipo == entEstado:
+				estados++
+			case e.tipo == entRespuesta && len(vistas) < 12:
+				vistas = append(vistas, fmt.Sprintf("%d:%x", e.car, e.datos[:min(len(e.datos), 4)]))
 			}
 			t.manejar(e)
 			if e.tipo == entConexion && !e.conectado {
