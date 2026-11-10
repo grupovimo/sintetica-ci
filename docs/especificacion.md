@@ -228,6 +228,17 @@ se sube nada al VPS (ver [local.md](local.md) y [nube.md](nube.md)).
   por Mercado Pago). La biblioteca de afuera es lo que lo hace posible en los
   robots con poca memoria. Pendiente de diseño. Los paquetes del marketplace
   van **firmados por la nube** y el núcleo solo carga los que verifican.
+- **Charla y voz sin depender de nadie** (8–9/11): el robot entiende lo del día
+  a día con su propio motor (datos en `shared/formato/charla/`), igual en el
+  robot, la nube (cgo) y el celu; la IA es el último recurso y puede ser la del
+  usuario con su clave. La voz: ElevenLabs con la cuenta de cada uno, Edge TTS
+  gratis, un paquete de voz sin internet y la voz propia de robot. Nada de
+  servidores extra: todo entra en el VPS actual.
+- **Entrar con Telegram** (9/11): sin SMTP, la cuenta se crea y se entra con el
+  bot; el mail se suma después.
+- **Motor de vida v3** (9/11): único por semilla, crece por etapas, recuerda y
+  escribe un diario, juega solo, empatía que dura, rutinas aprendidas (ver
+  `docs/motor-de-vida.md`).
 - **El robot cerrado** (M8, pedido de Nahuel el 8/11): en los robots que se
   venden, solo arranca firmware firmado por nosotros (secure boot v2 de la
   ESP32, con eFuses quemados en fábrica: es irreversible), la flash va cifrada

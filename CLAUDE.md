@@ -52,19 +52,22 @@ en `docs/motor-de-vida.md` (cómo está hecho) y
 - La landing a producción: `sh herramientas/desplegar-landing.sh` (HEAD → sintetica.grupovimo.com.ar).
 - La nube completa a producción: `sh herramientas/desplegar-nube.sh` (HEAD → api-sintetica, sintetica y mqtt-sintetica; desde el 8/11 reemplaza a la landing sola). El bot de Telegram corre solo en producción (long polling): el `.env` local va sin `TELEGRAM_TOKEN`.
 
-## Memoria del proyecto (estado al 8/11/2026)
+## Memoria del proyecto (estado al 9/11/2026)
 
-Rama de trabajo: `claude/pensive-tesla-8fe2fg` (sin PR).
+Rama de trabajo: `claude/pensive-tesla-8fe2fg` (sin PR). El detalle de cada
+decisión está en `docs/especificacion.md` ("Decisiones de la etapa 6"), y lo
+pendiente, en `docs/pendientes.md`.
 
 - **Hecho antes**: M0–M6 y el motor de vida v2 (ver `docs/motor-de-vida.md`).
-- **Etapa 6 (8/11)**:
-  - **Web**: la "consola" (`web/src/lib/consola/`, rutas `/robots`; `/bichos` redirige): Mis robots (dock con la foto real y la cara en vivo), la consola de cada robot con 10 módulos que guardan solos, el encendido (onboarding) y el Laboratorio (expresiones, comportamientos, reglas, vida, dibujos, animaciones, firmware, historial) en el mismo lenguaje. Tiempo real por SSE (`/v1/eventos`). Poco texto: ver la memoria `poco-texto`.
-  - **Núcleo**: recordatorios (se muestran a la hora; aviso 0x9E por BLE y nube), modo reloj y pomodoro, protector de pantalla, voz (solo config). Eventos 31 `recordatorio` y 32 `pomodoro`.
-  - **Nube**: bot oficial de Telegram (@sinteticalabs_bot, token en `.env`, nunca en el repo), automatizaciones (cuando X → Telegram / webhook firmado / otro robot), y un **servidor MCP con OAuth** en `/mcp` para que cada uno conecte su Claude o ChatGPT (17 herramientas; ver `docs/nube.md`).
-  - **iOS**: compila y sube a TestFlight desde `grupovimo/sintetica-ios` (`herramientas/publicar-ios.sh`); nunca en la Mac.
-  - **Broker MQTT embebido** (reemplaza a EMQX): Mochi MQTT adentro de la API (`api/internal/broker`), auth y ACL por ganchos con la lógica de `servidor/mqtt.go`, tcp :1883 (local) y TLS :8883 (producción, el certificado se relee solo). Ver `docs/nube.md`, "El broker", y en `produccion/README.md` los pasos para pasar el VPS.
-- **Sin verificar**: placas reales; claude.ai/ChatGPT conectados de verdad (necesitan la nube con HTTPS público).
-- **Lo próximo posible**: el motor de charla propio en todos lados, la voz en la consola y las apps, el perfil del cubito (ver `docs/xiaozhi.md`).
+- **Etapa 6 (8 y 9/11)**:
+  - **Web**: la "consola" (`web/src/lib/consola/`, rutas `/robots`; `/bichos` redirige) con sus módulos que guardan solos, el encendido y el Laboratorio. Tiempo real por SSE (`/v1/eventos`). Poco texto: ver la memoria `poco-texto`. La web es la referencia de las apps.
+  - **Núcleo**: recordatorios, reloj, pomodoro, protector, el paquete de vida (v1.6/v1.7: decir, despertador, clima, juegos, cuidado, avisos del celu), la compañía (v1.9: toques de amigos, agenda, presencia, hábitos, música, avisos de afuera), el **motor de charla sin IA** (`charla.cpp`, datos en `shared/formato/charla/`, 297 casos reales en `casos.json`), la **voz propia** (balbuceo, `voz_propia.cpp`; modo 2 = solo sin texto) y el **motor de vida v3** (único por semilla, etapas, recuerdos y diario, juega solo, empatía, rutinas; datos en `shared/formato/vida/caracter.json`). `cara.tamano` ya agranda la cara.
+  - **Nube**: Telegram (@sinteticalabs_bot; también se ENTRA con Telegram), automatizaciones, MCP con OAuth (`/mcp`), amigos y toques, agenda iCal, Spotify (sin claves, apagado), presencia y horarios, hábitos, avisos entrantes (GitHub, Mercado Pago), la **charla** (primero el motor propio por cgo; si no entiende, la IA: la del usuario con su clave, `/v1/ia`, o la del servidor, Anthropic o compatible con OpenAI por `CHARLA_URL`), la **voz** (ElevenLabs con la clave de cada usuario, conversación en tiempo real; Edge TTS gratis; paquete de voz sin internet). Broker MQTT embebido (Mochi) en la API.
+  - **Producción** (desde el 8/11, 20:30 UTC): la nube completa en el VPS de Grupo Vimo (`sh herramientas/desplegar-nube.sh`): https://sintetica.grupovimo.com.ar, https://api-sintetica.grupovimo.com.ar, mqtts://mqtt-sintetica.grupovimo.com.ar:8883. Sin SMTP: se entra con Telegram. Desplegado hasta `f9316d7` (sin la v3 del motor de vida). Sin usuarios todavía.
+  - **iOS**: build 15 en TestFlight (`herramientas/publicar-ios.sh`, compila en `grupovimo/sintetica-ios`), apunta a producción. **Android**: APK en el release `android-debug` de este repo.
+  - **El robot-celu** (Moto E4, `android-bicho/`, de Nahuel): anda contra la nube LOCAL; se pasa a producción con `python3 android-bicho/herramientas/sumar.py`. Quedó en silencio y sin recordatorios ni avisos (config v73) la noche del 8/11: volver a prenderlos desde el historial.
+  - **CI**: el repo `nawesan12/sintetica` se quedó sin minutos de Actions (pago o límite). Hay un espejo `grupovimo/sintetica-ci` (creado privado) y `herramientas/publicar-ci.sh`; hacerlo público y empujar lo tiene que correr Nahuel (el permiso de Claude lo bloquea). La v3 del motor de vida y la robustez de la nube **no pasaron CI**: falta medir la RAM del broche (`pio run -e broche-c3`).
+- **Sin verificar**: placas reales; claude.ai/ChatGPT conectados de verdad; ElevenLabs, Spotify, GitHub y Mercado Pago reales; las apps en un celu real.
 
 ## Trampas conocidas
 
