@@ -63,13 +63,19 @@ pendiente, en `docs/pendientes.md`.
   - **Web**: la "consola" (`web/src/lib/consola/`, rutas `/robots`; `/bichos` redirige) con sus módulos que guardan solos, el encendido y el Laboratorio. Tiempo real por SSE (`/v1/eventos`). Poco texto: ver la memoria `poco-texto`. La web es la referencia de las apps.
   - **Núcleo**: recordatorios, reloj, pomodoro, protector, el paquete de vida (v1.6/v1.7: decir, despertador, clima, juegos, cuidado, avisos del celu), la compañía (v1.9: toques de amigos, agenda, presencia, hábitos, música, avisos de afuera), el **motor de charla sin IA** (`charla.cpp`, datos en `shared/formato/charla/`, 297 casos reales en `casos.json`), la **voz propia** (balbuceo, `voz_propia.cpp`; modo 2 = solo sin texto) y el **motor de vida v3** (único por semilla, etapas, recuerdos y diario, juega solo, empatía, rutinas; datos en `shared/formato/vida/caracter.json`). `cara.tamano` ya agranda la cara.
   - **Nube**: Telegram (@sinteticalabs_bot; también se ENTRA con Telegram), automatizaciones, MCP con OAuth (`/mcp`), amigos y toques, agenda iCal, Spotify (sin claves, apagado), presencia y horarios, hábitos, avisos entrantes (GitHub, Mercado Pago), la **charla** (primero el motor propio por cgo; si no entiende, la IA: la del usuario con su clave, `/v1/ia`, o la del servidor, Anthropic o compatible con OpenAI por `CHARLA_URL`), la **voz** (ElevenLabs con la clave de cada usuario, conversación en tiempo real; Edge TTS gratis; paquete de voz sin internet). Broker MQTT embebido (Mochi) en la API.
-  - **Producción** (desde el 8/11, 20:30 UTC): la nube completa en el VPS de Grupo Vimo (`sh herramientas/desplegar-nube.sh`): https://sintetica.grupovimo.com.ar, https://api-sintetica.grupovimo.com.ar, mqtts://mqtt-sintetica.grupovimo.com.ar:8883. Sin SMTP: se entra con Telegram. Desplegado hasta `f9316d7` (sin la v3 del motor de vida). Sin usuarios todavía.
+  - **Producción** (desde el 8/11, 20:30 UTC): la nube completa en el VPS de Grupo Vimo (`sh herramientas/desplegar-nube.sh`): https://sintetica.grupovimo.com.ar, https://api-sintetica.grupovimo.com.ar, mqtts://mqtt-sintetica.grupovimo.com.ar:8883. Sin SMTP: se entra con Telegram. Desplegado hasta `52b1458` (10/11: con la v3 del motor de vida, el control /admin y la preventa). Sin usuarios todavía.
+  - **Control del dueño** (10/11): https://sintetica.grupovimo.com.ar/admin (unidades, componentes, compras, ventas, preventa; dólar oficial de DolarApi). **Preventa del cubito** con seña por Mercado Pago: apagada hasta cargar `MP_ACCESS_TOKEN` en `/opt/sintetica/.env` (ver `docs/pendientes.md`).
   - **iOS**: build 15 en TestFlight (`herramientas/publicar-ios.sh`, compila en `grupovimo/sintetica-ios`), apunta a producción. **Android**: APK en el release `android-debug` de este repo.
   - **El robot-celu** (Moto E4, `android-bicho/`, de Nahuel): anda contra la nube LOCAL; se pasa a producción con `python3 android-bicho/herramientas/sumar.py`. Quedó en silencio y sin recordatorios ni avisos (config v73) la noche del 8/11: volver a prenderlos desde el historial.
   - **CI**: el repo `nawesan12/sintetica` se quedó sin minutos de Actions (pago o límite). Hay un espejo `grupovimo/sintetica-ci` (creado privado) y `herramientas/publicar-ci.sh`; hacerlo público y empujar lo tiene que correr Nahuel (el permiso de Claude lo bloquea). La v3 del motor de vida y la robustez de la nube **no pasaron CI**: falta medir la RAM del broche (`pio run -e broche-c3`).
 - **Sin verificar**: placas reales; claude.ai/ChatGPT conectados de verdad; ElevenLabs, Spotify, GitHub y Mercado Pago reales; las apps en un celu real.
 
 ## Trampas conocidas
+
+- `docker build` desde Claude se cuelga en "load metadata" (el ayudante de
+  credenciales `desktop` de Docker en segundo plano): desplegar con
+  `DOCKER_CONFIG` apuntando a una config sin `credsStore` (solo
+  `{"currentContext":"desktop-linux"}` y un enlace a `~/.docker/contexts`).
 
 - **Archivos nuevos del núcleo**: además de `firmware/nucleo/`, hay que crear un
   enlace en `firmware/api/cgo/` (`ln -s ../../nucleo/x.cpp x.cpp`); el test
