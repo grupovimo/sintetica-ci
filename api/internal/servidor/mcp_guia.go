@@ -258,6 +258,23 @@ Cómo dibujar para su pantalla:
 Con ` + "`tamano: 0.46`, `sep: 0.3`, `boca_y: -0.42`, `blush: 0.5`" + ` y ` + "`reposo: true`" + ` queda una carita de anime que vive todo el día.
 
 Otras ideas: ojos de gato (una almendra verde con la pupila vertical), un visor de robot (una franja cian con líneas), corazones (` + "`ojo`" + ` un corazón rosa, ` + "`ojo_cerrado`" + ` una rayita), pixel art (rectángulos de 10 × 10).
+
+Lo que se aprende probando en la placa:
+
+- Los trazos finos desaparecen: el ojo se achica a 128 px. Pestañas y contornos de **7 a 11** (en un viewBox de 100), brillos de radio 4 o más.
+- Las pestañas **pegadas al borde del iris**: separadas, parecen cejas flotando.
+- ` + "`blush`" + ` hasta 0,4: más fuerte se ve marrón sobre el negro. Un rubor rosa queda mejor dibujado adentro del ojo (un arco abajo).
+- Mirá siempre las dos imágenes de ` + "`solo_ver`" + ` antes de guardar, y ajustá una vez.
+
+## Un set de caras: cuántas y cuáles
+
+Una cara sola ya vive: el motor le aplica encima las 38 expresiones de fábrica como deformaciones (` + "`listar_expresiones`" + `). Contento la sube y la achina, triste la baja e inclina, sorpresa la agranda, enojado la inclina hacia adentro, dormido cierra los ojos con ` + "`ojo_cerrado`" + `, hablando abre la ` + "`boca`" + `. Para que el robot se sienta tuyo de verdad, armá un **set**:
+
+1. **La cara de siempre** (` + "`reposo: true`" + `): ` + "`ojo`, `ojo_cerrado` y `boca`" + ` (3 sprites). Es la que se ve el 90 % del tiempo: dedicale el cuidado. Siempre con ` + "`ojo_cerrado`" + `: sin él parpadea aplastando el ojo y se ve peor.
+2. **Las emociones fuertes, con el nombre de la de fábrica**: si una cara de imagen se llama igual que una expresión de fábrica, el robot **cambia a ese dibujo** cuando siente esa emoción (al borrarla, vuelve la de fábrica). Las que más se ven, en orden: ` + "`contento`" + ` (ojos ^ ^ o con estrellitas), ` + "`enamorado`" + ` (corazones), ` + "`triste`" + ` (una lágrima), ` + "`enojado`" + ` (cejas en V) y ` + "`sorpresa`" + `. Para estas alcanza con ` + "`ojo`" + ` (1 sprite) y, si cambia mucho, ` + "`boca`" + ` (2): el parpadeo y el resto los toma del motor. Mismo estilo, colores y viewBox que la de siempre: que se note que es la misma cara emocionada.
+3. **El presupuesto**: 12 sprites y 8 caras de imagen por robot, y no se comparten entre caras. Un set completo típico: la de siempre (3) + contento, enamorado, triste y enojado con ojo y boca (8) = 11. Si piden más, primero sacá las bocas de las emociones (con 1 sprite cada una entran 9 emociones de sprites, pero hay lugar para 7 caras más de imagen).
+4. **Cómo trabajar**: diseñá la de siempre, mostrala con ` + "`solo_ver`" + `, guardala con ` + "`reposo: true`" + ` y ` + "`mostrar: true`" + ` para que el usuario la vea en la pantalla; después ofrecé las emociones de a una (` + "`disparar_evento`" + ` o ` + "`poner_cara`" + ` con su nombre para mostrar cada una). No hagas caras de imagen para las técnicas (` + "`bateria-baja`, `cargando`, `actualizando`, `sin-conexion`" + `): las de fábrica ya se ven bien sobre cualquier cara.
+5. Si el usuario quiere cambiar todo el estilo, borrá las del set viejo con ` + "`borrar_expresion`" + ` (liberan sus sprites) antes de dibujar las nuevas.
 `
 
 func contiene(l []string, s string) bool {
