@@ -71,7 +71,7 @@ export const Situaciones = [
 export const VariablesEstado = ['energia', 'animo', 'afecto', 'aburrimiento', 'curiosidad', 'sueno', 'estres'];
 export const Rasgos = ['energia', 'sociabilidad', 'picardia', 'timidez', 'curiosidad', 'malGenio'];
 export const LARGO_MEMORIA = 112;
-export const Modos = ['mascota', 'reloj', 'pomodoro', 'clima', 'notificaciones'];
+export const Modos = ['mascota', 'reloj', 'pomodoro', 'clima', 'notificaciones', 'galeria'];
 
 const texto = new TextEncoder();
 const lector = new TextDecoder();

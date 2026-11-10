@@ -30,6 +30,18 @@ function dibujar(fuente: CanvasImageSource, fw: number, fh: number, ancho: numbe
   return c;
 }
 
+// Los colores a lo que muestra la pantalla (16 bits, RGB565): se ve igual en el
+// robot y el QOI pesa ~20 % menos (sube más rápido por Bluetooth). Repite los
+// bits altos en los bajos para que el blanco siga siendo 255.
+export function a16Bits(d: Uint8ClampedArray): Uint8ClampedArray {
+  for (let i = 0; i < d.length; i += 4) {
+    d[i] = (d[i] & 0xf8) | (d[i] >> 5);
+    d[i + 1] = (d[i + 1] & 0xfc) | (d[i + 1] >> 6);
+    d[i + 2] = (d[i + 2] & 0xf8) | (d[i + 2] >> 5);
+  }
+  return d;
+}
+
 export async function prepararImagen(
   archivo: Blob,
   ancho: number,
@@ -43,7 +55,7 @@ export async function prepararImagen(
     const img = await createImageBitmap(archivo);
     const c = dibujar(img, img.width, img.height, ancho, alto, redonda);
     const datos = c.getContext('2d')!.getImageData(0, 0, ancho, alto);
-    return { qoi: codificarQoi(datos.data, ancho, alto), vista: c.toDataURL(), cuadros: 1 };
+    return { qoi: codificarQoi(a16Bits(datos.data), ancho, alto), vista: c.toDataURL(), cuadros: 1 };
   }
   const gif = decodificarGif(bytes);
   let cuadros: { rgba: Uint8ClampedArray; ms: number }[] = [];
@@ -60,6 +72,7 @@ export async function prepararImagen(
 type Cuadros = { cuadros: { rgba: Uint8ClampedArray; ms: number }[]; vista: string };
 
 function empaquetar({ cuadros, vista }: Cuadros, ancho: number, alto: number) {
+  for (const q of cuadros) a16Bits(q.rgba);
   if (cuadros.length === 1) return { qoi: codificarQoi(cuadros[0].rgba, ancho, alto), vista, cuadros: 1 };
   // Si no entra (o son demasiados cuadros), se saltea uno de cada dos y el que
   // queda dura lo de los dos: la animación sigue durando lo mismo.

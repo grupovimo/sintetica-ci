@@ -116,6 +116,11 @@ int leerTrozo(const char* clave, uint32_t off, uint8_t* d, size_t n) {
   return r;
 }
 
+int64_t espacioLibre() {
+  if (!g_hayLittleFs) return 0;
+  return static_cast<int64_t>(LittleFS.totalBytes()) - static_cast<int64_t>(LittleFS.usedBytes());
+}
+
 bool borrar(const char* clave) { return !g_hayLittleFs || !LittleFS.exists(ruta(clave)) || LittleFS.remove(ruta(clave)); }
 
 namespace {
@@ -160,6 +165,7 @@ void completarHal(Hal& h) {
   h.escribirTrozo = escribirTrozo;
   h.leerTrozo = leerTrozo;
   h.borrar = borrar;
+  h.espacioLibre = espacioLibre;
   h.notificar = bleNotificar;
   h.registrar = [](const char* m) { Serial.printf("[sintetica] %s\n", m); };
 }

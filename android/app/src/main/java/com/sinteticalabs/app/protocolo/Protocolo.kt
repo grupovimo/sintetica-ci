@@ -105,7 +105,7 @@ private fun recorte(s: String, max: Int): ByteArray {
 
 /** Los juegos (0x43), en el orden del protocolo. */
 val JUEGOS = listOf("ppt", "reflejos", "mirada", "dado", "moneda")
-val MODOS = listOf("mascota", "reloj", "pomodoro", "clima", "notificaciones")
+val MODOS = listOf("mascota", "reloj", "pomodoro", "clima", "notificaciones", "galeria")
 
 private val MENSAJES = mapOf(
     0 to "ok", 1 to "muy grande", 2 to "fuera de orden", 3 to "CRC distinto", 4 to "JSON inválido",

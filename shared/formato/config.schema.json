@@ -169,13 +169,14 @@
       }
     },
     "modo": {
-      "description": "Qué muestra: mascota (la cara), reloj (la hora grande con los ojos chiquitos arriba), pomodoro (cuenta regresiva; ver \"pomodoro\"), clima (el tiempo que manda la nube según \"ubicacion\"). notificaciones necesita datos de la nube: hasta que lleguen, se comporta como mascota.",
+      "description": "Qué muestra: mascota (la cara), reloj (la hora grande con los ojos chiquitos arriba), pomodoro (cuenta regresiva; ver \"pomodoro\"), clima (el tiempo que manda la nube según \"ubicacion\"), galeria (solo las imágenes subidas, rotando; ver \"galeria\"). notificaciones necesita datos de la nube: hasta que lleguen, se comporta como mascota.",
       "enum": [
         "mascota",
         "reloj",
         "pomodoro",
         "clima",
-        "notificaciones"
+        "notificaciones",
+        "galeria"
       ]
     },
     "lista": {
@@ -326,6 +327,19 @@
           "maximum": 3600,
           "default": 10,
           "description": "Segundos sin que pase nada."
+        }
+      }
+    },
+    "galeria": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "El modo galería: cada cuánto pasa a la siguiente imagen.",
+      "properties": {
+        "segundos": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 3600,
+          "default": 30
         }
       }
     },

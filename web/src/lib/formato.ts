@@ -123,7 +123,7 @@ export function spritesEnUso(c: Config, menos = ''): Set<number> {
   for (const [n, e] of Object.entries(c.expresiones ?? {})) if (n !== menos && esImagen(e)) for (const x of Object.values(e.sprites)) if (typeof x === 'number') l.add(x);
   return l;
 }
-export const MODOS = ['mascota', 'reloj', 'pomodoro', 'clima', 'notificaciones'] as const;
+export const MODOS = ['mascota', 'reloj', 'pomodoro', 'clima', 'notificaciones', 'galeria'] as const;
 export const CURVAS = ['suave', 'lineal', 'entrada', 'salida', 'rebote', 'paso'] as const;
 export const NOMBRES_CURVA: Record<string, string> = {
   suave: 'Suave', lineal: 'Lineal', entrada: 'Arranca lento', salida: 'Frena al final', rebote: 'Rebote', paso: 'Salto',
@@ -170,6 +170,8 @@ export type Config = {
   recordatorios?: Recordatorio[];
   voz?: { volumen?: number; tipo?: 'grave' | 'media' | 'aguda' | 'robot'; palabra?: string; conversar?: boolean; microfono?: number };
   pomodoro?: { trabajo?: number; descanso?: number };
+  // Modo galería: cada cuántos segundos pasa a la siguiente imagen (5 a 3600; 30 por defecto).
+  galeria?: { segundos?: number };
   // Protector de pantalla: tras `espera` segundos sin que pase nada, muestra esa imagen; cualquier cosa vuelve a la cara.
   protector?: { imagen: number; espera?: number };
   // Cuánto habla solo (0 a 1) y sus frases propias por situación (hasta 12 en total).

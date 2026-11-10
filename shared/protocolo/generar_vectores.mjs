@@ -192,7 +192,7 @@ const vectores = {
     {
       campos: { bateria: 87, humor: -0.35, modo: 'reloj', dormido: true, fija: true, emparejando: false, autenticado: true, wifi: true, nube: true, redConfigurada: true, actualizando: true, expresion: 'animacion:saludo', nombre: 'Ñandú', serie: '001', id: '00AABBCCDDEE', ancho: 240, alto: 240, redonda: true, version: '0.2.0', perfil: 'broche-c3', crcConfig: 0xcbf43926, encendido: 86400 },
     },
-  ].map((e) => ({ campos: { ...e.campos, crcConfigHex: e.campos.crcConfig.toString(16).padStart(8, '0') }, hex: estado({ ...e.campos, modo: ['mascota', 'reloj', 'pomodoro', 'clima', 'notificaciones'].indexOf(e.campos.modo) }) })),
+  ].map((e) => ({ campos: { ...e.campos, crcConfigHex: e.campos.crcConfig.toString(16).padStart(8, '0') }, hex: estado({ ...e.campos, modo: ['mascota', 'reloj', 'pomodoro', 'clima', 'notificaciones', 'galeria'].indexOf(e.campos.modo) }) })),
   respuestas: [
     { hex: '90 00', op: 0x10, ok: true, codigo: 0, detalle: '' },
     { hex: hex([0x91, 9, ...utf8('vinculá o autenticá primero')]), op: 0x11, ok: false, codigo: 9, detalle: 'vinculá o autenticá primero' },

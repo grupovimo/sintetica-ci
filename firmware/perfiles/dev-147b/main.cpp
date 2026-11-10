@@ -84,9 +84,12 @@ bool imuIniciar() {
   Wire.write(0x00);  // WHO_AM_I
   if (Wire.endTransmission(false) != 0 || Wire.requestFrom(pines::IMU_DIRECCION, 1) != 1) return false;
   if (Wire.read() != 0x05) return false;
+  imuEscribir(0x60, 0xB0);  // RESET: reinicio por software (sin esto los datos quedan en 0x7FFF)
+  delay(20);
   imuEscribir(0x02, 0x40);  // CTRL1: autoincremento de dirección
-  imuEscribir(0x03, 0x16);  // CTRL2: acelerómetro ±4 g, ~125 Hz
-  imuEscribir(0x08, 0x01);  // CTRL7: prender el acelerómetro
+  imuEscribir(0x03, 0x13);  // CTRL2: acelerómetro ±4 g, 1000 Hz
+  imuEscribir(0x04, 0x53);  // CTRL3: giróscopo ±512 dps, 1000 Hz (con los dos prendidos, ODR normal)
+  imuEscribir(0x08, 0x03);  // CTRL7: prender acelerómetro y giróscopo
   return true;
 }
 

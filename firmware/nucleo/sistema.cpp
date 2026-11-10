@@ -45,6 +45,7 @@ constexpr uint32_t QR_POR_BOTON_MS = 120000;  // el QR del botón dura 2 min
 constexpr uint8_t FALLOS_MAXIMOS = 5;
 constexpr uint32_t BLOQUEO_MS = 30000;
 // Sin letras ni números que se confundan (0/O, 1/I/L).
+constexpr int64_t MARGEN_ARCHIVOS = 16 * 1024;  // bloques de 4 KB y metadatos de LittleFS
 const char ALFABETO_CODIGO[] = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
 
@@ -604,10 +605,49 @@ bool Sistema::dibujarImagen(int espacio, float alfa) {
   return true;
 }
 
+int Sistema::imagenDeGaleria(int desde) const {
+  for (int k = 0; k < MAX_IMAGENES; k++) {
+    const int i = (desde + k) % MAX_IMAGENES;
+    if (imagenes_[i].largo > 0 && subiendo_ != i) return i;
+  }
+  return -1;
+}
+
+// Pasar a la siguiente imagen de la galería: se funde a la cara y vuelve con la otra.
+void Sistema::pasarGaleria(uint32_t ahora) {
+  const int actual = imagenDeGaleria(posGaleria_);
+  if (galeriaFundido_ || actual < 0 || imagenDeGaleria(actual + 1) == actual) return;
+  galeriaFundido_ = ahora ? ahora : 1;
+  galeriaPaso_ = false;
+}
+
+// La opacidad de la imagen de la galería: baja, cambia a la siguiente en el
+// medio (con la cara de fondo) y vuelve a subir.
+float Sistema::alfaGaleria(uint32_t ahora) {
+  constexpr uint32_t MEDIO_MS = 350;
+  if (!galeriaFundido_) return 1;
+  const uint32_t t = ahora - galeriaFundido_;
+  if (t < MEDIO_MS) return 1 - suave(static_cast<float>(t) / MEDIO_MS);
+  if (!galeriaPaso_) {
+    const int sig = imagenDeGaleria(imagenDeGaleria(posGaleria_) + 1);
+    if (sig >= 0) posGaleria_ = static_cast<uint8_t>(sig);
+    galeriaPaso_ = true;
+  }
+  if (t < 2 * MEDIO_MS) return suave(static_cast<float>(t - MEDIO_MS) / MEDIO_MS);
+  galeriaFundido_ = 0;
+  galeriaDesde_ = ahora;
+  return 1;
+}
+
 // La imagen que corresponde mostrar ahora, o -1 si va una cara.
 int Sistema::imagenParaMostrar(uint32_t ahora) {
   // El protector de pantalla (mientras entra, está o sale).
   if (faseProtector_ > 0 && !apagado_ && !emparejando_) return config_.protector.imagen;
+  // Galería: solo las imágenes, sin la cara (si no hay ninguna, la mascota de siempre).
+  if (config_.modo == Modo::Galeria) {
+    if (apagado_ || emparejando_ || alarma_ || globo_ || recVisible_ >= 0) return -1;
+    return imagenDeGaleria(posGaleria_);
+  }
   if (apagado_ || emparejando_ || motor_.hayFija() || animPedida_ >= 0 || largoLista() == 0 ||
       panel_ != Panel::Ninguno || recVisible_ >= 0 || config_.modo == Modo::Reloj || config_.modo == Modo::Pomodoro ||
       config_.modo == Modo::Clima || alarma_ || globo_)
@@ -635,6 +675,10 @@ void Sistema::bleImagen(uint8_t op, const uint8_t* d, size_t n) {
       const uint32_t largo = leer32(d + 2);
       const uint32_t limite = esSprite(d[1]) ? LIMITE_SPRITE : limiteImagen(perfil_.ancho, perfil_.alto);
       if (largo < 22 || largo > limite) return responder(car, op, MuyGrande);
+      // Que entre: lo que ya ocupa ese espacio se libera al reemplazarlo, y
+      // queda un margen para los bloques y los metadatos del sistema de archivos.
+      if (hal_.espacioLibre && static_cast<int64_t>(largo) + MARGEN_ARCHIVOS > hal_.espacioLibre() + meta(d[1])->largo)
+        return responder(car, op, MuyGrande, "no hay lugar");
       subiendo_ = d[1];
       subidaLargo_ = largo;
       subidaCrc_ = leer32(d + 6);
@@ -1011,6 +1055,8 @@ void Sistema::tick() {
   while (gestos_.sacar(&e)) {
     // En pomodoro, un toque arranca o pausa (y el bicho igual reacciona).
     if (e == Evento::Tacto && config_.modo == Modo::Pomodoro) pomoCorriendo_ = !pomoCorriendo_;
+    // En galería, un toque pasa a la siguiente imagen.
+    if (e == Evento::Tacto && config_.modo == Modo::Galeria) pasarGaleria(ahora), galeriaDesde_ = ahora;
     evento(e);
   }
   // Inclinado: los ojos "caen" hacia donde está la gravedad.
@@ -1064,6 +1110,10 @@ void Sistema::tick() {
     emparejando_ = true;
     emparejarHasta_ = ahora + QR_POR_BOTON_MS;
   }
+  // La galería pasa sola cada tantos segundos.
+  if (config_.modo == Modo::Galeria && !galeriaFundido_ &&
+      ahora - galeriaDesde_ >= static_cast<uint32_t>(config_.galeriaSegundos) * 1000u)
+    pasarGaleria(ahora), galeriaDesde_ = ahora;
   // La lista rota sola cada tantos minutos.
   if (config_.rotarMinutos && largoLista() > 1 &&
       ahora - ultimaRotacion_ >= static_cast<uint32_t>(config_.rotarMinutos) * 60000u)
@@ -1073,6 +1123,7 @@ void Sistema::tick() {
 
   if (vistaPrevia_) emparejando_ = false;
   elegirAnimacion(ahora);
+  const float alfaGal = config_.modo == Modo::Galeria ? alfaGaleria(ahora) : 1;
   int imagen = imagenParaMostrar(ahora);
   if (imagen >= 0 && imagen != imagenPreparada_ && !prepararImagen(imagen, ahora)) {
     // No se pudo leer: se marca vacía para no intentarlo en cada cuadro.
@@ -1086,7 +1137,8 @@ void Sistema::tick() {
   }
   if (imagen < 0) imagenPreparada_ = -1;
   // Entrando o saliendo del protector: la imagen sobre la cara, con fundido.
-  const float alfaImagen = imagen >= 0 && faseProtector_ > 0 ? suave(faseProtector_) : 1;
+  float alfaImagen = imagen >= 0 && faseProtector_ > 0 ? suave(faseProtector_) : 1;
+  if (alfaGal < alfaImagen) alfaImagen = alfaGal;
   if (imagen >= 0 && imagen == mostrandoImagen_ && !imagenSucia_ && alfaImagen >= 1) {
     // La imagen ya está en la pantalla: no hace falta redibujarla.
     notificarEstadoSiCambio();

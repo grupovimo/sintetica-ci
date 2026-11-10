@@ -1,6 +1,7 @@
 <script lang="ts">
-  // Modos: qué es el robot ahora. Mascota (se maneja solo), reloj, pomodoro
-  // o el clima de su ciudad. Las notificaciones llegan con la nube.
+  // Modos: qué es el robot ahora. Mascota (se maneja solo), reloj, pomodoro,
+  // el clima de su ciudad o la galería de sus imágenes. Las notificaciones
+  // llegan con la nube.
   import { usarBicho } from '$lib/bicho.svelte';
   import { usarGuardado } from '../guardado.svelte';
   import type { Modelo } from '../modelo';
@@ -15,11 +16,15 @@
     { clave: 'reloj', nombre: 'Reloj', dice: 'La hora grande, y él mirando de reojo.', listo: true },
     { clave: 'pomodoro', nombre: 'Pomodoro', dice: 'Tandas de foco y descanso. Un toque arranca o pausa.', listo: true },
     { clave: 'clima', nombre: 'Clima', dice: 'El tiempo de tu ciudad, con su cara.', listo: true },
+    { clave: 'galeria', nombre: 'Galería', dice: 'Tus imágenes, una tras otra. Un toque pasa.', listo: true },
     { clave: 'notificaciones', nombre: 'Avisos', dice: 'Lo que le mandes desde tus integraciones.', listo: false },
   ];
   const modo = $derived(b.config.modo ?? 'mascota');
   const trabajo = $derived(b.config.pomodoro?.trabajo ?? 25);
   const descanso = $derived(b.config.pomodoro?.descanso ?? 5);
+  const segundos = $derived(b.config.galeria?.segundos ?? 30);
+  const CADA = [[10, '10 s'], [30, '30 s'], [60, '1 min'], [300, '5 min']] as const;
+  const ponerSegundos = (s: number) => g.cambiar((c) => { if (s === 30) delete c.galeria; else c.galeria = { segundos: s }; });
 
   const ponerModo = (m: string) => g.cambiar((c) => { if (m === 'mascota') delete c.modo; else c.modo = m; });
   function pomo(cual: 'trabajo' | 'descanso', d: number) {
@@ -46,6 +51,15 @@
     <Ubicacion />
   {/if}
 
+  {#if modo === 'galeria'}
+    <div class="cada" role="radiogroup" aria-label="Cada cuánto cambia">
+      <span class="grabado">Cada</span>
+      {#each CADA as [s, t]}
+        <button role="radio" aria-checked={segundos === s} class="tecla chica" class:negra={segundos !== s} class:naranja={segundos === s} onclick={() => ponerSegundos(s)}>{t}</button>
+      {/each}
+    </div>
+  {/if}
+
   {#if modo === 'pomodoro'}
     <div class="visores">
       {#each [['trabajo', 'Foco', trabajo, 5], ['descanso', 'Descanso', descanso, 1]] as [k, t, v, paso]}
@@ -64,7 +78,8 @@
 
 <style>
   .modos { display: flex; flex-direction: column; gap: 16px; }
-  .teclas { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+  .teclas { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+  .cada { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .modo { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-height: 150px; padding: 14px; border: 0; border-radius: 18px; cursor: pointer;
     text-align: left; color: #1a1714; font-family: var(--marca); background: linear-gradient(180deg, #fbf9f5, #e6e0d6);
     box-shadow: inset 0 1px 0 #fff, 0 6px 0 #8f887c, 0 10px 16px -6px rgba(80,20,0,.55); transition: transform .08s, box-shadow .08s; }
@@ -79,6 +94,7 @@
   .lectura { display: flex; flex-direction: column; gap: 10px; }
   .digitos small { font-size: 18px; color: #8f877c; text-shadow: none; }
   .mas-menos { display: flex; flex-direction: column; gap: 10px; }
+  @media (max-width: 1100px) { .teclas { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   @media (max-width: 900px) { .teclas { grid-template-columns: repeat(2, minmax(0, 1fr)); } .modo { min-height: 120px; } }
   @media (max-width: 560px) { .visores { grid-template-columns: 1fr; } }
 </style>

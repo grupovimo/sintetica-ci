@@ -127,7 +127,7 @@ var Rasgos = []string{"energia", "sociabilidad", "picardia", "timidez", "curiosi
 const LargoMemoria = 112
 
 // Modos, en el orden del protocolo.
-var Modos = []string{"mascota", "reloj", "pomodoro", "clima", "notificaciones"}
+var Modos = []string{"mascota", "reloj", "pomodoro", "clima", "notificaciones", "galeria"}
 
 // Crc32 es el CRC-32 IEEE del protocolo.
 func Crc32(b []byte) uint32 { return crc32.ChecksumIEEE(b) }

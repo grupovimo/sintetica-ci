@@ -218,6 +218,50 @@ PRUEBA("imagen: cada 1 a 3 minutos vuelve la cara un par de segundos") {
   VERIFICAR(cara >= vueltas * 2400u && cara <= vueltas * 2600u);
 }
 
+PRUEBA("galeria: solo las imágenes, rotando con fundido; un toque pasa a la siguiente") {
+  arrancar();
+  auto a = qoi(240, 240, naranja), b = qoi(240, 240, degrade);
+  VERIFICAR(subir(1, a, crc32(a.data(), a.size())) == Ok);
+  VERIFICAR(subir(4, b, crc32(b.data(), b.size())) == Ok);
+  const char* cfg = R"({"version":1,"modo":"galeria","galeria":{"segundos":10}})";
+  g_mem["config"].assign(cfg, cfg + std::strlen(cfg));
+  // La mascota (sin botón de broche): el toque es Tacto.
+  g_t = 1000;
+  Perfil p;
+  p.ancho = 240, p.alto = 240, p.filasFranja = 40, p.redonda = true;
+  g_s.iniciar(hal(), g_franja, p);
+  g_s.modoVistaPrevia();
+  correr(40);
+  VERIFICAR(g_s.imagenVisible() == 1);
+  // 9 minutos: nunca vuelve la cara salvo en el fundido, y pasan las dos.
+  bool vio4 = false;
+  uint32_t cara = 0;
+  for (int i = 0; i < 9 * 60 * 50; i++) {
+    g_t += 20;
+    g_s.tick();
+    if (g_s.imagenVisible() == 4) vio4 = true;
+    if (g_s.imagenVisible() < 0) cara += 20;
+  }
+  VERIFICAR(vio4);
+  VERIFICAR(cara == 0);  // en el fundido la cara se ve debajo, pero la imagen sigue puesta
+  // Un toque pasa a la otra.
+  const int antes = g_s.imagenVisible();
+  g_s.tacto(true);
+  correr(60);
+  g_s.tacto(false);
+  correr(2000);
+  VERIFICAR(g_s.imagenVisible() >= 0 && g_s.imagenVisible() != antes);
+  // Sin imágenes, la cara de siempre.
+  escribir({ImgBorrar, 1});
+  escribir({ImgBorrar, 4});
+  correr(2000);
+  VERIFICAR(g_s.imagenVisible() == -1);
+  // Los segundos se validan.
+  const char* malo = R"({"version":1,"modo":"galeria","galeria":{"segundos":2}})";
+  static Config c;
+  VERIFICAR(!aplicarConfig(c, malo, std::strlen(malo)).ok());
+}
+
 PRUEBA("imagen: errores (sin autenticar, CRC, tamaño, orden, espacio)") {
   arrancar();
   auto img = qoi(240, 240, naranja);
@@ -246,6 +290,24 @@ PRUEBA("imagen: errores (sin autenticar, CRC, tamaño, orden, espacio)") {
   justo[2] += 1;
   escribir(justo);
   VERIFICAR(g_notis.back()[1] == MuyGrande);
+  // Sin lugar: se rechaza de entrada (lo que ocupa ese espacio cuenta como libre).
+  static int64_t s_libre = 0;
+  Hal conPoco = hal();
+  conPoco.espacioLibre = [] { return s_libre; };
+  Perfil chico;
+  chico.ancho = 240, chico.alto = 240, chico.filasFranja = 40, chico.redonda = true, chico.boton = Perfil::Boton::Broche;
+  g_archivos.clear(), g_mem.clear();
+  g_s.iniciar(conPoco, g_franja, chico);
+  g_s.modoVistaPrevia();
+  s_libre = 1000000;
+  auto entra = qoi(240, 240, degrade);
+  VERIFICAR(subir(2, entra, crc32(entra.data(), entra.size())) == Ok);
+  s_libre = 1000;
+  escribir({ImgInicio, 3, 0, 0x10, 0, 0, 0, 0, 0, 0});  // 4 KB más el margen: no entra
+  VERIFICAR(g_notis.back()[1] == MuyGrande);
+  s_libre = 16 * 1024;  // reemplazar la misma imagen sí entra: la vieja se libera
+  VERIFICAR(subir(2, entra, crc32(entra.data(), entra.size())) == Ok);
+  arrancar();
   // Sin autenticar.
   Perfil p;
   p.ancho = 240, p.alto = 240, p.filasFranja = 40, p.redonda = true;

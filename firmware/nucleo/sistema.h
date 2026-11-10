@@ -311,6 +311,10 @@ class Sistema {
   void avanzarSprites(uint32_t dt);
   static int leerSprite(void* contexto, int sprite, uint32_t desplazamiento, uint8_t* destino, size_t n);
   int imagenParaMostrar(uint32_t ahora);
+  // Modo galería: la primera imagen subida desde `desde` (en ronda), o -1.
+  int imagenDeGaleria(int desde) const;
+  void pasarGaleria(uint32_t ahora);
+  float alfaGaleria(uint32_t ahora);
   bool dibujarImagen(int espacio, float alfa = 1);
   void avanzarProtector(uint32_t ahora, uint32_t dt);
   void actividad() { ultimaActividad_ = hal_.ahoraMs(); }
@@ -403,6 +407,11 @@ class Sistema {
   // Lista y pulsador del broche.
   uint8_t posLista_ = 0;
   uint32_t ultimaRotacion_ = 0;
+  // Modo galería: la imagen que se ve y el fundido al pasar a la siguiente.
+  uint8_t posGaleria_ = 0;
+  uint32_t galeriaDesde_ = 0;
+  uint32_t galeriaFundido_ = 0;  // 0 = sin fundido
+  bool galeriaPaso_ = false;
   bool apagado_ = false;
   bool botonApretado_ = false;
   bool ignorarSoltar_ = false;

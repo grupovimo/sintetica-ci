@@ -45,7 +45,7 @@
   const ACCIONES: [Accion['tipo'], string][] = [
     ['decir', 'Decir'], ['cara', 'Cara'], ['modo', 'Modo'], ['despertar', 'Despertar'], ['jugar', 'Jugar'], ['telegram', 'Telegram'], ['webhook', 'URL'], ['robot', 'Otro robot'],
   ];
-  const MODOS_ACCION: [string, string][] = [['mascota', 'Compañía'], ['reloj', 'Reloj'], ['pomodoro', 'Pomodoro'], ['clima', 'Clima']];
+  const MODOS_ACCION: [string, string][] = [['mascota', 'Compañía'], ['reloj', 'Reloj'], ['pomodoro', 'Pomodoro'], ['clima', 'Clima'], ['galeria', 'Galería']];
   const DIAS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
   function dia(a: Automatizacion, l: string) {
     const ya = a.dias || DIAS.join('');
