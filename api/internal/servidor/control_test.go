@@ -235,11 +235,19 @@ func TestPreventa(t *testing.T) {
 	s, _ := servidorDePrueba(t)
 	h := s.Rutas()
 	admin := adminDePrueba(t, s)
+	ip := fmt.Sprintf("10.%d.%d.%d", time.Now().UnixNano()%250, time.Now().UnixNano()/7%250, time.Now().UnixNano()/13%250) // el tope de señas es por IP
 	senar := func(nombre string) (int, map[string]any) {
-		return pedir(t, h, "", "POST", "/v1/preventa/senas", `{"nombre":"`+nombre+`","contacto":"ana@ejemplo.com","color":"naranja"}`)
+		r := httptest.NewRequest("POST", "/v1/preventa/senas", strings.NewReader(`{"nombre":"`+nombre+`","contacto":"ana@ejemplo.com","color":"naranja"}`))
+		r.Header.Set("X-Forwarded-For", ip)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		var v map[string]any
+		json.Unmarshal(w.Body.Bytes(), &v) //nolint:errcheck
+		return w.Code, v
 	}
 
-	// Sin token de Mercado Pago, apagada aunque la prenda.
+	pedir(t, h, admin, "PUT", "/v1/admin/preventa", `{"activa":false,"precio":0,"sena":0,"cupos":0}`)
+	// Sin números no se prende.
 	if cod, v := pedir(t, h, admin, "PUT", "/v1/admin/preventa", `{"activa":true,"precio":0,"sena":0,"cupos":0}`); cod != http.StatusBadRequest {
 		t.Errorf("prender sin números: %d %v", cod, v)
 	}
@@ -249,6 +257,18 @@ func TestPreventa(t *testing.T) {
 	if cod, v := pedir(t, h, "", "GET", "/v1/preventa", ""); cod != http.StatusOK || v["activa"] != false {
 		t.Fatalf("pública sin nada: %d %v", cod, v)
 	}
+
+	// Sin token se ve igual y la seña entra como reserva (sin cobrar).
+	if cod, v := pedir(t, h, admin, "PUT", "/v1/admin/preventa", `{"activa":true,"precio":100000,"precioFinal":150000,"sena":20000,"cupos":5}`); cod != http.StatusOK {
+		t.Fatalf("prender sin token: %d %v", cod, v)
+	}
+	if _, v := pedir(t, h, "", "GET", "/v1/preventa", ""); v["activa"] != true {
+		t.Errorf("sin token no se ve: %v", v)
+	}
+	if cod, v := senar("Sin token"); cod != http.StatusCreated || v["ok"] != true || v["url"] != nil {
+		t.Errorf("seña sin token: %d %v", cod, v)
+	}
+	s.limites = nuevoLimitador()
 
 	mp := &mpFalso{token: "APP_USR-prueba", pagos: map[string]string{}}
 	srv := httptest.NewServer(mp)

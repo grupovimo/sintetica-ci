@@ -3,7 +3,7 @@ package servidor
 // La preventa del cubito en la landing: los números (que pone el dueño en
 // /admin/preventa), la seña con Mercado Pago (Checkout Pro, en pesos) y el
 // aviso de Mercado Pago cuando el pago sale. Sin MP_ACCESS_TOKEN la preventa
-// no se muestra y la landing sigue con la reserva gratis.
+// igual se muestra, pero la seña queda como reserva (sin cobrar).
 
 import (
 	"bytes"
@@ -46,7 +46,7 @@ func (s *Servidor) verPreventaPublica(w http.ResponseWriter, r *http.Request) {
 		s.interno(w, err)
 		return
 	}
-	activa := p.Activa && s.op.MPToken != "" && p.Sena > 0
+	activa := p.Activa && p.Sena > 0
 	if !activa {
 		responder(w, http.StatusOK, map[string]any{"activa": false})
 		return
@@ -98,7 +98,7 @@ func (s *Servidor) senar(w http.ResponseWriter, r *http.Request) {
 		s.interno(w, err)
 		return
 	}
-	if !pv.Activa || s.op.MPToken == "" || pv.Sena <= 0 {
+	if !pv.Activa || pv.Sena <= 0 {
 		fallar(w, http.StatusConflict, "la preventa no está abierta")
 		return
 	}
@@ -116,6 +116,10 @@ func (s *Servidor) senar(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if n >= 10 {
 		fallar(w, http.StatusTooManyRequests, "probaste muchas veces: esperá un rato")
+		return
+	}
+	if s.op.MPToken == "" {
+		s.reservarPreventa(w, r, sena, ip)
 		return
 	}
 	sena.Monto = pv.Sena
@@ -141,6 +145,30 @@ func (s *Servidor) senar(w http.ResponseWriter, r *http.Request) {
 	}
 	s.log.Info("seña nueva", "id", n.ID, "color", n.Color, "monto", n.Monto)
 	responder(w, http.StatusCreated, map[string]any{"url": link, "id": n.ID})
+}
+
+// reservarPreventa: sin Mercado Pago todavía, la seña queda como reserva de la
+// Unidad (sin cobrar) y avisa por Telegram → {ok}.
+func (s *Servidor) reservarPreventa(w http.ResponseWriter, r *http.Request, sena almacen.Sena, ip string) {
+	id, err := s.alm.CrearReserva(r.Context(), almacen.Reserva{Nombre: sena.Nombre, Pieza: "unidad", Contacto: sena.Contacto,
+		Color: sena.Color, Mensaje: "Preventa"}, ip)
+	if err != nil {
+		s.interno(w, err)
+		return
+	}
+	s.log.Info("reserva de preventa", "id", id, "color", sena.Color)
+	if s.integ != nil {
+		texto := "🧡 <b>Reserva de preventa</b> · unidad " + html.EscapeString(sena.Color) +
+			"\n<b>" + html.EscapeString(sena.Nombre) + "</b>\n" + html.EscapeString(sena.Contacto)
+		go func() {
+			ctx, cancelar := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancelar()
+			if err := s.integ.AvisarReserva(ctx, texto); err != nil {
+				s.log.Warn("reserva de preventa: no la pude avisar por Telegram", "id", id, "error", err)
+			}
+		}()
+	}
+	responder(w, http.StatusCreated, map[string]any{"ok": true})
 }
 
 // referenciaSena: el external_reference del pago ("sena-<id>").

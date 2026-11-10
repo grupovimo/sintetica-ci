@@ -85,14 +85,12 @@
 {#if p}
   <section class="placa-naranja tablero">
     <div class="cabeza">
-      <button class="llave" aria-pressed={p.activa} disabled={!conMP} onclick={() => guardar({ activa: !p!.activa })}>
+      <button class="llave" aria-pressed={p.activa} onclick={() => guardar({ activa: !p!.activa })}>
         <span class="led"></span>{p.activa ? 'Abierta en la landing' : 'Cerrada'}
       </button>
       <span class="estado oscuro"><span class="led" class:on={guardado}></span>{guardado ? 'Guardado' : 'Guarda solo'}</span>
     </div>
-    {#if !conMP}
-      <p class="aviso"><span class="led ambar"></span>Falta MP_ACCESS_TOKEN en el servidor</p>
-    {/if}
+    {#if !conMP}<span class="estado oscuro"><span class="led"></span>Sin Mercado Pago: las señas entran como reservas</span>{/if}
     <div class="campos">
       <label class="visor"><span class="grabado">Precio preventa</span>
         <input class="campo" type="number" min="0" step="any" value={p.precio || ''} placeholder="$" onchange={(e) => guardar({ precio: numero(e) })} /></label>

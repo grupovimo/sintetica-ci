@@ -232,7 +232,7 @@ func (s *Servidor) resumenControl(w http.ResponseWriter, r *http.Request) {
 		"vendidasMes": vendidasMes, "ventasMes": ventasMes, "cobradoMes": cobradoMes, "margenMes": margenMes,
 		"porCobrar": porCobrar, "invertido": invertido,
 		"costos": costos, "stockBajo": bajo,
-		"preventa": map[string]any{"activa": pv.Activa && s.op.MPToken != "", "cupos": pv.Cupos, "quedan": max(pv.Cupos-tomados, 0),
+		"preventa": map[string]any{"activa": pv.Activa, "cupos": pv.Cupos, "quedan": max(pv.Cupos-tomados, 0),
 			"senas": senasAprobadas, "senado": senado, "conMercadoPago": s.op.MPToken != ""},
 	}
 	responder(w, http.StatusOK, res)

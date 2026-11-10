@@ -80,8 +80,12 @@
     errorReserva = '';
     try {
       if (senando) {
-        const r = await api<{ url: string }>('/v1/preventa/senas', { cuerpo: { nombre, contacto, color, sitio } });
-        location.href = r.url;
+        const r = await api<{ url?: string }>('/v1/preventa/senas', { cuerpo: { nombre, contacto, color, sitio } });
+        if (r.url) {
+          location.href = r.url;
+          return;
+        }
+        reservado = true;
         return;
       }
       await api('/v1/reservas', { cuerpo: { nombre, pieza, contacto, color, mensaje: '', sitio } });

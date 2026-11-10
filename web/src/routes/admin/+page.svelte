@@ -85,7 +85,7 @@
   <section class="seccion">
     <span class="grabado">Preventa del cubito</span>
     <a class="placa-naranja preventa" href="/admin/preventa">
-      <span class="estado oscuro"><span class="led" class:on={r.preventa.activa}></span>{r.preventa.activa ? 'Abierta' : r.preventa.conMercadoPago ? 'Cerrada' : 'Falta Mercado Pago'}</span>
+      <span class="estado oscuro"><span class="led" class:on={r.preventa.activa}></span>{r.preventa.activa ? 'Abierta' : 'Cerrada'}</span>
       <div class="visores">
         <div class="visor dato"><span class="grabado">Señas</span><span class="digitos">{r.preventa.senas}</span></div>
         <div class="visor dato"><span class="grabado">Quedan</span><span class="digitos">{r.preventa.quedan}<small> / {r.preventa.cupos}</small></span></div>
