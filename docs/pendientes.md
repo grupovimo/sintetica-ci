@@ -1,4 +1,4 @@
-# Pendientes (al 9/11/2026)
+# Pendientes (al 10/11/2026)
 
 Lo que quedó abierto al cerrar la etapa 6. Ordenado por lo que más destraba.
 
@@ -39,6 +39,25 @@ Lo que quedó abierto al cerrar la etapa 6. Ordenado por lo que más destraba.
   `CHARLA_MODELO`) para la charla libre en producción; Spotify si se quiere.
 
 ## Para seguir
+
+0. **La placa 1.47B (10/11)**:
+   - **Borrar una imagen desde la app o la web no llega a la placa**: la
+     sincronización corta con "el bicho no respondió a tiempo". La placa recibe
+     el ImgListar por MQTT y publica la respuesta (`r=0`, visto en su serie),
+     pero la nube nunca manda el paso siguiente (ImgListarSprites). Empezó
+     después del primer DELETE. Desde `abb1fd4` la nube anota qué llegó
+     mientras esperaba ("sin respuesta" en el log de la API): enchufar la placa,
+     borrar una imagen y mirar `docker compose logs api | grep "sin respuesta"`.
+   - **El WiFi está escondido en la app** (Ajustes → Cerca): que el encendido
+     lo pida solo la primera vez.
+   - **El LED RGB** (GPIO 38): probarlo y decidir si sigue al ánimo (como datos
+     del motor, con fundido).
+   - **Galería en Android**: solo se sumó "galeria" a la lista de modos del
+     protocolo; falta el botón y el selector (Nahuel no usa Android: sin apuro).
+   - Calienta (~57 °C en el chip): si molesta, 160 MHz y menos brillo.
+   - La lista de imágenes en la mascota no avanza sola (rotar = 0 y BOOT es
+     "tocar"): con la galería ya no hace falta, pero la llave "Lista" de la app
+     confunde.
 
 1. **CI de la v3** (motor de vida) y de la robustez de la nube: que pasen,
    sobre todo la RAM del broche (la v3 suma ~2,4 KB; el segmento DRAM está

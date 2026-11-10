@@ -3,7 +3,9 @@
 // Pantalla: wiki de Waveshare (docs.waveshare.com/ESP32-S3-LCD-1.47B).
 // IMU y batería: tomados de un proyecto de la comunidad para esta placa
 // (github.com/f0xx/esp32-s3-good-vibes, docs/zephyr-hardware.md).
-// TODO verificar al grabar: IMU, batería, LED, desfase de columna y rotación.
+// Verificado en la placa (10/11/2026): la pantalla, la rotación y el desfase de
+// columna, y el IMU (necesita el reinicio por software, main.cpp). Falta: la
+// batería y el color del LED (el pin 38 lo confirma Waveshare).
 #pragma once
 
 namespace pines {
