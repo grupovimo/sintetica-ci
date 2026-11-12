@@ -412,12 +412,13 @@ func TestV19DePuntaAPunta(t *testing.T) {
 			Origen, Accion, Texto string
 			Guardado, Enviado     bool
 		}
-		if s := ana.pedir("POST", "/v1/bichos/"+ra+"/charla", map[string]string{"texto": "despertame a las 7"}, &r); s != 200 ||
+		if s := ana.pedir("POST", "/v1/bichos/"+ra+"/charla", map[string]string{"texto": "despertame todos los días a las 7"}, &r); s != 200 ||
 			r.Origen != "motor" || r.Accion != "alarma" || !r.Enviado {
 			t.Fatalf("charla: %d %+v", s, r)
 		}
 		// Con el robot conectado la charla la hace él y la alarma se guarda
 		// cuando llega su 0xCC (Guardado es solo para cuando la hace la nube).
+		// Una de todos los días: la de una vez vive solo en la RAM del robot.
 		var c struct {
 			Crc    uint32
 			Autor  string
