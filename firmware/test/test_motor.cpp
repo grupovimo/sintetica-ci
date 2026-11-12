@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "formato.h"
+#include "formato_vida.h"
 #include "motor_vida.h"
 #include "prueba.h"
 #include "rostro.h"
@@ -131,7 +132,8 @@ PRUEBA("vida: config v2 completa") {
   VERIFICAR(c.reglas[0].entonces[1].tipo == Accion::Tipo::Estado && c.reglas[0].entonces[1].variable == 6);
   VERIFICAR(c.reglas[1].si.evento == Evento::Nombre && c.reglas[1].nY == 1);
   const int b = c.vida.indiceComportamiento("saludar-mio");
-  VERIFICAR(b >= 0 && c.vida.comportamientos[b].pasos[0].vecesMax == 3);
+  Paso pasos[MAX_PASOS];
+  VERIFICAR(b >= 0 && pasosDe(c, c.vida.comportamientos[b], pasos) > 0 && pasos[0].vecesMax == 3);
   VERIFICAR(c.vida.brilloMax < 0.95f);
 }
 

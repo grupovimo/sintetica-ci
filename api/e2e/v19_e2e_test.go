@@ -413,9 +413,11 @@ func TestV19DePuntaAPunta(t *testing.T) {
 			Guardado, Enviado     bool
 		}
 		if s := ana.pedir("POST", "/v1/bichos/"+ra+"/charla", map[string]string{"texto": "despertame a las 7"}, &r); s != 200 ||
-			r.Origen != "motor" || r.Accion != "alarma" || !r.Guardado || !r.Enviado {
+			r.Origen != "motor" || r.Accion != "alarma" || !r.Enviado {
 			t.Fatalf("charla: %d %+v", s, r)
 		}
+		// Con el robot conectado la charla la hace él y la alarma se guarda
+		// cuando llega su 0xCC (Guardado es solo para cuando la hace la nube).
 		var c struct {
 			Crc    uint32
 			Autor  string
@@ -426,10 +428,10 @@ func TestV19DePuntaAPunta(t *testing.T) {
 				}
 			}
 		}
-		ana.pedir("GET", "/v1/bichos/"+ra+"/config", nil, &c)
-		if c.Autor != "charla" || c.Config.Despertador.Hora != "07:00" || !c.Config.Despertador.Activo {
-			t.Fatalf("la alarma en la config: %+v", c)
-		}
+		esperar(t, "la alarma en la config", 10*time.Second, func() bool {
+			ana.pedir("GET", "/v1/bichos/"+ra+"/config", nil, &c)
+			return c.Autor == "charla" && c.Config.Despertador.Hora == "07:00" && c.Config.Despertador.Activo
+		})
 		esperar(t, "que la alarma llegue al robot", 20*time.Second, func() bool { return leerVirtualEn(t, virtual).CrcConfig == c.Crc })
 	})
 }
