@@ -2,7 +2,8 @@
 
 La especificación completa está en `docs/especificacion.md`; el motor de vida,
 en `docs/motor-de-vida.md` (cómo está hecho) y
-`docs/motor-de-vida-especificacion.md` (lo que pide el doc). Lo esencial:
+`docs/motor-de-vida-especificacion.md` (lo que pide el doc). **La hoja de ruta
+(qué se vende y en qué orden) está en `docs/plan.md`.** Lo esencial:
 
 - **Caras, comportamientos, reglas y personalidades son datos, nunca código.**
   Viven en `shared/formato/` (JSON Schema v2, los dibujos base en `caras/` y el

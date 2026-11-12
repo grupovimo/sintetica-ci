@@ -1,5 +1,8 @@
 # Pendientes (al 10/11/2026)
 
+> La hoja de ruta (qué se vende y en qué orden) está en `docs/plan.md`.
+> Acá queda lo chico y lo que hace falta de Nahuel.
+
 Lo que quedó abierto al cerrar la etapa 6. Ordenado por lo que más destraba.
 
 ## Para Nahuel
@@ -94,6 +97,5 @@ Lo que quedó abierto al cerrar la etapa 6. Ordenado por lo que más destraba.
 8. Detalles: la sonrisa de "contento" tiene el mismo corte de halo que se
    arregló en los ojos; el APK de Android pesa 96 MB (achicar a arm64 al ir a
    la Play Store); `assetlinks.json` para que los links abran la app (con la
-   clave definitiva); `docs/contrato-v1.9.md` se puede borrar (ya está en los
-   docs de siempre); el desborde del rótulo "Copiar" de la URL del MCP en el
+   clave definitiva); el desborde del rótulo "Copiar" de la URL del MCP en el
    celu; la licencia GPL del port de `edgetts` si algún día se libera la nube.
