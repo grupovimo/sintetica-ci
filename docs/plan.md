@@ -53,10 +53,13 @@ bandeja, atajos globales y arranque con el sistema vienen de fábrica.
 Hecho (12/11): la app (`escritorio/`, compila en `grupovimo/sintetica-escritorio`),
 el núcleo nativo vivo, la cara flotante, MQTT, sumarse con Telegram y la
 licencia con Mercado Pago (`/v1/escritorio`). La charla escrita (atajo
-⌘/Ctrl+Shift+Espacio o doble clic; el motor propio en la compu y, si no
+⌘/Ctrl+Shift+Espacio o doble clic abren el panel con el día y la charla; el motor propio en la compu y, si no
 entiende, `bicho/{id}/charla` a la nube) y la voz propia por el parlante (cpal).
 Dictar: el dictado del sistema en el renglón (Mac: Fn dos veces; Windows: Win+H).
-Falta: el oído propio (palabra y Whisper), sentidos de la compu, acciones
+Los recordatorios y el despertador, también como notificación del sistema.
+Decidido (12/11): la interfaz es la cara flotante + un panel al costado; el
+mail, Gmail y Outlook por OAuth desde la nube; después, una extensión de Chrome.
+Falta: el mail, el oído propio (palabra y Whisper), sentidos de la compu, acciones
 locales, firmar e instalar en una Mac y una Windows de verdad.
 
 Piezas:
