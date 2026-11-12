@@ -31,9 +31,13 @@ amigos y la consola andan sin rehacer nada.
 
 ## Fase 0 — Destrabar (antes de cualquier cosa, esta semana)
 
-1. **CI**: sin minutos en `nawesan12`; el escritorio necesita runners de macOS y
-   Windows. Nahuel: pagar Actions o hacer público `grupovimo/sintetica-ci`
-   (`docs/pendientes.md`). Sin esto no hay instaladores.
+1. **CI** (decidido 12/11): la cuenta personal `nawesan12` no se toca. Lo que
+   necesita runners (macOS, Windows) va en **repos públicos de `grupovimo` con
+   solo lo que se compila**, como `herramientas/publicar-ios.sh` →
+   `grupovimo/sintetica-ios`; el escritorio, en `grupovimo/sintetica-escritorio`
+   (que además aloja las descargas). El repo entero no se hace público: los
+   perfiles y los docs dicen qué placas se usan. Las pruebas rápidas (núcleo,
+   Go, web) corren en la Mac.
 2. Pasar el CI de la v3 (RAM del broche) y desplegar.
 3. Token de Mercado Pago en `/opt/sintetica/.env` → preventa de la Unidad viva.
 4. Ordenar los docs: este plan pasa a `docs/plan.md` como única hoja de ruta;
@@ -83,9 +87,9 @@ Piezas:
      días con todo.
    - Página de compra y descarga en la landing; las ventas aparecen en /admin.
 7. **Firmar los instaladores**: Mac con el Developer ID de la cuenta de Apple
-   (ya existe para TestFlight) + notarización; Windows con **Azure Trusted
-   Signing** (~USD 10/mes; es el único costo fijo nuevo — decidir) o sin firma
-   al principio (SmartScreen avisa).
+   (ya existe para TestFlight) + notarización; **Windows sin firma** al
+   principio (decidido 12/11: SmartScreen avisa; Azure Trusted Signing, ~USD
+   10/mes, cuando haya ventas).
 
 Listo cuando: alguien en Windows y en Mac lo compra, lo instala, entra con
 Telegram, la cara vive en el escritorio, le habla y contesta, y le pone un
