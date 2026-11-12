@@ -51,16 +51,18 @@ export type Modelo = {
 export function modeloDe(b: Bicho): Modelo {
   const p = pantallaDe(b);
   const broche = b.perfil.includes('broche');
+  // El robot que vive en la compu (la app de escritorio): pantalla y nube.
+  const escritorio = b.perfil === 'escritorio';
   // Los virtuales traen todo, así se puede probar cada módulo sin hardware.
   const capacidades = new Set<Capacidad>(
     b.virtual
       ? ['pantalla', 'movimiento', 'bluetooth', 'wifi', 'microfono', 'parlante']
-      : broche
-        ? ['pantalla', 'movimiento', 'bluetooth', 'wifi']
+      : escritorio
+        ? ['pantalla', 'wifi']
         : ['pantalla', 'movimiento', 'bluetooth', 'wifi'],
   );
   return {
-    nombre: broche ? 'Broche' : 'Unidad',
+    nombre: escritorio ? 'Escritorio' : broche ? 'Broche' : 'Unidad',
     redonda: p.redonda,
     encuadre: p.redonda ? REDONDA : RECTANGULAR,
     capacidades,
