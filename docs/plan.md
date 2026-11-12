@@ -35,7 +35,9 @@ amigos y la consola andan sin rehacer nada.
    en repos **públicos** de `grupovimo`: el espejo `grupovimo/sintetica-ci`
    (`sh herramientas/publicar-ci.sh`), `grupovimo/sintetica-ios` y, para el
    escritorio, `grupovimo/sintetica-escritorio` (que además aloja las descargas).
-2. Pasar el CI de la v3 (RAM del broche) y desplegar.
+2. Pasar el CI de la v3 y desplegar. La RAM del broche (le faltaban 2,3 KB):
+   resuelta el 12/11 sacando de la RAM los pasos de los comportamientos de
+   fábrica (se leen de la flash al empezar; `Config` −8,9 KB).
 3. Token de Mercado Pago en `/opt/sintetica/.env` → preventa de la Unidad viva.
 4. Ordenar los docs: este plan pasa a `docs/plan.md` como única hoja de ruta;
    `docs/pendientes.md` queda solo para lo chico; se borra `docs/contrato-v1.9.md`.
@@ -47,6 +49,11 @@ para Mac y Windows, reusa **tal cual** la web (SvelteKit, la consola) y el núcl
 en WebAssembly (`web/src/lib/nucleo.ts`, `sim/web/sim.js` → `crearSimulador`), que
 ya corre un robot entero. Instaladores chicos (~10 MB), auto-actualización firmada,
 bandeja, atajos globales y arranque con el sistema vienen de fábrica.
+
+Hecho (12/11): la app (`escritorio/`, compila en `grupovimo/sintetica-escritorio`),
+el núcleo nativo vivo, la cara flotante, MQTT, sumarse con Telegram y la
+licencia con Mercado Pago (`/v1/escritorio`). Falta: charla y voz, sentidos de
+la compu, acciones locales, firmar e instalar en una Mac y una Windows de verdad.
 
 Piezas:
 
@@ -112,6 +119,15 @@ En orden (`docs/xiaozhi.md`):
 3. Perfil `firmware/perfiles/cubito-154/` con nuestro núcleo; voz con el
    protocolo de xiaozhi.
 4. Preventa del cubito con la misma maquinaria de la Unidad.
+
+## El broche (definido el 12/11)
+
+Caritas vivas, toques (el botón), **notas de voz** (micrófono → celu por
+Bluetooth), avisos del celu y, si entra, un **mini buzzer**. Sin parlante,
+charla, globos de texto ni WiFi. Quedan la galería y el modo hora (la hora
+sola, sin la carita). El motor de vida es el mismo por datos: lo que su
+hardware no tiene (movimiento, texto, voz) no se dispara. Falta en su perfil:
+las notas de voz, el buzzer (`Hal::sonido`) y la hora sin la cara.
 
 ## Fase 3 — Lo que hace crecer la venta
 
