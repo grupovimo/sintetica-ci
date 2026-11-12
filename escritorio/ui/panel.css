@@ -48,9 +48,44 @@ h1 { margin: 0; font-size: 20px; font-weight: 800; text-transform: capitalize; }
   background: var(--tarjeta);
 }
 .dia li span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dia .mas {
+  display: block;
+  padding: 4px 10px;
+  background: none;
+  color: var(--suave);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
 .dia .hora { font-variant-numeric: tabular-nums; color: var(--suave); }
 .dia .pasado { opacity: 0.45; }
 .vacio { margin: 0; padding: 0 16px 12px; color: var(--suave); }
+
+.listas {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--borde);
+  display: grid;
+  gap: 8px;
+}
+.pestanas { display: flex; gap: 6px; flex-wrap: wrap; }
+.pestanas button {
+  width: auto;
+  padding: 5px 11px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--tarjeta);
+  color: var(--suave);
+  box-shadow: inset 0 0 0 1px var(--borde);
+}
+.pestanas button[aria-expanded="true"] { color: var(--texto); box-shadow: inset 0 0 0 1.5px var(--acento); }
+.pestanas b { color: var(--acento); margin-left: 4px; }
+#items { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 168px; overflow-y: auto; }
+#items label { display: flex; align-items: center; gap: 10px; padding: 5px 4px; border-radius: 8px; cursor: pointer; }
+#items label:hover { background: var(--tarjeta); }
+#items input { flex: none; padding: 0; accent-color: var(--acento); width: 16px; height: 16px; margin: 0; }
+#items .hecho span { text-decoration: line-through; color: var(--suave); }
+#form-item { padding: 0; border: 0; }
+#form-item input { padding: 7px 12px; font-size: 13px; }
 
 .charla {
   flex: 1;

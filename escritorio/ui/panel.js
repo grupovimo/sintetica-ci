@@ -20,6 +20,7 @@ function renglon(icono, hora, texto) {
   return li;
 }
 
+let todoElDia = false;
 async function cargarDia() {
   const ahora = new Date();
   $('fecha').textContent = ahora.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric' });
@@ -38,7 +39,20 @@ async function cargarDia() {
   items.sort((a, b) => a[1].localeCompare(b[1]));
   // Los mails sin leer (Gmail, Outlook), al final: los tres últimos.
   for (const m of (d.correo || []).slice(0, 3)) items.push(['✉️', hhmm(new Date(m.en)), `${m.de}: ${m.asunto}`]);
-  $('dia').replaceChildren(...items.map((i) => renglon(...i)));
+  // Lo que viene primero (como mucho 3); lo pasado y el resto, plegado.
+  const filas = items.map((i) => renglon(...i));
+  const proximas = filas.filter((f) => !f.classList.contains('pasado'));
+  const resto = filas.filter((f) => !proximas.slice(0, 3).includes(f));
+  const ver = [...proximas.slice(0, 3)];
+  if (resto.length && !todoElDia) {
+    const mas = document.createElement('li');
+    mas.className = 'mas';
+    mas.textContent = `+${resto.length}`;
+    mas.title = 'Ver todo el día';
+    mas.addEventListener('click', () => { todoElDia = true; cargarDia(); });
+    ver.push(mas);
+  }
+  $('dia').replaceChildren(...(todoElDia ? filas : ver));
 }
 
 // A quién le hablás: esta compu o cualquier robot de la cuenta (la placa del
@@ -80,6 +94,67 @@ async function cargarRobots() {
   }
   $('robots').replaceChildren(...chips);
 }
+
+// Las listas (la del súper, pendientes…): las mismas que en el celu y Telegram.
+let listas = [];
+let abierta = null; // el id de la lista desplegada
+async function cargarListas() {
+  const r = await invoke('listas');
+  listas = r.listas || [];
+  $('listas').hidden = !r.listas;
+  // Sin ninguna, la del súper vacía para empezar a anotar.
+  const ver = listas.length ? listas : [{ id: '', nombre: r.porDefecto || 'súper', items: [] }];
+  $('pestanas').replaceChildren(...ver.map((l) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('aria-expanded', String(abierta === l.id));
+    b.append(l.nombre);
+    const faltan = l.items.filter((i) => !i.hecho).length;
+    if (faltan) {
+      const n = document.createElement('b');
+      n.textContent = faltan;
+      b.append(n);
+    }
+    b.addEventListener('click', () => { abierta = abierta === l.id ? null : l.id; cargarListas(); });
+    return b;
+  }));
+  const l = ver.find((x) => x.id === abierta);
+  $('items').hidden = $('form-item').hidden = !l;
+  if (!l) return;
+  const orden = [...l.items.filter((i) => !i.hecho), ...l.items.filter((i) => i.hecho)];
+  $('items').replaceChildren(...orden.map((i) => {
+    const li = document.createElement('li');
+    const lab = document.createElement('label');
+    if (i.hecho) lab.className = 'hecho';
+    const c = document.createElement('input');
+    c.type = 'checkbox';
+    c.checked = i.hecho;
+    c.addEventListener('change', async () => {
+      await invoke('lista', { accion: 'marcar', lista: l.id, item: i.id, hecho: c.checked });
+      cargarListas();
+    });
+    const t = document.createElement('span');
+    t.textContent = i.texto;
+    lab.append(c, t);
+    li.append(lab);
+    return li;
+  }));
+}
+$('form-item').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const texto = $('nuevo-item').value.trim();
+  if (!texto) return;
+  $('nuevo-item').value = '';
+  let id = abierta;
+  if (!id) {
+    // La primera: se crea la del súper.
+    await invoke('lista', { accion: 'crear', lista: '', texto: 'súper' });
+    id = (await invoke('listas')).listas?.[0]?.id;
+    abierta = id;
+  }
+  if (id) await invoke('lista', { accion: 'agregar', lista: id, texto });
+  cargarListas();
+});
 
 // La charla: se guarda en esta compu (las últimas 60).
 let charla = [];
@@ -130,11 +205,13 @@ $('form').addEventListener('submit', async (e) => {
   }
   const r = await invoke('charlar', { texto });
   // Lo que cambia algo (una alarma, un recordatorio) se ve en el día.
-  if (r === 'entendio' || r === 'nube') setTimeout(cargarDia, 3000);
+  if (r === 'entendio' || r === 'nube') setTimeout(() => { cargarDia(); cargarListas(); }, 3000);
 });
 
 cargarDia();
 cargarRobots();
+cargarListas();
+setInterval(cargarListas, 60 * 1000);
 setInterval(cargarDia, 5 * 60 * 1000);
 setInterval(cargarRobots, 30 * 1000);
 $('frase').focus();
