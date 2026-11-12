@@ -31,13 +31,10 @@ amigos y la consola andan sin rehacer nada.
 
 ## Fase 0 — Destrabar (antes de cualquier cosa, esta semana)
 
-1. **CI** (decidido 12/11): la cuenta personal `nawesan12` no se toca. Lo que
-   necesita runners (macOS, Windows) va en **repos públicos de `grupovimo` con
-   solo lo que se compila**, como `herramientas/publicar-ios.sh` →
-   `grupovimo/sintetica-ios`; el escritorio, en `grupovimo/sintetica-escritorio`
-   (que además aloja las descargas). El repo entero no se hace público: los
-   perfiles y los docs dicen qué placas se usan. Las pruebas rápidas (núcleo,
-   Go, web) corren en la Mac.
+1. **CI** (hecho 12/11): la cuenta personal `nawesan12` no se toca. Todo corre
+   en repos **públicos** de `grupovimo`: el espejo `grupovimo/sintetica-ci`
+   (`sh herramientas/publicar-ci.sh`), `grupovimo/sintetica-ios` y, para el
+   escritorio, `grupovimo/sintetica-escritorio` (que además aloja las descargas).
 2. Pasar el CI de la v3 (RAM del broche) y desplegar.
 3. Token de Mercado Pago en `/opt/sintetica/.env` → preventa de la Unidad viva.
 4. Ordenar los docs: este plan pasa a `docs/plan.md` como única hoja de ruta;

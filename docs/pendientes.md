@@ -17,14 +17,6 @@ Lo que quedó abierto al cerrar la etapa 6. Ordenado por lo que más destraba.
 - **Cargar el negocio** en /admin: componentes con costo, proveedor y link, la
   lista de materiales de la Unidad y el Broche, y las unidades que ya existen.
 
-- **El CI**: arreglar el pago o el límite de Actions de `nawesan12`, o hacer
-  público el espejo y empujar la rama:
-  ```sh
-  GH_TOKEN=$(gh auth token -u grupovimo) gh repo edit grupovimo/sintetica-ci --visibility public --accept-visibility-change-consequences
-  sh herramientas/publicar-ci.sh
-  ```
-  (El permiso de Claude Code bloquea publicar código afuera; para que lo haga
-  Claude, sumar un permiso para `sh herramientas/publicar-ci.sh`.)
 - **Entrar a producción** con Telegram (https://sintetica.grupovimo.com.ar/entrar)
   y pasar su id de Telegram a `ADMIN_TELEGRAM` en `/opt/sintetica/.env` (lo
   saca Claude de la base) para ser administrador.
