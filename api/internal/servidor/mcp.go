@@ -139,6 +139,7 @@ const instruccionesMCP = `Manejás los robots de Sintética del usuario: bichos 
 - Para que el robot diga algo ya: decir (hasta 60 bytes). Para que lo haga todos los días a una hora (decir el clima, despertar, cambiar de modo): rutinas. El despertador, el clima (su ubicación) y cuánto habla solo (habla) se guardan en su config.
 - El robot acompaña el día: cuidado (que te recuerde tomar agua, la pausa activa en horario de trabajo, el «¿Cómo estás?», el «te extraño» y el resumen del día por Telegram), avisos (cómo reacciona a una notificación o llamada de tal app o tal contacto), jugar (ppt, reflejos, mirada, dado, moneda) y resumen (cómo fue su día: juegos, sueños, a qué hora te esperó).
 - Con amigos: amigos (invitar con un código, aceptar, listar) y tocar (un toque, abrazo, beso o carita a los robots de un amigo; si lo acarician, vuelve). Del día: habitos (marcar los hábitos hechos, con su racha), horarios (cuándo llegás, salís y te dormís, aprendido de la presencia) y entrantes (la dirección secreta para que avise pagos de Mercado Pago, PR de GitHub o lo que mande cualquier sistema).
+- Las listas de la cuenta (la del súper, pendientes…): listas (ver, agregar, tachar, sacar, limpiar).
 - Hablale al usuario en español rioplatense.`
 
 // registroLlamada: lo que una herramienta anota mientras corre (qué bicho

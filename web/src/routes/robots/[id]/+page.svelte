@@ -28,6 +28,7 @@
   import Amigos from '$lib/consola/modulos/Amigos.svelte';
   import Habitos from '$lib/consola/modulos/Habitos.svelte';
   import Agenda from '$lib/consola/modulos/Agenda.svelte';
+  import Listas from '$lib/consola/modulos/Listas.svelte';
   import Avisos from '$lib/consola/modulos/Avisos.svelte';
   import { escuchar } from '$lib/eventos.svelte';
 
@@ -43,6 +44,7 @@
     { clave: 'recordatorios', nombre: 'Recordatorios', modulo: Recordatorios },
     { clave: 'habitos', nombre: 'Hábitos', modulo: Habitos },
     { clave: 'agenda', nombre: 'Agenda', modulo: Agenda },
+    { clave: 'listas', nombre: 'Listas', modulo: Listas },
     { clave: 'modos', nombre: 'Modos', modulo: Modos },
     { clave: 'reflejos', nombre: 'Reflejos', modulo: Reflejos },
     { clave: 'integraciones', nombre: 'Integraciones', modulo: Integraciones },

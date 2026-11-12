@@ -1175,6 +1175,41 @@ vez** el mp3 de cada frase que el robot dice **solo** y el robot se lo baja.
   hash, dónde guardarlo, cuándo pedirlo) está en `docs/protocolo-ble.md`,
   "Voz".
 
+### Listas
+
+La del súper, pendientes o la que sea: son **de la cuenta** (no de un robot),
+así que lo que se anota en la compu aparece en el celu y al revés
+(`023_listas.sql`; `almacen/listas.go`, `integraciones/listas.go`,
+`servidor/listas.go`). Topes: 30 listas por usuario, 200 cosas por lista, 120
+bytes por cosa y 40 por nombre. "súper" (`ListaPorDefecto`) se crea sola la
+primera vez que se usa.
+
+- **HTTP** (con sesión): `GET /v1/listas` → `{listas: [{id, nombre, creada,
+  items: [{id, texto, hecho, creado, hechoEn?}]}], porDefecto, topes}`;
+  `POST /v1/listas {nombre}` (201 nueva, 200 si ya había una con ese nombre);
+  `DELETE /v1/listas/{id}`; `POST /v1/listas/{id}/items {texto}` (varias
+  separadas por comas o "y"; lo que ya está no se repite y lo tachado vuelve)
+  → `{lista, agregados, yaEstaban}`; `PATCH /v1/listas/{id}/items/{item}
+  {hecho?, texto?}`; `DELETE /v1/listas/{id}/items/{item}`;
+  `POST /v1/listas/{id}/limpiar` (saca las tachadas) → `{lista, sacadas}`.
+  La de otro: 404. Topes: 409. Cada cambio publica el SSE `listas`.
+- **Charlando** (la consola, Telegram, el robot-celu y el escritorio por
+  `bicho/{id}/charla`): un analizador determinista corre **antes** que el
+  motor y la IA (el motor entiende "anotá…" como un recordatorio): "anotá
+  yerba y pan en la lista del súper", "sumá pilas a pendientes", "sacá la
+  yerba", "ya compré el pan" (la tacha), "¿qué hay en la lista del súper?",
+  "¿qué me falta comprar?", "limpiá la lista", "borrá la lista del súper" (la
+  vacía; borrarla del todo, desde la web). Sin decir "lista", valen el súper
+  (y "el super", "el chino", "las compras"), unas de siempre (pendientes,
+  farmacia…) y las que ya existen. Tachar o sacar sin decir de qué lista solo
+  agarra si la cosa está en alguna (si no, sigue el motor). El robot contesta
+  con un Decir corto ("Anotado: yerba y pan", "Súper: yerba, pan, queso y 2
+  más"). La IA ve un renglón con lo que falta en cada lista.
+- **Telegram**: las mismas frases (andan sin robots) y `/lista [nombre]` (la
+  lista numerada; las tachadas, solo cuántas).
+- **MCP**: la herramienta `listas` (ver, agregar, tachar, destachar, sacar,
+  limpiar).
+
 ## MCP: que una IA maneje los robots
 
 La API es un **servidor MCP remoto**: cada usuario conecta su Claude

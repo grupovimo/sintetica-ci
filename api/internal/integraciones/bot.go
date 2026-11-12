@@ -21,6 +21,7 @@ var comandosBot = []map[string]string{
 	{"command": "jugar", "description": "Jugar con un robot (dado, moneda, ppt, reflejos, mirada)"},
 	{"command": "habito", "description": "Marcar un hábito de hoy"},
 	{"command": "agenda", "description": "Lo que tenés hoy y mañana"},
+	{"command": "lista", "description": "Una lista (la del súper si no decís cuál)"},
 	{"command": "ayuda", "description": "Qué puedo hacer"},
 }
 
@@ -34,6 +35,7 @@ const textoAyuda = `Esto es lo que puedo hacer:
 /jugar [dado|moneda|ppt|reflejos|mirada] [nombre]: juega con vos en su pantalla
 /habito [hábito] [nombre]: marca un hábito de hoy (sin decir cuál, te muestra los que hay)
 /agenda: lo que tenés hoy y mañana en tu calendario
+/lista [nombre]: una lista (sin nombre, la del súper). Para anotar: «anotá yerba y pan en el súper»; para tachar: «ya compré el pan»
 /ayuda: esto
 
 Si me escribís sin comando, charlás con tu robot (si tenés varios, con el último con el que charlaste).
@@ -309,6 +311,17 @@ func (i *Integraciones) atenderMensaje(ctx context.Context, m *mensaje) {
 	if err != nil {
 		i.log.Warn("telegram: no pude leer los robots", "error", err)
 		return
+	}
+	// Las listas son de la cuenta: andan sin robots.
+	if comando == "/lista" || comando == "/listas" {
+		i.responder(ctx, chat, i.TextoListaTelegram(ctx, v.UsuarioID, resto), nil)
+		return
+	}
+	if !strings.HasPrefix(texto, "/") && texto != "" {
+		if r, ok := i.ListaDesdeTexto(ctx, v.UsuarioID, texto); ok {
+			i.responder(ctx, chat, r.paraTelegram(), nil)
+			return
+		}
 	}
 	if len(rs) == 0 && comando != "/ayuda" && comando != "/help" && comando != "/start" && comando != "/agenda" {
 		i.responder(ctx, chat, "Todavía no tenés robots en tu cuenta. Sumalos desde la app o la web.", nil)

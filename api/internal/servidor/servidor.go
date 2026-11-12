@@ -136,6 +136,7 @@ func (s *Servidor) Rutas() http.Handler {
 	s.rutasAgendaMusicaCharla(m)                                             // v1.9: agenda.go, musica.go y charla.go
 	s.rutasVoz(m)                                                            // ElevenLabs (voz.go)
 	s.rutasCorreo(m)                                                         // Gmail y Outlook (correo.go)
+	s.rutasListas(m)                                                         // las listas (listas.go)
 
 	m.HandleFunc("GET /v1/telegram", s.conSesion(s.verTelegram))
 	m.HandleFunc("POST /v1/telegram/vincular", s.conSesion(s.vincularTelegram))

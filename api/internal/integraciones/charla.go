@@ -152,7 +152,9 @@ type datosCharla struct {
 	Memoria      string
 	// Correo: los mails sin leer del dueño (solo en la charla con IA de
 	// texto, charlaConIA; vacío sin Gmail ni Outlook).
-	Correo      string
+	Correo string
+	// Listas: lo que falta en las listas del dueño (solo en charlaConIA).
+	Listas      string
 	Expresiones []string
 }
 
@@ -254,6 +256,9 @@ func promptCharla(d datosCharla) string {
 	}
 	if d.Correo != "" {
 		fmt.Fprintf(&b, "El mail de tu dueño (esto sí lo sabés y se lo podés contar): %s. ", d.Correo)
+	}
+	if d.Listas != "" {
+		fmt.Fprintf(&b, "Las listas de tu dueño (lo que falta; esto sí lo sabés): %s. Para anotar o tachar, que te diga por ejemplo «anotá yerba en el súper» o «ya compré el pan». ", d.Listas)
 	}
 	b.WriteString("\n\nContestá en español rioplatense, en tu personalidad, con UNA frase muy corta: hasta 50 letras (entra en un globo de 60 bytes). " +
 		"Sin emojis, sin comillas y sin markdown. No te llames a vos mismo \"bicho\". " +
@@ -372,7 +377,7 @@ func limpiarRespuesta(texto, expresion string, validas []string) (string, string
 
 // Charlar: el usuario le dice algo a su robot y el robot contesta (y lo dice
 // en su pantalla si está conectado). desde: "web", "app", "telegram" o
-// "robot". Primero el motor propio (charla_motor.go: sin IA y sin gastar el
+// "robot". Primero las listas (listas.go), después el motor propio (charla_motor.go: sin IA y sin gastar el
 // tope); solo si no entendió y hay IA, la IA.
 func (i *Integraciones) Charlar(ctx context.Context, usuario, bicho, texto, desde string) (RespuestaCharla, error) {
 	texto = strings.TrimSpace(texto)
@@ -381,6 +386,11 @@ func (i *Integraciones) Charlar(ctx context.Context, usuario, bicho, texto, desd
 	}
 	if _, err := i.alm.BichoDe(ctx, bicho, usuario); err != nil {
 		return RespuestaCharla{}, errors.New("ese robot no está en tu cuenta")
+	}
+	// Las listas antes que nada: el motor entiende "anotá…" como un
+	// recordatorio (listas.go).
+	if res, ok := i.charlaDeListas(ctx, usuario, bicho, texto, desde); ok {
+		return res, nil
 	}
 	r := i.entender(ctx, usuario, bicho, texto)
 	m, conIA := i.motorDe(ctx, usuario)
@@ -400,6 +410,7 @@ func (i *Integraciones) Charlar(ctx context.Context, usuario, bicho, texto, desd
 func (i *Integraciones) charlaConIA(ctx context.Context, usuario, bicho, texto, desde string) (RespuestaCharla, error) {
 	d := i.datosCharla(ctx, bicho)
 	d.Correo = i.resumenCorreo(usuario)
+	d.Listas = i.resumenListas(ctx, usuario)
 	t, e, mo, n, err := i.contestarConIA(ctx, usuario, d, texto)
 	if err != nil {
 		return RespuestaCharla{}, err

@@ -86,7 +86,9 @@ export type Evento =
   // La voz (ElevenLabs conectado o no, o cambió la de Edge), el paquete de voz sin internet y la clave de IA propia.
   | { tipo: 'voz'; bicho?: string; datos: { conectado?: boolean; edge?: boolean } }
   | { tipo: 'voz-paquete'; bicho: string; datos: { estado: string; version: number; frases: number } }
-  | { tipo: 'ia'; bicho?: string; datos: { propia: boolean } };
+  | { tipo: 'ia'; bicho?: string; datos: { propia: boolean } }
+  // Las listas (de la cuenta): cambió alguna, desde donde sea.
+  | { tipo: 'listas'; bicho?: string; datos?: undefined };
 
 // Cómo ve la pantalla cada perfil (también los virtuales).
 export function pantallaDe(b: { perfil: string; estado: Estado | null }) {

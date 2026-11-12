@@ -37,8 +37,8 @@ func cuentaVacia(ctx context.Context, tx pgx.Tx, id string) (bool, error) {
 
 // unir suma la cuenta `desde` (vacía) a `hacia` y la borra: el mail (si
 // `hacia` no tiene), el admin, el nombre (si `hacia` no tiene), el Telegram
-// (si `hacia` no tiene: si tienen uno cada una, ErrOtroTelegram) y las
-// sesiones abiertas.
+// (si `hacia` no tiene: si tienen uno cada una, ErrOtroTelegram), las
+// sesiones abiertas y las listas.
 func unir(ctx context.Context, tx pgx.Tx, desde, hacia string) error {
 	var tgDesde, tgHacia bool
 	if err := tx.QueryRow(ctx, `select exists(select 1 from telegram_vinculos where usuario_id = $1),
@@ -68,6 +68,9 @@ func unir(ctx context.Context, tx pgx.Tx, desde, hacia string) error {
 		if _, err := tx.Exec(ctx, q, desde, hacia); err != nil {
 			return err
 		}
+	}
+	if err := unirListas(ctx, tx, desde, hacia); err != nil {
+		return err
 	}
 	_, err := tx.Exec(ctx, `delete from usuarios where id = $1`, desde)
 	return err
