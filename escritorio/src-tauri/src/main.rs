@@ -171,6 +171,50 @@ fn hoy(app: State<App>) -> serde_json::Value {
     })
 }
 
+fn sesion(app: &App) -> Result<String, String> {
+    std::fs::read_to_string(app.carpeta.join("sesion")).map(|s| s.trim().to_string()).map_err(|_| "primero sumalo a tu cuenta".into())
+}
+
+/// Los robots de la cuenta (las placas, el celu y esta compu), para el panel.
+#[tauri::command(async)]
+fn robots(app: State<App>) -> serde_json::Value {
+    let Ok(s) = sesion(&app) else { return json!([]) };
+    let Ok(r) = cuenta::pedir(&s, "/v1/bichos") else { return json!([]) };
+    let lista: Vec<_> = r["bichos"]
+        .as_array()
+        .map(|l| l.as_slice())
+        .unwrap_or_default()
+        .iter()
+        .map(|b| {
+            let id = b["id"].as_str().unwrap_or_default();
+            json!({
+                "id": id,
+                "apodo": b["apodo"],
+                "perfil": b["perfil"],
+                "conectado": b["conectado"],
+                "este": id == &*app.nucleo.id,
+            })
+        })
+        .collect();
+    json!(lista)
+}
+
+/// Hablarle a otro robot de la cuenta (la placa del escritorio, el celu):
+/// contesta en su pantalla y la respuesta vuelve para el panel.
+#[tauri::command(async)]
+fn charlar_con(app: State<App>, id: String, texto: String) -> Result<String, String> {
+    let s = sesion(&app)?;
+    let r = cuenta::enviar(&s, "POST", &format!("/v1/bichos/{id}/charla"), json!({ "texto": texto }))?;
+    Ok(r["texto"].as_str().unwrap_or_default().to_string())
+}
+
+/// Un mimo a otro robot (como acariciarlo).
+#[tauri::command(async)]
+fn mimo(app: State<App>, id: String) -> Result<(), String> {
+    let s = sesion(&app)?;
+    cuenta::enviar(&s, "POST", &format!("/v1/bichos/{id}/comando"), json!({ "evento": "caricia" })).map(|_| ())
+}
+
 /// El panel al lado de la cara: el día, la charla y el renglón para hablarle.
 fn abrir_panel(app: &AppHandle) {
     let v = match app.get_webview_window("panel") {
@@ -355,7 +399,7 @@ fn main() {
             }
             _ => {}
         })
-        .invoke_handler(tauri::generate_handler![cuadro, tocar, como_esta, entrar, codigo, licencia, comprar, charlar, hoy, panel, esconder])
+        .invoke_handler(tauri::generate_handler![cuadro, tocar, como_esta, entrar, codigo, licencia, comprar, charlar, hoy, panel, esconder, robots, charlar_con, mimo])
         .run(tauri::generate_context!())
         .expect("no arrancó Sintética");
 }
