@@ -268,8 +268,14 @@ fn abrir_panel(app: &AppHandle) {
         None => {
             let mut b = WebviewWindowBuilder::new(app, "panel", WebviewUrl::App("panel.html".into()))
                 .title("Sintética")
-                .inner_size(360.0, 560.0)
-                .min_inner_size(300.0, 380.0);
+                .inner_size(360.0, 600.0)
+                .min_inner_size(320.0, 440.0)
+                .background_color(tauri::window::Color(22, 20, 15, 255));
+            // En la Mac, la barra va por arriba del panel (los semáforos sobre la chapa).
+            #[cfg(target_os = "macos")]
+            {
+                b = b.title_bar_style(tauri::TitleBarStyle::Overlay).hidden_title(true);
+            }
             // Pegado a la derecha de la cara.
             if let Some(c) = app.get_webview_window("cara") {
                 if let (Ok(p), Ok(t), Ok(f)) = (c.outer_position(), c.outer_size(), c.scale_factor()) {
