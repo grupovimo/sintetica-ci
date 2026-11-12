@@ -52,8 +52,12 @@ bandeja, atajos globales y arranque con el sistema vienen de fábrica.
 
 Hecho (12/11): la app (`escritorio/`, compila en `grupovimo/sintetica-escritorio`),
 el núcleo nativo vivo, la cara flotante, MQTT, sumarse con Telegram y la
-licencia con Mercado Pago (`/v1/escritorio`). Falta: charla y voz, sentidos de
-la compu, acciones locales, firmar e instalar en una Mac y una Windows de verdad.
+licencia con Mercado Pago (`/v1/escritorio`). La charla escrita (atajo
+⌘/Ctrl+Shift+Espacio o doble clic; el motor propio en la compu y, si no
+entiende, `bicho/{id}/charla` a la nube) y la voz propia por el parlante (cpal).
+Dictar: el dictado del sistema en el renglón (Mac: Fn dos veces; Windows: Win+H).
+Falta: el oído propio (palabra y Whisper), sentidos de la compu, acciones
+locales, firmar e instalar en una Mac y una Windows de verdad.
 
 Piezas:
 
