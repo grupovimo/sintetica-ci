@@ -14,9 +14,10 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use serde_json::json;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::ShortcutState;
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
@@ -233,6 +234,10 @@ fn mirar_globos(app: AppHandle) {
         .unwrap();
 }
 
+fn carpeta_app<R: tauri::Runtime>(app: &impl Manager<R>) -> PathBuf {
+    app.path().app_data_dir().unwrap_or_default()
+}
+
 fn abrir_consola(app: &AppHandle) {
     if let Some(v) = app.get_webview_window("consola") {
         let _ = v.show();
@@ -260,6 +265,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_shortcuts([ATAJO])
@@ -289,9 +295,27 @@ fn main() {
             let hablar = MenuItem::with_id(app, "hablar", "Hablarle", true, Some(ATAJO))?;
             let consola = MenuItem::with_id(app, "consola", "Abrir la consola", true, None::<&str>)?;
             let sumar = MenuItem::with_id(app, "entrar", "Sumarlo a mi cuenta", true, None::<&str>)?;
+            let tamano = Submenu::with_items(
+                app,
+                "Tamaño",
+                true,
+                &[
+                    &MenuItem::with_id(app, "tam-200", "Chica", true, None::<&str>)?,
+                    &MenuItem::with_id(app, "tam-280", "Mediana", true, None::<&str>)?,
+                    &MenuItem::with_id(app, "tam-380", "Grande", true, None::<&str>)?,
+                ],
+            )?;
+            // Abrir al prender la compu: prendido la primera vez; después, lo que elijas.
+            let marca = carpeta_app(app).join("autoarranque");
+            if !marca.exists() {
+                let _ = app.autolaunch().enable();
+                let _ = std::fs::write(&marca, "1");
+            }
+            let al_prender = app.autolaunch().is_enabled().unwrap_or(false);
+            let arranque = CheckMenuItem::with_id(app, "arranque", "Abrir al prender la compu", true, al_prender, None::<&str>)?;
             let salir = MenuItem::with_id(app, "salir", "Salir", true, None::<&str>)?;
             let sep = PredefinedMenuItem::separator(app)?;
-            let menu = Menu::with_items(app, &[&mostrar, &hablar, &consola, &sumar, &sep, &salir])?;
+            let menu = Menu::with_items(app, &[&mostrar, &hablar, &consola, &sumar, &sep, &tamano, &arranque, &PredefinedMenuItem::separator(app)?, &salir])?;
             let mut bandeja = TrayIconBuilder::with_id("sintetica").menu(&menu).tooltip("Sintética");
             if let Some(i) = app.default_window_icon() {
                 bandeja = bandeja.icon(i.clone());
@@ -300,6 +324,16 @@ fn main() {
                 .on_menu_event(|app, e| match e.id.as_ref() {
                     "cara" => alternar_cara(app),
                     "hablar" => abrir_panel(app),
+                    "arranque" => {
+                        let a = app.autolaunch();
+                        let _ = if a.is_enabled().unwrap_or(false) { a.disable() } else { a.enable() };
+                    }
+                    t if t.starts_with("tam-") => {
+                        if let (Some(v), Ok(ancho)) = (app.get_webview_window("cara"), t[4..].parse::<f64>()) {
+                            let (m, archivo) = (app.state::<sentidos::Movida>(), carpeta_app(app).join("tamano"));
+                            sentidos::tamano(&v, &m, ancho, &archivo);
+                        }
+                    }
                     "consola" => abrir_consola(app),
                     "entrar" => entrar(app.clone()),
                     "salir" => app.exit(0),
