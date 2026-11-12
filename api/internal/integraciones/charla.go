@@ -150,7 +150,10 @@ type datosCharla struct {
 	Clima        string
 	Hora         string
 	Memoria      string
-	Expresiones  []string
+	// Correo: los mails sin leer del dueño (solo en la charla con IA de
+	// texto, charlaConIA; vacío sin Gmail ni Outlook).
+	Correo      string
+	Expresiones []string
 }
 
 func (i *Integraciones) datosCharla(ctx context.Context, bicho string) datosCharla {
@@ -248,6 +251,9 @@ func promptCharla(d datosCharla) string {
 	}
 	if d.Memoria != "" {
 		fmt.Fprintf(&b, "Lo que recordás: %s. ", d.Memoria)
+	}
+	if d.Correo != "" {
+		fmt.Fprintf(&b, "El mail de tu dueño (esto sí lo sabés y se lo podés contar): %s. ", d.Correo)
 	}
 	b.WriteString("\n\nContestá en español rioplatense, en tu personalidad, con UNA frase muy corta: hasta 50 letras (entra en un globo de 60 bytes). " +
 		"Sin emojis, sin comillas y sin markdown. No te llames a vos mismo \"bicho\". " +
@@ -393,6 +399,7 @@ func (i *Integraciones) Charlar(ctx context.Context, usuario, bicho, texto, desd
 // charlaConIA: lo que no entendió el motor, con la IA.
 func (i *Integraciones) charlaConIA(ctx context.Context, usuario, bicho, texto, desde string) (RespuestaCharla, error) {
 	d := i.datosCharla(ctx, bicho)
+	d.Correo = i.resumenCorreo(usuario)
 	t, e, mo, n, err := i.contestarConIA(ctx, usuario, d, texto)
 	if err != nil {
 		return RespuestaCharla{}, err

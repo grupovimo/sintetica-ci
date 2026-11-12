@@ -7,7 +7,7 @@
   import { api, ErrorApi } from '$lib/api';
   import { usarBicho } from '$lib/bicho.svelte';
   import { escuchar } from '$lib/eventos.svelte';
-  import type { Bicho } from '$lib/tipos';
+  import type { Bicho, MailNoLeido } from '$lib/tipos';
   import { cortarBytes, JUEGOS, MAX_TEXTO } from '$lib/formato';
   import type { Modelo } from '../modelo';
   import IAPropia from './IAPropia.svelte';
@@ -88,6 +88,20 @@
   }
   async function desconectarSpotify() { await api('/v1/musica/spotify', { metodo: 'DELETE' }).catch(() => {}); await cargarMusica(); }
 
+  // Mail: Gmail y Outlook (cada uno, solo si la nube tiene sus claves).
+  type Proveedor = 'gmail' | 'outlook';
+  type Cuenta = { disponible: boolean; conectada: boolean; direccion: string };
+  type Correo = { gmail: Cuenta; outlook: Cuenta; noLeidos: MailNoLeido[] };
+  const PROVEEDORES: { id: Proveedor; nombre: string }[] = [{ id: 'gmail', nombre: 'Gmail' }, { id: 'outlook', nombre: 'Outlook' }];
+  let correo = $state<Correo | null>(null);
+  const hayCorreo = $derived(!!correo && (correo.gmail.disponible || correo.outlook.disponible));
+  const correoConectado = $derived(!!correo && (correo.gmail.conectada || correo.outlook.conectada));
+  async function cargarCorreo() { correo = await api<Correo>('/v1/correo').catch(() => null); }
+  async function conectarCorreo(p: Proveedor) {
+    try { location.href = (await api<{ url: string }>(`/v1/correo/${p}`)).url; } catch (e) { error = texto(e, 'No pude abrir el mail.'); }
+  }
+  async function desconectarCorreo(p: Proveedor) { await api(`/v1/correo/${p}`, { metodo: 'DELETE' }).catch(() => {}); await cargarCorreo(); }
+
   // Tu IA (MCP): las IAs conectadas por OAuth y los tokens para Claude Code.
   type Cliente = { id: string; cliente: string; creada: string; usada: string | null };
   type TokenIA = { id: string; nombre: string; creado: string; usado: string | null };
@@ -137,7 +151,9 @@
     cargar();
     cargarIA();
     cargarMusica();
+    cargarCorreo();
     return escuchar((e) => {
+      if (e.tipo === 'correo') cargarCorreo();
       const t = (e as { tipo: string; bicho?: string }).tipo;
       if (t === 'telegram' || (t === 'automatizacion' && e.bicho === b.id)) cargar();
       if (t === 'mcp') cargarIA();
@@ -296,6 +312,37 @@
       </div>
     {/if}
 
+    {#if hayCorreo && correo}
+      <div class="correo bandeja">
+        <div class="logo sobre" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#0e0d0b" stroke-width="2.2" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="12.5" rx="2" /><path d="m4 7 8 6.2L20 7" /></svg>
+        </div>
+        <div class="que">
+          <span class="grabado">Mail</span>
+          {#if !correoConectado}<b>Que te avise tus mails</b>
+          {:else if correo.noLeidos.length === 0}<b>Nada sin leer</b>
+          {:else}<b>{correo.noLeidos.length} sin leer</b>
+            <ul class="mails">
+              {#each correo.noLeidos.slice(0, 3) as m (m.en + m.de + m.asunto)}
+                <li><b>{m.de}</b><span>{m.asunto}</span></li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+        <div class="cuentas">
+          {#each PROVEEDORES as p (p.id)}
+            {@const c = correo[p.id]}
+            {#if c.conectada}
+              <span class="cuenta" title={c.direccion}>
+                <small>{c.direccion || p.nombre}</small>
+                <button class="tecla negra chica" aria-label={`Desconectar ${p.nombre}`} onclick={() => desconectarCorreo(p.id)}>✕</button>
+              </span>
+            {:else if c.disponible}<button class="tecla naranja" onclick={() => conectarCorreo(p.id)}>{p.nombre}</button>{/if}
+          {/each}
+        </div>
+      </div>
+    {/if}
+
     <div class="titulo">
       <span class="grabado">Automatizaciones{guardando === 'guardando' ? ' · guardando…' : guardando === 'guardado' ? ' · guardadas' : ''}</span>
       <button class="tecla negra" disabled={autos.length >= 20} onclick={nueva}>+ Nueva</button>
@@ -435,6 +482,15 @@
   .quieto .eq i { animation: none; transform: scaleY(.25); }
   @keyframes eq { from { transform: scaleY(.2); } to { transform: scaleY(1); } }
   .telegram { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: center; }
+  .correo { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: center; }
+  .sobre { background: linear-gradient(180deg, #ffd27a, #f4b13a) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 5px 0 #b67d17 !important; }
+  .mails { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .mails li { display: flex; gap: 8px; min-width: 0; padding: 6px 10px; border-radius: 10px; background: #0e0d0b; color: #d9d2c6; font: 600 13px/1.3 var(--marca); }
+  .mails li b { font: 800 13px/1.3 var(--marca) !important; text-transform: none !important; letter-spacing: 0 !important; color: #ff8a5c; flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mails li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .cuentas { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+  .cuenta { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .cuenta small { font: 700 12px/1.2 var(--marca); color: rgba(26,23,20,.75); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
   .qr { grid-column: 1 / -1; justify-self: center; width: 200px; padding: 10px; border-radius: 18px; background: #f3eee8; box-shadow: 0 6px 0 #a39c90; }
   .qr :global(svg) { display: block; width: 100%; height: auto; }
   .logo { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(180deg, #3aa4e0, #1d7fbf);
@@ -474,7 +530,9 @@
     .auto { grid-template-columns: 1fr; }
     .lado { flex-direction: row; flex-wrap: wrap; }
     .telegram { grid-template-columns: auto minmax(0, 1fr); }
-    .telegram > :last-child, .musica > :last-child { grid-column: 1 / -1; }
+    .telegram > :last-child, .musica > :last-child, .correo > :last-child { grid-column: 1 / -1; }
+    .correo { grid-template-columns: auto minmax(0, 1fr); }
+    .cuentas { flex-direction: row; flex-wrap: wrap; }
     .musica { grid-template-columns: auto minmax(0, 1fr); }
   }
 </style>

@@ -44,7 +44,7 @@
     }
   }
 
-  // Los links que vuelven acá: una invitación de amigo (?amigo=CODIGO) y la vuelta de Spotify (?spotify=ok).
+  // Los links que vuelven acá: una invitación de amigo (?amigo=CODIGO) la vuelta de Spotify (?spotify=ok) y la del mail (?correo=ok).
   let invitado = $state('');
   let banda = $state<{ texto: string; ok: boolean } | null>(null);
   function limpiar(...p: string[]) {
@@ -66,7 +66,9 @@
     invitado = (page.url.searchParams.get('amigo') ?? '').replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 8);
     const sp = page.url.searchParams.get('spotify');
     if (sp) banda = sp === 'ok' ? { texto: 'Spotify conectado', ok: true } : { texto: sp === 'cancelado' ? 'Spotify: cancelado' : 'Spotify no se conectó', ok: false };
-    if (invitado || sp) limpiar('amigo', 'spotify');
+    const co = page.url.searchParams.get('correo');
+    if (co) banda = co === 'ok' ? { texto: 'Mail conectado', ok: true } : { texto: co === 'cancelado' ? 'Mail: cancelado' : 'El mail no se conectó', ok: false };
+    if (invitado || sp || co) limpiar('amigo', 'spotify', 'correo', 'detalle');
     cargar();
     return escuchar((e) => {
       const b = bichos.find((x) => x.id === e.bicho);

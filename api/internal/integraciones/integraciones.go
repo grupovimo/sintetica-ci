@@ -90,6 +90,8 @@ type Integraciones struct {
 	paq estadoPaquete // el paquete de voz sin internet (paquete_voz.go)
 
 	cm estadoCharlaMotor // la charla sin IA: el hilo de cada robot (charla_motor.go)
+
+	correo estadoCorreo // Gmail y Outlook (correo.go)
 }
 
 type entradaCache struct {

@@ -58,6 +58,9 @@ export type Actualizacion = {
   actualizada: string;
 };
 
+// Un mail sin leer (la nube lo sabe en memoria, no lo guarda).
+export type MailNoLeido = { de: string; asunto: string; en: string; proveedor: 'gmail' | 'outlook' };
+
 export type Evento =
   | { tipo: 'estado'; bicho: string; datos: Estado }
   | { tipo: 'conexion'; bicho: string; datos: { conectado: boolean } }
@@ -77,6 +80,8 @@ export type Evento =
   // v1.9: la agenda (cambió o se viene un evento), lo que suena (Spotify sin robot; el celu, con su robot) y la charla con IA.
   | { tipo: 'agenda'; bicho?: string; datos: { conectada?: boolean; titulo?: string; minutos?: number; manana?: number } }
   | { tipo: 'musica'; bicho?: string; datos: { conectada?: boolean; nombre?: string; sonando?: boolean; titulo?: string; artista?: string; bpm?: number; de?: string } }
+  // El mail (Gmail u Outlook): se conectó o desconectó una cuenta, o llegaron mails nuevos.
+  | { tipo: 'correo'; bicho?: string; datos: { proveedor?: 'gmail' | 'outlook'; conectada?: boolean; direccion?: string; nuevos?: MailNoLeido[]; texto?: string; robots?: string[] } }
   | { tipo: 'charla'; bicho: string; datos: { texto: string; expresion: string; de: string; enviado: boolean } }
   // La voz (ElevenLabs conectado o no, o cambió la de Edge), el paquete de voz sin internet y la clave de IA propia.
   | { tipo: 'voz'; bicho?: string; datos: { conectado?: boolean; edge?: boolean } }

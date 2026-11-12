@@ -196,6 +196,9 @@ func correr(log *slog.Logger) error {
 		V19: integraciones.OpcionesV19{
 			Secreto: secreto, APIURL: op.URLPublica, WebURL: op.WebURL,
 			SpotifyID: os.Getenv("SPOTIFY_CLIENT_ID"), SpotifySecreto: os.Getenv("SPOTIFY_CLIENT_SECRET"),
+			// El mail (sin las claves de un proveedor, ese apagado).
+			GoogleID: os.Getenv("GOOGLE_CLIENT_ID"), GoogleSecreto: os.Getenv("GOOGLE_CLIENT_SECRET"),
+			MicrosoftID: os.Getenv("MICROSOFT_CLIENT_ID"), MicrosoftSecreto: os.Getenv("MICROSOFT_CLIENT_SECRET"),
 			AnthropicClave: os.Getenv("ANTHROPIC_API_KEY"), AnthropicModelo: os.Getenv("CHARLA_MODELO"),
 			CharlaURL: os.Getenv("CHARLA_URL"), CharlaClave: os.Getenv("CHARLA_CLAVE"),
 			// La voz gratis (Edge TTS): prendida salvo EDGE_TTS=0.

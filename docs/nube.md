@@ -802,6 +802,50 @@ sin ellas, apagado y `GET /v1/musica` → `{"disponible": false}`.
   el celu (Android lo lee de la sesión de medios): el `0x4B` a ese robot (409 si
   no está conectado; 30 por minuto). MCP **`musica`** (`ver` / `mandar`).
 
+**Mail** (`correo_cuentas` en `022_correo.sql`; `integraciones/correo.go`):
+Gmail con `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` (un cliente OAuth "web"
+en console.cloud.google.com, con la API de Gmail y el redirect
+`API_URL_PUBLICA/v1/correo/gmail/vuelta`) y Outlook/Hotmail con
+`MICROSOFT_CLIENT_ID` y `MICROSOFT_CLIENT_SECRET` (una app en portal.azure.com
+para cuentas de cualquier organización y personales, redirect
+`API_URL_PUBLICA/v1/correo/outlook/vuelta`). Sin las claves de uno, ese queda
+apagado (`disponible: false`).
+
+- `GET /v1/correo/{gmail|outlook}` → `{"url"}` (Gmail: `openid email
+  gmail.readonly`, `access_type=offline&prompt=consent`; Outlook:
+  `offline_access Mail.Read User.Read`; el `state` lleva el usuario y el
+  proveedor, vence en 10 min, firmado). La vuelta (`GET
+  /v1/correo/{proveedor}/vuelta`, sin sesión; 30 por hora por IP) guarda el
+  refresh token cifrado y la dirección, y vuelve a
+  `WEB_URL/robots?correo=ok|error|cancelado`. `DELETE /v1/correo/{proveedor}`.
+- `GET /v1/correo` → `{"gmail": {disponible, conectada, direccion},
+  "outlook": {…}, "noLeidos": [{de, asunto, en, proveedor}]}` (hasta 20, el más
+  nuevo primero).
+- Cada 2 minutos, por cuenta: los no leídos importantes de la bandeja de
+  entrada de las últimas dos semanas (Gmail: `is:unread in:inbox
+  category:primary`; Outlook: `isRead eq false`, sin los de "Otros"), hasta
+  20. **De los mails no se guarda nada en la base**: quién y el asunto viven
+  en la memoria de la API; en la base solo queda hasta cuándo se miró
+  (`revisado`). La primera vuelta después de conectar solo pone esa marca (no
+  avisa los viejos). Es nuevo lo que no estaba en la vuelta anterior y llegó
+  hasta 10 min antes de la marca (recién arrancada la API, lo que llegó
+  después de la marca).
+- Los nuevos de las cuentas de un usuario van en **un aviso**: el `0x44` de
+  tipo `mail` (el de los avisos entrantes; título = el asunto del más nuevo,
+  de = "Juan" o "Juan +2") a sus robots conectados, que lo dicen con su frase
+  (`frases.json`, "mail"); el SSE `correo` (`{nuevos, texto: "Mail de Juan:
+  asunto", robots}`; al conectar o desconectar, `{proveedor, conectada}`) y,
+  con Telegram vinculado, "Mail de Juan: asunto" o "Tenés 3 mails nuevos:" y
+  la lista.
+- Access token en memoria; si el proveedor dice `invalid_grant` (lo
+  revocaron), se olvida la cuenta. Microsoft rota el refresh token: se guarda
+  el nuevo.
+- La charla con IA sabe los no leídos ("tiene 3 sin leer (los más nuevos:
+  Juan: Reunión; …)", hasta 5), así "¿tengo mails?" anda. El motor propio no.
+- Gmail: `gmail.readonly` es un alcance "restringido" de Google: con la app en
+  modo prueba entran solo los usuarios de prueba (hasta 100); para abrirlo a
+  todos, Google pide verificación y una auditoría de seguridad.
+
 **Charla con IA** (`charlas_uso` y `charla_robot`): con `ANTHROPIC_API_KEY`
 (modelo `claude-haiku-5-5`, o `CHARLA_MODELO`), con el SDK oficial de Go
 (`github.com/anthropics/anthropic-sdk-go`), **o** con cualquier servicio
@@ -1266,6 +1310,8 @@ SVG) y el prompt `inventar_cara`.
 | `TELEGRAM_API_URL` | la API de Telegram (para tests) | vacío = `https://api.telegram.org` |
 | `CLIMA_API_URL`, `GEOCODING_API_URL` | Open-Meteo (pronóstico y búsqueda de lugares; para tests) | vacío = `https://api.open-meteo.com/v1/forecast` y `https://geocoding-api.open-meteo.com/v1/search` |
 | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` | la app de Spotify (la música); vacías = apagado | el de `.env` (nunca en el repo) |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | el cliente OAuth de Google (el mail de Gmail); vacías = apagado | el de `.env` (nunca en el repo) |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | la app de Microsoft (el mail de Outlook/Hotmail); vacías = apagado | el de `.env` (nunca en el repo) |
 | `ANTHROPIC_API_KEY` | la charla con IA; vacía = apagada | el de `.env` (nunca en el repo) |
 | `CHARLA_MODELO` | el modelo de la charla | vacío = `claude-haiku-5-5` (con `CHARLA_URL`, obligatorio) |
 | `CHARLA_URL`, `CHARLA_CLAVE` | un servicio compatible con OpenAI para la charla (Groq, OpenRouter, Gemini, Ollama) | vacías = Anthropic |

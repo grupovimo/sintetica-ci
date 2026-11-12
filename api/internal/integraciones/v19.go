@@ -26,6 +26,17 @@ type OpcionesV19 struct {
 	// Vacías, las de Spotify (los tests ponen un servidor falso).
 	SpotifyCuentasURL, SpotifyAPIURL string
 
+	// El mail (correo.go): Google (Gmail) y Microsoft (Outlook, Hotmail).
+	// Sin las claves de uno, ese queda apagado.
+	GoogleID, GoogleSecreto       string
+	MicrosoftID, MicrosoftSecreto string
+	// Vacías, las de siempre (los tests ponen un servidor falso):
+	// GoogleCuentasURL reemplaza a accounts.google.com y a oauth2.googleapis.com
+	// (/o/oauth2/v2/auth y /token); MicrosoftCuentasURL, a
+	// login.microsoftonline.com/common/oauth2/v2.0.
+	GoogleCuentasURL, GmailURL    string
+	MicrosoftCuentasURL, GraphURL string
+
 	AnthropicClave  string
 	AnthropicURL    string // vacía, la de siempre (los tests ponen un servidor falso)
 	AnthropicModelo string // vacío, claude-haiku-5-5 (con CharlaURL, el modelo de ese servicio)
@@ -66,6 +77,7 @@ func (i *Integraciones) iniciarV19() {
 		musica: map[string]sonando{}, tokens: map[string]tokenAcceso{}, bpms: map[string]int{},
 		charlas: make(chan struct{}, 8),
 	}
+	i.iniciarCorreo(sec)
 	i.iniciarVoz(sec)
 	i.iniciarIA(sec)
 	i.iniciarPaquete(sec)
@@ -73,8 +85,8 @@ func (i *Integraciones) iniciarV19() {
 
 func (i *Integraciones) ahora() time.Time { return i.v19.ahora() }
 
-// correrV19: la agenda cada minuto (y la lee cada 5) y, con Spotify, qué
-// suena cada 20 s.
+// correrV19: la agenda cada minuto (y la lee cada 5), con Spotify, qué
+// suena cada 20 s y, con Gmail u Outlook, el mail cada 2 minutos.
 func (i *Integraciones) correrV19(ctx context.Context) {
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -83,6 +95,11 @@ func (i *Integraciones) correrV19(ctx context.Context) {
 		wg.Add(1)
 		go func() { defer wg.Done(); i.sondearMusica(ctx) }()
 		i.log.Info("Spotify prendido")
+	}
+	if i.CorreoActivo() {
+		wg.Add(1)
+		go func() { defer wg.Done(); i.sondearCorreo(ctx) }()
+		i.log.Info("mail prendido")
 	}
 	if i.CharlaActiva() {
 		i.log.Info("charla con IA prendida", "modelo", i.modeloCharla())
