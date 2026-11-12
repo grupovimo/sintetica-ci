@@ -174,29 +174,45 @@ func (s *Servidor) reservarPreventa(w http.ResponseWriter, r *http.Request, sena
 // referenciaSena: el external_reference del pago ("sena-<id>").
 func referenciaSena(id int64) string { return "sena-" + strconv.FormatInt(id, 10) }
 
-// crearPreferencia arma el pago en Mercado Pago (Checkout Pro) → (id, init_point).
+// crearPreferencia arma el pago de una seña → (id, init_point).
 func (s *Servidor) crearPreferencia(ctx context.Context, sena almacen.Sena) (string, string, error) {
 	web := strings.TrimRight(s.op.WebURL, "/")
+	return s.preferenciaMP(ctx, pedidoMP{
+		Item: "sena-unidad", Titulo: "Seña · Unidad Sintética (preventa)", Monto: sena.Monto,
+		Referencia: referenciaSena(sena.ID), Volver: web + "/?sena=%s#reservar", Email: sena.Email, Nombre: sena.Nombre,
+	})
+}
+
+// pedidoMP: un cobro de Checkout Pro, en pesos. Volver lleva un %s que se
+// reemplaza por ok, pendiente o error.
+type pedidoMP struct {
+	Item, Titulo       string
+	Monto              float64
+	Referencia, Volver string
+	Email, Nombre      string
+}
+
+// preferenciaMP arma el pago en Mercado Pago (Checkout Pro) → (id, init_point).
+// El aviso llega a /v1/preventa/mp, que mira el prefijo de la referencia.
+func (s *Servidor) preferenciaMP(ctx context.Context, p pedidoMP) (string, string, error) {
+	volver := func(e string) string { return fmt.Sprintf(p.Volver, e) }
 	cuerpo := map[string]any{
 		"items": []map[string]any{{
-			"id": "sena-unidad", "title": "Seña · Unidad Sintética (preventa)", "quantity": 1,
-			"unit_price": sena.Monto, "currency_id": "ARS",
+			"id": p.Item, "title": p.Titulo, "quantity": 1, "unit_price": p.Monto, "currency_id": "ARS",
 		}},
-		"external_reference":   referenciaSena(sena.ID),
+		"external_reference":   p.Referencia,
 		"statement_descriptor": "SINTETICA",
-		"back_urls": map[string]string{
-			"success": web + "/?sena=ok#reservar", "pending": web + "/?sena=pendiente#reservar", "failure": web + "/?sena=error#reservar",
-		},
-		"expires": true, "expiration_date_to": time.Now().Add(24 * time.Hour).Format("2006-01-02T15:04:05.000-07:00"),
+		"back_urls":            map[string]string{"success": volver("ok"), "pending": volver("pendiente"), "failure": volver("error")},
+		"expires":              true, "expiration_date_to": time.Now().Add(24 * time.Hour).Format("2006-01-02T15:04:05.000-07:00"),
 	}
-	if strings.HasPrefix(web, "https://") {
+	if strings.HasPrefix(p.Volver, "https://") {
 		cuerpo["auto_return"] = "approved" // MP no lo acepta con back_urls http
 	}
 	if u := strings.TrimRight(s.op.URLPublica, "/"); strings.HasPrefix(u, "https://") {
 		cuerpo["notification_url"] = u + "/v1/preventa/mp?source_news=webhooks"
 	}
-	if sena.Email != "" {
-		cuerpo["payer"] = map[string]any{"email": sena.Email, "name": sena.Nombre}
+	if p.Email != "" {
+		cuerpo["payer"] = map[string]any{"email": p.Email, "name": p.Nombre}
 	}
 	b, _ := json.Marshal(cuerpo)
 	ctx, cancelar := context.WithTimeout(ctx, 10*time.Second)
@@ -207,7 +223,7 @@ func (s *Servidor) crearPreferencia(ctx context.Context, sena almacen.Sena) (str
 	}
 	req.Header.Set("Authorization", "Bearer "+s.op.MPToken)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Idempotency-Key", referenciaSena(sena.ID))
+	req.Header.Set("X-Idempotency-Key", p.Referencia)
 	res, err := clienteMP.Do(req)
 	if err != nil {
 		return "", "", errors.New("Mercado Pago no contestó")
@@ -217,17 +233,17 @@ func (s *Servidor) crearPreferencia(ctx context.Context, sena almacen.Sena) (str
 		detalle, _ := io.ReadAll(io.LimitReader(res.Body, 512))
 		return "", "", fmt.Errorf("Mercado Pago contestó %d: %s", res.StatusCode, detalle)
 	}
-	var p struct {
+	var r struct {
 		ID        string `json:"id"`
 		InitPoint string `json:"init_point"`
 	}
-	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&p); err != nil {
+	if err := json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(&r); err != nil {
 		return "", "", err
 	}
-	if p.ID == "" || !strings.HasPrefix(p.InitPoint, "https://") {
+	if r.ID == "" || !strings.HasPrefix(r.InitPoint, "https://") {
 		return "", "", errors.New("Mercado Pago no devolvió el link")
 	}
-	return p.ID, p.InitPoint, nil
+	return r.ID, r.InitPoint, nil
 }
 
 // POST /v1/preventa/mp: el aviso de Mercado Pago. No se le cree al cuerpo: con
@@ -267,6 +283,10 @@ func (s *Servidor) avisoMP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.log.Warn("preventa: no pude leer el pago", "pago", id, "error", err)
 		fallar(w, http.StatusBadGateway, "no pude leer el pago") // Mercado Pago reintenta
+		return
+	}
+	if strings.HasPrefix(pago.Referencia, "lic-") {
+		s.avisoLicencia(w, r, pago, id)
 		return
 	}
 	senaID, err := strconv.ParseInt(strings.TrimPrefix(pago.Referencia, "sena-"), 10, 64)

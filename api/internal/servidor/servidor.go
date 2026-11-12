@@ -153,6 +153,8 @@ func (s *Servidor) Rutas() http.Handler {
 	m.HandleFunc("GET /v1/preventa", s.verPreventaPublica) // la preventa del cubito (preventa.go)
 	m.HandleFunc("POST /v1/preventa/senas", s.senar)
 	m.HandleFunc("POST /v1/preventa/mp", s.avisoMP)
+	m.HandleFunc("GET /v1/escritorio", s.conSesion(s.verEscritorio)) // la licencia del escritorio (escritorio.go)
+	m.HandleFunc("POST /v1/escritorio/comprar", s.conSesion(s.comprarEscritorio))
 	s.rutasControl(m) // el centro de control del dueño, /v1/admin/... (control.go)
 
 	m.HandleFunc("GET /v1/firmwares", s.conSesion(s.listarFirmwares))
