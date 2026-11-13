@@ -403,9 +403,12 @@ def generar_charla() -> str:
         no_empieza = [plegar(w) for w in it.get("no_empieza", [])]
         if any(not re.fullmatch(r"[a-z0-9]+", w) for w in no_empieza):
             mal(nombre, "no_empieza: palabras sueltas, sin tildes")
+        no_con = [plegar(w) for w in it.get("no_con", [])]
+        if any(not re.fullmatch(r"[a-z0-9]+", w) for w in no_con):
+            mal(nombre, "no_con: palabras sueltas, sin tildes")
         filas.append(f'    {{"{nombre}", {ACCIONES_CHARLA.index(accion)}, {int(dato)}, {necesita}, '
                      f'{REQUIERE_CHARLA[requiere]}, {marcas}, {c_texto(expresion)}, {c_texto(comp)}, {c_texto(texto)}, '
-                     f'{c_texto("|".join(no_empieza))}, {pp}, {np_}, '
+                     f'{c_texto("|".join(no_empieza))}, {c_texto("|".join(no_con))}, {pp}, {np_}, '
                      f'{{{{{r[0]}, {r[1]}}}, {{{f[0]}, {f[1]}}}, {{{s[0]}, {s[1]}}}, {{{co[0]}, {co[1]}}}}}}},')
     relleno = sorted({plegar(w) for w in datos["relleno"]})
     abrev = [(plegar(k), plegar(v)) for k, v in datos["abreviaturas"].items()]
@@ -429,6 +432,7 @@ def generar_charla() -> str:
         "  const char* comportamiento;",
         "  const char* texto;     // el texto por defecto (temporizador)",
         "  const char* noEmpieza; // tu|que|cuando: si el texto libre empieza así, no es esta",
+        "  const char* noCon;     // lista|super: si la frase tiene una de estas palabras, no es esta",
         "  uint16_t patron, nPatrones;  // en PATRONES_CHARLA (~ adelante: dudoso, pregunta antes)",
         "  uint16_t grupo[4][2];  // respuestas, falta, sin y confirmar: primera y cantidad en RESPUESTAS_CHARLA",
         "};",

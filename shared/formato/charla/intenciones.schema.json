@@ -70,6 +70,7 @@
           "falta": {"$ref": "#/$defs/falta"},
           "sin": {"$ref": "#/$defs/respuestas"},
           "confirmar": {"$ref": "#/$defs/respuestas", "description": "La pregunta antes de hacer algo que cambia datos cuando no está seguro («¿Te llamás {texto}?»); con «sí», lo hace. Obligatoria en las que cambian algo."},
+          "no_con": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9]+$"}, "description": "Si la frase tiene una de estas palabras, no es esta intención («anotá yerba en la lista» no es un recordatorio: es de las listas, en la nube)."},
           "no_empieza": {"type": "array", "items": {"type": "string", "pattern": "^[a-z0-9]+$"}, "description": "Si el texto libre empieza con una de estas palabras, no es esta intención («me gusta tu voz» no es un gusto)."}
         }
       }

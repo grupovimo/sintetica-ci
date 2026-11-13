@@ -215,6 +215,7 @@
       "patrones": ["recordame|recorda|recordarme|acordame|acorda|acordate|recordate|recuerdame|recuerda", "avisame|avisarme", "no me dejes olvidar", "haceme acordar", "anota*|agenda* recordatorio?", "pone* recordatorio", "recordatorio"],
       "accion": "recordatorio",
       "necesita": ["texto", "hora"],
+      "no_con": ["lista", "listas", "super", "supermercado", "pendientes"],
       "mayuscula": true,
       "sigue": true,
       "expresion": "pensando",
@@ -697,6 +698,12 @@
       "respuestas": {"todos": ["Da {resultado}.", "¡{resultado}!", "Es {resultado}. Fácil."]},
       "sin": {"todos": ["Esa cuenta no me sale."]},
       "ia": true
+    },
+    "lista": {
+      "patrones": ["lista|listas", "super|supermercado|verduleria|farmacia", "pendientes", "ya? compre|tengo", "falta comprar", "anota*|agrega*|suma*|saca*|borra*|tacha* lista|super|pendientes|compra|farmacia"],
+      "expresion": "pensando",
+      "ia": true,
+      "respuestas": {"todos": ["Las listas las tengo en la nube. Probá en un rato.", "Sin internet no llego a tus listas."]}
     },
     "pregunta-dificil": {
       "patrones": ["por que", "que es", "quien es|fue", "como se hace", "explicame", "que significa", "cual es la capital", "cuantos|cuantas", "sentido de la vida", "que opinas de"],
