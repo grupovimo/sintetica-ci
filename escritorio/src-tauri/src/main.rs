@@ -328,6 +328,7 @@ fn mirar_globos(app: AppHandle) {
                 visto = g.numero;
                 let _ = app.emit("dijo", json!({ "texto": g.texto, "aviso": g.aviso.is_some() }));
                 if let Some(a) = g.aviso {
+                    app.state::<sentidos::Movida>().llamar.store(true, std::sync::atomic::Ordering::Relaxed);
                     let titulo = if a == Aviso::Despertador { "Despertador" } else { "Recordatorio" };
                     let _ = app.notification().builder().title(titulo).body(&g.texto).show();
                 }
